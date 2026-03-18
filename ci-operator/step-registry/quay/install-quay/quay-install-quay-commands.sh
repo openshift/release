@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Waiting for NooBaa CRD to be available..." >&2
+for i in $(seq 1 60); do
+    if oc get crd noobaas.noobaa.io &>/dev/null; then
+        echo "NooBaa CRD available" >&2
+        break
+    fi
+    if (( i == 60 )); then
+        echo "Timed out waiting for NooBaa CRD" >&2
+        exit 1
+    fi
+    sleep 5
+done
+
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
@@ -24,7 +37,7 @@ EOF
 echo "Waiting for NooBaa storage..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=120s
 
-echo "Creating Quay registry..." >&2
+echo "Creating Quay namespace and config bundle..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
@@ -33,24 +46,56 @@ metadata:
 EOF
 
 cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: config-bundle-secret
+  namespace: quay
+stringData:
+  config.yaml: |
+    FEATURE_USER_INITIALIZE: true
+    SUPER_USERS:
+    - admin
+EOF
+
+echo "Creating Quay registry with config bundle..." >&2
+cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
   name: quay
   namespace: quay
 spec:
+  configBundleSecret: config-bundle-secret
   components:
   - kind: clair
     managed: true
 EOF
 
-for _ in {1..60}; do
-    if [[ "$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        echo "Quay is ready" >&2
+echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
+for i in $(seq 1 90); do
+    status="$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+    if [[ "$status" == "True" ]]; then
+        echo "Quay is ready (after $((i * 10))s)" >&2
         exit 0
+    fi
+    if (( i % 6 == 0 )); then
+        echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
+        oc -n quay get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
     fi
     sleep 10
 done
+
 echo "Timed out waiting for Quay to become ready" >&2
+echo "Final QuayRegistry conditions:" >&2
+oc -n quay get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+echo "Pods in quay namespace:" >&2
+oc -n quay get pods -o wide >&2 || true
+echo "Events in quay namespace:" >&2
+oc -n quay get events --sort-by='.lastTimestamp' >&2 || true
+
 oc -n quay get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
+oc -n quay get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
+oc -n quay get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
 exit 1

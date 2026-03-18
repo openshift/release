@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,7 +14,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -106,7 +106,7 @@ tests:
           memory: 100Mi
       timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: unit
+- as: unit-and-gencheck
   steps:
     cluster_profile: ossm-aws
     env:
@@ -129,6 +129,29 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
+    - as: gencheck
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          export GOBIN='/gobin' && \
+          export GOCACHE='/tmp/cache' && \
+          export GOMODCACHE='/tmp/cache' && \
+          export XDG_CACHE_HOME='/tmp/cache' && \
+          export ARTIFACTS='${ARTIFACT_DIR}' && \
+          cd /work && \
+          entrypoint \
+          make gen-check"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
     - as: unit
       cli: latest
       commands: |
@@ -291,7 +314,7 @@ tests:
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
       SKIPPED_SUITES: external_ca|file_mounted_certs|policy_attachment_only
-      SKIPPED_TESTS: TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestNormalization|TestEgressGatewayTls/Mutual_TLS_origination_from_egress_gateway_to_https_endpoint|TestEgressGatewayTls/SIMPLE_TLS_origination_from_egress_gateway_to_https_endpoint|TestAuthz_MultipleCustomProviders_NonOverlapping|TestAuthz_MultipleCustomProviders_Overlapping
+      SKIPPED_TESTS: TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestNormalization|TestAuthz_MultipleCustomProviders_NonOverlapping|TestAuthz_MultipleCustomProviders_Overlapping
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: security
       TEST_SUITE_DESC: Istio Integration security
@@ -312,7 +335,7 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestWaypointAsEgressGatewayForWildcardEntries|TestZtunnelCRL
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestZtunnelSecureMetrics|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestZtunnelCRL
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: ambient
       TEST_SUITE_DESC: Istio Integration ambient

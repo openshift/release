@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build10
+    cluster: build07
     context: ci/prow/ci
     decorate: true
     decoration_config:
@@ -26,9 +26,17 @@ presubmits:
         - --target=ci
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -87,9 +95,17 @@ presubmits:
         - --target=e2e-aws-ci-tests
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -163,9 +179,17 @@ presubmits:
         - --target=e2e-aws-ran-profile
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -214,7 +238,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build07
+    cluster: build11
     context: ci/prow/e2e-telco5g-cnftests
     decorate: true
     decoration_config:
@@ -237,9 +261,17 @@ presubmits:
         - --target=e2e-telco5g-cnftests
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -279,7 +311,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build07
+    cluster: build11
     context: ci/prow/e2e-telco5g-hcp-cnftests
     decorate: true
     decoration_config:
@@ -302,9 +334,17 @@ presubmits:
         - --target=e2e-telco5g-hcp-cnftests
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -340,11 +380,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-telco5g-hcp-cnftests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build10
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -355,6 +395,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.16-images
     rerun_command: /test images
+    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
     spec:
       containers:
       - args:
@@ -400,7 +441,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build10
+    cluster: build07
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -423,9 +464,17 @@ presubmits:
         - --target=security
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -465,7 +514,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build10
+    cluster: build07
     context: ci/prow/ztp-ci
     decorate: true
     decoration_config:
@@ -486,9 +535,17 @@ presubmits:
         - --target=ztp-ci
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services check-validate-main-promotion dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -22,7 +22,7 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation
+check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation check-validate-main-promotion
 	@echo "Service config check: PASS"
 
 check-boskos:
@@ -40,6 +40,10 @@ check-cluster-profiles: python-help
 check-yaml-indentation: python-help
 	hack/validate-yaml-indentation.sh .
 	@echo "YAML indentation check: PASS"
+
+check-validate-main-promotion: python-help
+	python3 hack/validate-main-promotion-guard.py
+	@echo "Main promotion validation: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -89,7 +93,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260206-85e3dda3b --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260310-6097a43c8 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen

@@ -15,7 +15,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-operator
@@ -34,9 +34,17 @@ presubmits:
         - --target=e2e-agnostic-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -98,7 +106,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-operator-devpreview
@@ -117,9 +125,17 @@ presubmits:
         - --target=e2e-agnostic-operator-devpreview
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -181,7 +197,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-operator-techpreview
@@ -199,9 +215,17 @@ presubmits:
         - --target=e2e-agnostic-operator-techpreview
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -263,7 +287,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn
@@ -282,9 +306,17 @@ presubmits:
         - --target=e2e-agnostic-ovn
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -337,7 +369,7 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build10
-    context: ci/prow/e2e-agnostic-ovn-techpreview-serial
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-1of3
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -346,12 +378,12 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-techpreview-serial
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-techpreview-serial-1of3
     path_alias: github.com/openshift/cluster-version-operator
-    rerun_command: /test e2e-agnostic-ovn-techpreview-serial
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-1of3
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -359,15 +391,24 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 1"
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-agnostic-ovn-techpreview-serial
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -413,7 +454,191 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-1of3,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build10
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-2of3
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-techpreview-serial-2of3
+    path_alias: github.com/openshift/cluster-version-operator
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-2of3
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 2"
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agnostic-ovn-techpreview-serial
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-2of3,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build10
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-3of3
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-techpreview-serial-3of3
+    path_alias: github.com/openshift/cluster-version-operator
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-3of3
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 3"
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agnostic-ovn-techpreview-serial
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-3of3,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -429,7 +654,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-upgrade-into-change
@@ -448,9 +673,17 @@ presubmits:
         - --target=e2e-agnostic-ovn-upgrade-into-change
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -512,7 +745,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-upgrade-into-change-techpreview
@@ -530,9 +763,17 @@ presubmits:
         - --target=e2e-agnostic-ovn-upgrade-into-change-techpreview
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -594,7 +835,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-upgrade-out-of-change
@@ -613,9 +854,17 @@ presubmits:
         - --target=e2e-agnostic-ovn-upgrade-out-of-change
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -677,7 +926,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-agnostic-ovn-upgrade-out-of-change-techpreview
@@ -695,9 +944,17 @@ presubmits:
         - --target=e2e-agnostic-ovn-upgrade-out-of-change-techpreview
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -749,7 +1006,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
@@ -759,7 +1016,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-e2e-aws-ovn-techpreview
@@ -778,9 +1035,17 @@ presubmits:
         - --target=e2e-aws-ovn-techpreview
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -861,9 +1126,17 @@ presubmits:
         - --target=e2e-extended-tests
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -944,9 +1217,17 @@ presubmits:
         - --target=e2e-hypershift
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1027,9 +1308,17 @@ presubmits:
         - --target=e2e-hypershift-conformance
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1106,9 +1395,17 @@ presubmits:
         - --target=gofmt
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1232,9 +1529,17 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1271,6 +1576,97 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
+    cluster: build07
+    context: ci/prow/tls-scanner
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.22-tls-scanner
+    optional: true
+    path_alias: github.com/openshift/cluster-version-operator
+    rerun_command: /test tls-scanner
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=tls-scanner
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )tls-scanner,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
     cluster: build10
     context: ci/prow/unit
     decorate: true
@@ -1296,9 +1692,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1360,9 +1764,17 @@ presubmits:
         - --target=verify-deps
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1430,9 +1842,17 @@ presubmits:
         - --target=verify-update
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -1494,9 +1914,17 @@ presubmits:
         - --target=verify-yaml
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

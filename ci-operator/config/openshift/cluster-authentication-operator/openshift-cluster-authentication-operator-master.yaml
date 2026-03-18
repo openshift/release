@@ -51,7 +51,7 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ipv6
@@ -80,7 +80,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-console-login
   steps:
@@ -108,6 +108,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-disruptive
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/cluster-authentication-operator/operator/disruptive
+    test:
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - as: e2e-gcp-operator-encryption-rotation
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
@@ -192,7 +202,7 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - as: test-operator-integration
   commands: |
@@ -203,7 +213,7 @@ tests:
   as: e2e-aws-external-oidc-conformance-parallel
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: ExternalOIDC\|\[Feature:OAuthServer\]\|\[Feature:RoleBindingRestrictions\]\|oauth-apiserver\|\[apigroup:oauth.openshift.io\]\|\[apigroup:user.openshift.io\]\|OAuth
         access token\|\[sig-auth\]\[Feature:OpenShiftAuthorization\] authorization
@@ -222,7 +232,7 @@ tests:
   as: e2e-aws-external-oidc-conformance-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --disable-monitor=legacy-test-framework-invariants
       TEST_SKIPS: ExternalOIDC\|\[Feature:OAuthServer\]\|\[Feature:RoleBindingRestrictions\]\|oauth-apiserver\|\[apigroup:oauth.openshift.io\]\|\[apigroup:user.openshift.io\]\|OAuth
@@ -239,30 +249,28 @@ tests:
   as: e2e-aws-operator-parallel-ote
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator/parallel
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-  timeout: 1h0m0s
 - always_run: true
   as: e2e-aws-operator-serial-ote
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator/serial
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-  timeout: 1h0m0s
 - always_run: true
   as: e2e-aws-operator-encryption-serial-ote
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption/serial
     test:
@@ -274,7 +282,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption-rotation/serial
     test:
@@ -286,7 +294,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption-perf/serial
     test:
@@ -298,7 +306,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption-kms/serial
     test:

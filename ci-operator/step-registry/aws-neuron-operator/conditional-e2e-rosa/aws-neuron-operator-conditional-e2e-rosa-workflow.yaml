@@ -5,7 +5,7 @@ workflow:
       HOSTED_CP: "true"
       ENABLE_BYOVPC: "true"
       ZONES_COUNT: "1"
-      COMPUTE_MACHINE_TYPE: "inf2.xlarge"
+      COMPUTE_MACHINE_TYPE: "inf2.8xlarge"
       REPLICAS: "2"
       OCM_LOGIN_ENV: "production"
     pre:
@@ -24,12 +24,15 @@ workflow:
     # Additional configuration
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
+    # Install operators before tests so eco-gotests detects them as pre-existing
+    - ref: aws-neuron-operator-install-operators
     test:
     - ref: aws-neuron-operator-test
     post:
+    - ref: aws-neuron-operator-gather
     - chain: rosa-aws-sts-hcp-deprovision
   documentation: |-
-    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.xlarge)
+    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
     compute nodes, then runs the AWS Neuron operator E2E tests conditionally
     based on kernel changes.
 

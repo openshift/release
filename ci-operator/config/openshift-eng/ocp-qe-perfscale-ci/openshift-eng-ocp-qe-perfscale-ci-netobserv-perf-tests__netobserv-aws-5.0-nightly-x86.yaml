@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   cli:
     name: "5.0"
     namespace: ocp
@@ -19,6 +23,15 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_literal: FROM cerberus.prow
+  from: cerberus.prow
+  to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -55,19 +68,26 @@ tests:
       LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-periodic.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy
+      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion.yaml
+      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "5.0"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
+    - ref: netobserv-cerberus-report
     - chain: netobserv-perf-test-post
     test:
+    - ref: redhat-chaos-observer-start
     - ref: netobserv-perf-test-deploy
     - ref: openshift-qe-kube-burner-ingress-perf
     - chain: netobserv-perf-test-post-workload
@@ -99,18 +119,25 @@ tests:
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-node-density-heavy-service.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deploymentModel=Service
+      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Service
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "5.0"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
+    - ref: netobserv-cerberus-report
     - chain: netobserv-perf-test-post
     test:
+    - ref: redhat-chaos-observer-start
     - ref: netobserv-perf-test-deploy
     - ref: openshift-qe-kube-burner-ingress-perf
     - chain: netobserv-perf-test-post-workload
@@ -142,18 +169,25 @@ tests:
       LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-periodic.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=250,WORKLOAD=cluster-density-v2
+      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion.yaml
+      ORION_ENVS: PLATFORM=AWS,WORKERS=250,WORKLOAD=cluster-density-v2,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "5.0"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: cluster-density-v2
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
+    - ref: netobserv-cerberus-report
     - chain: netobserv-perf-test-post
     test:
+    - ref: redhat-chaos-observer-start
     - ref: netobserv-perf-test-deploy
     - ref: openshift-qe-kube-burner-ingress-perf
     - chain: netobserv-perf-test-post-workload

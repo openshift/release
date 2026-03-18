@@ -36,11 +36,11 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -53,7 +53,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-gcp-operator-encryption-aescbc
@@ -144,6 +144,25 @@ tests:
       resources:
         requests:
           cpu: 100m
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

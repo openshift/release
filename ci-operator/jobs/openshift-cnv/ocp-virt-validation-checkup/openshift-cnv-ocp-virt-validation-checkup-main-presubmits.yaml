@@ -14,7 +14,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cnv-ocp-virt-validation-checkup-main-e2e-aws
     rerun_command: /test e2e-aws
@@ -29,9 +29,17 @@ presubmits:
         - --target=e2e-aws
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -80,14 +88,14 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cnv-ocp-virt-validation-checkup-main-images
     rerun_command: /test images
@@ -136,14 +144,14 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cnv-ocp-virt-validation-checkup-main-unit
     rerun_command: /test unit
@@ -156,9 +164,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

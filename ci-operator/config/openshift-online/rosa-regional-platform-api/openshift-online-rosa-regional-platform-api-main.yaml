@@ -1,8 +1,6 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+  project_image:
+    dockerfile_path: ci/Containerfile
 resources:
   '*':
     limits:
@@ -11,8 +9,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: test
-  commands: make test
+- as: lint
+  commands: ./ci/lint.sh
+  container:
+    from: src
+- as: unit
+  commands: ./ci/unit-tests.sh
+  container:
+    from: src
+- as: verify
+  commands: ./ci/verify.sh
   container:
     from: src
 zz_generated_metadata:

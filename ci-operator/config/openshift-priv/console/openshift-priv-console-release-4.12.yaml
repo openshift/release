@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.6
   ocp_builder_rhel-8-base-nodejs-openshift-4.12:
     name: builder
     namespace: ocp
@@ -16,10 +12,9 @@ build_root:
 canonical_go_repository: github.com/openshift/console
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: console
 - dockerfile_path: Dockerfile.plugins.demo
-  from: rhel-8-base-nodejs-openshift-4.12
+  from: ocp_builder_rhel-8-base-nodejs-openshift-4.12
   to: console-plugin-demo
 promotion:
   to:
@@ -99,7 +94,7 @@ tests:
 - as: ceph-storage-plugin
   run_if_changed: frontend/packages/ceph-storage-plugin
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m4.2xlarge
       ZONES_COUNT: "1"
@@ -108,8 +103,7 @@ tests:
       cli: latest
       commands: ./test-prow-e2e.sh ceph
       credentials:
-      - collection: ""
-        mount_path: /var/run/operator-secret
+      - mount_path: /var/run/operator-secret
         name: operator-secret
         namespace: test-credentials
       from: pipeline:src

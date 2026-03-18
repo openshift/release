@@ -73,6 +73,24 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   pushd lightspeed-operator
   run_or_fail make deploy
   run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-operator-controller-manager
+  run_or_fail oc patch deployment lightspeed-operator-controller-manager \
+  -n openshift-lightspeed \
+  --type='json' \
+  -p='[
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/0/securityContext",
+      "value": {
+        "allowPrivilegeEscalation": false,
+        "seccompProfile": {
+          "type": "RuntimeDefault"
+        },
+        "capabilities": {
+          "drop": ["ALL"]
+        }
+      }
+    }
+  ]'
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=600s
   popd
 
@@ -106,7 +124,7 @@ EOF
 
   # Wait for the app server deployment
   sleep 60
-  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
+  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=900s
   LOG_START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"

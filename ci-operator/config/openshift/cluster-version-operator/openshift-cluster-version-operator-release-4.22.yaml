@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v2.3.1
+    tag: v2.10.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -67,12 +67,12 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     test:
     - as: e2e-test
       commands: make integration-test
@@ -94,9 +94,10 @@ tests:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: e2e-agnostic-ovn-techpreview-serial
+  shard_count: 3
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -104,12 +105,12 @@ tests:
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-agnostic-ovn-upgrade-out-of-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -127,14 +128,14 @@ tests:
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-agnostic-operator-techpreview
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -149,14 +150,14 @@ tests:
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-into-change-techpreview
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -167,7 +168,7 @@ tests:
   as: e2e-agnostic-operator-devpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     test:
@@ -196,6 +197,17 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: openshift-cluster-version
+    test:
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

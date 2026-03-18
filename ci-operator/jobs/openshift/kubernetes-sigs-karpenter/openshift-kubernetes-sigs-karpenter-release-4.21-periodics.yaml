@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build06
   cron: 0 5 * * 1
   decorate: true
   extra_refs:
@@ -9,7 +9,7 @@ periodics:
     repo: kubernetes-sigs-karpenter
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kubernetes-sigs-karpenter-release-4.21-e2e-kwok
@@ -24,9 +24,17 @@ periodics:
       - --target=e2e-kwok
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

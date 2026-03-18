@@ -5,14 +5,14 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-service-catalog-release-4.9-e2e-aws-operator
@@ -29,9 +29,17 @@ presubmits:
         - --target=e2e-aws-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -80,7 +88,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build10
+    cluster: build09
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -137,7 +145,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build10
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -157,9 +165,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

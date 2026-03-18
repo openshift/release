@@ -21,11 +21,11 @@ images:
     stream-coreos-base:
       as:
       - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
-  to: stream-coreos
+  to: os-image
 - build_args:
   - name: OPENSHIFT_CI
     value: "1"
-  dockerfile_path: extensions/Dockerfile
+  dockerfile_path: extensions/Containerfile
   inputs:
     ocp_builder_stream:
       as:
@@ -33,14 +33,39 @@ images:
     stream-coreos:
       as:
       - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+  to: extensions-image
+- dockerfile_literal: |-
+    FROM os-image
+    LABEL io.openshift.os.streamclass=centos-10
+  inputs:
+    os-image:
+      as:
+      - os-image
+  to: stream-coreos
+- dockerfile_literal: |-
+    FROM extensions-image
+    LABEL io.openshift.os.streamclass=centos-10
+  inputs:
+    extensions-image:
+      as:
+      - extensions-image
   to: stream-coreos-extensions
 promotion:
   to:
-  - name: scos-4.22
+  - excluded_images:
+    - os-image
+    - extensions-image
+    name: scos-4.22
     namespace: origin
-  - name: scos-4.22-art
+  - excluded_images:
+    - os-image
+    - extensions-image
+    name: scos-4.22-art
     namespace: origin
-  - name: scos-5.0-art
+  - excluded_images:
+    - os-image
+    - extensions-image
+    name: scos-5.0-art
     namespace: origin
 releases:
   latest:
@@ -58,7 +83,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master

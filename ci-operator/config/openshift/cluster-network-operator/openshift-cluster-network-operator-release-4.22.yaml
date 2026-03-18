@@ -51,6 +51,7 @@ tests:
   container:
     from: src
 - as: e2e-gcp-ovn-upgrade
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: gcp
     env:
@@ -59,7 +60,7 @@ tests:
 - always_run: true
   as: e2e-aws-ovn-upgrade-ipsec
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
@@ -67,13 +68,14 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -86,20 +88,22 @@ tests:
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-aws-ovn-serial
   shard_count: 2
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -108,13 +112,14 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -126,6 +131,7 @@ tests:
 - as: e2e-metal-ipi-ovn-ipv6-ipsec
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -135,8 +141,9 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -176,7 +183,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
@@ -184,7 +191,7 @@ tests:
   as: e2e-azure-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn-dualstack
@@ -192,13 +199,14 @@ tests:
   as: e2e-azure-ovn-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn-upgrade
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -207,6 +215,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: gcp
     env:
@@ -220,12 +229,21 @@ tests:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-aws-ovn-rhcos10-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+    workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -252,29 +270,16 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-aws-ovn-clusternetwork-cidr-expansion
-  cron: 0 3 * * 0,2,4,6
-  steps:
-    cluster_profile: aws-3
-    env:
-      EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-cidr-expansion
-- as: e2e-aws-ovn-subnet-configs
-  cron: 0 3 * * 0,2,4,6
-  steps:
-    cluster_profile: aws-3
-    env:
-      EXTRA_MG_ARGS: --host-network
-    workflow: ovn-subnet-configs
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-hypershift-conformance
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
@@ -321,7 +326,7 @@ tests:
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -329,7 +334,7 @@ tests:
   as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -338,7 +343,7 @@ tests:
   as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
@@ -432,6 +437,7 @@ tests:
       PROJECT_NAME: cluster-network-operator
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: hypershift-aks
     env:
@@ -448,12 +454,14 @@ tests:
 - as: e2e-metal-ipi-ovn-dualstack-bgp
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
 - as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw

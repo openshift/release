@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build06
+  cluster: build03
   cron: 58 0 20 8 *
   decorate: true
   extra_refs:
@@ -9,13 +9,13 @@ periodics:
     repo: aws-efs-csi-driver-operator
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-aws-efs-csi-driver-operator-release-4.13-nightly-operator-e2e
   reporter_config:
     slack:
-      channel: '#forum-ocp-storage'
+      channel: '#team-ocp-storage-triage'
       job_states_to_report:
       - failure
       - error
@@ -32,9 +32,17 @@ periodics:
       - --target=nightly-operator-e2e
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

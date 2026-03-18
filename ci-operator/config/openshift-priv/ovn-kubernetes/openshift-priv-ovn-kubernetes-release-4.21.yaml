@@ -12,10 +12,7 @@ base_images:
     namespace: ci
     tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+  from_repository: true
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
@@ -49,8 +46,9 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
@@ -59,18 +57,21 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
 - as: e2e-aws-ovn-edge-zones
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -80,6 +81,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -88,6 +90,7 @@ tests:
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -96,6 +99,7 @@ tests:
 - as: e2e-metal-ipi-ovn-dualstack
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -104,22 +108,25 @@ tests:
 - always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-aws-ovn
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws-ovn-fdp-qe
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
@@ -130,6 +137,7 @@ tests:
 - always_run: false
   as: e2e-metal-ovn-fdp-qe-ipv6
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -145,8 +153,9 @@ tests:
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -156,6 +165,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -164,14 +174,16 @@ tests:
 - always_run: false
   as: e2e-azure-ovn
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
 - as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
@@ -179,30 +191,34 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-upgrade-ipsec
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - always_run: false
   as: e2e-aws-ovn-serial-ipsec
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - as: e2e-aws-ovn-upgrade-local-gateway
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-azure-ovn-upgrade
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -212,6 +228,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
@@ -220,6 +237,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-windows
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -230,6 +248,7 @@ tests:
 - always_run: false
   as: e2e-openstack-ovn
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -240,14 +259,16 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -257,6 +278,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -272,27 +294,28 @@ tests:
 - as: e2e-metal-ipi-ovn-dualstack-bgp
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
 - as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   capabilities:
   - intranet
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - as: e2e-aws-ovn-hypershift
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
     cd go-controller
-    PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
-    # these packages need running as a container for TestNewClientset
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
-    PKGS=$PKGS make test NOROOT=TRUE
+    unset KUBERNETES_SERVICE_HOST # Unit tests expect non-K8s-pod environment; unset to match upstream CI behavior
+    unset KUBERNETES_SERVICE_PORT
+    make test NOROOT=TRUE
   container:
     from: src
 - as: lint
@@ -308,8 +331,9 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn-serial
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -322,6 +346,7 @@ tests:
     workflow: openshift-ci-security
 - always_run: true
   as: qe-perfscale-payload-control-plane-6nodes
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -344,6 +369,7 @@ tests:
 - always_run: true
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -363,6 +389,7 @@ tests:
 - always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l2
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -382,8 +409,9 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -391,8 +419,9 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-techpreview
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -400,14 +429,16 @@ tests:
 - always_run: false
   as: e2e-azure-ovn-techpreview
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
 - always_run: true
   as: e2e-gcp-ovn-techpreview
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: gcp
     env:
@@ -417,6 +448,7 @@ tests:
 - always_run: false
   as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: gcp
     env:
@@ -428,6 +460,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -441,6 +474,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -454,6 +488,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -467,6 +502,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -480,6 +516,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-techpreview
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -491,6 +528,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -501,6 +539,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -510,6 +549,7 @@ tests:
 - always_run: false
   as: perfscale-aws-ovn-small-cluster-density-v2
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -528,6 +568,7 @@ tests:
 - always_run: false
   as: perfscale-aws-ovn-small-node-density-cni
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -544,6 +585,7 @@ tests:
 - always_run: false
   as: perfscale-aws-ovn-medium-cluster-density-v2
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -565,6 +607,7 @@ tests:
 - always_run: false
   as: perfscale-aws-ovn-medium-node-density-cni
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale

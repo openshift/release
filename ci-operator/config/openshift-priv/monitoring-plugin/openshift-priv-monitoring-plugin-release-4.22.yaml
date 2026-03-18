@@ -41,6 +41,18 @@ resources:
       cpu: 1000m
       memory: 8Gi
 tests:
+- as: go-tests
+  commands: |
+    # The default GOFLAGS adds -mod=vendor while the monitoring-plugin
+    # repository doesn't vendor the dependencies.
+    unset GOFLAGS
+    export GOCACHE=/tmp/go-build
+    export GOLANGCI_LINT_CACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    make test-backend lint-backend
+    git diff --exit-code
+  container:
+    from: src
 - as: lint
   commands: |
     make lint-frontend
@@ -53,13 +65,13 @@ tests:
     from: monitoring-plugin-test
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-hypershift-conformance
@@ -73,7 +85,7 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- always_run: true
+- always_run: false
   as: e2e-monitoring
   cluster_claim:
     architecture: amd64
@@ -221,7 +233,7 @@ tests:
   as: e2e-monitoring-dev
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
     workflow: ipi-aws

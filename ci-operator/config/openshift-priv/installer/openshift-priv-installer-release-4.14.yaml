@@ -35,6 +35,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  ocp_4.10_cli:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: cli
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -68,6 +72,11 @@ images:
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
   to: src-oc
 promotion:
   to:
@@ -179,7 +188,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       USER_TAGS: |
         keyA valueA
@@ -190,27 +199,27 @@ tests:
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-proxy
 - always_run: false
   as: e2e-aws-upi-proxy
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi-proxy
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sharednetwork
 - always_run: false
   as: e2e-aws-ovn-shared-vpc-localzones
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: local-zone
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
@@ -219,7 +228,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: local-zone
     workflow: openshift-e2e-aws-edge-zones
@@ -228,7 +237,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
@@ -267,31 +276,31 @@ tests:
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-shared-vpc
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-sharednetwork
 - always_run: false
   as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-resourcegroup
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-latestinstaller
 - as: e2e-aws-ovn-upi
   run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
@@ -315,13 +324,13 @@ tests:
 - as: e2e-azure-ovn-upi
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-upi
 - always_run: false
   as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
@@ -535,7 +544,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-metal-single-node-live-iso
@@ -549,7 +558,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -670,7 +679,7 @@ tests:
   optional: true
   run_if_changed: /aws/subnet.go
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-publicsubnets
 - always_run: false
   as: e2e-openstack-dualstack-techpreview

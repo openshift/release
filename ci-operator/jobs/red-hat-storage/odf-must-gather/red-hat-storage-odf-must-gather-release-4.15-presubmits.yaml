@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build11
+    cluster: build05
     context: ci/prow/check-must-gather-binary
     decorate: true
     labels:
@@ -22,9 +22,17 @@ presubmits:
         - --target=check-must-gather-binary
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -58,7 +66,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build11
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:

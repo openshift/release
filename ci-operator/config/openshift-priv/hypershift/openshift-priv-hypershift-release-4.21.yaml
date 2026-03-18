@@ -247,7 +247,7 @@ tests:
   as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -260,7 +260,7 @@ tests:
   as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -391,6 +391,23 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
+- always_run: true
+  as: e2e-aws-external-oidc
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: TestExternalOIDC
+      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
+    workflow: hypershift-aws-e2e-external-oidc
+- always_run: true
+  as: e2e-azure-aks-external-oidc
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - always_run: false
   as: verify-deps
   steps:
@@ -404,7 +421,7 @@ tests:
   - build-tmpfs
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-420
     workflow: hypershift-aws-reqserving-e2e

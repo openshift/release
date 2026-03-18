@@ -182,6 +182,7 @@ fi
 # even on success
 cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
 export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}
 EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
@@ -389,16 +390,10 @@ echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
-# Add APPLIANCE_IMAGE only for appliance e2e tests
-if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
+# Add APPLIANCE_IMAGE only for appliance and OVE e2e tests
+if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ] || [ "${AGENT_E2E_TEST_BOOT_MODE}" == "ISO_NO_REGISTRY" ];
 then
   echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
-fi
-
-# Add AGENT_ISO_BUILDER_IMAGE only for OVE ISOBuilder e2e tests
-if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "ISO_NO_REGISTRY" ];
-then
-  echo "export AGENT_ISO_BUILDER_IMAGE=${AGENT_ISO_BUILDER_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
 # If any extra manifests, then set ASSETS_EXTRA_FOLDER

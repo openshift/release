@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -39,94 +39,17 @@ periodics:
       - --variant=camel-k-ocp4.14-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build06
-  cron: 0 23 31 2 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: jboss-fuse
-    repo: camel-k-test-container
-  labels:
-    ci-operator.openshift.io/cloud: ibmcloud
-    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
-    ci-operator.openshift.io/variant: camel-k-ocp4.14-lp-interop
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-jboss-fuse-camel-k-test-container-main-camel-k-ocp4.14-lp-interop-camel-k-interop-ibmcloud
-  reporter_config:
-    slack:
-      channel: '#camel-k-notifications'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=camel-k-interop-ibmcloud
-      - --variant=camel-k-ocp4.14-lp-interop
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -171,6 +94,99 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: jboss-fuse
+    repo: camel-k-test-container
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: camel-k-ocp4.14-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-jboss-fuse-camel-k-test-container-main-camel-k-ocp4.14-lp-interop-camel-k-interop-ibmcloud
+  reporter_config:
+    slack:
+      channel: '#camel-k-notifications'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=camel-k-interop-ibmcloud
+      - --variant=camel-k-ocp4.14-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -210,9 +226,17 @@ periodics:
       - --variant=camel-k-ocp4.14-lp-rosa-classic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -256,7 +280,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -295,9 +319,17 @@ periodics:
       - --variant=camel-k-ocp4.15-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -341,7 +373,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build09
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -380,9 +412,17 @@ periodics:
       - --variant=camel-k-ocp4.15-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -426,7 +466,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -465,83 +505,17 @@ periodics:
       - --variant=camel-k-ocp4.16-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build06
-  cron: 0 23 31 2 *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: jboss-fuse
-    repo: camel-k-test-container
-  labels:
-    ci-operator.openshift.io/cloud: ibmcloud
-    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
-    ci-operator.openshift.io/variant: camel-k-ocp4.16-lp-interop
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-jboss-fuse-camel-k-test-container-main-camel-k-ocp4.16-lp-interop-camel-k-interop-ibmcloud
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=camel-k-interop-ibmcloud
-      - --variant=camel-k-ocp4.16-lp-interop
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -586,6 +560,88 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: jboss-fuse
+    repo: camel-k-test-container
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: camel-k-ocp4.16-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-jboss-fuse-camel-k-test-container-main-camel-k-ocp4.16-lp-interop-camel-k-interop-ibmcloud
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=camel-k-interop-ibmcloud
+      - --variant=camel-k-ocp4.16-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -625,9 +681,17 @@ periodics:
       - --variant=camel-k-ocp4.16-lp-rosa-classic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -671,7 +735,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -711,9 +775,17 @@ periodics:
       - --variant=camel-k-ocp4.17-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -757,7 +829,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -797,9 +869,17 @@ periodics:
       - --variant=camel-k-ocp4.17-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -843,7 +923,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -881,9 +961,17 @@ periodics:
       - --variant=camel-k-ocp4.17-lp-rosa-classic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -921,7 +1009,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -961,9 +1049,17 @@ periodics:
       - --variant=camel-k-ocp4.18-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -1007,7 +1103,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1047,9 +1143,17 @@ periodics:
       - --variant=camel-k-ocp4.18-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -1093,7 +1197,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1133,9 +1237,17 @@ periodics:
       - --variant=camel-k-ocp4.19-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -1179,7 +1291,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1219,9 +1331,17 @@ periodics:
       - --variant=camel-k-ocp4.19-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -1265,7 +1385,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1305,9 +1425,17 @@ periodics:
       - --variant=camel-k-ocp4.20-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -1351,7 +1479,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1391,9 +1519,17 @@ periodics:
       - --variant=camel-k-ocp4.20-lp-interop
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

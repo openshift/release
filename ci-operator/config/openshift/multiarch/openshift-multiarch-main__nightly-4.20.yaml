@@ -155,12 +155,12 @@ tests:
 - as: ocp-e2e-aws-ovn-upgrade-multi-x-ax
   interval: 72h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-aws-ovn-multi-x-ax
   cron: 08 11 * * 5
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
@@ -179,7 +179,7 @@ tests:
 - as: ocp-e2e-aws-ovn-multi-day-0-a-x
   interval: 24h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -198,7 +198,7 @@ tests:
 - as: ocp-e2e-serial-aws-ovn-multi-x-ax
   cron: 19 23 * * 2
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: EgressIPs can be assigned automatically\| OpenShift alerting rules\|
         pods should have the assigned EgressIPs\| only pods matched by the pod selector
@@ -210,7 +210,7 @@ tests:
 - as: ocp-e2e-upgrade-aws-ovn-arm64
   interval: 72h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -221,7 +221,7 @@ tests:
 - as: ocp-e2e-upgrade-aws-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
@@ -229,14 +229,14 @@ tests:
 - as: ocp-installer-e2e-aws-ovn-multi-a-a
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
     workflow: ipi-aws-ovn
 - as: ocp-image-ecosystem-aws-ovn-multi-a-a
   interval: 96h
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-image-ecosystem
@@ -244,14 +244,14 @@ tests:
   interval: 72h
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn-serial
 - as: ocp-e2e-aws-ovn-arm64
   interval: 72h
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -263,14 +263,14 @@ tests:
 - as: ocp-e2e-aws-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-ovn-multi-x-x-to-a-x
   interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MIGRATION_CP_MACHINE_TYPE: m6g.xlarge
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -292,7 +292,7 @@ tests:
 - as: ocp-e2e-aws-ovn-multi-a-a-to-x-a
   interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MIGRATION_ARCHITECTURE: x86_64
       MIGRATION_CP_MACHINE_TYPE: m6i.xlarge
@@ -316,7 +316,7 @@ tests:
 - as: ocp-e2e-aws-upi-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -327,7 +327,7 @@ tests:
 - as: ocp-e2e-aws-ovn-sno-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       OCP_ARCH: arm64
     observers:
@@ -337,7 +337,7 @@ tests:
 - as: ocp-e2e-aws-ovn-techpreview-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
@@ -350,7 +350,7 @@ tests:
   interval: 72h
   shard_count: 3
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
@@ -481,59 +481,63 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 1 * * 2,4
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
       ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: heavy-build
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 * * 0
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 1 * * 0
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 * * 6
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 1 * * 6
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
@@ -541,7 +545,8 @@ tests:
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi-fips
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-z-z
   capabilities:
   - sshd-bastion
@@ -601,34 +606,6 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
       VOLUME_CAPACITY: 120G
-    workflow: openshift-e2e-libvirt-upi
-- as: ocp-heavy-build-ovn-remote-s2s-libvirt-ppc64le
-  capabilities:
-  - power-s2s-dns
-  cron: 0 1 * * 1,3
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.20"
-      ETCD_DISK_SPEED: slow
-      TEST_TYPE: heavy-build
-      USE_RAMFS: "true"
-    workflow: openshift-e2e-libvirt-upi
-- as: ocp-heavy-build-ovn-remote-s2s-libvirt-multi-p-p
-  capabilities:
-  - power-s2s-dns
-  cron: 0 1 * * 2,4
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.20"
-      ETCD_DISK_SPEED: slow
-      TEST_TYPE: heavy-build
-      USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
@@ -720,12 +697,12 @@ tests:
 - as: ocp-e2e-aws-ovn-multi-x-x
   interval: 72h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-upgrade-aws-ovn-multi-x-x
   interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: ocp-e2e-gcp-ovn-multi-a-a
   cron: 0 11 * * 0

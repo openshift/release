@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.21:tools'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.23:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -377,8 +377,9 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-endpoint=http://ghproxy',
                                         '--github-graphql-endpoint=http://ghproxy/graphql',
                                         '--github-throttle=250',
-                                        '--jira-endpoint=https://issues.redhat.com',
-                                        '--jira-bearer-token-file=/etc/jira/api',
+                                        "--jira-endpoint=https://redhat.atlassian.net",
+                                        "--jira-username=brawilli@redhat.com",
+                                        "--jira-password-file=/etc/jira/password",
                                         '--verify-jira',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--supplemental-plugin-config-dir=/etc/plugins',
@@ -464,8 +465,9 @@ def _add_osd_rc_deployment(gendoc):
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
                                         '--enable-jira',
-                                        '--jira-endpoint=https://issues.redhat.com',
-                                        '--jira-bearer-token-file=/etc/jira/api',
+                                        "--jira-endpoint=https://redhat.atlassian.net",
+                                        "--jira-username=brawilli@redhat.com",
+                                        "--jira-password-file=/etc/jira/password",
                                         ],
                             'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
                             'imagePullPolicy': 'Always',

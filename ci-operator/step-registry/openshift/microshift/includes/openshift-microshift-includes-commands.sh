@@ -201,6 +201,8 @@ function ci_get_clonerefs() {
 }
 
 function ci_clone_src() {
+    local force_clone="${1:-false}"
+
     fails=0
     for _ in $(seq 3) ; do
         if ci_get_clonerefs; then
@@ -215,7 +217,31 @@ function ci_clone_src() {
         fi
     done
 
-    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+    if [ "${force_clone}" == "true" ]; then
+        # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
+        local branch
+        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
+        # MicroShift repo uses main instead of master
+        if [ "${branch}" == "master" ]; then
+            branch="main"
+        fi
+        CLONEREFS_OPTIONS=$(jq -n \
+            --arg branch "${branch}" \
+            '{
+                "src_root": "/go",
+                "log":"/dev/null",
+                "git_user_name": "ci-robot",
+                "git_user_email": "ci-robot@openshift.io",
+                "fail": true,
+                "refs": [{
+                    "org": "openshift",
+                    "repo": "microshift",
+                    "base_ref": $branch,
+                    "workdir": true
+                }]
+            }')
+        export CLONEREFS_OPTIONS
+    elif [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
         CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [(select(.refs) | .refs), try(.extra_refs[])]}')
         export CLONEREFS_OPTIONS

@@ -5,12 +5,12 @@ presubmits:
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-update-keys-release-5.0-e2e-aws
@@ -26,9 +26,17 @@ presubmits:
         - --target=e2e-aws
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -77,12 +85,12 @@ presubmits:
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-update-keys-release-5.0-e2e-aws-upgrade
@@ -98,9 +106,17 @@ presubmits:
         - --target=e2e-aws-upgrade
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -149,7 +165,7 @@ presubmits:
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:

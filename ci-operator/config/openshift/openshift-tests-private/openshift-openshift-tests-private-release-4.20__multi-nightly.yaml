@@ -746,7 +746,7 @@ tests:
 - as: aws-ipi-public-ipv4-pool-byo-subnet-amd-f28-destructive
   cron: 6 13 5 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
     leases:
@@ -758,7 +758,7 @@ tests:
 - as: aws-ipi-public-ipv4-pool-byo-subnet-mini-perm-arm-f14
   cron: 55 21 12,26 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
@@ -774,7 +774,7 @@ tests:
 - as: aws-ipi-public-ipv4-pool-mini-perm-amd-f28-destructive
   cron: 24 2 6 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
@@ -787,7 +787,7 @@ tests:
 - as: aws-ipi-public-ipv4-pool-mini-perm-arm-f14
   cron: 19 10 6,20 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
@@ -1784,18 +1784,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f7
+- as: baremetal-ipi-ovn-ipv4-vmedia-multi-arch-day2-amd-f14
   capabilities:
   - intranet
-  cron: 34 16 4,11,20,27 * *
+  cron: 25 13 12,26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
       masters: "3"
-      workers: "2"
+      workers: "1"
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
@@ -1869,23 +1873,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
-- as: baremetal-ipi-ovn-ipv4-disconnected-arm-f14
-  capabilities:
-  - intranet
-  cron: 21 19 4,20 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disconnected'
-      RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      architecture: arm64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-ipi-disconnected
 - as: baremetal-ipi-ovn-ipv4-vmedia-capi-tp-amd-f14
   capabilities:
   - intranet
@@ -2647,6 +2634,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-upi-ovn-ipv4-day2-scale-amd-f28
+  capabilities:
+  - intranet
+  cron: 20 20 11 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      SCALE_UPI: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "1"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

@@ -9,7 +9,7 @@ periodics:
     repo: cluster-storage-operator
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
     job-release: "4.21"
@@ -17,7 +17,7 @@ periodics:
   name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
   reporter_config:
     slack:
-      channel: '#forum-ocp-storage'
+      channel: '#team-ocp-storage-triage'
       job_states_to_report:
       - failure
       - error
@@ -35,90 +35,17 @@ periodics:
       - --variant=periodics
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build11
-  cron: 23 3 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: release-4.21
-    org: openshift
-    repo: cluster-storage-operator
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: periodics
-    ci.openshift.io/generator: prowgen
-    job-release: "4.21"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-azure-ovn-upgrade-check-dev-symlinks
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: |
-        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=periodic-e2e-azure-ovn-upgrade-check-dev-symlinks
-      - --variant=periodics
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -163,6 +90,95 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build07
+  cron: 23 3 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.21
+    org: openshift
+    repo: cluster-storage-operator
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-azure-ovn-upgrade-check-dev-symlinks
+  reporter_config:
+    slack:
+      channel: '#team-ocp-storage-triage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=periodic-e2e-azure-ovn-upgrade-check-dev-symlinks
+      - --variant=periodics
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 10 2 * * *
   decorate: true
   extra_refs:
@@ -180,7 +196,7 @@ periodics:
   name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-baremetal-ipi-ovn-upgrade-check-dev-symlinks
   reporter_config:
     slack:
-      channel: '#forum-ocp-storage'
+      channel: '#team-ocp-storage-triage'
       job_states_to_report:
       - failure
       - error
@@ -198,9 +214,17 @@ periodics:
       - --variant=periodics
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -261,7 +285,7 @@ periodics:
   name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
   reporter_config:
     slack:
-      channel: '#forum-ocp-storage'
+      channel: '#team-ocp-storage-triage'
       job_states_to_report:
       - failure
       - error
@@ -279,9 +303,17 @@ periodics:
       - --variant=periodics
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -326,7 +358,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 47 3 * * *
+  cron: 50 10 * * *
   decorate: true
   extra_refs:
   - base_ref: release-4.21
@@ -342,7 +374,7 @@ periodics:
   name: periodic-ci-openshift-cluster-storage-operator-release-4.21-periodics-periodic-e2e-vsphere-ovn-upgrade-check-dev-symlinks
   reporter_config:
     slack:
-      channel: '#forum-ocp-storage'
+      channel: '#team-ocp-storage-triage'
       job_states_to_report:
       - failure
       - error
@@ -360,9 +392,17 @@ periodics:
       - --variant=periodics
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
