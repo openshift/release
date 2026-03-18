@@ -3,6 +3,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
+  go_builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.23
   loki:
     name: loki
     namespace: logging
@@ -19,12 +23,16 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.23
+    tag: rhel-9-golang-1.24-openshift-4.23
   use_build_cache: true
 images:
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
+  inputs:
+    go_builder:
+      as:
+      - golang:1.24.4
   to: loki-operator
 - dockerfile_literal: |
     FROM registry.redhat.io/ubi9/go-toolset:latest
@@ -52,15 +60,7 @@ promotion:
   to:
   - additional_images:
       loki-operator-bundle: loki-operator-bundle
-    name: 5.y
-    namespace: logging
-  - additional_images:
-      loki-operator-bundle: loki-operator-bundle
-    name: 6.y
-    namespace: logging
-  - additional_images:
-      loki-operator-bundle: loki-operator-bundle
-    name: "6.6"
+    name: "6.5"
     namespace: logging
 releases:
   latest:
@@ -133,7 +133,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.21"
+    version: "4.20"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle
@@ -153,6 +153,6 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-generic-claim
 zz_generated_metadata:
-  branch: main
+  branch: release-6.5
   org: openshift
   repo: loki
