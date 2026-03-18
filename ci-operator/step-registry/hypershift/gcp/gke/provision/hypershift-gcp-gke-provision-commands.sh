@@ -24,6 +24,14 @@ INFRA_ID="${RESOURCE_NAME_PREFIX}"
 CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
 HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
 
+# Write deprovision-critical values to SHARED_DIR before creating any resources,
+# so the deprovision step can clean up if the step fails or the job is interrupted.
+# Deprovision handles non-existent projects gracefully (|| true).
+echo "${GCP_REGION}" > "${SHARED_DIR}/gcp-region"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/control-plane-cluster-name"
+echo "${CP_PROJECT_ID}" > "${SHARED_DIR}/control-plane-project-id"
+echo "${HC_PROJECT_ID}" > "${SHARED_DIR}/hosted-cluster-project-id"
+
 # ============================================================================
 # Step 1: Create Dynamic Projects (under CI folder)
 # NOTE: These commands run without tracing to protect CI_FOLDER_ID and BILLING_ACCOUNT_ID
@@ -191,11 +199,7 @@ echo "Kubeconfig created successfully"
 # Re-enable tracing
 set -x
 
-# Save cluster info for deprovision step and downstream steps
-echo "${CLUSTER_NAME}" > "${SHARED_DIR}/control-plane-cluster-name"
-echo "${CP_PROJECT_ID}" > "${SHARED_DIR}/control-plane-project-id"
-echo "${HC_PROJECT_ID}" > "${SHARED_DIR}/hosted-cluster-project-id"
-echo "${GCP_REGION}" > "${SHARED_DIR}/gcp-region"
+# Save remaining cluster info for downstream steps
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra-id"
 echo "${VPC_NAME}" > "${SHARED_DIR}/vpc-name"
 echo "${PSC_SUBNET_NAME}" > "${SHARED_DIR}/psc-subnet"
