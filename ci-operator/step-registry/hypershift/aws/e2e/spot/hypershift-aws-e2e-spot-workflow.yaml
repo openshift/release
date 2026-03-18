@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-aws-e2e-spot
+  documentation: |-
+    The HyperShift AWS spot instance e2e workflow creates an SQS queue and
+    EventBridge rules, then executes spot instance tests against a new
+    ephemeral HyperShift cluster.
+
+    This workflow extends hypershift-aws-e2e-external with SQS infrastructure
+    setup/cleanup for the AWS Node Termination Handler spot instance test.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-aws-spot-sqs-setup
+    test:
+    - ref: hypershift-aws-run-e2e-external
+    - ref: hypershift-aws-spot-verify
+    post:
+    - ref: hypershift-aws-spot-sqs-cleanup
+    - chain: hypershift-destroy-nested-management-cluster
