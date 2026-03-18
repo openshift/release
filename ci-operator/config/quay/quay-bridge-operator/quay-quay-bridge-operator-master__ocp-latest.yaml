@@ -49,38 +49,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e
-  steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OO_INDEX: ci-index-quay
-    env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: quay-bridge-operator
-      OO_TARGET_NAMESPACES: '!all'
-    post:
-    - ref: quay-gather
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - ref: quay-install-odf-operator
-    - ref: quay-install-quay-operator
-    - ref: quay-install-quay
-    - ref: quay-create-admin
-    - ref: optional-operators-subscribe
-    - ref: quay-enable-quay-bridge-operator
-    test:
-    - as: tests
-      commands: |
-        make test-e2e
-      from: src-oc
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
 - as: nightly-quay-3-10-unstable-e2e
   cron: 42 10 */1 * 1-5
   steps:
