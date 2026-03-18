@@ -38,7 +38,7 @@ chmod +x /tmp/iso.sh
 #
 GUSR=vanhalenar
 GBRN=el10-scenarios
-# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
 # ci_clone_src
 
