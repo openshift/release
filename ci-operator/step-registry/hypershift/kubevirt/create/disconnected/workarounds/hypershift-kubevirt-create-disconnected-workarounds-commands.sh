@@ -100,6 +100,49 @@ if [[ -z ${MCE} ]] ; then
   echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
 fi
 
+### workaround for https://issues.redhat.com/browse/CNTRLPLANE-1200
+### Mirror specific release containing cluster-api images for disconnected environments
+echo "workaround for https://issues.redhat.com/browse/CNTRLPLANE-1200"
+
+# Get the cluster version
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f 1,2)
+
+# Workaround for https://issues.redhat.com/browse/OCPBUGS-74263
+# Use oc adm release mirror which preserves digests in the target registry
+# Same as the one defined in support/backwardcompat/backwardcompat.go in openshift/hypershift
+if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth  \
+    --from quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962 \
+    --to ${mirror_registry}/localimages/local-release-image
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth  \
+    --from quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58 \
+    --to ${mirror_registry}/localimages/local-release-image
+fi
+
+# Create ImageContentSourcePolicy to redirect ocp-v4.0-art-dev pulls to local mirror
+oc apply -f - <<EOF2
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${mirror_registry}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+EOF2
+
+# Wait for machine-config-operator to process the ICSP
+sleep 1200
+###
+
 EOF
 scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
 ### workaround for https://issues.redhat.com/browse/CNV-38194
