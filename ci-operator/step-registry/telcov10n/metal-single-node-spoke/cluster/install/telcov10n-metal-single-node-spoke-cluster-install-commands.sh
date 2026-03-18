@@ -72,6 +72,34 @@ function get_hfs_helper {
     | jq -r -c '.status.settings')" != "null" ]
 }
 
+function bios_settings_already_applied {
+  local hostname_with_base_domain="${1}"
+
+  local current_status_settings
+  current_status_settings=$(oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -ojson \
+    | jq -r '.status.settings // {}')
+
+  if [ "${current_status_settings}" == "null" ] || [ "${current_status_settings}" == "{}" ]; then
+    return 1
+  fi
+
+  local desired_settings_json
+  desired_settings_json=$(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+
+  local all_match=true
+  while IFS= read -r key; do
+    local desired_value current_value
+    desired_value=$(echo "${desired_settings_json}" | jq -r ".[\"${key}\"]")
+    current_value=$(echo "${current_status_settings}" | jq -r ".[\"${key}\"] // \"null\"")
+    if [ "${desired_value}" != "${current_value}" ]; then
+      all_match=false
+      echo "[INFO] BIOS mismatch - ${key}: desired='${desired_value}', current='${current_value}'"
+    fi
+  done < <(echo "${desired_settings_json}" | jq -r 'keys[]')
+
+  [ "${all_match}" == "true" ]
+}
+
 function generate_host_firmware_settings_manifest {
 
   if [ "${BIOS_SETTINGS}" != "{}" ] ; then
@@ -82,6 +110,19 @@ function generate_host_firmware_settings_manifest {
     echo "************ telcov10n Setup BIOS settings ************"
 
     wait_until_command_is_ok "get_hfs_helper" 10s 100
+
+    # Skip patching if desired BIOS settings are already reflected in status.settings.
+    # Patching when settings already match bumps the HFS generation without the HFS controller
+    # updating observedGeneration (since no actual BIOS change is needed), causing Metal3 BMO
+    # to loop indefinitely in 'preparing' state waiting for observedGeneration to catch up.
+    if bios_settings_already_applied "${hostname_with_base_domain}" ; then
+      echo
+      echo "[INFO] Desired BIOS settings already applied to hardware. Skipping HostFirmwareSettings patch."
+      echo "[INFO] Patching when settings already match causes Metal3 BMO to stall in 'preparing' state."
+      echo
+      oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+      return 0
+    fi
 
     echo
     echo "${hostname_with_base_domain} HostFirmwareSettings before patch:"
