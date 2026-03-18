@@ -100,8 +100,7 @@ spec:
           cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
           sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
-          # For UPSTREAM use Dockerfile for upstream contents
-          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
+          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
             make docker-build
           else
@@ -109,6 +108,7 @@ spec:
             if [ -f "Dockerfile.ocp" ]; then
               DOCKERFILE="Dockerfile.ocp"
             else
+              # upstream uses Dockerfile.ci
               DOCKERFILE="Dockerfile.ci"
             fi
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
