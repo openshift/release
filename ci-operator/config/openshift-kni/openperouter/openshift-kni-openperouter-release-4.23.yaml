@@ -1,0 +1,45 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/openperouter/openperouter
+images:
+- dockerfile_path: Dockerfile.openshift
+  to: openperouter-operator
+- dockerfile_path: operator/bundle.Dockerfile.openshift
+  to: openperouter-operator-bundle
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: operator/bundle.Dockerfile.openshift
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/telco-5g-tenant/openperouter-operator-[\d].*
+    with: pipeline:openperouter-operator
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-kni
+  repo: openperouter
