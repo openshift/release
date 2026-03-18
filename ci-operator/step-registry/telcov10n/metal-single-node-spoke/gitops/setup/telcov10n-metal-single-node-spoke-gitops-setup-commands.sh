@@ -263,6 +263,61 @@ EOF
   set +x
 }
 
+function fix_argocd_packagemanifest_schema_issue {
+  # Workaround for ArgoCD failing to sync due to OLM's packageserver exposing a broken
+  # OpenAPI v2 schema for PackageManifest: the spec.$ref uses JSON Pointer ~1 encoding
+  # that ArgoCD's go-openapi library cannot resolve, causing a fatal SchemaError that
+  # prevents the cluster cache from building and keeps sync status permanently Unknown.
+  #
+  # Fix: exclude PackageManifest from ArgoCD resource tracking, then temporarily scale
+  # down the OLM package-server-manager so the broken schema is absent from /openapi/v2
+  # when ArgoCD restarts with a clean schema cache. The package server is restored after
+  # ArgoCD successfully syncs.
+
+  echo "************ telcov10n Workaround: Fix ArgoCD PackageManifest OpenAPI schema issue ************"
+
+  echo "Excluding PackageManifest resources from ArgoCD to prevent OpenAPI schema errors:"
+  local existing_exclusions pm_exclusion new_exclusions
+  existing_exclusions=$(oc -n openshift-gitops get argocd openshift-gitops \
+    -o jsonpath='{.spec.resourceExclusions}')
+  pm_exclusion="- apiGroups:\n  - operators.coreos.com\n  kinds:\n  - PackageManifest\n  clusters:\n  - \"*\"\n"
+  new_exclusions="${existing_exclusions}${pm_exclusion}"
+  set -x
+  oc -n openshift-gitops patch argocd openshift-gitops --type=merge \
+    --patch "{\"spec\":{\"resourceExclusions\":\"${new_exclusions}\"}}"
+  set +x
+
+  echo "Temporarily scaling down OLM package-server-manager to remove broken PackageManifest schema from /openapi/v2:"
+  set -x
+  oc -n openshift-operator-lifecycle-manager scale deployment package-server-manager --replicas=0
+  oc -n openshift-operator-lifecycle-manager rollout status deployment/package-server-manager --timeout=60s || true
+  set +x
+
+  echo "Deleting PackageManifest APIService so its broken schema is removed from the aggregated OpenAPI spec:"
+  set -x
+  oc delete apiservice v1.packages.operators.coreos.com --ignore-not-found=true
+  set +x
+
+  echo "Restarting ArgoCD components to reload the cluster schema cache without PackageManifest:"
+  set -x
+  oc -n openshift-gitops rollout restart deployment/openshift-gitops-repo-server
+  oc -n openshift-gitops rollout restart statefulset/openshift-gitops-application-controller
+  oc -n openshift-gitops rollout status deployment/openshift-gitops-repo-server --timeout=120s
+  oc -n openshift-gitops rollout status statefulset/openshift-gitops-application-controller --timeout=120s
+  set +x
+
+  echo "Waiting for ArgoCD clusters app to sync..."
+  wait_until_command_is_ok \
+    "oc -n openshift-gitops get applications.argoproj.io clusters -o jsonpath='{.status.sync.status}' | grep -w Synced" \
+    10s 60
+
+  echo "Restoring OLM package-server-manager:"
+  set -x
+  oc -n openshift-operator-lifecycle-manager scale deployment package-server-manager --replicas=1
+  set +x
+  echo "ArgoCD PackageManifest schema workaround complete."
+}
+
 function main {
   set_hub_cluster_kubeconfig
   if [ "${SITE_CONFIG_VERSION}" == "v2" ]; then
@@ -271,6 +326,7 @@ function main {
     setup_argocd_policy_plugin
     setup_argocd_roles_permissions
     create_argo_application
+    fix_argocd_packagemanifest_schema_issue
   else
     setup_hub_cluster_with_argocd
   fi
