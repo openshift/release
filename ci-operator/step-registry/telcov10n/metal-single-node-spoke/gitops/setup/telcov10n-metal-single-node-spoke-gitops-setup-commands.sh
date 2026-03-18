@@ -277,14 +277,19 @@ function fix_argocd_packagemanifest_schema_issue {
   echo "************ telcov10n Workaround: Fix ArgoCD PackageManifest OpenAPI schema issue ************"
 
   echo "Excluding PackageManifest resources from ArgoCD to prevent OpenAPI schema errors:"
-  local existing_exclusions pm_exclusion new_exclusions
+  local existing_exclusions patch_file
   existing_exclusions=$(oc -n openshift-gitops get argocd openshift-gitops \
     -o jsonpath='{.spec.resourceExclusions}')
-  pm_exclusion="- apiGroups:\n  - operators.coreos.com\n  kinds:\n  - PackageManifest\n  clusters:\n  - \"*\"\n"
-  new_exclusions="${existing_exclusions}${pm_exclusion}"
+  patch_file=$(mktemp --suffix=.json)
+  python3 -c "
+import json, sys
+existing = sys.argv[1]
+addition = '- apiGroups:\n  - operators.coreos.com\n  kinds:\n  - PackageManifest\n  clusters:\n  - \"*\"\n'
+patch = {'spec': {'resourceExclusions': existing + addition}}
+print(json.dumps(patch))
+" "${existing_exclusions}" > "${patch_file}"
   set -x
-  oc -n openshift-gitops patch argocd openshift-gitops --type=merge \
-    --patch "{\"spec\":{\"resourceExclusions\":\"${new_exclusions}\"}}"
+  oc -n openshift-gitops patch argocd openshift-gitops --type=merge --patch-file "${patch_file}"
   set +x
 
   echo "Temporarily scaling down OLM package-server-manager to remove broken PackageManifest schema from /openapi/v2:"
