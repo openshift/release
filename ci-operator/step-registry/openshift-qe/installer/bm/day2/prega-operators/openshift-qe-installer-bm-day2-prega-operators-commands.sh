@@ -5,6 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
 
 oc config view
 oc projects
