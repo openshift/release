@@ -477,7 +477,10 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  # openshift-install agent wait-for SSHs to the rendezvous host; ensure default key location exists (Z/s390x only)
+  # openshift-install agent wait-for bootstrap-complete completes when the bootstrap Kube API is
+  # live and the bootstrap-complete ConfigMap is present (openshift/installer pkg/agent/cluster.go).
+  # A TCP check to rendezvous :22 is only for diagnostic logs when APIs are not up yet—not the
+  # success condition. s390x still requires ssh-privatekey in the cluster profile for the agent workflow.
   if [ "$ARCH" == "s390x" ]; then
     if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
       echo "ERROR: ${CLUSTER_PROFILE_DIR}/ssh-privatekey is required for agent install but not found in cluster profile"
