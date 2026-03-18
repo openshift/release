@@ -127,6 +127,9 @@ chain:
     - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
       default: "false"
       documentation: "Assign the service principal roles to the managed identities"
+    - name: AUTO_ASSIGN_ROLES
+      default: "false"
+      documentation: "assign required Azure RBAC roles to workload identities"    
     - name: DNS_ZONE_RG_NAME
       default: "os4-common"
       documentation: "dns zone resource group"
@@ -141,7 +144,10 @@ chain:
       documentation: "Enable marketplace flags"
     - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
       default: ""
-      documentation: "image generation value"  
+      documentation: "image generation value" 
+    - name: CLI
+      default: ""
+      documentation: "hcp or hypershift cli path"      
     commands: |-
       set -exuo pipefail
 
@@ -222,8 +228,12 @@ chain:
         NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
       fi
       
+      if [[  -z $CLI ]]; then
+      CLI="/usr/bin/hypershift"
+      fi
+      
       COMMAND=(
-        /usr/bin/hypershift create cluster azure \
+        "${CLI}" create cluster azure \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
@@ -361,6 +371,11 @@ chain:
         COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
       fi
       
+      if [[ $AUTO_ASSIGN_ROLES == "true" ]]; then
+        COMMAND+=(--auto-assign-roles=true)
+        COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+
       if [[ -n "${HYPERSHIFT_INSTANCE_TYPE}" ]]; then
         COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
       fi
@@ -372,6 +387,7 @@ chain:
       if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
           COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
       fi
+
 
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
