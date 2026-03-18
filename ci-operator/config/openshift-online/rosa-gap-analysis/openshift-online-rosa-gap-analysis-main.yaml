@@ -1,0 +1,27 @@
+build_root:
+  from_repository: true
+images:
+  - dockerfile_path: ./ci/Containerfile
+    to: rosa-gap-analysis
+resources:
+  "*":
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+  - as: rosa-gap-analysis-nightly
+    commands: |
+      set -euo pipefail
+      chmod +x ./scripts/gap-all.sh
+      ./scripts/gap-all.sh
+    container:
+      from: rosa-gap-analysis
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    cron: "0 6 * * *" # Run at 6 AM UTC daily
+
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-gap-analysis
