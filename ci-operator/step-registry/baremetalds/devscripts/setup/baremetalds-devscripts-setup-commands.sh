@@ -11,10 +11,20 @@ echo "************ baremetalds devscripts setup command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 # Get dev-scripts logs and other configuration
+finished_ran=false
+
 finished()
 {
   # Remember dev-scripts setup exit code
   retval=$?
+
+  # This function can be triggered multiple times because we trap both
+  # signals (INT/TERM) and EXIT. The flag is used to ensure the function
+  # runs only once.
+  if [[ "${finished_ran}" == true ]]; then
+        return
+    fi
+  finished_ran=true
 
   # Make sure we always execute all of this, so we gather logs and installer status, even when
   # install fails.
@@ -53,7 +63,7 @@ finished()
     echo "$retval" > "${SHARED_DIR}/install-status.txt"
   fi
 }
-trap finished EXIT TERM
+trap finished EXIT INT TERM
 
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
