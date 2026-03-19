@@ -20,7 +20,7 @@ function DeleteAllVms() {
         }
     done
 
-    oc wait --for=delete pod -l app=chaos-target -n "${LPC_LP_CNV__VM__NS}" --timeout=2m
+    oc wait --for=delete pod -l app=chaos-target -n "${LPC_LP_CNV__VM__NS}" --timeout=2m || true
     if [[ ${failedCount} -gt 0 ]]; then
         : "WARNING: Failed to delete ${failedCount} VM(s)."
         return 1
