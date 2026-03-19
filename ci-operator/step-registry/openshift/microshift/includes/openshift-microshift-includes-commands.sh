@@ -220,7 +220,7 @@ function ci_clone_src() {
     if [ "${force_clone}" == "true" ]; then
         # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
         local branch
-        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
         # MicroShift repo uses main instead of master
         if [ "${branch}" == "master" ]; then
             branch="main"
@@ -735,6 +735,12 @@ function get_source_dir() {
     [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
     [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
     [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [bootc-releases-el9]="scenarios-bootc/el9/releases:scenarios-bootc"
+    [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
+    [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
+    [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
+    [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
+    [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
     [periodics]="scenarios/periodics:scenarios-periodics"

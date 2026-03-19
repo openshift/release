@@ -41,7 +41,20 @@ export BYOH_NUM_WORKERS="${BYOH_NUM_WORKERS:-2}"
 export BYOH_WINDOWS_VERSION="${BYOH_WINDOWS_VERSION:-2022}"
 
 # Extract terraform state + config from SHARED_DIR tarball
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
+# Auto-detect which platform tarball exists (aws, azure, gcp, vsphere, nutanix, none)
+PLATFORM=""
+for p in aws azure gcp vsphere nutanix none; do
+    if [[ -f "${SHARED_DIR}/terraform_byoh_${p}.tar" ]]; then
+        PLATFORM="${p}"
+        echo "Detected terraform platform: ${PLATFORM}"
+        break
+    fi
+done
+if [[ -z "${PLATFORM}" ]]; then
+    echo "ERROR: No terraform tarball found in ${SHARED_DIR}/ (checked: aws, azure, gcp, vsphere, nutanix, none)"
+    ls -la "${SHARED_DIR}/" || true
+    exit 1
+fi
 if [[ -f "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" ]]; then
     echo "Extracting terraform files from ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar..."
     mkdir -p "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
@@ -86,9 +99,6 @@ fi
 WORK_DIR="/usr/local/share/byoh-provisioner"
 echo "Using provisioner directory: ${WORK_DIR}"
 
-# Detect platform
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]' 2>/dev/null || echo "unknown")
-echo "Platform detected: ${PLATFORM}"
 
 # Verify byoh.sh is available
 if ! command -v byoh.sh &> /dev/null; then
