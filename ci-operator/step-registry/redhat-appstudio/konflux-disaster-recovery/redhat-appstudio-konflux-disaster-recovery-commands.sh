@@ -85,10 +85,10 @@ timeout --foreground 5m bash  <<- "EOF"
             sleep 20
     done
 EOF
-  if [ $? -ne 0 ]; then
-	  echo "Timed out waiting for login"
-	  exit 1
-  fi
+if [ $? -ne 0 ]; then
+	echo "Timed out waiting for login"
+	exit 1
+fi
 
 # Define a new environment for BYOC pointing to a kubeconfig with token. RHTAP environments only supports kubeconfig with token:
 # See: https://issues.redhat.com/browse/GITOPSRVCE-554
