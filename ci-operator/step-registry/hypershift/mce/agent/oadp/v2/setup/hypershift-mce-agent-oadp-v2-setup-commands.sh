@@ -5,6 +5,11 @@ set -o errexit
 set -o pipefail
 set -x
 
+# Set the IP address of Minio running on virthost to prevent flakes due
+# to the hostname being unresolvable. This value is calculated in
+# baremetalds-devscripts-setup-commands.sh as ${EXTERNAL_SUBNET_V4%.*}.1.
+VIRTHOST_IP="192.168.111.1"
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -105,7 +110,7 @@ spec:
   config:
     region: minio
     s3ForcePathStyle: "true"
-    s3Url: "http://virthost.ostest.test.metalkube.org:9000"
+    s3Url: "http://${VIRTHOST_IP}:9000"
     insecureSkipTLSVerify: "true"
     profile: default
 EOF

@@ -170,6 +170,10 @@ fi
 
 EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 
+if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --auto-repair"
+fi
+
 case "${IP_STACK}" in
  "v4")
    EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
@@ -211,6 +215,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --generate-ssh \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
+    --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
     ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
@@ -227,6 +232,7 @@ else
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
+    --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
