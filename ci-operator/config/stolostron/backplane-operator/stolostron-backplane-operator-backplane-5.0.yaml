@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -16,14 +20,21 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
+  inputs:
+    stolostron_builder_go1.25-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: backplane-operator
 - dockerfile_path: build/Dockerfile.test.prow
+  inputs:
+    stolostron_builder_go1.25-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: backplane-operator-test
 promotion:
   to:
-  - name: "2.17"
-    namespace: stolostron
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -86,19 +97,60 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: backplane-fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: backplane-operator
     env:
-      DESTINATION_BRANCH: backplane-2.17
-    workflow: ocm-ci-fastforward
-- as: backplane-fast-forward-5-0
+      IMAGE_REPO: backplane-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-test
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: backplane-operator-test
     env:
-      DESTINATION_BRANCH: backplane-5.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: backplane-operator-test
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="backplane-operator-test"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: stolostron
   repo: backplane-operator
