@@ -4,8 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Create the Jira configuration file
-firewatch jira-config-gen --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" --server-url "${FIREWATCH_JIRA_SERVER}"
+jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
+
+if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
+    jira_config_cmd+=" --email $(cat "${FIREWATCH_JIRA_EMAIL_PATH}")"
+fi
+
+eval "${jira_config_cmd}"
 
 report_command="firewatch report"
 
