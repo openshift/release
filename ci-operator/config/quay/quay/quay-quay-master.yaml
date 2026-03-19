@@ -1,0 +1,72 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.18
+images:
+- dockerfile_path: Dockerfile
+  to: quay-server
+- dockerfile_literal: |
+    FROM src
+    RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
+        dnf install -y nodejs \
+        alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+        libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+        libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+        libwayland-client && \
+        dnf clean all
+    WORKDIR /go/src/github.com/quay/quay/web
+    RUN npm ci
+    ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+    RUN npx playwright install chromium
+  from: src
+  to: quay-playwright-runner
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: playwright-e2e
+  steps:
+    cluster_profile: aws-quay-qe
+    dependencies:
+      QUAY_CI_IMAGE: pipeline:quay-server
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_REPO_MIRROR: true
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: redhat-operators
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-deploy-quay-custom-image
+    - ref: quay-tests-test-quay-playwright
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay

@@ -9,7 +9,7 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-HUB_KUBECONFIG="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 # Process inventory from vault mounts
 process_inventory() {
@@ -46,8 +46,6 @@ process_inventory() {
     echo "Processing complete. Check \"${dest_file}\""
 }
 
-echo "SPOKE_CLUSTER=${SPOKE_CLUSTER}"
-
 echo "Create group_vars directory"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
@@ -61,7 +59,7 @@ echo "Create host_vars directory"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
 echo "Process host inventory files from vault mounts"
-find /var/host_variables/kni-qe-99/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+find /var/host_variables/${CLUSTER_NAME}/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
     echo "Process host inventory file: ${dir}"
     process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
 done
@@ -95,7 +93,23 @@ done
 
 cd /eco-ci-cd
 
+echo "Construct Report Portal attributes"
+if [[ -n "${REPORTS_PORTAL_ATTRIBUTES_ENV}" ]]; then
+  REPORTS_PORTAL_ATTRIBUTES="${REPORTS_PORTAL_ATTRIBUTES_ENV}"
+  echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES} (from REPORTS_PORTAL_ATTRIBUTES_ENV)"
+else
+  REPORTS_PORTAL_ATTRIBUTES=""
+  if [[ -f "${SHARED_DIR}/cluster_version" ]]; then
+    CLUSTER_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
+    CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
+    REPORTS_PORTAL_ATTRIBUTES="ci-lane:${CI_LANE};spoke_ocp_build:${CLUSTER_VERSION}"
+    echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
+  fi
+fi
+
+echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
+
 echo "Upload reports to Polarion and Report Portal"
 ansible-playbook ./playbooks/cnf/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_3node'"
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_3node' reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"

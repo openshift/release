@@ -9,7 +9,7 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-HUB_KUBECONFIG="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 # Process inventory from vault mounts
 process_inventory() {
@@ -45,8 +45,6 @@ process_inventory() {
 
     echo "Processing complete. Check \"${dest_file}\""
 }
-
-echo "SPOKE_CLUSTER=${SPOKE_CLUSTER}"
 
 echo "Create group_vars directory"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
@@ -95,7 +93,16 @@ done
 
 cd /eco-ci-cd
 
+echo "Construct Report Portal attributes"
+REPORTS_PORTAL_ATTRIBUTES=""
+if [[ -f "${SHARED_DIR}/cluster_version" ]]; then
+  CLUSTER_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
+  CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
+  REPORTS_PORTAL_ATTRIBUTES="ci-lane:${CI_LANE};spoke_ocp_build:${CLUSTER_VERSION}"
+  echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
+fi
+
 echo "Upload reports to Polarion and Report Portal"
 ansible-playbook ./playbooks/cnf/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_standard'"
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_standard' reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"

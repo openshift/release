@@ -194,9 +194,11 @@ case "$CLUSTER_TYPE" in
   removal_list=( )
   echo "Removing the hosts having architectures: ${SCALE_IN_ARCHITECTURES}..."
   REGEX=$(echo "$SCALE_IN_ARCHITECTURES" | tr ',' '|')
+  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker\"))" "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    # shellcheck disable=SC2154
     removal_list+=( "${name}/${mac}" )
     oc adm cordon "${name}.${CLUSTER_NAME}.${BASE_DOMAIN}"
     oc adm drain --force --ignore-daemonsets --delete-local-data --grace-period=10 "${name}.${CLUSTER_NAME}.${BASE_DOMAIN}"

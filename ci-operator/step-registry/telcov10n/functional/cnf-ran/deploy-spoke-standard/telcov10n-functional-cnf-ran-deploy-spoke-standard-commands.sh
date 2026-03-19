@@ -93,4 +93,5 @@ ansible-playbook -i inventories/ocp-deployment/build-inventory.py \
                    spoke_cluster=${SPOKE_CLUSTER} \
                    masters_secret_name=${MASTERS_SECRET_NAME} \
                    ocp_version=${VERSION} \
-                   ztp_git_repo_url=${ZTP_GIT_REPO}"
+                   ztp_git_repo_url=${ZTP_GIT_REPO} \
+                   ztp_git_branch=${ZTP_GIT_BRANCH}"

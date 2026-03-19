@@ -2,8 +2,6 @@ presubmits:
   openshift/assisted-installer:
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
@@ -19,6 +17,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-release-ocm-2.13-e2e-ai-operator-ztp
     rerun_command: /test e2e-ai-operator-ztp
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -30,9 +29,17 @@ presubmits:
         - --target=e2e-ai-operator-ztp
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -105,9 +112,17 @@ presubmits:
         - --target=e2e-ai-operator-ztp-sno-day2-workers
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -156,7 +171,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
-    cluster: build08
+    cluster: build04
     context: ci/prow/format-check
     decorate: true
     labels:
@@ -175,9 +190,17 @@ presubmits:
         - --target=format-check
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -211,7 +234,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
-    cluster: build08
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -265,7 +288,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
-    cluster: build08
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     labels:
@@ -284,9 +307,17 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -320,7 +351,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
-    cluster: build08
+    cluster: build04
     context: ci/prow/mce-images
     decorate: true
     labels:
@@ -375,7 +406,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.13$
     - ^release-ocm-2\.13-
-    cluster: build08
+    cluster: build04
     context: ci/prow/unit-test
     decorate: true
     labels:
@@ -395,9 +426,17 @@ presubmits:
         - --target=unit-test
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

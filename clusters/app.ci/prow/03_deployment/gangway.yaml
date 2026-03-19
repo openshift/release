@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: gangway
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -78,7 +81,7 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --ref=master
+          - --ref=main
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
@@ -93,7 +96,7 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --ref=master
+          - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
           - --max-failures=3
@@ -145,7 +148,7 @@ objects:
           - mountPath: /tmp
             name: nginx-tmp
         - name: gangway
-          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20260128-95b2a3412
+          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20260316-25576911a
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -298,6 +301,9 @@ objects:
     name: periodic-job-bot
   - kind: ServiceAccount
     namespace: aro-hcp-prow-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-classic-prow-ci
     name: periodic-job-bot
   - kind: ServiceAccount
     namespace: ocp-isc-qe-team

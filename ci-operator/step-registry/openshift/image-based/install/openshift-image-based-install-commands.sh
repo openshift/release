@@ -48,6 +48,7 @@ cd ${remote_workdir}/ib-orchestrate-vm
 export REGISTRY_AUTH_FILE='${remote_workdir}/.pull_secret.json'
 export PULL_SECRET=\$(<\$REGISTRY_AUTH_FILE)
 export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
+export IP_STACK="${IP_STACK}"
 
 sudo dnf -y install runc crun gcc-c++ zip
 

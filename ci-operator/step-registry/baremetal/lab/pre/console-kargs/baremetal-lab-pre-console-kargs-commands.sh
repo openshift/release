@@ -38,6 +38,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
+  if [[ "${name}" == *-a-* ]] && [ "${SCALE_UPI}" == "true" ]; then
+    echo "{INFO} Additional worker ${name} will be added as day2 operation by scaling with BMO"
+    continue
+  fi
   mac_prefix=${mac//:/-}
   role=${name%%-[0-9]*}
   role=${role%%-a*}

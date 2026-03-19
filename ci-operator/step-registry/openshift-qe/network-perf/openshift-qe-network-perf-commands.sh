@@ -4,7 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -16,12 +15,7 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-oc config view
-oc projects
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
@@ -35,6 +29,12 @@ pushd e2e-benchmarking/workloads/network-perf-v2
 if [ ${CLEAN_UP} == "true" ]; then
 # Clean up resources from possible previous tests.
   oc delete ns netperf --wait=true --ignore-not-found=true
+fi
+
+#If vm mode enable, generate a new ssh key to access the VM
+if [ ${VM} == "true" ]; then
+  mkdir -p ~/.ssh
+  ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
 fi
 
 # Only store the results from the full run versus the smoke test.

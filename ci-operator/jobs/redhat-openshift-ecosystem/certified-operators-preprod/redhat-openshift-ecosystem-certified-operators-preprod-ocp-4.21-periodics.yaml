@@ -11,7 +11,6 @@ periodics:
     repo: certified-operators-preprod
   labels:
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-openshift-ecosystem-certified-operators-preprod-ocp-4.21-preflight-preprod-claim
   spec:
@@ -25,9 +24,17 @@ periodics:
       - --target=preflight-preprod-claim
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

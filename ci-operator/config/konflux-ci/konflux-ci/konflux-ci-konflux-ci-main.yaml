@@ -1,0 +1,60 @@
+base_images:
+  e2e-test-runner:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: konflux-e2e-v420-optional
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - ref: konflux-ci-install-operator
+    workflow: redhat-appstudio-claim
+- always_run: false
+  as: konflux-e2e-v420-arm64-optional
+  cluster_claim:
+    architecture: arm64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - ref: konflux-ci-install-operator
+    workflow: redhat-appstudio-claim
+zz_generated_metadata:
+  branch: main
+  org: konflux-ci
+  repo: konflux-ci

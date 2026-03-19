@@ -109,6 +109,13 @@ if [ -e /var/run/microshift-dev-access-keys/registry.stage.redhat.io ] ; then
         "${INSTANCE_PREFIX}:/tmp"
 fi
 
+if [ -e /var/run/microshift-dev-access-keys/ocp_mirror_username ] && \
+   [ -e /var/run/microshift-dev-access-keys/ocp_mirror_password ] ; then
+    scp /var/run/microshift-dev-access-keys/ocp_mirror_username \
+        /var/run/microshift-dev-access-keys/ocp_mirror_password \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true

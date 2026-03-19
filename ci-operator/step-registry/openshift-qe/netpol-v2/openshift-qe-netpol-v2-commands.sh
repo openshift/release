@@ -30,8 +30,10 @@ export WORKLOAD=network-policy
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+# Use awk for fractional multiplier support; result is truncated to int
+iteration_multiplier=$ITERATION_MULTIPLIER_ENV
+ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
+export ITERATIONS
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 

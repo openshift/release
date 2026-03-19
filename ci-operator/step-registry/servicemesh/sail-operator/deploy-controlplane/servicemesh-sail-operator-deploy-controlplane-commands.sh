@@ -214,7 +214,7 @@ retry_command "oc get installplan -n openshift-operators --no-headers | grep -q 
 
 # Check InstallPlan status
 echo "Step 2: Waiting for InstallPlan approval and completion..."
-retry_command "oc get installplan -n openshift-operators -o jsonpath='{.items[?(@.spec.clusterServiceVersionNames[*]==\"sailoperator*\")].status.phase}' | grep -q Installed" "InstallPlan completion"
+retry_command "oc get installplan -n openshift-operators -l operators.coreos.com/sailoperator.openshift-operators -o jsonpath='{.items[*].status.phase}' | grep -q Complete" "InstallPlan completion"
 
 # Wait for CSV to be created and ready
 echo "Step 3: Waiting for ClusterServiceVersion (CSV) to be ready..."
@@ -225,8 +225,11 @@ echo "Step 4: Identifying and waiting for operator deployment..."
 OPERATOR_DEPLOYMENT=""
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-    # Get deployment name from CSV
-    OPERATOR_DEPLOYMENT=$(oc get csv -n openshift-operators -o jsonpath='{.items[?(@.metadata.name=~"sailoperator.*")].spec.install.spec.deployments[0].name}' 2>/dev/null || true)
+    # Get deployment name from CSV via the subscription's installedCSV reference
+    CSV_NAME=$(oc get subscription sailoperator -n openshift-operators -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+    if [ -n "$CSV_NAME" ]; then
+        OPERATOR_DEPLOYMENT=$(oc get csv "$CSV_NAME" -n openshift-operators -o jsonpath='{.spec.install.spec.deployments[0].name}' 2>/dev/null || true)
+    fi
 
     if [ -n "$OPERATOR_DEPLOYMENT" ]; then
         echo "Found operator deployment: $OPERATOR_DEPLOYMENT"
@@ -252,10 +255,10 @@ retry_command "oc wait --for=condition=Available=True --timeout=5s deployment/$O
 # Install the Istio control plane
 if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
     echo "Deploying Istio control plane in ambient mode"
-    BUILD_WITH_CONTAINER=0 make deploy-istio-with-ambient
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make deploy-istio-with-ambient
 elif [ "${ISTIO_CONTROL_PLANE_MODE}" == "sidecar" ]; then
     echo "Deploying Istio control plane in sidecar mode"
-    BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
 else
     echo "ERROR: Unsupported mode: ${ISTIO_CONTROL_PLANE_MODE}. Use 'ambient' or 'sidecar'."
     exit 1

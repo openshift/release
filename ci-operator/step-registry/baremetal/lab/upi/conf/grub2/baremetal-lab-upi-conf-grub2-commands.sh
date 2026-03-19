@@ -55,7 +55,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     fi
   fi
 
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ] && [ "${SCALE_UPI}" == "true" ]; then
+    echo "No grub configuration needed for ${name} as it will be scaled with BMO"
+  elif [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ] && [ "${SCALE_UPI}" == "false" ]; then
     cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
 set timeout=5
 set default=0

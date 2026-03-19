@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build06
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -11,7 +11,6 @@ periodics:
     repo: certified-operators-prod
   labels:
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-openshift-ecosystem-certified-operators-prod-ocp-4.21-preflight-prod-claim
   spec:
@@ -25,9 +24,17 @@ periodics:
       - --target=preflight-prod-claim
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

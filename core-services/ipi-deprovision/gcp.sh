@@ -17,7 +17,25 @@ function queue() {
 
 function deprovision() {
   WORKDIR="${1}"
-  timeout --signal=SIGTERM 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
+  timeout --signal=SIGTERM 20m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
+}
+
+function cleanup_vpc_network() {
+  local infraID="${1}"
+
+  for subnet_info in $(gcloud --project="${GCP_PROJECT}" compute networks subnets list --filter="network=${infraID}-network" --format="csv[no-heading](name,region.basename())"); do
+    subnet_name="${subnet_info%%,*}"
+    subnet_region="${subnet_info##*,}"
+    echo "Deleting subnet ${subnet_name} in ${subnet_region} ..."
+    gcloud --project="${GCP_PROJECT}" compute networks subnets delete "${subnet_name}" --region="${subnet_region}" --quiet || return 1
+  done
+
+  for route in $(gcloud --project="${GCP_PROJECT}" compute routes list --filter="network=${infraID}-network" --format="value(name)"); do
+    echo "Deleting route ${route} ..."
+    gcloud --project="${GCP_PROJECT}" compute routes delete "${route}" --quiet || return 1
+  done
+
+  gcloud --project="${GCP_PROJECT}" compute networks delete "${infraID}-network" --quiet || return 1
 }
 
 logdir="${ARTIFACTS}/deprovision"
@@ -65,6 +83,20 @@ if ! wait; then
   echo "At least one deprovision job failed or timed out."
 fi
 
+for workdir in $(find "${logdir}" -mindepth 1 -type d); do
+  if [[ -f "${workdir}/failure" ]]; then
+    infraID="$(basename "${workdir}")"
+    echo "Attempting to clean up VPC network ${infraID}-network ..."
+    if cleanup_vpc_network "${infraID}"; then
+      echo "Successfully deleted VPC network for ${infraID}"
+      rm "${workdir}/failure"
+      touch "${workdir}/warning"
+    else
+      echo "Failed to clean up VPC network for ${infraID}"
+    fi
+  fi
+done
+
 gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-8 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
 gcs_bucket_age_cutoff_seconds="$(date --date="${gcs_bucket_age_cutoff}" '+%s')"
 echo "deleting GCS buckets with a creationTimestamp before ${gcs_bucket_age_cutoff} in GCE ..."
@@ -91,6 +123,12 @@ for INSTANCE in $INSTANCES; do
     echo "Deleting Filestore instance $INSTANCE"
     gcloud filestore instances delete "$INSTANCE" --async --force --quiet
 done
+
+WARNINGS="$(find ${clusters} -name warning -printf '%H\n' | sort)"
+if [[ -n "${WARNINGS}" ]]; then
+  echo "The following clusters required VPC network cleanup:"
+  xargs --max-args 1 basename <<< $WARNINGS
+fi
 
 FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then

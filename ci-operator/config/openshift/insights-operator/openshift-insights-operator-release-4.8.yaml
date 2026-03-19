@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: rhel-8-release-golang-1.16-openshift-4.8
 images:
 - from: base
   to: insights-operator
@@ -50,7 +50,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   steps:
@@ -63,8 +63,7 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests
@@ -84,8 +83,7 @@ tests:
       cli: latest
       commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests

@@ -11,6 +11,10 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
+  rhel-coreos-base:
+    name: "4.20"
+    namespace: ocp
+    tag: rhel-coreos
   tests-private:
     name: tests-private
     namespace: ci
@@ -41,6 +45,9 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
+    rhel-coreos-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
   to: rhel-coreos
 promotion:
   to:
@@ -92,7 +99,7 @@ tests:
 - as: e2e-azure-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azurestack-ipi
@@ -104,13 +111,13 @@ tests:
 - as: e2e-azure-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: regression-clusterinfra-azure-ipi-ccm
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       E2E_RUN_TAGS: '@ccm'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
