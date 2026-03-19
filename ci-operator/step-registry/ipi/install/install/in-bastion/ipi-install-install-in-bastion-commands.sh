@@ -128,8 +128,19 @@ function prepare_next_steps() {
   run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "rm -rf ${REMOTE_SECRETS_DIR}"
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM INT
+trap 'prepare_next_steps; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi;' EXIT TERM INT
+
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "User specified a custom payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+elif [[ "${USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -216,17 +227,9 @@ run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "
 # bootstrap failure
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${SSH_PRIV_KEY_PATH}" "/home/${BASTION_SSH_USER}/.ssh/"
 
-if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
-  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
-  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
-  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
-  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
-fi
-
 # Always extract installer from the specified clustr payload to avoid mismatch, especially this step is based on upi-installer image
 echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
---command=openshift-install --to="/tmp" || exit 1
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
 export INSTALLER_BINARY="/tmp/openshift-install"
 
 echo "=============== openshift-install version =============="

@@ -77,12 +77,20 @@ function check_signed() {
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
-  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  echo "User specified a custom payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+elif [[ "${USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
 fi
 
-echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
+  exit 1
+fi
 
 # target release
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
@@ -92,8 +100,7 @@ echo "target_release_image_repo: $target_release_image_repo"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
-unset KUBECONFIG
-oc registry login
+KUBECONFIG="" oc registry login
 
 run_command "which oc"
 run_command "oc version --client"
