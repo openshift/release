@@ -195,7 +195,7 @@ case "$CLUSTER_TYPE" in
   echo "Removing the hosts having architectures: ${SCALE_IN_ARCHITECTURES}..."
   REGEX=$(echo "$SCALE_IN_ARCHITECTURES" | tr ',' '|')
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker\"))" "${SHARED_DIR}/hosts.yaml"); do
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1090,SC2154
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     removal_list+=( "${name}/${mac}" )
     oc adm cordon "${name}.${CLUSTER_NAME}.${BASE_DOMAIN}"
