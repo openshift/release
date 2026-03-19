@@ -123,9 +123,15 @@ deploy_frr_external_container() {
   # create a $CLI network attached to the cluster network by attaching to the existing ostestbm bridge
   $CLI network create --driver bridge --ipam-driver=none --opt com.docker.network.bridge.name=ostestbm ostestbm_net
 
-  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:10.4.2
+  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:10.4.3
   # ipv4 forwarding is enabled by default, we only need to turn on ipv6 forwarding
   $CLI exec frr sysctl -w net.ipv6.conf.all.forwarding=1
+  # Enable keep_addr_on_down to preserve IPv6 addresses during VRF enslavement.
+  # Without this, IPv6 global addresses are removed when interfaces are moved to a VRF,
+  # causing FRR/zebra to fail creating FIB nexthop groups ("no fib nhg" bug).
+  # See: https://docs.kernel.org/networking/vrf.html (section 4: Enslave L3 interfaces)
+  #      https://github.com/FRRouting/frr/issues/1666
+  $CLI exec frr sysctl -w net.ipv6.conf.all.keep_addr_on_down=1
   
   # attach the frr container to the ostestbm bridge, so it can talk with the OCP nodes.
   # use primary network gateway as the default route

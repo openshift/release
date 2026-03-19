@@ -250,6 +250,15 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-classic-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-classic-stg-quota-slice': {
+        'default': 5,
+    },
+    'aro-classic-prod-quota-slice': {
+        'default': 30
+    },
     'aro-hcp-int-quota-slice': {
         'default': 1,
     },
