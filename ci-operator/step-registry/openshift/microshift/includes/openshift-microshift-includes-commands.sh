@@ -732,9 +732,9 @@ EOF
 function get_source_dir() {
   declare -A SCENARIO_DIRS=(
     [bootc-upstream]="scenarios-bootc/upstream:scenarios-bootc"
-    # [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
-    # [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
-    # [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
+    [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
+    [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
     [bootc-releases-el9]="scenarios-bootc/el9/releases:scenarios-bootc"
     [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
     [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
