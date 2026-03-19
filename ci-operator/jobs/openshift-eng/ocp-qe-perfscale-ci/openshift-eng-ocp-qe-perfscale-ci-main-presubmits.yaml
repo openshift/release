@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/4.20-nightly-control-plane-aws-ipsec-120nodes
     decorate: true
     decoration_config:
@@ -602,7 +602,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/4.21-nightly-control-plane-aws-ipsec-120nodes
     decorate: true
     decoration_config:
@@ -1199,7 +1199,179 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
+    context: ci/prow/4.21-nightly-node-density-heavy-baremetal-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+      ci-operator.openshift.io/variant: 4.21-nightly-node-density-heavy
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-node-density-heavy-baremetal-3nodes
+    rerun_command: /test 4.21-nightly-node-density-heavy-baremetal-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=baremetal-3nodes
+        - --variant=4.21-nightly-node-density-heavy
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-node-density-heavy-baremetal-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/4.22-nightly-node-density-heavy-baremetal-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+      ci-operator.openshift.io/variant: 4.22-nightly-node-density-heavy
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.22-nightly-node-density-heavy-baremetal-3nodes
+    rerun_command: /test 4.22-nightly-node-density-heavy-baremetal-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=baremetal-3nodes
+        - --variant=4.22-nightly-node-density-heavy
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.22-nightly-node-density-heavy-baremetal-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -1284,7 +1456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-conc-builds-3nodes
     decorate: true
     decoration_config:
@@ -1369,7 +1541,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -1454,7 +1626,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -1539,7 +1711,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-router-perf-24nodes
     decorate: true
     decoration_config:
@@ -1624,7 +1796,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.21-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -1709,7 +1881,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.21-nightly-x86-conc-builds-3nodes
     decorate: true
     decoration_config:
@@ -1794,7 +1966,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.21-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -1879,7 +2051,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.21-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -1964,7 +2136,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.21-nightly-x86-router-perf-24nodes
     decorate: true
     decoration_config:
@@ -2049,7 +2221,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -2134,7 +2306,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-conc-builds-3nodes
     decorate: true
     decoration_config:
@@ -2219,7 +2391,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -2304,7 +2476,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-180nodes
     decorate: true
     decoration_config:
@@ -2389,7 +2561,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-72udn
     decorate: true
     decoration_config:
@@ -2474,7 +2646,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-layer2-72udn
     decorate: true
     decoration_config:
@@ -2559,7 +2731,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-3nodes-udn
     decorate: true
     decoration_config:
@@ -2644,7 +2816,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -2729,7 +2901,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.22-nightly-x86-router-perf-24nodes
     decorate: true
     decoration_config:
@@ -2814,7 +2986,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -2899,7 +3071,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-conc-builds-3nodes
     decorate: true
     decoration_config:
@@ -2984,7 +3156,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -3069,7 +3241,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes
     decorate: true
     decoration_config:
@@ -3154,7 +3326,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn
     decorate: true
     decoration_config:
@@ -3239,7 +3411,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn
     decorate: true
     decoration_config:
@@ -3324,7 +3496,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn
     decorate: true
     decoration_config:
@@ -3409,7 +3581,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -3494,7 +3666,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-4.23-nightly-x86-router-perf-24nodes
     decorate: true
     decoration_config:
@@ -3579,7 +3751,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -3664,7 +3836,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -3749,7 +3921,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes
     decorate: true
     decoration_config:
@@ -3834,7 +4006,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn
     decorate: true
     decoration_config:
@@ -3919,7 +4091,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn
     decorate: true
     decoration_config:
@@ -4004,7 +4176,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn
     decorate: true
     decoration_config:
@@ -4089,7 +4261,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -4174,7 +4346,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/aws-5.0-nightly-x86-router-perf-24nodes
     decorate: true
     decoration_config:
@@ -10214,6 +10386,91 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/metal-x86-orion-datapath
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-orion-datapath
+    rerun_command: /test metal-x86-orion-datapath
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=orion-datapath
+        - --variant=metal-x86
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-x86-orion-datapath|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/metal-x86-orion-ingress
     decorate: true
     decoration_config:
@@ -10901,7 +11158,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-build-farm-114nodes
     decorate: true
     decoration_config:
@@ -10998,7 +11255,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-cluster-density-v2-249nodes
     decorate: true
     decoration_config:
@@ -11083,7 +11340,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-conc-builds-3nodes
     decorate: true
     decoration_config:
@@ -11168,7 +11425,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-control-plane-120nodes
     decorate: true
     decoration_config:
@@ -11264,7 +11521,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -11360,7 +11617,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
@@ -11445,7 +11702,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-data-path-9nodes
     decorate: true
     decoration_config:
@@ -11541,7 +11798,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -11626,7 +11883,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build10
     context: ci/prow/rosa-4.21-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
