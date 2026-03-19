@@ -20,7 +20,7 @@ if [ ${OCP_BUILD} == "dev" ]; then
   jq -s '.[0] * .[1]' /tmp/existing_pull_secret.json /tmp/prega_pull_secret.json > /tmp/merged_pull_secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged_pull_secret.json
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker=true | wc -l)" --timeout=60m mcp worker
+  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 
   echo "Applying the ImageDigestMirrorSet manifest"
@@ -30,7 +30,7 @@ if [ ${OCP_BUILD} == "dev" ]; then
   curl -o /tmp/idms.yaml http://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   oc apply -f /tmp/idms.yaml
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker=true | wc -l)" --timeout=60m mcp worker
+  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 
   echo "Creating CatalogSource for PREGA Operator Index"
@@ -50,6 +50,7 @@ EOF
   sleep 300
   kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s
   echo "CatalogSource is ready"
+  oc get catalogsources.operators.coreos.com -n openshift-marketplace
   oc get packagemanifests.packages.operators.coreos.com
 
 else
