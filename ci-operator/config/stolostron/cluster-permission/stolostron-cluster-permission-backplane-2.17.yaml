@@ -14,8 +14,7 @@ images:
   to: cluster-permission
 promotion:
   to:
-  - disabled: true
-    name: "2.17"
+  - name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -62,23 +61,45 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-permission
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.17
-    workflow: ocm-ci-fastforward
-- as: latest-image-mirror
+- as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: cluster-permission
     env:
       IMAGE_REPO: cluster-permission
-      IMAGE_TAG: latest
+      IMAGE_TAG: backplane-2.17
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
+    env:
+      IMAGE_REPO: cluster-permission
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=cluster-permission
+        export OSCI_COMPONENT_VERSION=2.17.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.17
   org: stolostron
   repo: cluster-permission
