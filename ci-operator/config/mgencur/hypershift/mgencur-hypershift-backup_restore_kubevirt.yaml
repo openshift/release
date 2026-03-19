@@ -1,0 +1,58 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "4.21"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-kubevirt-metal-ovn-backuprestore
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      OADP_OPERATOR_SUB_CHANNEL: stable
+      OADP_OPERATOR_SUB_SOURCE: qe-app-registry
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+    workflow: hypershift-mce-kubevirt-baremetalds-backuprestore
+zz_generated_metadata:
+  branch: backup_restore_kubevirt
+  org: mgencur
+  repo: hypershift

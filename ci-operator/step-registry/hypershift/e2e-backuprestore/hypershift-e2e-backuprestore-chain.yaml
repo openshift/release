@@ -4,6 +4,16 @@ chain:
   - as: tests
     cli: latest
     commands: |-
+      # Build the hypershift CLI binary from source
+      echo "Cloning hypershift repository..."
+      git clone --branch backup_restore_kubevirt https://github.com/mgencur/hypershift.git /tmp/hypershift-src
+      echo "Building hypershift CLI..."
+      cd /tmp/hypershift-src
+      GOWORK=off go build -o /tmp/hypershift-cli/hypershift .
+      export PATH="/tmp/hypershift-cli:${PATH}"
+      hypershift version
+      # Build the backuprestore test binary from source
+      GO111MODULE=on GOWORK=off GOFLAGS=-mod=vendor go test -gcflags=all='-N -l' -tags e2ev2,backuprestore -c -o bin/test-backuprestore ./test/e2e/v2/tests
       export PATH="/hypershift/bin:${PATH}"
       export E2E_HOSTED_CLUSTER_NAME=$(cat ${SHARED_DIR}/cluster-name)
       export E2E_HOSTED_CLUSTER_NAMESPACE=${E2E_HOSTED_CLUSTER_NAMESPACE:-clusters}

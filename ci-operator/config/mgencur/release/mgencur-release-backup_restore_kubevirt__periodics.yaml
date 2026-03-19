@@ -1,0 +1,49 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-v2-kubevirt-aws-backuprestore
+  cron: 0 4 * * 3
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-kubevirt-e2e-backuprestore
+zz_generated_metadata:
+  branch: backup_restore_kubevirt
+  org: mgencur
+  repo: release
+  variant: periodics
