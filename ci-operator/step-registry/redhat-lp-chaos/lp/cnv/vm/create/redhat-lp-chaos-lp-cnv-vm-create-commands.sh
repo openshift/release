@@ -16,6 +16,8 @@ declare vmNamesForWait=""
         --dry-run=client -o yaml --save-config
 } | oc apply -f -
 
+oc wait "Namespace/${LPC_LP_CNV__VM__NS}" --for=create --timeout=60s > /dev/null
+
 # Create vms
 function VmCreate() {
   declare vmIndex="${1}"; (($#)) && shift
@@ -50,7 +52,7 @@ function VmCreate() {
         .spec.template.spec.volumes[0].dataVolume.name = ($vmName + "-volume")
         ' | \
     yq -p json -o yaml eval .
-  } 0<<EOF | oc apply -f -
+  } 0<<'EOF' | oc apply -f -
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
