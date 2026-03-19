@@ -126,8 +126,72 @@ function deploy_operators() {
     run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
 
+# Mapping: operator_name -> "namespace|deployment|imagestream_name|component|binary_path"
+# Add new operators here as needed.
+declare -A OPERATOR_IMAGESTREAM_CONFIG=(
+    ["ingress-node-firewall"]="openshift-ingress-node-firewall|ingress-node-firewall-controller-manager|ingress-node-firewall-tests|ingress-node-firewall|/usr/bin/ingress-node-firewall-test-extension.tar.gz"
+    # ["nmstate"]="openshift-nmstate|nmstate-controller|nmstate-tests|nmstate|/usr/bin/kubernetes-nmstate-test-extension.tar.gz"
+    # ["metallb"]="metallb-system|controller|metallb-tests|metallb|/usr/bin/metallb-test-extension.tar.gz"
+)
+
+function deploy_operators_imagestreams() {
+    if [[ -z "${KONFLUX_TARGET_OPERATORS:-}" ]]; then
+        echo "KONFLUX_TARGET_OPERATORS is not set, skipping ImageStream creation"
+        return 0
+    fi
+
+    IFS=',' read -ra operators <<< "${KONFLUX_TARGET_OPERATORS}"
+    for operator in "${operators[@]}"; do
+        operator="${operator// /}"  # trim whitespace
+
+        local cfg="${OPERATOR_IMAGESTREAM_CONFIG[$operator]:-}"
+        if [[ -z "${cfg}" ]]; then
+            echo "WARNING: No ImageStream config found for operator '${operator}', skipping"
+            continue
+        fi
+
+        IFS='|' read -r op_namespace op_deployment op_imagestream op_component op_binary <<< "${cfg}"
+
+        echo "Discovering image for operator '${operator}' from deployment '${op_deployment}' in '${op_namespace}'..."
+        local operator_image
+        if ! operator_image=$(oc get deployment "${op_deployment}" -n "${op_namespace}" \
+                -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null) \
+                || [[ -z "${operator_image}" ]]; then
+            echo "WARNING: Failed to get image for deployment '${op_deployment}' in '${op_namespace}', skipping"
+            continue
+        fi
+        echo "Found image for '${operator}': ${operator_image}"
+
+        echo "Creating ImageStream '${op_imagestream}' in namespace 'openshift'..."
+        oc apply -f - <<EOF
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ${op_imagestream}
+  namespace: openshift
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - name: latest
+    annotations:
+      testextension.redhat.io/component: "${op_component}"
+      testextension.redhat.io/binary: "${op_binary}"
+    from:
+      kind: DockerImage
+      name: ${operator_image}
+    importPolicy:
+      scheduled: false
+    referencePolicy:
+      type: Source
+EOF
+        echo "ImageStream '${op_imagestream}' created/updated successfully"
+    done
+}
+
 set_proxy
 install_deps
 run_command "oc whoami"
 run_command "which oc && oc version -o yaml"
 deploy_operators
+deploy_operators_imagestreams
