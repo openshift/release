@@ -134,10 +134,10 @@ def generate_development_rbac(config):
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-{context.is_namespace}-rbac.yaml'), context) as gendoc:
                 _add_namespace_read_only_rbac(gendoc, context.is_namespace)
-                _add_deployment_monitoring_role(gendoc)
                 _add_cache_monitoring_rbac(gendoc)
 
     context = Context(config, "x86_64", False)
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin-origin-rbac.yaml'), context) as gendoc:
+        _add_deployment_monitoring_role(gendoc)
         _add_monitoring_rbac(gendoc, 'ci')
         _add_namespace_read_only_rbac(gendoc, 'origin')
