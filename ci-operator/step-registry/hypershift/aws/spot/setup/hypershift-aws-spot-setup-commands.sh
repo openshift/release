@@ -74,8 +74,26 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
   cp "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/guest_kubeconfig"
 fi
 
-# Get HCP namespace
-HCP_NAMESPACE=$(oc get hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" -o jsonpath='{.status.controlPlaneNamespace}' 2>/dev/null || echo "${HC_NAMESPACE}-${CLUSTER_NAME}")
+# Get HCP namespace (wait for it to be populated in status)
+HCP_NAMESPACE=""
+echo "Waiting for controlPlaneNamespace to be set on HostedCluster status"
+timeout 5m bash -c "
+  while true; do
+    NS=\$(oc get hostedcluster ${CLUSTER_NAME} -n ${HC_NAMESPACE} -o jsonpath='{.status.controlPlaneNamespace}' 2>/dev/null)
+    if [[ -n \"\${NS}\" ]]; then
+      echo \"\${NS}\"
+      break
+    fi
+    echo \"\$(date) controlPlaneNamespace not set yet...\"
+    sleep 10
+  done
+"
+HCP_NAMESPACE=$(oc get hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" -o jsonpath='{.status.controlPlaneNamespace}')
+if [[ -z "${HCP_NAMESPACE}" ]]; then
+  HCP_NAMESPACE="${HC_NAMESPACE}-${CLUSTER_NAME}"
+  echo "WARNING: controlPlaneNamespace still empty, using fallback: ${HCP_NAMESPACE}"
+fi
+echo "HCP namespace: ${HCP_NAMESPACE}"
 
 # Wait for spot MachineHealthCheck to be created (indicates controller reconciled the spot NodePool)
 echo "Waiting for spot MachineHealthCheck ${SPOT_NP_NAME}-spot in namespace ${HCP_NAMESPACE}"
