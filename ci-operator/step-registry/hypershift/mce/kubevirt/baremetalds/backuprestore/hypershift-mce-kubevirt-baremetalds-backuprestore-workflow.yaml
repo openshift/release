@@ -1,0 +1,65 @@
+workflow:
+  as: hypershift-mce-kubevirt-baremetalds-backuprestore
+  documentation: |-
+    The HyperShift KubeVirt backup/restore workflow executes OADP backup and restore
+    tests against a new ephemeral HyperShift cluster running on KubeVirt.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift and is destroyed after tests complete.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    test:
+    - ref: hypershift-mce-agent-minio
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-mce-agent-oadp-v2-setup
+    - chain: hypershift-e2e-backuprestore
+    post:
+    - ref: hypershift-mce-dump
+    - chain: gather-core-dump
+    - chain: hypershift-mce-kubevirt-destroy
+    - chain: baremetalds-ofcir-post
+    env:
+      CLUSTERTYPE: host_384gb_el9
+      E2E_HOSTED_CLUSTER_NAMESPACE: local-cluster
+      TEST_SKIPS: etcd leader changes are not excessive \| StatefulSet Basic \| StatefulSet Non-retain
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_TARGET_OPERATORS: metallb,local-storage
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      HYPERSHIFT_NP_AUTOREPAIR: "true"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G

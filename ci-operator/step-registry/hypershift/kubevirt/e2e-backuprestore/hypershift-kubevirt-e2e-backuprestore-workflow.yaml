@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-kubevirt-e2e-backuprestore
+  documentation: |-
+    The HyperShift kubevirt e2e-backuprestore workflow executes backup and restore
+    tests against a new ephemeral HyperShift cluster on KubeVirt using OADP.
+
+    It provisions an AWS management cluster, installs KubeVirt and HyperShift,
+    creates a KubeVirt-based hosted cluster, installs the OADP operator with
+    AWS S3 backup storage, runs backup/restore E2E tests, and then runs
+    a minimal conformance suite.
+  steps:
+    env:
+      ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK: "true"
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      HYPERSHIFT_INSTANCE_TYPE: c5n.metal
+      HYPERSHIFT_ZONES: "us-east-1a"
+      # Use external DNS domain to avoid issues with OCPBUGS-59880
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "service.ci.hypershift.devcluster.openshift.com"
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-health-check
+    test:
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-aws-oadp-setup
+    - chain: hypershift-e2e-backuprestore
+    post:
+    - ref: wait
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - ref: hypershift-aws-oadp-destroy
+    - chain: hypershift-kubevirt-destroy
+    - chain: hypershift-destroy-nested-management-cluster
