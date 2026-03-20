@@ -11,8 +11,10 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
 get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
+  QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
   OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
-  OPERATOR_PREGA_VERSION=$(curl -s 'https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1' | jq --arg version "$OCP_VERSION" -r '.tags[].name | select(startswith($version))' | sort -V | tail -1)
+  DIGEST=$(curl -s ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
+  OPERATOR_PREGA_VERSION=$(curl -s ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
   echo "PREGA Operator Version: ${OPERATOR_PREGA_VERSION} for OCP Version: ${OCP_VERSION}"
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
