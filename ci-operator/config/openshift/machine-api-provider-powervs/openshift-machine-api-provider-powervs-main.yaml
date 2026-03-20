@@ -18,6 +18,12 @@ releases:
       include_built_images: true
       name: "4.22"
       namespace: ocp
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -56,6 +62,21 @@ tests:
     env:
       PROJECT_NAME: machine-api-provider-powervs
     workflow: openshift-ci-security
+- always_run: false
+  as: e2e-powervs-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: main
+      CLUSTER_NAME_MODIFIER: capi-main
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
 - as: verify-deps
   steps:
     env:
