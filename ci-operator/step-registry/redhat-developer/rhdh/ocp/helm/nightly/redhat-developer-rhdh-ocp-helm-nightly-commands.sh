@@ -64,15 +64,30 @@ else
     exit 1
 fi
 
-timeout --foreground 5m bash <<-"EOF"
+timeout --foreground 10m bash <<-"EOF"
     while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
-            sleep 20
+            echo "Login failed, retrying in 30s..."
+            sleep 30
     done
 EOF
 if [ $? -ne 0 ]; then
     echo "Timed out waiting for login"
     exit 1
 fi
+
+echo "========== Cluster Health Check =========="
+echo "Verifying cluster API server is fully responsive..."
+timeout --foreground 5m bash <<-"EOF"
+    while ! oc get nodes &>/dev/null; do
+        echo "API server not ready, retrying in 15s..."
+        sleep 15
+    done
+EOF
+if [ $? -ne 0 ]; then
+    echo "Timed out waiting for cluster API server to become ready"
+    exit 1
+fi
+echo "Cluster API server is ready"
 
 echo "========== Cluster Service Account and Token Management =========="
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
