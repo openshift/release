@@ -70,7 +70,7 @@ if [[ -z "${HC_NAME}" ]]; then
 fi
 
 echo "Found HostedCluster: ${HC_NAMESPACE}/${HC_NAME}"
-HCP_NAMESPACE=$(oc get hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" -o jsonpath='{.status.controlPlaneNamespace}' 2>/dev/null || echo "${HC_NAMESPACE}-${HC_NAME}")
+HCP_NAMESPACE="${HC_NAMESPACE}-${HC_NAME}"
 echo "HCP namespace: ${HCP_NAMESPACE}"
 
 # Step 1: Check terminationHandlerQueueURL on HostedCluster
@@ -135,7 +135,7 @@ if [[ -f "${GUEST_KUBECONFIG}" ]]; then
   fi
 else
   # Try to extract guest kubeconfig
-  GUEST_KUBECONFIG_SECRET=$(oc get hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" -o jsonpath='{.status.kubeConfig.name}' 2>/dev/null || true)
+  GUEST_KUBECONFIG_SECRET=$(oc get hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" -o jsonpath='{.status.kubeconfig.name}' 2>/dev/null || true)
   if [[ -n "${GUEST_KUBECONFIG_SECRET}" ]]; then
     oc get secret "${GUEST_KUBECONFIG_SECRET}" -n "${HC_NAMESPACE}" -o jsonpath='{.data.kubeconfig}' 2>/dev/null | base64 -d > /tmp/guest_kubeconfig || true
     if [[ -s /tmp/guest_kubeconfig ]]; then
@@ -232,6 +232,8 @@ spec:
     type: AWS
     aws:
       instanceType: m5.large
+      subnet:
+        id: subnet-placeholder
       placement:
         marketType: Spot
         capacityReservation:
@@ -262,6 +264,8 @@ spec:
     type: AWS
     aws:
       instanceType: m5.large
+      subnet:
+        id: subnet-placeholder
       placement:
         marketType: Spot
         tenancy: dedicated
@@ -291,6 +295,8 @@ spec:
     type: AWS
     aws:
       instanceType: m5.large
+      subnet:
+        id: subnet-placeholder
       placement:
         marketType: OnDemand
         spot:
