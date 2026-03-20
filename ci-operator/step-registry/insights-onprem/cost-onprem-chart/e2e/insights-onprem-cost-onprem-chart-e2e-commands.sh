@@ -219,12 +219,43 @@ fi
 # Use bash to execute since source may be read-only (can't chmod)
 bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
 
-# Copy IQE test artifacts to CI artifact directory if they exist
-if [ "${RUN_IQE:-false}" == "true" ] && [ -d "./tests/reports" ]; then
-    echo "Collecting IQE test artifacts..."
+# Copy test artifacts to CI artifact directory
+echo "========== Collecting Test Artifacts =========="
+if [ -d "./tests/reports" ]; then
+    echo "Found test reports directory, copying artifacts..."
+    
+    # Copy all files from reports directory
     cp -r ./tests/reports/* "${ARTIFACT_DIR}/" 2>/dev/null || true
-    # Rename junit file for CI recognition
+    
+    # Rename junit files for Prow recognition (must be prefixed with junit)
+    # IQE test results
     if [ -f "${ARTIFACT_DIR}/iqe_junit.xml" ]; then
         mv "${ARTIFACT_DIR}/iqe_junit.xml" "${ARTIFACT_DIR}/junit_iqe.xml"
+        echo "  - junit_iqe.xml (IQE test results)"
     fi
+    
+    # Chart pytest results
+    if [ -f "${ARTIFACT_DIR}/junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/junit.xml" "${ARTIFACT_DIR}/junit_chart.xml"
+        echo "  - junit_chart.xml (chart test results)"
+    fi
+    
+    # HTML report
+    if [ -f "${ARTIFACT_DIR}/report.html" ]; then
+        echo "  - report.html (HTML test report)"
+    fi
+    
+    # IQE output log
+    if [ -f "${ARTIFACT_DIR}/iqe_output.log" ]; then
+        echo "  - iqe_output.log (IQE test output)"
+    fi
+    
+    # Screenshots directory
+    if [ -d "${ARTIFACT_DIR}/screenshots" ]; then
+        echo "  - screenshots/ (UI test screenshots)"
+    fi
+    
+    echo "Artifacts collected to ${ARTIFACT_DIR}"
+else
+    echo "No test reports directory found"
 fi
