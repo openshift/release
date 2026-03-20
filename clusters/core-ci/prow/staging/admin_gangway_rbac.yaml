@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: ci-staging
+  name: gangway
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: |
+      {"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"gangway"}}
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: ci-staging
+  name: gangway
+rules:
+- apiGroups:
+  - "prow.k8s.io"
+  resources:
+  - prowjobs
+  verbs:
+  - create
+  - get
+  - list
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: ci-staging
+  name: gangway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gangway
+subjects:
+- kind: ServiceAccount
+  name: gangway
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway-oauth
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gangway-oauth
+subjects:
+- kind: ServiceAccount
+  name: gangway
+  namespace: ci-staging
