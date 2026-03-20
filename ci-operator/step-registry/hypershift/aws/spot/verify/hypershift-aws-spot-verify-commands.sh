@@ -16,10 +16,16 @@ set -o xtrace
 #   - Termination handler runs management-side (not in guest cluster)
 #   - Web identity token auth (token-minter sidecar)
 #   - Spot NodePool resources (AWSMachineTemplate, MachineDeployment, MachineHealthCheck)
+#   - SQS event simulation (rebalance recommendation -> node taint)
 #   - CEL validation rules for invalid configurations
 
 export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 AWS_REGION="${AWS_REGION:-us-east-1}"
+
+# AWS credentials for SQS event simulation
+AWS_CREDS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
+export AWS_SHARED_CREDENTIALS_FILE="${AWS_CREDS_FILE}"
+export AWS_DEFAULT_REGION="${AWS_REGION}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -212,9 +218,96 @@ else
   skip "No spot NodePool found (e2e test may have cleaned up)"
 fi
 
-# Step 6: CEL validation rules
+# Step 6: SQS event simulation - send rebalance recommendation, verify node taint
 echo ""
-echo "--- Step 6: CEL validation rules ---"
+echo "--- Step 6: SQS event simulation ---"
+
+# Get SQS queue URL from shared dir (saved by sqs-setup step)
+SQS_QUEUE_URL="${QUEUE_URL:-}"
+if [[ -z "${SQS_QUEUE_URL}" ]] && [[ -f "${SHARED_DIR}/spot_sqs_queue_url" ]]; then
+  SQS_QUEUE_URL=$(cat "${SHARED_DIR}/spot_sqs_queue_url")
+fi
+
+# Resolve guest kubeconfig
+GUEST_KC=""
+if [[ -f "${SHARED_DIR}/guest_kubeconfig" ]]; then
+  GUEST_KC="${SHARED_DIR}/guest_kubeconfig"
+elif [[ -f /tmp/guest_kubeconfig ]] && [[ -s /tmp/guest_kubeconfig ]]; then
+  GUEST_KC="/tmp/guest_kubeconfig"
+fi
+
+if [[ -z "${SQS_QUEUE_URL}" ]]; then
+  skip "SQS queue URL not available, skipping event simulation"
+elif [[ -z "${GUEST_KC}" ]]; then
+  skip "Guest kubeconfig not available, skipping event simulation"
+else
+  # Get a worker node's providerID from the guest cluster
+  NODE_PROVIDER_ID=$(KUBECONFIG="${GUEST_KC}" oc get nodes -l node-role.kubernetes.io/worker \
+    -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null || true)
+  NODE_NAME=$(KUBECONFIG="${GUEST_KC}" oc get nodes -l node-role.kubernetes.io/worker \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+  if [[ -z "${NODE_PROVIDER_ID}" ]] || [[ -z "${NODE_NAME}" ]]; then
+    skip "No worker node found in guest cluster for SQS simulation"
+  else
+    # Extract instance ID from providerID (format: aws:///us-east-1a/i-0123456789abcdef0)
+    INSTANCE_ID="${NODE_PROVIDER_ID##*/}"
+    echo "Target node: ${NODE_NAME}, instance: ${INSTANCE_ID}"
+
+    # Build EC2 Rebalance Recommendation event (same format as EventBridge)
+    EVENT_JSON=$(cat <<SQSEOF
+{
+  "version": "0",
+  "source": "aws.ec2",
+  "detail-type": "EC2 Instance Rebalance Recommendation",
+  "detail": {"instance-id": "${INSTANCE_ID}"},
+  "id": "$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "test-$(date +%s)")",
+  "time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "region": "${AWS_REGION}",
+  "account": "000000000000"
+}
+SQSEOF
+)
+
+    echo "Sending EC2 Rebalance Recommendation event to SQS queue"
+    SEND_RESULT=$(aws sqs send-message \
+      --queue-url "${SQS_QUEUE_URL}" \
+      --message-body "${EVENT_JSON}" \
+      --region "${AWS_REGION}" 2>&1 || true)
+
+    if echo "${SEND_RESULT}" | grep -q "MessageId"; then
+      pass "SQS rebalance recommendation event sent for instance ${INSTANCE_ID}"
+
+      # Wait for the node to get the rebalance-recommendation taint (up to 5 minutes)
+      echo "Waiting for node ${NODE_NAME} to receive rebalance-recommendation taint..."
+      TAINT_FOUND=false
+      for i in $(seq 1 30); do
+        TAINTS=$(KUBECONFIG="${GUEST_KC}" oc get node "${NODE_NAME}" \
+          -o jsonpath='{.spec.taints[*].key}' 2>/dev/null || true)
+        if echo "${TAINTS}" | grep -q "aws-node-termination-handler"; then
+          TAINT_FOUND=true
+          break
+        fi
+        echo "$(date) Attempt ${i}/30: waiting for taint..."
+        sleep 10
+      done
+
+      if [[ "${TAINT_FOUND}" == "true" ]]; then
+        TAINT_DETAIL=$(KUBECONFIG="${GUEST_KC}" oc get node "${NODE_NAME}" \
+          -o jsonpath='{.spec.taints}' 2>/dev/null || true)
+        pass "Node ${NODE_NAME} received NTH taint: ${TAINT_DETAIL}"
+      else
+        fail "Node ${NODE_NAME} did NOT receive NTH taint within 5 minutes"
+      fi
+    else
+      fail "Failed to send SQS message: ${SEND_RESULT}"
+    fi
+  fi
+fi
+
+# Step 7: CEL validation rules
+echo ""
+echo "--- Step 7: CEL validation rules ---"
 
 # Test: Spot + Capacity Reservation should be rejected
 CEL_RESULT=$(oc apply --dry-run=server -f - 2>&1 <<EOF || true
