@@ -18,7 +18,7 @@ set -o xtrace
 #   - Spot NodePool resources (AWSMachineTemplate, MachineDeployment, MachineHealthCheck)
 #   - CEL validation rules for invalid configurations
 
-export KUBECONFIG="${KUBECONFIG:-${SHARED_DIR}/management_cluster_kubeconfig}"
+export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
 PASS_COUNT=0
