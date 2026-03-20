@@ -139,8 +139,20 @@ tests:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
-      DEDICATEDHOST_ZONE: "2"
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      RT_ENABLED: "true"
+      SLEEP_DURATION: 5m
+    post:
+    - ref: gather-ibmcloud-resource
+    - ref: cucushift-installer-wait
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
