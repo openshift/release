@@ -64,26 +64,26 @@ else
     exit 1
 fi
 
-timeout --foreground 10m bash <<-"EOF"
+# Disable tracing to protect credentials from leaking into CI logs
+set +x 2>/dev/null
+if ! timeout --foreground 10m bash <<-"EOF"; then
     while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
             echo "Login failed, retrying in 30s..."
             sleep 30
     done
 EOF
-if [ $? -ne 0 ]; then
     echo "Timed out waiting for login"
     exit 1
 fi
 
 echo "========== Cluster Health Check =========="
 echo "Verifying cluster API server is fully responsive..."
-timeout --foreground 5m bash <<-"EOF"
-    while ! oc get nodes &>/dev/null; do
+if ! timeout --foreground 5m bash <<-"EOF"; then
+    while ! oc get nodes 2>&1; do
         echo "API server not ready, retrying in 15s..."
         sleep 15
     done
 EOF
-if [ $? -ne 0 ]; then
     echo "Timed out waiting for cluster API server to become ready"
     exit 1
 fi
