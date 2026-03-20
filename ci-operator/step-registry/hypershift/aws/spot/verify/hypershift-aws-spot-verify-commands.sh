@@ -296,6 +296,100 @@ SQSEOF
         TAINT_DETAIL=$(KUBECONFIG="${GUEST_KC}" oc get node "${NODE_NAME}" \
           -o jsonpath='{.spec.taints}' 2>/dev/null || true)
         pass "Node ${NODE_NAME} received NTH taint: ${TAINT_DETAIL}"
+
+        # Step 6b: Verify spot remediation controller annotates and deletes the Machine
+        echo ""
+        echo "--- Step 6b: Spot remediation (Machine annotation + deletion + replacement) ---"
+
+        # Find the CAPI Machine for this node using the node's annotations
+        MACHINE_NAME=$(KUBECONFIG="${GUEST_KC}" oc get node "${NODE_NAME}" \
+          -o jsonpath='{.metadata.annotations.cluster\.x-k8s\.io/machine}' 2>/dev/null || true)
+        MACHINE_NAMESPACE=$(KUBECONFIG="${GUEST_KC}" oc get node "${NODE_NAME}" \
+          -o jsonpath='{.metadata.annotations.cluster\.x-k8s\.io/cluster-namespace}' 2>/dev/null || true)
+
+        if [[ -z "${MACHINE_NAME}" ]] || [[ -z "${MACHINE_NAMESPACE}" ]]; then
+          skip "Could not find CAPI Machine annotations on node ${NODE_NAME}"
+        else
+          echo "CAPI Machine: ${MACHINE_NAMESPACE}/${MACHINE_NAME}"
+
+          # Count current machines before remediation
+          MACHINE_COUNT_BEFORE=$(oc get machine -n "${MACHINE_NAMESPACE}" \
+            -l hypershift.openshift.io/interruptible-instance --no-headers 2>/dev/null | wc -l || echo "0")
+          MACHINE_COUNT_BEFORE=$(echo "${MACHINE_COUNT_BEFORE}" | tr -d ' ')
+          echo "Machine count before remediation: ${MACHINE_COUNT_BEFORE}"
+
+          # Wait for the Machine to get the spot-interruption-signal annotation (up to 3 minutes)
+          echo "Waiting for Machine ${MACHINE_NAME} to get spot-interruption-signal annotation..."
+          ANNOTATION_FOUND=false
+          for i in $(seq 1 18); do
+            SIGNAL=$(oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" \
+              -o jsonpath='{.metadata.annotations.hypershift\.openshift\.io/spot-interruption-signal}' 2>/dev/null || true)
+            if [[ -n "${SIGNAL}" ]]; then
+              ANNOTATION_FOUND=true
+              pass "Machine ${MACHINE_NAME} annotated with spot-interruption-signal: ${SIGNAL}"
+              break
+            fi
+            # Check if Machine was already deleted
+            if ! oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" &>/dev/null; then
+              ANNOTATION_FOUND=true
+              pass "Machine ${MACHINE_NAME} already deleted by spot remediation"
+              break
+            fi
+            echo "$(date) Attempt ${i}/18: waiting for annotation..."
+            sleep 10
+          done
+
+          if [[ "${ANNOTATION_FOUND}" != "true" ]]; then
+            fail "Machine ${MACHINE_NAME} did NOT get spot-interruption-signal annotation within 3 minutes"
+          fi
+
+          # Wait for the Machine to be deleted (up to 3 minutes)
+          echo "Waiting for Machine ${MACHINE_NAME} to be deleted..."
+          MACHINE_DELETED=false
+          for i in $(seq 1 18); do
+            if ! oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" &>/dev/null; then
+              MACHINE_DELETED=true
+              break
+            fi
+            # Check if it has a deletion timestamp
+            DEL_TS=$(oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" \
+              -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)
+            if [[ -n "${DEL_TS}" ]]; then
+              echo "Machine ${MACHINE_NAME} has deletionTimestamp: ${DEL_TS}"
+            fi
+            echo "$(date) Attempt ${i}/18: waiting for machine deletion..."
+            sleep 10
+          done
+
+          if [[ "${MACHINE_DELETED}" == "true" ]]; then
+            pass "Machine ${MACHINE_NAME} deleted by spot remediation controller"
+          else
+            fail "Machine ${MACHINE_NAME} was NOT deleted within 3 minutes"
+          fi
+
+          # Wait for a replacement Machine to be created (up to 5 minutes)
+          echo "Waiting for replacement Machine to be created..."
+          REPLACEMENT_FOUND=false
+          for i in $(seq 1 30); do
+            MACHINE_COUNT_NOW=$(oc get machine -n "${MACHINE_NAMESPACE}" \
+              -l hypershift.openshift.io/interruptible-instance --no-headers 2>/dev/null | wc -l || echo "0")
+            MACHINE_COUNT_NOW=$(echo "${MACHINE_COUNT_NOW}" | tr -d ' ')
+            if [[ "${MACHINE_COUNT_NOW}" -ge "${MACHINE_COUNT_BEFORE}" ]]; then
+              REPLACEMENT_FOUND=true
+              break
+            fi
+            echo "$(date) Attempt ${i}/30: machines=${MACHINE_COUNT_NOW}, expected>=${MACHINE_COUNT_BEFORE}..."
+            sleep 10
+          done
+
+          if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
+            NEW_MACHINES=$(oc get machine -n "${MACHINE_NAMESPACE}" \
+              -l hypershift.openshift.io/interruptible-instance -o name 2>/dev/null || true)
+            pass "Replacement Machine created. Current machines: ${NEW_MACHINES}"
+          else
+            fail "Replacement Machine was NOT created within 5 minutes"
+          fi
+        fi
       else
         fail "Node ${NODE_NAME} did NOT receive NTH taint within 5 minutes"
       fi
