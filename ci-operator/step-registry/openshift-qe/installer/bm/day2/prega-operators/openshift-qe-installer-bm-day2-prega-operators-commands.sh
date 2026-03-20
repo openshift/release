@@ -6,6 +6,22 @@ set -x
 cat /etc/os-release
 
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+
+get_idms_manifest() {
+  echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
+  OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
+  OPERATOR_PREGA_VERSION=$(curl -s 'https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1' | jq --arg version "$OCP_VERSION" -r '.tags[].name | select(startswith($version))' | sort -V | tail -1)
+  echo "PREGA Operator Version: ${OPERATOR_PREGA_VERSION} for OCP Version: ${OCP_VERSION}"
+  ssh ${SSH_ARGS} root@${bastion} "
+    set -e
+    set -o pipefail
+    curl -o /tmp/idms.yaml http://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
+  echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
+}
 
 oc config view
 oc projects
@@ -24,10 +40,7 @@ if [ ${OCP_BUILD} == "dev" ]; then
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 
   echo "Applying the ImageDigestMirrorSet manifest"
-  OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
-  OPERATOR_PREGA_VERSION=$(curl -s 'https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1' | jq --arg version "$OCP_VERSION" -r '.tags[].name | select(startswith($version))' | sort -V | tail -1)
-  echo "Installing PREGA Operator ${OPERATOR_PREGA_VERSION} for OCP ${OCP_VERSION}"
-  curl -o /tmp/idms.yaml http://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+  get_idms_manifest
   oc apply -f /tmp/idms.yaml
   sleep 300
   kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
