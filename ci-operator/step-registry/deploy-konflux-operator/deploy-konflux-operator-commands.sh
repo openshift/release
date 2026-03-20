@@ -162,13 +162,13 @@ function deploy_operators_imagestreams() {
         fi
         echo "Found image for '${operator}': ${operator_image}"
 
-        echo "Creating ImageStream '${op_imagestream}' in namespace 'openshift'..."
+        echo "Creating ImageStream '${op_imagestream}' in it's own namespace '${op_namespace}'"
         oc apply -f - <<EOF
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
   name: ${op_imagestream}
-  namespace: openshift
+  namespace: ${op_namespace}
 spec:
   lookupPolicy:
     local: false
@@ -186,6 +186,11 @@ spec:
       type: Source
 EOF
         echo "ImageStream '${op_imagestream}' created/updated successfully"
+
+        echo "Creating TestExtensionAdmission CR '${op_component}-admission' to permit '${op_namespace}/${op_imagestream}'..."
+        /usr/libexec/origin/openshift-tests extension-admission create "${op_component}-admission" \
+            --permit="${op_namespace}/${op_imagestream}"
+        echo "TestExtensionAdmission '${op_component}-admission' created successfully"
     done
 }
 
