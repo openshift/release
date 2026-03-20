@@ -172,7 +172,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
           {
@@ -185,7 +185,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past five minutes.',
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
         ],
