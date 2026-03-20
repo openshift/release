@@ -9,6 +9,23 @@ spec:
   destination:
     name: app.ci
     namespace: openshift-gitops
+  ignoreDifferences:
+    - group: apps
+      kind: DaemonSet
+      name: webhook-server
+      namespace: crt-admission-webhooks
+      jqPathExpressions:
+        - '.spec.template.spec.containers[].image'
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - '.spec.template.spec.containers[].image'
+    - group: apps
+      kind: StatefulSet
+      name: vault
+      namespace: vault
+      jqPathExpressions:
+        - '.spec.template.spec.containers[].image'
   project: default
   source:
     directory:
@@ -27,4 +44,5 @@ spec:
       - ApplyOutOfSyncOnly=true
       - CreateNamespace=true
       - PruneLast=true
+      - RespectIgnoreDifferences=true
       - ServerSideApply=true
