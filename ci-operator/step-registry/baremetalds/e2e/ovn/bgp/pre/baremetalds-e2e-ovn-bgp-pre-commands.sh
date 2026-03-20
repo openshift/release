@@ -292,10 +292,14 @@ done
 if [ -n "${FRR_IMAGE:-}" ]; then
   echo "Setting CNO to Unmanaged and waiting for reconciliation to stop..."
   oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"managementState":"Unmanaged"}}'
-  oc rollout restart deployment/network-operator -n openshift-network-operator
-  until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
-    sleep 5
-  done
+  # Wait for CNO to complete any in-flight reconciliation after being set to Unmanaged.
+  # Note: Cannot restart CNO deployment as it resets managementState back to Managed
+  # (tracked in https://redhat.atlassian.net/browse/OCPBUGS-78974).
+  sleep 60s
+  # oc rollout restart deployment/network-operator -n openshift-network-operator
+  # until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
+  #  sleep 5
+  # done
 
   # Update the FRR and reloader container images
   echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
