@@ -10,6 +10,7 @@
             'for': '5m',
             labels: {
               severity: 'critical',
+              team: 'crt',
             },
             annotations: {
               message: '{{ $labels.deployment }} has been down for 5 minutes.',
