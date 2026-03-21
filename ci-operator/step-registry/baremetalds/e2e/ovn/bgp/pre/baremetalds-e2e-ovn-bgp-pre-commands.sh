@@ -12,6 +12,8 @@ set -o errexit
 set -o pipefail
 set -x
 
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] Starting baremetalds-e2e-ovn-bgp-pre setup"
+
 FRR_K8S_VERSION=v0.0.21
 FRR_TMP_DIR=$(mktemp -d -u)
 
@@ -288,10 +290,19 @@ done
 # This is used while waiting for OCP builds with FRR 10.
 # This will be removed once OCP builds with FRR 10 are available.
 if [ -n "${FRR_IMAGE:-}" ]; then
-  echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
+  echo "Setting CNO to Unmanaged and waiting for reconciliation to stop..."
   oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"managementState":"Unmanaged"}}'
+  # Wait for CNO to complete any in-flight reconciliation after being set to Unmanaged.
+  # Note: Cannot restart CNO deployment as it resets managementState back to Managed
+  # (tracked in https://redhat.atlassian.net/browse/OCPBUGS-78974).
+  sleep 60s
+  # oc rollout restart deployment/network-operator -n openshift-network-operator
+  # until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
+  #  sleep 5
+  # done
 
   # Update the FRR and reloader container images
+  echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
   oc set image daemonset/frr-k8s -n openshift-frr-k8s frr="${FRR_IMAGE}" reloader="${FRR_IMAGE}"
 
   echo "Waiting for daemonset 'frr-k8s' to rollout with new image..."
