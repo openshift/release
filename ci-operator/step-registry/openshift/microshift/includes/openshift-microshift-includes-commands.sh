@@ -219,14 +219,24 @@ function ci_clone_src() {
 
     if [ "${force_clone}" == "true" ]; then
         # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
-        local branch
-        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
-        # MicroShift repo uses main instead of master
-        if [ "${branch}" == "master" ]; then
+        # Priority: MICROSHIFT_PR > MICROSHIFT_GIT > MICROSHIFT_NIGHTLY > JOB_SPEC extraction
+        local branch pr_number=""
+        if [ -n "${MICROSHIFT_PR:-}" ]; then
             branch="main"
+            pr_number="${MICROSHIFT_PR}"
+        elif [ -n "${MICROSHIFT_GIT:-}" ]; then
+            branch="${MICROSHIFT_GIT}"
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] && [ -n "${OCP_VERSION:-}" ]; then
+            branch="release-${OCP_VERSION}"
+        else
+            branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
+            # MicroShift repo uses main instead of master
+            [ "${branch}" == "master" ] && branch="main"
         fi
+
         CLONEREFS_OPTIONS=$(jq -n \
             --arg branch "${branch}" \
+            --arg pr "${pr_number}" \
             '{
                 "src_root": "/go",
                 "log":"/dev/null",
@@ -238,7 +248,7 @@ function ci_clone_src() {
                     "repo": "microshift",
                     "base_ref": $branch,
                     "workdir": true
-                }]
+                } + if $pr != "" then {"pulls": [{"number": ($pr | tonumber), "sha": ""}]} else {} end]
             }')
         export CLONEREFS_OPTIONS
     elif [ -z ${CLONEREFS_OPTIONS+x} ]; then
