@@ -4,6 +4,29 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Debug: Print credential paths and their existence
+echo "=== Firewatch Jira Credentials Debug ==="
+echo "FIREWATCH_JIRA_SERVER: ${FIREWATCH_JIRA_SERVER}"
+echo "FIREWATCH_JIRA_API_TOKEN_PATH: ${FIREWATCH_JIRA_API_TOKEN_PATH}"
+echo "FIREWATCH_JIRA_EMAIL_PATH: ${FIREWATCH_JIRA_EMAIL_PATH}"
+echo ""
+echo "Checking secrets directory /tmp/secrets/jira/:"
+ls -la /tmp/secrets/jira/ || echo "Directory does not exist"
+echo ""
+echo "Token file exists: $([ -f "${FIREWATCH_JIRA_API_TOKEN_PATH}" ] && echo "YES" || echo "NO")"
+echo "Email file exists: $([ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ] && echo "YES" || echo "NO")"
+echo ""
+if [ -f "${FIREWATCH_JIRA_API_TOKEN_PATH}" ]; then
+    echo "Token file size: $(wc -c < "${FIREWATCH_JIRA_API_TOKEN_PATH}") bytes"
+    echo "Token file content (first 10 chars): $(head -c 10 "${FIREWATCH_JIRA_API_TOKEN_PATH}")..."
+fi
+if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
+    echo "Email file size: $(wc -c < "${FIREWATCH_JIRA_EMAIL_PATH}") bytes"
+    echo "Email file content: $(cat "${FIREWATCH_JIRA_EMAIL_PATH}")"
+fi
+echo "========================================="
+echo ""
+
 # Jira Cloud (*.atlassian.net) requires email + API token authentication
 # Jira Server only requires API token authentication
 if [[ "${FIREWATCH_JIRA_SERVER}" == *"atlassian.net"* ]]; then
