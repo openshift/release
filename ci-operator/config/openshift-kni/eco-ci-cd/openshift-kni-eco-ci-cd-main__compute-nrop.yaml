@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 200Mi
+tests:
+- as: e2e-telcov10n-nrop-tests-prod-4-21
+  capabilities:
+  - intranet
+  cron: 59 23 * * 1
+  steps:
+    env:
+      CLUSTER_NAME: helix47
+      OPERATORS: |
+        [
+            {"name":"numaresources-operator","catalog":"redhat-operators","nsname":"openshift-numaresources","deploy_default_config":false,"channel":"4.21"}
+        ]
+      TEST_ENV: prod
+    workflow: telcov10n-functional-compute-nrop-nrop-testing
+- as: e2e-telcov10n-nrop-tests-stage-4-21
+  capabilities:
+  - intranet
+  cron: 59 23 * * 1
+  steps:
+    env:
+      CLUSTER_NAME: helix47
+      TEST_ENV: stage
+    workflow: telcov10n-functional-compute-nrop-nrop-testing
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: compute-nrop
