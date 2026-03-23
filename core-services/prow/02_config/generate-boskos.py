@@ -281,6 +281,7 @@ CONFIG = {
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
+    'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -730,6 +731,9 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
+for i in range(20):
+    CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
 
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
