@@ -27,10 +27,21 @@ echo "============================================="
 OUTPUT_DIR="${ARO_REPO_DIR}/${WORKLOAD_CLUSTER_NAME:-capz-tests}-${DEPLOYMENT_ENV}"
 if [[ -d "${OUTPUT_DIR}" ]]; then
   for f in "${OUTPUT_DIR}"/*; do
-    cp "${f}" "${SHARED_DIR}/generated-$(basename "${f}")"
-    cp "${f}" "${ARTIFACT_DIR}/"
+    basename_f="$(basename "${f}")"
+    # Always copy to SHARED_DIR (raw, needed for deploy-crs step)
+    cp "${f}" "${SHARED_DIR}/generated-${basename_f}"
+    # Skip credential files from public artifacts
+    case "${basename_f}" in
+      credentials.yaml)
+        echo "# Redacted - contains Kubernetes Secret resources" > "${ARTIFACT_DIR}/${basename_f}"
+        echo "[generate-yamls] ${basename_f} excluded from artifacts (contains secrets)"
+        ;;
+      *)
+        cp "${f}" "${ARTIFACT_DIR}/"
+        ;;
+    esac
   done
-  echo "Copied generated YAMLs to SHARED_DIR and ARTIFACT_DIR"
+  echo "Copied generated YAMLs to SHARED_DIR and ARTIFACT_DIR (credentials redacted)"
   ls -la "${SHARED_DIR}"/generated-*
 fi
 
