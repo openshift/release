@@ -21,15 +21,22 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: horologium
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260217-999e46ca7
+        image: quay.io/prucek/prow:horologium_db
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/jobs
         volumeMounts:
         - name: config
           mountPath: /etc/config
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
           readOnly: true
       volumes:
       - name: config
         configMap:
           name: config
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

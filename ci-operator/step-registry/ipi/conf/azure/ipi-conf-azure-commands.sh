@@ -50,6 +50,8 @@ else
   AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
 fi
 
+echo "${AZURE_BASE_DOMAIN}" > "${SHARED_DIR}/basedomain.txt"
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
@@ -169,6 +171,34 @@ platform:
     userProvisionedDNS: Enabled
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# Configure dual-stack networking if IP_FAMILY is set
+if [[ -n "${IP_FAMILY:-}" ]]; then
+  echo "Configuring Azure dual-stack networking with IP_FAMILY: ${IP_FAMILY}"
+  patch_dualstack="${SHARED_DIR}/install-config-dualstack.yaml.patch"
+  
+  cat > "${patch_dualstack}" << EOF
+platform:
+  azure:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  - cidr: fd00::/64
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  - cidr: fd01::/64
+    hostPrefix: 64
+  serviceNetwork:
+  - 172.30.0.0/16
+  - fd02::/112
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
+  cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
+  echo "Dual-stack networking configuration added to install-config.yaml"
 fi
 
 # starting from 4.19, cluster sp only needs Contributor role

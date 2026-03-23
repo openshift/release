@@ -33,13 +33,14 @@ tests:
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       CYPRESS_COO_NAMESPACE: coo
-      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator/coo-fbc-v4-21@sha256:47464f6b674a85101ecd5dc45c450f7415e4d94d9533e3d9f06849f5246d423d
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:ffcb03434d9ff4bbba09109b3585505cb73cd15d7be7cf47d02439b3ef9f7ca3
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+            {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+            {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
         ]
     test:
     - ref: rhobs-konflux-catalogsource
@@ -47,6 +48,7 @@ tests:
     - ref: install-operators
     - ref: acm-mch
     - ref: rhobs-acm-setup-observability
+    - ref: rhobs-acm-alerting-ui-test
     - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-azure-ipi

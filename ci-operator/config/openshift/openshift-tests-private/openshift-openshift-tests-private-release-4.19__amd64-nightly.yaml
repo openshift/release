@@ -2034,6 +2034,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: baremetalds-ipi-ovn-dualstack-kubevirt-hypershift-f14
+  capabilities:
+  - intranet
+  cron: 23 4 7,23 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      HYPERSHIFT_NODE_MEMORY: "16"
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
 - as: baremetalds-ipi-ovn-lvms-f14
   capabilities:
   - intranet
@@ -2343,7 +2353,7 @@ tests:
     - ref: ipi-conf
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-gcp
-    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: ipi-conf-gcp-zones
     - ref: ipi-conf-gcp-confidential-computing
     - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
     - chain: ipi-install
@@ -3995,6 +4005,169 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
+- as: baremetalds-hypershift-agent-mce-disconnected-guest-f14
+  capabilities:
+  - intranet
+  cron: 42 3 6,20 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      E2E_RUN_TAGS: '@disconnected'
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-guest
+- as: baremetalds-hypershift-agent-mce-disconnected-guest-f14-des
+  capabilities:
+  - intranet
+  cron: 19 0 9,23 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-guest
+- as: baremetalds-hypershift-agent-mce-disconnected-mgmt-f14
+  capabilities:
+  - intranet
+  cron: 47 4 11,27 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected
+- as: baremetalds-hypershift-agent-mce-dualstack-guest-f14
+  capabilities:
+  - intranet
+  cron: 14 9 10,25 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-dualstack-guest-f14-des
+  capabilities:
+  - intranet
+  cron: 29 15 12,26 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-dualstack-mgmt-f14
+  capabilities:
+  - intranet
+  cron: 51 21 13,28 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-hypershift-agent-mce-guest-f14
+  capabilities:
+  - intranet
+  cron: 8 7 1,15 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-guest-f28-destructive
+  capabilities:
+  - intranet
+  cron: 27 19 18 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-mgmt-f14
+  capabilities:
+  - intranet
+  cron: 36 13 2,16 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetalds-hypershift-agent-mce-n1minor-guest-f28
   capabilities:
   - intranet
@@ -4282,6 +4455,23 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: baremetal-ipi-ovn-ipv4-disconnected-f28
+  capabilities:
+  - intranet
+  cron: 30 13 26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
+      RESERVE_BOOTSTRAP: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-disconnected
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

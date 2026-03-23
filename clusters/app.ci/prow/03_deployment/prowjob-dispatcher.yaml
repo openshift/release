@@ -76,28 +76,11 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: prowjob-dispatcher
         image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
         imagePullPolicy: Always
         args:
+        - --upstream-branch=main
         - --github-token-path=/etc/github/oauth
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
@@ -136,6 +119,24 @@ spec:
           requests:
             memory: "2Gi"
             cpu: "0.7"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: slack
         secret:

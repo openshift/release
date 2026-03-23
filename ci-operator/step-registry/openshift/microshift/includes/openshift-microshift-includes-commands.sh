@@ -201,6 +201,13 @@ function ci_get_clonerefs() {
 }
 
 function ci_clone_src() {
+    local force_clone="${1:-false}"
+
+    # Clusterbot variables override force_clone - they require explicit branch selection
+    if [ -n "${MICROSHIFT_PR:-}" ] || [ -n "${MICROSHIFT_GIT:-}" ] || [ -n "${MICROSHIFT_NIGHTLY:-}" ]; then
+        force_clone="true"
+    fi
+
     fails=0
     for _ in $(seq 3) ; do
         if ci_get_clonerefs; then
@@ -215,7 +222,41 @@ function ci_clone_src() {
         fi
     done
 
-    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+    if [ "${force_clone}" == "true" ]; then
+        # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
+        # Priority: MICROSHIFT_PR > MICROSHIFT_GIT > MICROSHIFT_NIGHTLY > JOB_SPEC extraction
+        local branch pr_number=""
+        if [ -n "${MICROSHIFT_PR:-}" ]; then
+            branch="main"
+            pr_number="${MICROSHIFT_PR}"
+        elif [ -n "${MICROSHIFT_GIT:-}" ]; then
+            branch="${MICROSHIFT_GIT}"
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] && [ -n "${OCP_VERSION:-}" ]; then
+            branch="release-${OCP_VERSION}"
+        else
+            branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
+            # MicroShift repo uses main instead of master
+            [ "${branch}" == "master" ] && branch="main"
+        fi
+
+        CLONEREFS_OPTIONS=$(jq -n \
+            --arg branch "${branch}" \
+            --arg pr "${pr_number}" \
+            '{
+                "src_root": "/go",
+                "log":"/dev/null",
+                "git_user_name": "ci-robot",
+                "git_user_email": "ci-robot@openshift.io",
+                "fail": true,
+                "refs": [{
+                    "org": "openshift",
+                    "repo": "microshift",
+                    "base_ref": $branch,
+                    "workdir": true
+                } + if $pr != "" then {"pulls": [{"number": ($pr | tonumber), "sha": ""}]} else {} end]
+            }')
+        export CLONEREFS_OPTIONS
+    elif [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
         CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [(select(.refs) | .refs), try(.extra_refs[])]}')
         export CLONEREFS_OPTIONS
@@ -709,6 +750,12 @@ function get_source_dir() {
     [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
     [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
     [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [bootc-releases-el9]="scenarios-bootc/el9/releases:scenarios-bootc"
+    [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
+    [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
+    [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
+    [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
+    [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
     [periodics]="scenarios/periodics:scenarios-periodics"

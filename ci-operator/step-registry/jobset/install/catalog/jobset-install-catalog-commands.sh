@@ -151,22 +151,6 @@ EOF
     echo "[$(timestamp)] Rollout progress completed"
 }
 
-# Applicable for 'disconnected' env
-# Note: This is a temporary workaround to avoid the disruptive impact of the 'enable-qe-catalogsource-disconnected' step.
-# As per current implementation, that step is called by every 'disconnected' cluster provisioning workflow that maintained by QE.
-# Hence this function can be removed in future once above mentioned design is well refined.
-function tmp_prune_disruptive_resource() {
-    echo "Pruning the disruptive resources in previous step 'enable-qe-catalogsource-disconnected'..."
-    run_command "oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found"
-    run_command "oc delete imagecontentsourcepolicy image-policy-aosqe --ignore-not-found"
-    run_command "oc delete imagedigestmirrorset image-policy-aosqe --ignore-not-found"
-
-    echo "[$(timestamp)] Waiting for the MachineConfigPool to finish rollout..."
-    oc wait mcp --all --for=condition=Updating --timeout=5m || true
-    oc wait mcp --all --for=condition=Updated --timeout=20m || true
-    echo "[$(timestamp)] Rollout progress completed"
-}
-
 function check_catalog_readiness () {
     echo "Waiting the applied catalog source to become READY..."
     if wait_for_state "catalogsource/${CS_CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
@@ -198,7 +182,6 @@ if [ "${MIRROR_OPERATORS}" == "true" ]; then
     cd "$TMP_DIR"
 
     check_mirror_registry
-    tmp_prune_disruptive_resource
     configure_host_pull_secret
     install_oc_mirror
     mirror_catalog_and_operator

@@ -3,6 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -38,6 +42,7 @@ tests:
   cron: 0 0 30 2 *
   steps:
     env:
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1106846
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -52,8 +57,8 @@ tests:
     test:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: distributed-tracing-tests-tempo-stage
+    - ref: distributed-tracing-tests-tracing-ui-integration
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

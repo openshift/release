@@ -14,5 +14,5 @@ which python3
 python3 --version
 job --version
 job --help
-# it runs the jobs from the https://github.com/openshift/release-tests/blob/master/_releases/required-jobs.json
+# it runs the jobs from the https://github.com/openshift/release-tests/blob/main/_releases/required-jobs.json
 job run_z_stream_test

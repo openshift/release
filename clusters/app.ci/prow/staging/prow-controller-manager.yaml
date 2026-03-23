@@ -21,6 +21,7 @@ spec:
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
@@ -35,7 +36,7 @@ spec:
             secretKeyRef:
               name: openshift-prow-github-app
               key: appid
-        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260217-999e46ca7
+        image: quay.io/prucek/prow:prow-controller-manager_db
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
@@ -47,6 +48,9 @@ spec:
           readOnly: true
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
           readOnly: true
       volumes:
       - name: service-account-token
@@ -63,3 +67,6 @@ spec:
       - name: build-farm-credentials
         secret:
           secretName: prow-controller-manager
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

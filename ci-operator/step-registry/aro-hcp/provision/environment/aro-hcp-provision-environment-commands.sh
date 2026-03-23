@@ -43,6 +43,8 @@ fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
 export OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/rp-override-config-$(date +%s).yaml}
+export AZURE_TOKEN_CREDENTIALS=prod
+
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
@@ -60,28 +62,29 @@ yq eval -n "
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat ${OVERRIDE_CONFIG_FILE}
 
-# TODO: Remove this block once ci-export-provision-vars is upstreamed to ARO-HCP
-# https://github.com/Azure/ARO-HCP/pull/4037
-if ! grep -q '^ci-export-provision-vars:' dev-infrastructure/Makefile; then
-  cat >> dev-infrastructure/Makefile << 'EOF'
+CONFIG_PROV="${SHARED_DIR}/config-prov.yaml"
 
-ci-export-provision-vars:
-	@{ \
-		echo "export SVC_RESOURCEGROUP='$(SVC_RESOURCEGROUP)'"; \
-		echo "export MGMT_RESOURCEGROUP='$(MGMT_RESOURCEGROUP)'"; \
-		echo "export REGIONAL_RESOURCEGROUP='$(REGIONAL_RESOURCEGROUP)'"; \
-		echo "export GLOBAL_RESOURCEGROUP='$(GLOBAL_RESOURCEGROUP)'"; \
-		echo "export REGION='$(REGION)'"; \
-	} > "$${SHARED_DIR}/provision.env"
-.PHONY: ci-export-provision-vars
-EOF
-fi
-
-# Export resource group names to make sure this is available even if provisioning fails.
-make -C dev-infrastructure ci-export-provision-vars DEPLOY_ENV=prow REGION="${LOCATION}"
+# There's a $SHARED_DIR/config.yaml already from the write-config step
+# but it is of limited accuracy. It's fine for int/stg/prod, but this prov
+# step will generate temporary names for a bunch of things, so if we want
+# following steps to know what those are, we need to override the older
+# less accurate config.yaml.
+# And let's do it in a way that works even if provisioning ends up failing.
+finalize() {
+    if [[ -s "${CONFIG_PROV}" ]]; then
+        mv "${CONFIG_PROV}" "${SHARED_DIR}/config.yaml"
+        cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
+    fi
+}
+trap finalize EXIT
 
 unset GOFLAGS
-make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz DEPLOY_ENV=prow EXTRA_ARGS="--region ${LOCATION}" ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
+make -o tooling/templatize/templatize entrypoint/Region \
+  DEPLOY_ENV=prow \
+  EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
+  TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
+  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
+  CONFIG_OUTPUT=${CONFIG_PROV}
 
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"

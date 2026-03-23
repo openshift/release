@@ -1,12 +1,12 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.20:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-9-base-nodejs-openshift-4.22
+  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.25-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
@@ -14,7 +14,7 @@ images:
 - dockerfile_path: Dockerfile
   to: console
 - dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.20
+  from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
   to: console-plugin-demo
 promotion:
   to:
@@ -44,7 +44,7 @@ resources:
       memory: 14Gi
   console:
     requests:
-      cpu: "4"
+      cpu: "2"
       memory: 10Gi
   frontend:
     requests:
@@ -65,7 +65,7 @@ tests:
     go install -mod= github.com/jstemmer/go-junit-report@latest
     /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: ocp_builder_rhel-9-golang-1.24-openshift-4.20
+    from: ocp_builder_rhel-9-golang-1.25-openshift-4.22
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
@@ -93,7 +93,8 @@ tests:
       from: src
       resources:
         requests:
-          cpu: 100m
+          cpu: "4"
+          memory: 10Gi
       timeout: 6h0m0s
     workflow: ipi-gcp
 zz_generated_metadata:

@@ -54,12 +54,12 @@ tests:
   commands: GO_COMPLIANCE_INFO=0 make test
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: GO_COMPLIANCE_INFO=0 make verify
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -81,10 +81,11 @@ tests:
     mount_path: /tmp/secret
     name: hive-codecov-token
 - as: security
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
-      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_CODE_ADDITIONAL_ARGS: -d --severity-threshold=high
+      SNYK_DEPS_ADDITIONAL_ARGS: -d
       SNYK_ENABLE_DEPS_SCAN: "true"
     workflow: openshift-ci-security
 - as: e2e
@@ -98,7 +99,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -115,12 +116,10 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/hiveci-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/secret/pull-secret
+      - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -145,7 +144,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -164,12 +163,10 @@ tests:
         export USE_MANAGED_DNS=false
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/hiveci-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/secret/pull-secret
+      - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -204,11 +201,13 @@ tests:
 - as: e2e-azure
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
-      commands: GO_COMPLIANCE_INFO=0 CLOUD=azure make test-e2e
+      commands: |
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        GO_COMPLIANCE_INFO=0 CLOUD=azure make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -242,8 +241,7 @@ tests:
 
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/vault/vsphere-ibmcloud-ci
+      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
         name: vsphere-ibmcloud-ci
         namespace: test-credentials
       dependencies:

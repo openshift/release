@@ -64,13 +64,13 @@ if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
     CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
 fi
 
-export CLUSTER_NAME="kni-qe-99"
 echo CLUSTER_NAME=${CLUSTER_NAME}
 
 # Set kubeconfig path
-KUBECONFIG_PATH="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
+KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 # Extract and configure SSH key for Ansible to connect to masters
+
 echo "Set up SSH key configuration for Ansible"
 PROJECT_DIR="/tmp"
 cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/ansible_ssh_key"
@@ -130,5 +130,3 @@ ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml -i ./inven
 # configure gitops
 ansible-playbook playbooks/ran/hub-sno-configure-gitops.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} gitlab_repo_url=${GITLAB_REPO_URL}" -vv
-
-

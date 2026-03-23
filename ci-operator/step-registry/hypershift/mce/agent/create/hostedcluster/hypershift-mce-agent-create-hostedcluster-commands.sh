@@ -89,6 +89,14 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 fi
 
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE" ]]; then
+    OVERRIDE_CPO_IMAGE="$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE"
+fi
+
+if [[ -n "${OVERRIDE_CPO_IMAGE}" ]]; then
+  EXTRA_ARGS+=" --annotations=hypershift.openshift.io/control-plane-operator-image=${OVERRIDE_CPO_IMAGE} "
+fi
+
 if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi

@@ -147,6 +147,8 @@ if [ ${Z_VERSION} -lt 11 ]; then
   replicas: ${CONTROL_PLANE_REPLICAS}
   platform:
     vsphere:
+      cpus: 4
+      coresPerSocket: 4
       osDisk:
         diskSizeGB: 120
 compute:
@@ -155,7 +157,7 @@ compute:
   platform:
     vsphere:
       cpus: 4
-      coresPerSocket: 1
+      coresPerSocket: 4
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
@@ -178,6 +180,7 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   platform:
     vsphere:
       cpus: 8
+      coresPerSocket: 8
       memoryMB: 32768
       osDisk:
         diskSizeGB: 120

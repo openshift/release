@@ -7,6 +7,14 @@ images:
 - dockerfile_path: Containerfile
   to: nvidia-ci
 releases:
+  arm64-latest:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        stream: 4-stable
+        upper: 4.22.0-0
   latest:
     prerelease:
       product: ocp
@@ -45,6 +53,19 @@ tests:
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.3
+    workflow: nvidia-gpu-operator-e2e-aws
+- always_run: false
+  as: nvidia-gpu-operator-e2e-arm64
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AWS_REGION_OVERWRITE: us-east-1
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_TYPE: g5g.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
     workflow: nvidia-gpu-operator-e2e-aws
 zz_generated_metadata:
   branch: main

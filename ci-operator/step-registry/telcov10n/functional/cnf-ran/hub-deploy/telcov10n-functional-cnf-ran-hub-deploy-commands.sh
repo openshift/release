@@ -35,9 +35,7 @@ process_inventory() {
     echo "Processing complete. Check \"${dest_file}\""
 }
 
-
-export CLUSTER_NAME="kni-qe-99"
-echo CLUSTER_NAME="${CLUSTER_NAME}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
@@ -55,15 +53,30 @@ done
 echo "Create host_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-
 find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
     echo "Process group inventory file: ${dir}"
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
+# Workaround: fthub-01 and kni-qe-106 share the same hypervisor (hv16), but
+# ci-operator cannot mount the same secret twice. Process the fthub-01 mount
+# as the kni-qe-106 hypervisor inventory.
+if [ "${CLUSTER_NAME}" = "kni-qe-106" ]; then
+    echo "Process shared hypervisor inventory for kni-qe-106 from fthub-01 mount"
+    process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
+        /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+fi
+
 cd /eco-ci-cd
+
+EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true"
+
+if [ "${DISABLE_INSIGHTS}" = "true" ]; then
+    EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
+fi
+
 ansible-playbook ./playbooks/deploy-ocp-sno.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true"
+    --extra-vars "${EXTRA_VARS}"
 
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
