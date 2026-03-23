@@ -74,13 +74,8 @@ groups:
     - infra-image-mirroring.yaml
     - '[^-]infra-periodics.yaml'
   build01:
-    jobs:
-    - periodic-build01-upgrade
     paths:
     - infra-periodics-origin-release-images.yaml
-  build02:
-    jobs:
-    - periodic-build02-upgrade
 kvm:
 - build02
 - build04
