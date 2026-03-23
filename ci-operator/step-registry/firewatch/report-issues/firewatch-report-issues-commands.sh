@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Jira Cloud (*.atlassian.net) requires email + API token authentication
+# Jira Server only requires API token authentication
+if [[ "${FIREWATCH_JIRA_SERVER}" == *"atlassian.net"* ]]; then
+    if [ ! -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
+        echo "ERROR: Jira Cloud requires email authentication. Please ensure FIREWATCH_JIRA_EMAIL_PATH is set and the email file exists at: ${FIREWATCH_JIRA_EMAIL_PATH}"
+        exit 1
+    fi
+fi
+
 jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
 
 if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
