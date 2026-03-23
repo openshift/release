@@ -172,7 +172,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
           {
@@ -185,7 +185,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Probing the instance {{ $labels.instance }} has been failing for the past five minutes.',
+              message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
         ],
@@ -196,23 +196,44 @@
           {
             alert: 'openshift-priv-image-building-jobs-failing',
             expr: |||
-             (
-               sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state="success"}[12h])
-               )
-               /
-               sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
-               )
-             )
-             < 0.90
+              (
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state="success"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+                  )
+                )
+                /
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+                  )
+                )
+              ) < 0.90
+              and on (job_tail)
+              (
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state="success"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+                  )
+                )
+                /
+                sum by (job_tail) (
+                  label_replace(
+                    rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state=~"success|failure|aborted"}[12h]),
+                    "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+                  )
+                )
+              ) >= 0.90
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
+              message: 'The priv image-building job branch-ci-openshift-priv-{{ $labels.job_tail }} is failing while the corresponding public job branch-ci-openshift-{{ $labels.job_tail }} remains healthy. See priv <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-openshift-priv-{{ $labels.job_tail }}|deck-internal> and public <https://prow.ci.openshift.org/?job=branch-ci-openshift-{{ $labels.job_tail }}|deck>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
             },
           }
         ],
