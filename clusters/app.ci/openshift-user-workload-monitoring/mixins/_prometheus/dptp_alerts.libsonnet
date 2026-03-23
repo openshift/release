@@ -116,14 +116,14 @@
           {
             alert: 'high-ci-operator-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.',
             },
           }
         ],
