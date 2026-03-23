@@ -370,11 +370,13 @@ SQSEOF
             fail "Machine ${MACHINE_NAME} was NOT deleted within 3 minutes"
           fi
 
-          # Wait for a new replacement Machine (name not in MACHINES_BEFORE, not deleting) (up to 5 minutes)
+          # Wait for a new replacement Machine (name not in MACHINES_BEFORE, not deleting) (up to 10 minutes)
+          # CAPI MachineSet waits for the old Machine to be fully removed (finalizers cleared,
+          # EC2 instance terminated) before creating a replacement, which can take 2-5+ minutes.
           echo "Waiting for a new replacement Machine (not in: ${MACHINES_BEFORE})..."
           REPLACEMENT_FOUND=false
           REPLACEMENT_NAME=""
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             # Get all machines with spot label, then filter out deleting ones
             while IFS= read -r LINE; do
               NAME=$(echo "${LINE}" | awk '{print $1}')
@@ -403,14 +405,14 @@ SQSEOF
             if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
               break
             fi
-            echo "$(date) Attempt ${i}/30: no new replacement machine yet..."
+            echo "$(date) Attempt ${i}/60: no new replacement machine yet..."
             sleep 10
           done
 
           if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
             pass "Replacement Machine ${REPLACEMENT_NAME} created with interruptible-instance label"
           else
-            fail "No new replacement Machine created within 5 minutes (existing before: ${MACHINES_BEFORE})"
+            fail "No new replacement Machine created within 10 minutes (existing before: ${MACHINES_BEFORE})"
           fi
         fi
       else
