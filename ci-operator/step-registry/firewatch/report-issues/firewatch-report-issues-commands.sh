@@ -36,13 +36,24 @@ if [[ "${FIREWATCH_JIRA_SERVER}" == *"atlassian.net"* ]]; then
     fi
 fi
 
-jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
-
+# Strip whitespace from credentials files to avoid authentication issues
+TOKEN=$(cat "${FIREWATCH_JIRA_API_TOKEN_PATH}" | tr -d '[:space:]')
+EMAIL=""
 if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
-    jira_config_cmd+=" --email $(cat "${FIREWATCH_JIRA_EMAIL_PATH}")"
+    EMAIL=$(cat "${FIREWATCH_JIRA_EMAIL_PATH}" | tr -d '[:space:]')
 fi
 
-eval "${jira_config_cmd}"
+echo "Token length after cleanup: ${#TOKEN}"
+echo "Email length after cleanup: ${#EMAIL}"
+
+# Build jira-config-gen command
+if [ -n "${EMAIL}" ]; then
+    echo "Using email + token authentication for Jira Cloud"
+    firewatch jira-config-gen --token-path <(echo -n "${TOKEN}") --server-url "${FIREWATCH_JIRA_SERVER}" --email "${EMAIL}"
+else
+    echo "Using token-only authentication for Jira Server"
+    firewatch jira-config-gen --token-path <(echo -n "${TOKEN}") --server-url "${FIREWATCH_JIRA_SERVER}"
+fi
 
 report_command="firewatch report"
 
