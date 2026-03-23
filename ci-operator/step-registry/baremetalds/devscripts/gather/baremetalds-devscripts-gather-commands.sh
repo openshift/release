@@ -23,6 +23,28 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
+if [[ ! -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
+  echo "### Dev-scripts logs not found, collecting as fallback..."
+  ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
+  if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
+    sed -i '
+      /auths/ s/.*/*** PULL_SECRET ***/;
+      s/password: .*/password: REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/* || true
+  fi
+fi
+
+if [[ ! -f "${SHARED_DIR}/install-status.txt" ]]; then
+  status_file="${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt"
+  if [[ -f "${status_file}" ]]; then
+    cp "${status_file}" "${SHARED_DIR}/install-status.txt"
+  else
+    echo "1" > "${SHARED_DIR}/install-status.txt"
+  fi
+fi
+
 echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd dev-scripts
