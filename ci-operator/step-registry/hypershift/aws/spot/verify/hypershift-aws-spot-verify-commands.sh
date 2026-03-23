@@ -375,13 +375,15 @@ SQSEOF
           REPLACEMENT_FOUND=false
           REPLACEMENT_NAME=""
           for i in $(seq 1 30); do
-            # Get names of non-deleting machines with spot label
-            # jsonpath filter: items without deletionTimestamp
-            CURRENT_NAMES=$(oc get machine -n "${MACHINE_NAMESPACE}" \
-              -l hypershift.openshift.io/interruptible-instance \
-              -o jsonpath='{range .items[?(@.metadata.deletionTimestamp=="")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-            # Find a name that wasn't in the before list
-            for NAME in ${CURRENT_NAMES}; do
+            # Get all machines with spot label, then filter out deleting ones
+            while IFS= read -r LINE; do
+              NAME=$(echo "${LINE}" | awk '{print $1}')
+              DEL=$(echo "${LINE}" | awk '{print $2}')
+              # Skip machines that have a deletionTimestamp
+              if [[ -n "${DEL}" ]] && [[ "${DEL}" != "<none>" ]]; then
+                continue
+              fi
+              # Check if this is a new machine (not in MACHINES_BEFORE)
               IS_OLD=false
               for OLD in ${MACHINES_BEFORE}; do
                 if [[ "${NAME}" == "${OLD}" ]]; then
@@ -389,12 +391,15 @@ SQSEOF
                   break
                 fi
               done
-              if [[ "${IS_OLD}" == "false" ]]; then
+              if [[ "${IS_OLD}" == "false" ]] && [[ -n "${NAME}" ]]; then
                 REPLACEMENT_NAME="${NAME}"
                 REPLACEMENT_FOUND=true
                 break
               fi
-            done
+            done < <(oc get machine -n "${MACHINE_NAMESPACE}" \
+              -l hypershift.openshift.io/interruptible-instance \
+              -o custom-columns=NAME:.metadata.name,DELETED:.metadata.deletionTimestamp \
+              --no-headers 2>/dev/null || true)
             if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
               break
             fi
