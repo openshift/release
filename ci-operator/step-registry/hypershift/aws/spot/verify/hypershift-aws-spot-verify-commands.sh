@@ -312,11 +312,11 @@ SQSEOF
         else
           echo "CAPI Machine: ${MACHINE_NAMESPACE}/${MACHINE_NAME}"
 
-          # Count current machines before remediation
-          MACHINE_COUNT_BEFORE=$(oc get machine -n "${MACHINE_NAMESPACE}" \
-            -l hypershift.openshift.io/interruptible-instance --no-headers 2>/dev/null | wc -l || echo "0")
-          MACHINE_COUNT_BEFORE=$(echo "${MACHINE_COUNT_BEFORE}" | tr -d ' ')
-          echo "Machine count before remediation: ${MACHINE_COUNT_BEFORE}"
+          # Record existing machine names before remediation
+          MACHINES_BEFORE=$(oc get machine -n "${MACHINE_NAMESPACE}" \
+            -l hypershift.openshift.io/interruptible-instance \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+          echo "Machines before remediation: ${MACHINES_BEFORE}"
 
           # Wait for the Machine to get the spot-interruption-signal annotation (up to 3 minutes)
           echo "Waiting for Machine ${MACHINE_NAME} to get spot-interruption-signal annotation..."
@@ -370,27 +370,42 @@ SQSEOF
             fail "Machine ${MACHINE_NAME} was NOT deleted within 3 minutes"
           fi
 
-          # Wait for a replacement Machine to be created (up to 5 minutes)
-          echo "Waiting for replacement Machine to be created..."
+          # Wait for a new replacement Machine (name not in MACHINES_BEFORE, not deleting) (up to 5 minutes)
+          echo "Waiting for a new replacement Machine (not in: ${MACHINES_BEFORE})..."
           REPLACEMENT_FOUND=false
+          REPLACEMENT_NAME=""
           for i in $(seq 1 30); do
-            MACHINE_COUNT_NOW=$(oc get machine -n "${MACHINE_NAMESPACE}" \
-              -l hypershift.openshift.io/interruptible-instance --no-headers 2>/dev/null | wc -l || echo "0")
-            MACHINE_COUNT_NOW=$(echo "${MACHINE_COUNT_NOW}" | tr -d ' ')
-            if [[ "${MACHINE_COUNT_NOW}" -ge "${MACHINE_COUNT_BEFORE}" ]]; then
-              REPLACEMENT_FOUND=true
+            # Get names of non-deleting machines with spot label
+            # jsonpath filter: items without deletionTimestamp
+            CURRENT_NAMES=$(oc get machine -n "${MACHINE_NAMESPACE}" \
+              -l hypershift.openshift.io/interruptible-instance \
+              -o jsonpath='{range .items[?(@.metadata.deletionTimestamp=="")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+            # Find a name that wasn't in the before list
+            for NAME in ${CURRENT_NAMES}; do
+              IS_OLD=false
+              for OLD in ${MACHINES_BEFORE}; do
+                if [[ "${NAME}" == "${OLD}" ]]; then
+                  IS_OLD=true
+                  break
+                fi
+              done
+              if [[ "${IS_OLD}" == "false" ]]; then
+                REPLACEMENT_NAME="${NAME}"
+                REPLACEMENT_FOUND=true
+                break
+              fi
+            done
+            if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
               break
             fi
-            echo "$(date) Attempt ${i}/30: machines=${MACHINE_COUNT_NOW}, expected>=${MACHINE_COUNT_BEFORE}..."
+            echo "$(date) Attempt ${i}/30: no new replacement machine yet..."
             sleep 10
           done
 
           if [[ "${REPLACEMENT_FOUND}" == "true" ]]; then
-            NEW_MACHINES=$(oc get machine -n "${MACHINE_NAMESPACE}" \
-              -l hypershift.openshift.io/interruptible-instance -o name 2>/dev/null || true)
-            pass "Replacement Machine created. Current machines: ${NEW_MACHINES}"
+            pass "Replacement Machine ${REPLACEMENT_NAME} created with interruptible-instance label"
           else
-            fail "Replacement Machine was NOT created within 5 minutes"
+            fail "No new replacement Machine created within 5 minutes (existing before: ${MACHINES_BEFORE})"
           fi
         fi
       else
