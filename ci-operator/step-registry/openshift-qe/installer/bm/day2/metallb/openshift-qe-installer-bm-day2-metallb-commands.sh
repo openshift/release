@@ -45,7 +45,7 @@ metadata:
 spec:
   channel: stable
   name: metallb-operator
-  source: redhat-operators
+  source: ${OPERATOR_SOURCE_INDEX}
   sourceNamespace: openshift-marketplace
 EOF
 
