@@ -61,25 +61,6 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
         name: retester
         imagePullPolicy: Always
@@ -127,6 +108,25 @@ spec:
           requests:
             memory: "5Gi"
             cpu: "250m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: prow-config
         configMap:
