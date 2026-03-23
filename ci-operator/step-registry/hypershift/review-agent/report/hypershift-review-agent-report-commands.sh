@@ -67,7 +67,7 @@ format_duration() {
 # Make a Jira issue key into a link, or return text as-is
 linkify_jira() {
   local text=$1
-  echo "$text" | sed -E 's/([A-Z][A-Z0-9]+-[0-9]+)/<a href="https:\/\/issues.redhat.com\/browse\/\1">\1<\/a>/g'
+  echo "$text" | sed -E 's/([A-Z][A-Z0-9]+-[0-9]+)/<a href="https:\/\/redhat.atlassian.net\/browse\/\1">\1<\/a>/g'
 }
 
 # Extract data from stream-json output file

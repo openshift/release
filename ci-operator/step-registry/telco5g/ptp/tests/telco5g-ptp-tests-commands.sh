@@ -161,8 +161,8 @@ spec:
 
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#DAEMON_IMG#${DAEMON_IMG}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#SIDECAR_IMG#${SIDECAR_IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#DAEMON_IMAGE#${DAEMON_IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#SIDECAR_IMAGE#${SIDECAR_IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged

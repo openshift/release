@@ -95,6 +95,9 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
+    'rosa-e2e-quota-slice': {
+        'us-west-2': 3,
+    },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
     },
@@ -250,6 +253,15 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-classic-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-classic-stg-quota-slice': {
+        'default': 5,
+    },
+    'aro-classic-prod-quota-slice': {
+        'default': 30
+    },
     'aro-hcp-int-quota-slice': {
         'default': 1,
     },
@@ -328,6 +340,9 @@ CONFIG = {
     },
     'gcp-telco-quota-slice': {
         'us-central1': 40,
+    },
+    'gcp-perfscale-qe-quota-slice': {
+        'us-east1': 6,
     },
     'libvirt-s390x-1-quota-slice': {},
     'libvirt-s390x-2-quota-slice': {},
