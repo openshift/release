@@ -281,6 +281,7 @@ CONFIG = {
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
+    'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -731,31 +732,39 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
+for i in range(20):
+    CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
+
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
         'aws': {
+            'install': 50,
             'quota': CONFIG['aws-quota-slice'],
         },
         'aws-2': {
+            'install': 50,
             'quota': CONFIG['aws-2-quota-slice'],
         },
         'aws-3': {
+            'install': 50,
             'quota': CONFIG['aws-3-quota-slice'],
         },
         'aws-4': {
+            'install': 50,
             'quota': CONFIG['aws-4-quota-slice'],
         },
         'aws-5': {
+            'install': 50,
             'quota': CONFIG['aws-5-quota-slice'],
         },
     },
     'openshift-org-azure': {
         'azure-2': {
-            'install': 32,
+            'install': 50,
             'quota': CONFIG['azure-2-quota-slice'],
         },
         'azure4': {
-            'install': 32,
+            'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
     }
