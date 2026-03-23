@@ -4,30 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Jira Cloud (*.atlassian.net) requires email + API token authentication
-# Jira Server only requires API token authentication
-if [[ "${FIREWATCH_JIRA_SERVER}" == *"atlassian.net"* ]]; then
-    if [ ! -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
-        echo "ERROR: Jira Cloud requires email authentication. Please ensure FIREWATCH_JIRA_EMAIL_PATH is set and the email file exists at: ${FIREWATCH_JIRA_EMAIL_PATH}"
-        exit 1
-    fi
-fi
+jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
 
-# Strip whitespace from credentials files to avoid authentication issues
-TOKEN=$(cat "${FIREWATCH_JIRA_API_TOKEN_PATH}" | tr -d '[:space:]')
-EMAIL=""
 if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
-    EMAIL=$(cat "${FIREWATCH_JIRA_EMAIL_PATH}" | tr -d '[:space:]')
+    jira_config_cmd+=" --email $(cat "${FIREWATCH_JIRA_EMAIL_PATH}")"
 fi
 
-# Build jira-config-gen command
-if [ -n "${EMAIL}" ]; then
-    echo "Using email + token authentication for Jira Cloud"
-    firewatch jira-config-gen --token-path <(echo -n "${TOKEN}") --server-url "${FIREWATCH_JIRA_SERVER}" --email "${EMAIL}"
-else
-    echo "Using token-only authentication for Jira Server"
-    firewatch jira-config-gen --token-path <(echo -n "${TOKEN}") --server-url "${FIREWATCH_JIRA_SERVER}"
-fi
+eval "${jira_config_cmd}"
 
 report_command="firewatch report"
 
