@@ -1,5 +1,5 @@
 base_images:
-  cli:
+  cli-base:
     name: "4.21"
     namespace: ocp
     tag: cli
@@ -9,6 +9,11 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.20
 images:
+- dockerfile_literal: |
+    FROM cli-base
+    RUN dnf install -y --setopt=tsflags=nodocs jq && dnf clean all && rm -rf /var/cache/dnf/*
+  from: cli-base
+  to: cli
 - dockerfile_literal: |
     FROM icr.io/cpopen/ibm-spectrum-scale-must-gather:v5.2.3.5
   to: ibm-must-gather
