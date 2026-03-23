@@ -4638,6 +4638,34 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-hypershift
+- as: baremetalds-ipi-ovn-f7-longrun-tp-mco-abc
+  cluster: build05
+  cron: 21 4 1,10,17,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependency_overrides:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-s1gpm2k/release:latest
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f7-mco
+  cluster: build05
+  cron: 29 21 6,13,20,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependency_overrides:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-s1gpm2k/release:latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
