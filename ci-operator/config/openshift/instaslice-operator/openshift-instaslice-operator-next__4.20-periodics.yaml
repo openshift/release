@@ -1,10 +1,10 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.18
+    tag: rhel-9-golang-1.23-openshift-4.20
   operator-sdk:
-    name: "4.18"
+    name: "4.20"
     namespace: origin
     tag: operator-sdk
   redhat-base-ubi9:
@@ -15,42 +15,41 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.23-openshift-4.20
 images:
-  items:
-  - dockerfile_literal: |
-      FROM src
-      RUN dnf install -y skopeo git jq && dnf clean all
-    from: src
-    to: instaslice-base-src
-  - dockerfile_path: Dockerfile.ocp
-    from: redhat-base-ubi9
-    inputs:
-      ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-        as:
-        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
-    to: instaslice-operator
-  - dockerfile_path: Dockerfile.daemonset.ocp
-    from: redhat-base-ubi9
-    inputs:
-      ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-        as:
-        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
-    to: das-daemonset
-  - dockerfile_path: Dockerfile.scheduler.ocp
-    from: redhat-base-ubi9
-    inputs:
-      ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-        as:
-        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
-    to: das-scheduler
-  - dockerfile_path: Dockerfile.webhook.ocp
-    from: redhat-base-ubi9
-    inputs:
-      ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-        as:
-        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
-    to: das-webhook
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git jq && dnf clean all
+  from: src
+  to: instaslice-base-src
+- dockerfile_path: Dockerfile.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: instaslice-operator
+- dockerfile_path: Dockerfile.daemonset.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-daemonset
+- dockerfile_path: Dockerfile.scheduler.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-scheduler
+- dockerfile_path: Dockerfile.webhook.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.20:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-webhook
 operator:
   bundles:
   - as: das-operator-bundle
@@ -67,17 +66,17 @@ operator:
     with: pipeline:das-scheduler
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
     release:
       channel: fast
-      version: "4.18"
+      version: "4.20"
   latest:
     release:
       channel: fast
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -87,7 +86,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-bundle-periodic
-  cron: 0 0 * * 1,4
+  cron: 0 8 * * 3
   steps:
     cluster_profile: gcp
     dependencies:
@@ -124,7 +123,7 @@ tests:
           cpu: 100m
     - ref: openshift-instaslice-operator-e2e-bundle-next-run-e2e
 - as: e2e-bundle-runc-periodic
-  cron: 0 4 * * 2,5
+  cron: 0 12 * * 4
   steps:
     cluster_profile: gcp
     dependencies:
@@ -168,4 +167,4 @@ zz_generated_metadata:
   branch: next
   org: openshift
   repo: instaslice-operator
-  variant: 4.18-periodics
+  variant: 4.20-periodics
