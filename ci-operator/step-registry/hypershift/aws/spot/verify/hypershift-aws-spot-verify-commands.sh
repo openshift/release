@@ -343,27 +343,30 @@ SQSEOF
             fail "Machine ${MACHINE_NAME} did NOT get spot-interruption-signal annotation within 3 minutes"
           fi
 
-          # Wait for the Machine to be deleted (up to 3 minutes)
+          # Wait for the Machine to be marked for deletion (up to 3 minutes)
+          # The Machine object may persist with a deletionTimestamp while CAPI
+          # finalizers clean up the EC2 instance. A deletionTimestamp means the
+          # spot remediation controller successfully deleted it.
           echo "Waiting for Machine ${MACHINE_NAME} to be deleted..."
           MACHINE_DELETED=false
           for i in $(seq 1 18); do
             if ! oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" &>/dev/null; then
               MACHINE_DELETED=true
+              pass "Machine ${MACHINE_NAME} fully removed"
               break
             fi
-            # Check if it has a deletion timestamp
             DEL_TS=$(oc get machine "${MACHINE_NAME}" -n "${MACHINE_NAMESPACE}" \
               -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)
             if [[ -n "${DEL_TS}" ]]; then
-              echo "Machine ${MACHINE_NAME} has deletionTimestamp: ${DEL_TS}"
+              MACHINE_DELETED=true
+              pass "Machine ${MACHINE_NAME} marked for deletion (deletionTimestamp: ${DEL_TS})"
+              break
             fi
             echo "$(date) Attempt ${i}/18: waiting for machine deletion..."
             sleep 10
           done
 
-          if [[ "${MACHINE_DELETED}" == "true" ]]; then
-            pass "Machine ${MACHINE_NAME} deleted by spot remediation controller"
-          else
+          if [[ "${MACHINE_DELETED}" != "true" ]]; then
             fail "Machine ${MACHINE_NAME} was NOT deleted within 3 minutes"
           fi
 
