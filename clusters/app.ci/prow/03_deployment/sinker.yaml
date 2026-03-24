@@ -36,21 +36,8 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
       - name: sinker
-        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260310-6097a43c8
+        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260316-25576911a
         args:
         - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
@@ -75,6 +62,19 @@ spec:
           requests:
             memory: "10Gi"
             cpu: "50m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       volumes:
       - name: release
         emptyDir: {}

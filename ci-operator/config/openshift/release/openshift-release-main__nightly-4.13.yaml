@@ -59,6 +59,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  driver-toolkit-tests:
+    name: "4.13"
+    namespace: ocp
+    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.13"
     namespace: ocp
@@ -764,6 +768,22 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
+- as: e2e-aws-driver-toolkit
+  cron: 15 13 25 7 *
+  steps:
+    cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: driver-toolkit-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
