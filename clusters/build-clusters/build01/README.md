@@ -186,18 +186,18 @@ Upgrading inside the same minor version of `build01` is automated by [periodic-b
 
 ### Upgrading between minor versions
 
-Modify channel configuration, e.g., from OCP 4.3 to 4.4:
+Modify channel configuration, e.g., from OCP 4.19 to 4.20:
 
 ```
-oc --as system:admin --context build01 patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/channel", "value": "candidate-4.4"}]'
+oc --as system:admin --context build01 adm upgrade channel candidate-4.20
 ```
 
 ### Run the upgrade command
 
-For example, upgrade to 4.5.4
+For example, upgrade to 4.20.16
 
 ```
-oc --as system:admin --context build01 adm upgrade --to=4.5.4
+oc --as system:admin --context build01 adm upgrade --to=4.20.16
 ```
 
 ## Destroy the cluster
