@@ -140,7 +140,36 @@ spec:
 EOF2
 
 # Wait for machine-config-operator to process the ICSP
-sleep 1200
+# Poll for MachineConfigPool updates with timeout
+echo "Waiting for MachineConfigPools to update (timeout: 25 minutes)..."
+TIMEOUT=1500  # 25 minutes
+ELAPSED=0
+INTERVAL=30
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  # Check if all MachineConfigPools are updated and not degraded
+  UPDATING=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Updating" and .status=="True")) | .metadata.name')
+  DEGRADED=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Degraded" and .status=="True")) | .metadata.name')
+
+  if [[ -z "$UPDATING" && -z "$DEGRADED" ]]; then
+    echo "All MachineConfigPools are ready (elapsed: ${ELAPSED}s)"
+    break
+  fi
+
+  if [[ -n "$UPDATING" ]]; then
+    echo "MachineConfigPools still updating: $UPDATING (elapsed: ${ELAPSED}s)"
+  fi
+  if [[ -n "$DEGRADED" ]]; then
+    echo "Warning: MachineConfigPools degraded: $DEGRADED"
+  fi
+
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+  echo "Warning: Timeout waiting for MachineConfigPools (waited ${ELAPSED}s)"
+  oc get machineconfigpool
+fi
 ###
 
 EOF
@@ -170,7 +199,30 @@ spec:
     - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-snapshotter-rhel8
     source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8
 EOF
-sleep 120
+
+# Wait for IDMS to be applied and pods to stabilize
+echo "Waiting for ImageDigestMirrorSet to be processed (timeout: 5 minutes)..."
+TIMEOUT=300  # 5 minutes
+ELAPSED=0
+INTERVAL=15
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  # Check if machine-config is still updating due to IDMS
+  UPDATING=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Updating" and .status=="True")) | .metadata.name')
+
+  if [[ -z "$UPDATING" ]]; then
+    echo "IDMS applied and machine configs stable (elapsed: ${ELAPSED}s)"
+    break
+  fi
+
+  echo "Machine configs still updating after IDMS: $UPDATING (elapsed: ${ELAPSED}s)"
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+  echo "Warning: Timeout waiting for IDMS processing (waited ${ELAPSED}s)"
+fi
+
 oc delete pods -n openshift-storage -l=app=csi-rbdplugin-provisioner
 oc delete pods -n openshift-storage -l=app=csi-cephfsplugin-provisioner
 ###

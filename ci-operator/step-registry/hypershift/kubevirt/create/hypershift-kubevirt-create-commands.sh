@@ -227,7 +227,6 @@ else
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
-sleep 360m
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
