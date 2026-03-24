@@ -266,9 +266,12 @@ fi
 # connects, on a specific VRF per extra cluster network, to the corresponding agnhost container macvlan network and that extra cluster network  
 deploy_frr_external_container vrf_neighbors
 
-# apply FRR-K8s overrides to enable debug logging
-oc create namespace openshift-frr-k8s
-oc apply -f - <<EOF
+# For no-overlay clusters, FRR-K8s is not used — skip its setup.
+# Detect no-overlay by checking the ovn-kubernetes config for transport="no-overlay".
+if ! oc get cm ovnkube-config -n openshift-ovn-kubernetes -o yaml 2>/dev/null | grep -q 'transport="no-overlay"'; then
+  # apply FRR-K8s overrides to enable debug logging
+  oc create namespace openshift-frr-k8s
+  oc apply -f - <<EOF
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -278,43 +281,46 @@ data:
   frrk8s-loglevel: --log-level=debug
 EOF
 
-# enable route advertisement with FRR
-oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+  # enable route advertisement with FRR
+  oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
 
-echo "Waiting for daemonset 'frr-k8s' to be created..."
-until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
-  sleep 5
-done
-
-echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..."
-until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
-  sleep 5
-done
-
-# Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
-# upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
-# This is used while waiting for OCP builds with FRR 10.
-# This will be removed once OCP builds with FRR 10 are available.
-if [ -n "${FRR_IMAGE:-}" ]; then
-  echo "Setting CNO to Unmanaged and waiting for reconciliation to stop..."
-  oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"managementState":"Unmanaged"}}'
-  # Wait for CNO to complete any in-flight reconciliation after being set to Unmanaged.
-  # Note: Cannot restart CNO deployment as it resets managementState back to Managed
-  # (tracked in https://redhat.atlassian.net/browse/OCPBUGS-78974).
-  sleep 60s
-  # oc rollout restart deployment/network-operator -n openshift-network-operator
-  # until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
-  #  sleep 5
-  # done
-
-  # Update the FRR and reloader container images
-  echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
-  oc set image daemonset/frr-k8s -n openshift-frr-k8s frr="${FRR_IMAGE}" reloader="${FRR_IMAGE}"
-
-  echo "Waiting for daemonset 'frr-k8s' to rollout with new image..."
+  echo "Waiting for daemonset 'frr-k8s' to be created..."
   until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
     sleep 5
   done
+
+  echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..."
+  until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
+    sleep 5
+  done
+
+  # Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
+  # upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
+  # This is used while waiting for OCP builds with FRR 10.
+  # This will be removed once OCP builds with FRR 10 are available.
+  if [ -n "${FRR_IMAGE:-}" ]; then
+    echo "Setting CNO to Unmanaged and waiting for reconciliation to stop..."
+    oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"managementState":"Unmanaged"}}'
+    # Wait for CNO to complete any in-flight reconciliation after being set to Unmanaged.
+    # Note: Cannot restart CNO deployment as it resets managementState back to Managed
+    # (tracked in https://redhat.atlassian.net/browse/OCPBUGS-78974).
+    sleep 60s
+    # oc rollout restart deployment/network-operator -n openshift-network-operator
+    # until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
+    #  sleep 5
+    # done
+
+    # Update the FRR and reloader container images
+    echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
+    oc set image daemonset/frr-k8s -n openshift-frr-k8s frr="${FRR_IMAGE}" reloader="${FRR_IMAGE}"
+
+    echo "Waiting for daemonset 'frr-k8s' to rollout with new image..."
+    until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
+      sleep 5
+    done
+  fi
+else
+  echo "NoOverlay transport detected in ovnkube-config, skipping FRR-K8s setup steps..."
 fi
 
 # set up BGP peering of the cluster with the external FRR instance container
@@ -408,4 +414,15 @@ $IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || 
 $IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
 $IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 $IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+
+echo "since frr changed from 192.168.111.1 to 192.168.111.3.Clean stale host kernel routes learned via BGP (IPv4/IPv6), if any"
+$IP route show proto bgp | grep '^10\.' | awk '{print $1}' | xargs -I {} $IP route delete {} || true
+$IP -6 route show proto bgp | grep '^fd01\:' | awk '{print $1}' | xargs -I {} $IP -6 route delete {} || true
+echo "--------------------------------"
+echo "IPv4 routes:"
+$IP route
+echo "--------------------------------"
+echo "IPv6 routes:"
+$IP -6 route
+echo "--------------------------------"
 EOFTOP
