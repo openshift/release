@@ -60,17 +60,68 @@ tests:
       FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: cucushift-installer-rehearse-azure-ipi-custom-dns
-- as: installer-rehearse-aws
+- as: installer-rehearse-aws-ipv6-https
   cron: '@yearly'
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
-      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_NEW_PUBLIC_DNS_RECORD_WAITING_TIME: "600"
-    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_HTTPS_PROXY: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv6Primary
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
+- as: installer-rehearse-aws-ipv6-http
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv6Primary
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
+- as: installer-rehearse-aws-ipv4-https
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_HTTPS_PROXY: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv4Primary
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
+- as: installer-rehearse-aws-ipv4-http
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv4Primary
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
 - as: installer-rehearse-vsphere-dis
   cron: '@yearly'
   steps:
