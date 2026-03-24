@@ -590,6 +590,22 @@ networking:
 EOF
   fi
 
+  # byo-vpc
+  vpc_info_json=${SHARED_DIR}/vpc_info.json
+  if [ -f "$vpc_info_json" ]; then
+    vpc_ipv4_cidr=$(jq -r '.vpc_ipv4_cidr' "$vpc_info_json")
+    vpc_ipv6_cidr=$(jq -r '.vpc_ipv6_cidr' "$vpc_info_json")
+    export vpc_ipv4_cidr
+    export vpc_ipv6_cidr
+    if [[ "${IP_FAMILY}" == "DualStackIPv6Primary" ]]; then
+      yq-v4 eval -i '.networking.machineNetwork[0].cidr = env(vpc_ipv6_cidr)' ${patch_dualstack}
+      yq-v4 eval -i '.networking.machineNetwork[1].cidr = env(vpc_ipv4_cidr)' ${patch_dualstack}
+    else
+      yq-v4 eval -i '.networking.machineNetwork[0].cidr = env(vpc_ipv4_cidr)' ${patch_dualstack}
+      yq-v4 eval -i '.networking.machineNetwork[1].cidr = env(vpc_ipv6_cidr)' ${patch_dualstack}
+    fi
+  fi
+
   yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
   cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
   echo "Dual-stack networking configuration added to install-config.yaml"
