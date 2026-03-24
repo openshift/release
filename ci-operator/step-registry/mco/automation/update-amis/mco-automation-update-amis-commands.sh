@@ -62,18 +62,22 @@ GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
 readonly GITHUB_TOKEN
 info "cfg: GitHub token loaded successfully"
 
-# Configuration: Load Jira token from file (optional - bug creation will be skipped if not available)
+# Configuration: Load Jira credentials from files (optional - bug creation will be skipped if not available)
+# Jira Cloud uses Basic Auth: email:api_token. Both files must be present.
 JIRA_TOKEN=""
-if [[ -n "${JIRA_TOKEN_PATH:-}" ]] && [[ -f "${JIRA_TOKEN_PATH}" ]]; then
-  info "cfg: loading Jira token"
+JIRA_EMAIL=""
+if [[ -n "${JIRA_TOKEN_PATH:-}" ]] && [[ -f "${JIRA_TOKEN_PATH}" ]] && \
+   [[ -n "${JIRA_EMAIL_PATH:-}" ]] && [[ -f "${JIRA_EMAIL_PATH}" ]]; then
+  info "cfg: loading Jira credentials"
   JIRA_TOKEN=$(cat "${JIRA_TOKEN_PATH}")
-  info "cfg: Jira token loaded successfully"
+  JIRA_EMAIL=$(cat "${JIRA_EMAIL_PATH}")
+  info "cfg: Jira credentials loaded successfully"
 else
-  info "cfg: Jira token not configured, bug creation will be skipped"
+  info "cfg: Jira credentials not configured, bug creation will be skipped"
 fi
 
 # Jira API base URL
-JIRA_API="https://issues.redhat.com/rest/api/2"
+JIRA_API="https://redhat.atlassian.net/rest/api/2"
 
 # GitHub API base URL
 GITHUB_API="https://api.github.com"
@@ -116,6 +120,7 @@ github_api() {
 
 # Jira API helper function
 # Security: Uses -s (silent) to prevent token exposure in error messages
+# Jira Cloud uses Basic Auth with email:api_token (Bearer tokens no longer supported)
 jira_api() {
   local method="$1"
   local endpoint="$2"
@@ -123,13 +128,13 @@ jira_api() {
 
   if [[ -n "${data}" ]]; then
     curl -s -X "${method}" \
-      -H "Authorization: Bearer ${JIRA_TOKEN}" \
+      -u "${JIRA_EMAIL}:${JIRA_TOKEN}" \
       -H "Content-Type: application/json" \
       -d "${data}" \
       "${JIRA_API}${endpoint}"
   else
     curl -s -X "${method}" \
-      -H "Authorization: Bearer ${JIRA_TOKEN}" \
+      -u "${JIRA_EMAIL}:${JIRA_TOKEN}" \
       -H "Content-Type: application/json" \
       "${JIRA_API}${endpoint}"
   fi
@@ -175,7 +180,7 @@ fields = {
 target_version = '${target_version}'
 if target_version:
     fields['versions'] = [{'name': target_version}]
-    fields['customfield_12319940'] = [{'name': target_version}]  # Target Version
+    fields['customfield_10855'] = [{'name': target_version}]  # Target Version
 print(json.dumps({'fields': fields}))
 ")
 
