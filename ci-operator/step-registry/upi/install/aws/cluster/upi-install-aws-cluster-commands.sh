@@ -177,6 +177,17 @@ rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -f ${INSTALL_DIR}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${INSTALL_DIR}/manifests/cluster-scheduler-02-config.yml
 
+# Copy manifests from SHARED_DIR to installer directory (required for features like OVN hybrid networking)
+echo "Copying manifests from SHARED_DIR to installer directory:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  echo "  Copying ${manifest}"
+  cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
 echo "Creating ignition configs"
 openshift-install --dir=${INSTALL_DIR} create ignition-configs &
 wait "$!"

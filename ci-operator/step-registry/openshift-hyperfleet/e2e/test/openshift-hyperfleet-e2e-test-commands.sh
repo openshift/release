@@ -13,8 +13,17 @@ log(){
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
 MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 
+cp -r /e2e/ /tmp/
+cd "/tmp/e2e/deploy-scripts/"
+cp  .env.example .env
+source .env
+
 export HYPERFLEET_API_URL
 export MAESTRO_URL
 export HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
+export TESTDATA_DIR="/e2e/testdata"
+NAMESPACE=$(cat "${SHARED_DIR}/namespace_name")
+export NAMESPACE
+
 # Run e2e tests via --label-filter
 hyperfleet-e2e test --label-filter=${LABEL_FILTER} --junit-report ${ARTIFACT_DIR}/junit.xml

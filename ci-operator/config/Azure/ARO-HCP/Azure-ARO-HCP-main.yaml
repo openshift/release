@@ -78,18 +78,17 @@ images:
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     ENV GOBIN="/usr/local/bin"
     ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-    # Install Python for grafana tests
-    RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
-    RUN pip3 install black
     ENV GOFLAGS='-mod=readonly'
     RUN make install-tools && \
         make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests prow-job-executor
+        make -C test/ aro-hcp-tests prow-job-executor && \
+        go clean -cache -modcache && \
+        rm -f go.work.sum
     RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
     RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
     RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
     RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP && rm -f go.work.sum
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
   from: src
   inputs:
     src:
@@ -149,6 +148,12 @@ tests:
   steps:
     test:
     - ref: aro-hcp-test-unit
+- as: secrets-validation
+  run_if_changed: ^(tooling/secret-sync|dev-infrastructure/data)/
+  steps:
+    cluster_profile: aro-hcp-dev
+    test:
+    - ref: aro-hcp-secrets-validation
 - as: verify
   steps:
     test:
@@ -238,7 +243,7 @@ tests:
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
-  skip_if_only_changed: ^(?:action\.yml|CODEOWNERS|docs/|LICENSE|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:editorconfig|gitattributes|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|\.md$)$
+  skip_if_only_changed: ^(?:action\.yml|CODEOWNERS|docs/|LICENSE|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:editorconfig|gitattributes|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
   steps:
     cluster_profile: aro-hcp-dev
     env:

@@ -37,6 +37,26 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
+      - name: horologium
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --projected-token-file=/var/sa-token/token
+        - --dry-run=false
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260316-25576911a
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
+        resources:
+          requests:
+            memory: "7.5Gi"
+            cpu: "150m"
       - name: git-sync
         command:
         - /git-sync
@@ -55,26 +75,6 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - name: horologium
-        args:
-        - --config-path=/etc/config/config.yaml
-        - --supplemental-prow-config-dir=/etc/config
-        - --job-config-path=/var/repo/release/ci-operator/jobs
-        - --projected-token-file=/var/sa-token/token
-        - --dry-run=false
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260304-f92e22b4d
-        volumeMounts:
-        - name: service-account-token
-          mountPath: /var/sa-token
-        - name: config
-          mountPath: /etc/config
-          readOnly: true
-        - name: release
-          mountPath: /var/repo
-        resources:
-          requests:
-            memory: "7.5Gi"
-            cpu: "150m"
       volumes:
       - name: service-account-token
         projected:

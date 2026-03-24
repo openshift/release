@@ -186,11 +186,35 @@ tests:
     test:
     - as: e2e
       commands: |
-        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        CTX_HUB_CLUSTER=$(oc config current-context)
+        oc create namespace managed --dry-run=client -o yaml | oc apply -f -
+
+        cat <<EOF | oc apply -f -
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: managed
+          labels:
+            cloud: auto-detect
+            vendor: auto-detect
+        spec:
+          hubAcceptsClient: true
+        EOF
+
+        oc create secret generic auto-import-secret \
+          -n managed \
+          --from-file=kubeconfig="${SHARED_DIR}/managed-1.kc" \
+          --dry-run=client -o yaml | oc apply -f -
+        oc wait managedcluster managed \
+          --for=condition=ManagedClusterConditionAvailable=True \
+          --timeout=300s
+        oc get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log

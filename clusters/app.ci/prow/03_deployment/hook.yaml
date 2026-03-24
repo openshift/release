@@ -128,26 +128,8 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: hook
-        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260304-f92e22b4d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260316-25576911a
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -162,8 +144,9 @@ spec:
         - --bugzilla-endpoint=https://bugzilla.redhat.com
         - --bugzilla-api-key-path=/etc/bugzilla/api
         - --bugzilla-auth-method=bearer
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/token
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=aos-team-dp-testplatform@redhat.com
+        - --jira-password-file=/etc/jira/password
         - --projected-token-file=/var/sa-token/token
         - --supplemental-plugin-config-dir=/etc/plugins
         - --kubeconfig-dir=/etc/build-farm-credentials
@@ -221,6 +204,24 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:

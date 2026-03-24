@@ -95,6 +95,18 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
+    'rosa-e2e-01-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
+    },
+    'rosa-e2e-02-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
+    },
+    'rosa-e2e-03-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
+    },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
     },
@@ -250,6 +262,15 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-classic-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-classic-stg-quota-slice': {
+        'default': 5,
+    },
+    'aro-classic-prod-quota-slice': {
+        'default': 30
+    },
     'aro-hcp-int-quota-slice': {
         'default': 1,
     },
@@ -269,6 +290,7 @@ CONFIG = {
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
+    'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -328,6 +350,9 @@ CONFIG = {
     },
     'gcp-telco-quota-slice': {
         'us-central1': 40,
+    },
+    'gcp-perfscale-qe-quota-slice': {
+        'us-east1': 6,
     },
     'libvirt-s390x-1-quota-slice': {},
     'libvirt-s390x-2-quota-slice': {},
@@ -716,22 +741,39 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
+for i in range(20):
+    CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
+
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
         'aws': {
-            'install': 16,
+            'install': 50,
             'quota': CONFIG['aws-quota-slice'],
         },
         'aws-2': {
-            'install': 16,
+            'install': 50,
             'quota': CONFIG['aws-2-quota-slice'],
+        },
+        'aws-3': {
+            'install': 50,
+            'quota': CONFIG['aws-3-quota-slice'],
+        },
+        'aws-4': {
+            'install': 50,
+            'quota': CONFIG['aws-4-quota-slice'],
+        },
+        'aws-5': {
+            'install': 50,
+            'quota': CONFIG['aws-5-quota-slice'],
         },
     },
     'openshift-org-azure': {
         'azure-2': {
+            'install': 50,
             'quota': CONFIG['azure-2-quota-slice'],
         },
         'azure4': {
+            'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
     }

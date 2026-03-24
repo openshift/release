@@ -22,12 +22,16 @@ tests:
   commands: ./ci/helm-lint.sh
   container:
     from: src
+- as: check-docs
+  commands: ./ci/check-docs.sh
+  container:
+    from: src
 - as: check-rendered-files
   commands: ./ci/check-rendered-files.sh
   container:
     from: src
 - as: nightly-ephemeral
-  cron: 0 7 * * *
+  cron: 0 4 * * *
   steps:
     post:
     - as: teardown-ephemeral
@@ -66,7 +70,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: nightly-integration
-  cron: 0 7 * * *
+  cron: 0 4 * * *
   steps:
     test:
     - as: e2e
@@ -88,7 +92,7 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh --teardown
+        ./ci/nightly.sh --teardown-fire-and-forget
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds

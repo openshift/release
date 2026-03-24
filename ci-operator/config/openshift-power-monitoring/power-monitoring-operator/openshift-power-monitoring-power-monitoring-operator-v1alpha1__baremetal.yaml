@@ -1,0 +1,93 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- build_args:
+  - name: GIT_BRANCH
+    value: v1alpha1
+  - name: GIT_COMMIT
+    value: HEAD
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  - name: VERSION
+    value: v1alpha1
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: power-monitoring-operator
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: power-monitoring-operator-tests-runner
+operator:
+  bundles:
+  - as: power-monitoring-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
+    with: pipeline:power-monitoring-operator
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- always_run: false
+  as: power-monitoring-operator-e2e-baremetal-amd64
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-observability-inject-ci-registry-auth
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=30m
+      dependencies:
+      - env: OO_BUNDLE
+        name: power-monitoring-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
+    workflow: baremetal-lab-sno
+zz_generated_metadata:
+  branch: v1alpha1
+  org: openshift-power-monitoring
+  repo: power-monitoring-operator
+  variant: baremetal

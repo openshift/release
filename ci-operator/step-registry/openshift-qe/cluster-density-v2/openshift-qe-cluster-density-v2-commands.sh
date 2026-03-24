@@ -57,8 +57,10 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
 
 # Use CDV2_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 9
-iteration_multiplier=$((${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+# Use awk for fractional multiplier support; result is truncated to int
+iteration_multiplier=${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}
+ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
+export ITERATIONS
 
 export WORKLOAD=cluster-density-v2
 EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
