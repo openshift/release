@@ -20,6 +20,13 @@ git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
 echo "Cloning HyperShift repository..."
 git clone https://github.com/hypershift-community/hypershift /tmp/hypershift
 
+# Configure management cluster kubeconfig
+export KUBECONFIG=/var/run/agent-management-kubeconfig/kubeconfig
+echo "=== Validating management cluster access ==="
+oc whoami
+oc get nodes
+echo "=== Management cluster access validated ==="
+
 # Build HyperShift operator image
 echo "=== Building HyperShift operator image ==="
 podman build -f /tmp/hypershift/Dockerfile --platform linux/amd64 -t quay.io/agarcial/ho:test /tmp/hypershift
