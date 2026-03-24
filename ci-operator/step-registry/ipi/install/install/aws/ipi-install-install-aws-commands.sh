@@ -186,6 +186,14 @@ EOF
   echo 'Patched efa pg into 99_openshift-cluster-api_worker-machineset-0.yaml'
 }
 
+function is_dualstack() {
+  if [[ "${IP_FAMILY:-}" == *"DualStack"* ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -457,7 +465,12 @@ EOF
   router_lb=$(oc -n openshift-ingress get service router-default -o json | jq -r '.status.loadBalancer.ingress[].hostname')
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
-    router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
+    if is_dualstack; then
+      router_lb_hostzone_id=$(aws --region ${REGION} elbv2 describe-load-balancers | jq -r ".LoadBalancers[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneId")
+    else
+      router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
+    fi
+
     aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
       --template-body 'file:///tmp/ingress_app.yml' \
       --parameters \
@@ -480,7 +493,7 @@ EOF
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
-  fi    
+  fi
     
   echo "Created stack $APPS_DNS_STACK_NAME"
 
