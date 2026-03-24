@@ -22,15 +22,34 @@ function deprovision() {
 
 function cleanup_vpc_network() {
   local infraID="${1}"
+  local networkLink
+  networkLink="$(gcloud --project="${GCP_PROJECT}" compute networks describe "${infraID}-network" --format="value(selfLink)")" || return 1
 
-  for subnet_info in $(gcloud --project="${GCP_PROJECT}" compute networks subnets list --filter="network=${infraID}-network" --format="csv[no-heading](name,region.basename())"); do
+  for rule in $(gcloud --project="${GCP_PROJECT}" compute forwarding-rules list --filter="network=${networkLink}" --format="csv[no-heading](name,region.basename())"); do
+    rule_name="${rule%%,*}"
+    rule_region="${rule##*,}"
+    if [[ -n "${rule_region}" ]]; then
+      echo "Deleting forwarding rule ${rule_name} in ${rule_region} ..."
+      gcloud --project="${GCP_PROJECT}" compute forwarding-rules delete "${rule_name}" --region="${rule_region}" --quiet || return 1
+    else
+      echo "Deleting global forwarding rule ${rule_name} ..."
+      gcloud --project="${GCP_PROJECT}" compute forwarding-rules delete "${rule_name}" --global --quiet || return 1
+    fi
+  done
+
+  for fw in $(gcloud --project="${GCP_PROJECT}" compute firewall-rules list --filter="network=${networkLink}" --format="value(name)"); do
+    echo "Deleting firewall rule ${fw} ..."
+    gcloud --project="${GCP_PROJECT}" compute firewall-rules delete "${fw}" --quiet || return 1
+  done
+
+  for subnet_info in $(gcloud --project="${GCP_PROJECT}" compute networks subnets list --filter="network=${networkLink}" --format="csv[no-heading](name,region.basename())"); do
     subnet_name="${subnet_info%%,*}"
     subnet_region="${subnet_info##*,}"
     echo "Deleting subnet ${subnet_name} in ${subnet_region} ..."
     gcloud --project="${GCP_PROJECT}" compute networks subnets delete "${subnet_name}" --region="${subnet_region}" --quiet || return 1
   done
 
-  for route in $(gcloud --project="${GCP_PROJECT}" compute routes list --filter="network=${infraID}-network" --format="value(name)"); do
+  for route in $(gcloud --project="${GCP_PROJECT}" compute routes list --filter="network=${networkLink}" --format="value(name)"); do
     echo "Deleting route ${route} ..."
     gcloud --project="${GCP_PROJECT}" compute routes delete "${route}" --quiet || return 1
   done
