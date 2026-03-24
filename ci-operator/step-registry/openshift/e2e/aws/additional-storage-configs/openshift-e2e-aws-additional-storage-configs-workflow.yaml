@@ -1,0 +1,18 @@
+workflow:
+  as: openshift-e2e-aws-additional-storage-configs
+  documentation: |-
+    Provisions an AWS cluster with TechPreviewNoUpgrade and prepares storage for testing Additional Storage Configurations.
+    This workflow:
+    1. Provisions an AWS cluster with TechPreviewNoUpgrade feature gate
+    2. Sets up SSD (EBS volume) mounted at /mnt/ssd-artifacts
+    3. Sets up NFS server and mounts at /mnt/nfs-artifacts
+    4. Leaves cluster ready for manual testing
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - ref: storage-setup-ssd-nfs-mounts
+    test:
+    - ref: wait
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-deprovision
