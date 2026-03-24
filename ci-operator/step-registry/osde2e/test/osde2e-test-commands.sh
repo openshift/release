@@ -24,12 +24,12 @@ fi
 TEST_PARAMETERS="--configs ${CONFIGS} \
 --secret-locations ${SECRET_LOCATIONS}"
 
-if [[ -n ${SKIP_MUST_GATHER} ]]
+if [[ "${SKIP_MUST_GATHER}" == "true" ]]
 then
   TEST_PARAMETERS="${TEST_PARAMETERS} --skip-must-gather"
 fi
 
-if [[ -n ${SKIP_DESTROY_CLUSTER} ]]
+if [[ "${SKIP_DESTROY_CLUSTER}" == "true" ]]
 then
   TEST_PARAMETERS="${TEST_PARAMETERS} --skip-destroy-cluster"
 fi
