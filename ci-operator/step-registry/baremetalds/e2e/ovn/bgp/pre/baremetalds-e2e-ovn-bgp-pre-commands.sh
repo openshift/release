@@ -42,6 +42,12 @@ IP6TABLES="$SUDO ip6tables"
 
 source ~/dev-scripts-additional-config
 
+# Skip this step if routing mode is Managed (not applicable for no-overlay with managed routing)
+if [ "${NO_OVERLAY_ROUTING:-}" = "Managed" ]; then
+  echo "Routing mode is Managed, skipping baremetalds-e2e-ovn-bgp-pre setup"
+  exit 0
+fi
+
 clone_frr() {
   [ -d "$FRR_TMP_DIR" ] || {
     mkdir -p "$FRR_TMP_DIR" && trap 'rm -rf $FRR_TMP_DIR' EXIT
