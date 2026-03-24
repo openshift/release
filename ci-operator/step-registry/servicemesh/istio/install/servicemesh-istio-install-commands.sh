@@ -350,6 +350,12 @@ spec:
   istio_namespace: istio-system
   server:
     write_timeout: 60
+  # kiali regression tests are failing with cache enabled. See https://redhat-internal.slack.com/archives/CHR7P722J/p1770620651384959
+  kiali_internal:
+    graph_cache:
+      enabled: false
+    health_cache:
+      enabled: false
 EOF
 oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} kiali/kiali; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
 oc annotate route kiali haproxy.router.openshift.io/timeout=60s -n ${ISTIO_NAMESPACE}
