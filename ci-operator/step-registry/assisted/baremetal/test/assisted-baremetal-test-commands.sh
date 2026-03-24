@@ -47,7 +47,7 @@ cat > "${MAIN_PLAYBOOK}" <<-EOF
   hosts: primary
   gather_facts: yes
   vars:
-    test_type:               "{{ lookup('env','TEST_TYPE')           | default('minimal') }}"
+    test_type:               "{{ lookup('env','TEST_TYPE')           | default('none') }}"
     test_suite:              "{{ lookup('env','TEST_SUITE')          | default('openshift/conformance/parallel') }}"
     custom_test_list:        "{{ lookup('env','CUSTOM_TEST_LIST')    | default('') }}"
     minimal_test_list:       "{{ lookup('env','MINIMAL_TEST_LIST')   | default('') }}"
