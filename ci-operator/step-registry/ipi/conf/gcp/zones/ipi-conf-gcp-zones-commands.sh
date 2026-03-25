@@ -22,13 +22,10 @@ function get_zones_from_region() {
 
   if [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - INFO: Filtering zones by the exclusion pattern '${ZONES_EXCLUSION_PATTERN}'"
-    mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | grep -v "${ZONES_EXCLUSION_PATTERN}" | shuf)
+    mapfile -t ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | grep -v "${ZONES_EXCLUSION_PATTERN}")
   else
-    mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | shuf)
+    mapfile -t ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)')
   fi
-  
-  echo "$(date -u --rfc-3339=seconds) - INFO: Take the first ${ZONES_COUNT} zones"
-  ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
   echo "$(date -u --rfc-3339=seconds) - INFO: GCP region: ${GCP_REGION} (zones: ${ZONES[*]})"
 }
 
@@ -45,18 +42,18 @@ function get_zones_by_machine_type() {
   fi
 
   echo "$(date -u --rfc-3339=seconds) - INFO: Get all zones supporting the machine type '${machine_type}'"
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
-  if [[ ${#AVAILABILITY_ZONES[@]} -eq 0 ]]; then
+  mapfile -t ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+  if [[ ${#ZONES[@]} -eq 0 ]]; then
     echo "$(date -u --rfc-3339=seconds) - INFO: Failed to find any zone in region '${GCP_REGION}' supporting the machine type '${machine_type}'"
     return
   fi
-  echo "$(date -u --rfc-3339=seconds) - INFO: [${machine_type}] the initial AVAILABILITY_ZONES '${AVAILABILITY_ZONES[*]}'"
+  echo "$(date -u --rfc-3339=seconds) - INFO: [${machine_type}] the initial ZONES '${ZONES[*]}'"
   
   if [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - INFO: Filtering zones by the exclusion pattern '${ZONES_EXCLUSION_PATTERN}'"
     local filtered_zones=()
     set +e
-    for zone in "${AVAILABILITY_ZONES[@]}"; do
+    for zone in "${ZONES[@]}"; do
       echo "${zone}" | grep -q "${ZONES_EXCLUSION_PATTERN}"
       if [[ $? -ne 0 ]]; then
         filtered_zones+=("${zone}")
@@ -68,18 +65,13 @@ function get_zones_by_machine_type() {
 
     # Only use filtered zones if we found non-PATTERN-matching zones, otherwise use all zones
     if [[ ${#filtered_zones[@]} -gt 0 ]]; then
-      AVAILABILITY_ZONES=("${filtered_zones[@]}")
+      ZONES=("${filtered_zones[@]}")
     else
       echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find zones NOT matching the pattern, abort."
       exit 1
     fi
   fi
-  
-  echo "$(date -u --rfc-3339=seconds) - INFO: Shuffle zones randomly to spread load across zones instead of always picking alphabetically first"
-  mapfile -t AVAILABILITY_ZONES < <(printf '%s\n' "${AVAILABILITY_ZONES[@]}" | shuf)
-  
-  echo "$(date -u --rfc-3339=seconds) - INFO: Take the first ${ZONES_COUNT} zones"
-  ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+
   echo "$(date -u --rfc-3339=seconds) - INFO: [${machine_type}] GCP region: ${GCP_REGION} (zones: ${ZONES[*]})"
 }
 
@@ -184,7 +176,15 @@ if [[ -z "${CONTROL_PLANE_ZONES}" ]]; then
     get_zones_from_region ZONES_ARRAY2
   fi
   echo "$(date -u --rfc-3339=seconds) - INFO: As a temporary workaround of https://redhat.atlassian.net/browse/OCPBUGS-78431, ensure the zones of compute & controlPlane machines are the same"
-  array_intersection_or_fallback  CANDIDATE_ZONES_ARRAY ZONES_ARRAY2
+  array_intersection_or_fallback CANDIDATE_ZONES_ARRAY ZONES_ARRAY2
+fi
+
+if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -gt 0 ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: Shuffle zones randomly to spread load across zones instead of always picking alphabetically first"
+  mapfile -t CANDIDATE_ZONES_ARRAY < <(printf '%s\n' "${CANDIDATE_ZONES_ARRAY[@]}" | shuf)
+  echo "$(date -u --rfc-3339=seconds) - INFO: Take the first ${ZONES_COUNT} zones"
+  CANDIDATE_ZONES_ARRAY=("${CANDIDATE_ZONES_ARRAY[@]:0:${ZONES_COUNT}}")
+  echo "$(date -u --rfc-3339=seconds) - INFO: GCP region: ${GCP_REGION} (zones: ${CANDIDATE_ZONES_ARRAY[*]})"
 fi
 
 if [[ -n "${COMPUTE_ZONES}" ]]; then
