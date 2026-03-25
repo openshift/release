@@ -1,0 +1,25 @@
+ref:
+  as: openshift-pipelines-cleanup
+  from: openshift-pipelines-runner
+  commands: openshift-pipelines-cleanup-commands.sh
+  best_effort: true
+  grace_period: 60s
+  timeout: 10m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 200Mi
+  env:
+  - name: CLEANUP_PIPELINERUNS
+    default: "true"
+    documentation: When "true", delete all PipelineRuns in labelled test namespaces.
+  - name: CLEANUP_PVCS
+    default: "true"
+    documentation: When "true", delete all PersistentVolumeClaims in labelled test namespaces.
+  - name: CLEANUP_NAMESPACES
+    default: "true"
+    documentation: When "true", delete all labelled test namespaces.
+  documentation: |-
+    Post-test cleanup. Removes PipelineRuns, PVCs, and test namespaces
+    labelled openshift-pipelines.tekton.dev/test=true. All actions are
+    best-effort; failures are logged but do not fail the overall job.
