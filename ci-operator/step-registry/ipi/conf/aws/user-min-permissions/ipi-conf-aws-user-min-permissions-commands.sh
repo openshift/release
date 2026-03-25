@@ -60,6 +60,9 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+# Ignore unknown keys in the config, as sometimes the CI job was created prior to the future merge.
+export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
+
 
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
