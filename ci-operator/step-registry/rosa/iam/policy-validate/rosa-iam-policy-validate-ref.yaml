@@ -1,0 +1,28 @@
+ref:
+  as: rosa-iam-policy-validate
+  from: src
+  grace_period: 10m
+  commands: rosa-iam-policy-validate-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: LEASED_RESOURCE
+    default: "us-east-1"
+    documentation: AWS region to use for IAM API calls.
+  documentation: |-
+    This step validates that ROSA HCP AWS-managed IAM policies grant all
+    permissions required by OCP components. It uses osdctl iampermissions
+    simulate to run SimulateCustomPolicy against each managed policy with
+    supplementary test scenarios that include condition-context edge cases
+    (e.g., ec2:CreateTags without ec2:CreateAction context, as in CFE-1131).
+
+    The step:
+    1. Fetches all 8 ROSA HCP AWS-managed operator policies from the IAM API
+    2. Loads supplementary test manifests defining expected permission scenarios
+    3. Runs SimulateCustomPolicy for each action/context combination
+    4. Produces JUnit XML results in ${ARTIFACT_DIR}/iam-policy-validation/
+
+    Requires AWS credentials with iam:SimulateCustomPolicy, iam:GetPolicy,
+    and iam:GetPolicyVersion permissions.
