@@ -1,0 +1,21 @@
+workflow:
+  as: cucushift-installer-rehearse-gcp-ipi-ovn-winc-debug
+  steps:
+    env:
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_TARGET_NAMESPACES: '!install'
+      SUB_SOURCE: "wmco"
+      WINDOWS_NODE_REPLICAS: 2
+      TIMEOUT: "+8 hours"
+    pre:
+      - chain: cucushift-installer-rehearse-gcp-ipi-ovn-winc-provision
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - ref: wait
+      - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+  documentation: |-
+    This is the debug workflow for GCP IPI Windows Containers testing.
+    It keeps the cluster alive for 8 hours after test completion for debugging purposes,
+    then automatically deprovisions the cluster.
