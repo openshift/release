@@ -198,9 +198,10 @@ fi
 
 # Check that specified identity should be attached on each node
 echo "-------------Check that identity is attached on each node-------------"
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 node_filter=""
-if (( ${ocp_minor_version} < 19 )); then
+if (( ocp_major_version == 4 && ocp_minor_version < 19 )); then
     # No rhel worker is provisioned on 4.19+
     node_filter="node.openshift.io/os_id=rhcos,"
 fi
@@ -217,7 +218,7 @@ else
     check_machine_managedIdentity "master" "${expected_identity_id_master}" "${cluster_identity_name}"|| check_result=1
 
     #cpms feature is supported starting from 4.13 on Azure platform
-    if (( ${ocp_minor_version} > 12 )); then
+    if (( ocp_major_version == 4 && ocp_minor_version > 12 )) || (( ocp_major_version > 4 )); then
         echo "-------------Check identity in controlplanemachineset spec-------------"
         cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
         echo "checking controlplanemachineset cluster..."
