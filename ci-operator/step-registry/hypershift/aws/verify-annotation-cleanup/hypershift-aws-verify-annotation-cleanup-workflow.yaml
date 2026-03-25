@@ -1,0 +1,19 @@
+workflow:
+  as: hypershift-aws-verify-annotation-cleanup
+  documentation: |-
+    Verifies OCPBUGS-78979: referenced-resource annotations on secrets and
+    configmaps are properly cleaned up when a HostedCluster is deleted,
+    regardless of the HostedControlPlane state.
+
+    The workflow creates a HostedCluster, verifies annotations are set on
+    referenced resources, deletes the cluster, and confirms all annotations
+    are removed.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    test:
+    - ref: hypershift-aws-verify-annotation-cleanup
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
