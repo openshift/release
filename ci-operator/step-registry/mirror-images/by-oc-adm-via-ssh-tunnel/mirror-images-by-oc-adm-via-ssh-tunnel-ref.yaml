@@ -1,0 +1,27 @@
+ref:
+  as: mirror-images-by-oc-adm-via-ssh-tunnel
+  from: upi-installer
+  timeout: 4h0m0s
+  grace_period: 10m
+  commands: mirror-images-by-oc-adm-via-ssh-tunnel-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  - name: ENABLE_IDMS
+    default: "yes"
+    documentation: Whether to print out IDMS, by default, it is ICSP
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Mirror release images via SSH tunnel to bastion registry for vSphere disconnected environments.
+    Sets up SSH tunnel, then runs oc adm release mirror through the tunnel.
