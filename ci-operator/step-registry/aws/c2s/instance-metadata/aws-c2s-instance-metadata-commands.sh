@@ -103,7 +103,7 @@ else
     cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
 fi
 
-if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version <= 9 )); then
   echo "C2S: workaround for C2S emulator (BZ#1926975)"
   cat << EOF > ${SHARED_DIR}/manifest_c2s_emulator_patch_cloud-provider-config.yaml
 apiVersion: v1

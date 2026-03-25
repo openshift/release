@@ -173,8 +173,10 @@ fi
 
 # os disk cache check
 # will remove the version check when OCPBUGS-33470 backport to old version
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 16 )); then
+
+if (( ocp_major_version == 4 && ocp_minor_version < 16 )); then
     echo "Disk cache checking is available on 4.16+ cluster currently, skip the check!"
     exit ${check_result}
 fi

@@ -155,8 +155,9 @@ else
 fi
 
 if ! is_empty "$ic_platform_key"; then
+  ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
   ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-  if (( ocp_minor_version < 13 )); then
+  if (( ocp_major_version == 4 && ocp_minor_version < 13 )); then
     echo "Skip: KMS key: PVC: default storage class is only available on 4.13+, skip checking."
   else
     if [[ "${pvc_kms_key}" != "${ic_platform_key}" ]]; then

@@ -236,14 +236,14 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 if [ -f "${SHARED_DIR}/unset-proxy.sh" ] ; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
 
-if ((ocp_major_version == 4 && ocp_minor_version >= 19)) && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+if ( ((ocp_major_version == 4 && ocp_minor_version >= 19)) || ((ocp_major_version > 4)) ) && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
 
   echo "Check if instances match CPMS spec ... "
 
