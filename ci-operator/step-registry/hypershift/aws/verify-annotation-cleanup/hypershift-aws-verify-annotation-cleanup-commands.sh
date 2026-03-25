@@ -115,6 +115,7 @@ echo "Deleting HostedCluster ${CLUSTER_NAME}..."
 bin/hypershift destroy cluster aws \
   --aws-creds="${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
   --name "${CLUSTER_NAME}" \
+  --infra-id "${CLUSTER_NAME}" \
   --region "${HC_REGION}" \
   --base-domain "${DOMAIN}" \
   --cluster-grace-period 10m
