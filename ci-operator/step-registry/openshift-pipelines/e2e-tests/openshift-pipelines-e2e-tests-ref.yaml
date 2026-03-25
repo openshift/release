@@ -1,0 +1,24 @@
+ref:
+  as: openshift-pipelines-e2e-tests
+  from: openshift-pipelines-runner
+  commands: openshift-pipelines-e2e-tests-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  env:
+  - name: PIPELINES_TEST_SPECS
+    default: "specs/pipelines/;specs/triggers/;specs/metrics/;specs/operator/addon.spec;specs/operator/auto-prune.spec"
+    documentation: Semi-colon-separated list of gauge spec paths to run.
+  - name: TEST_TAGS
+    default: "e2e"
+    documentation: Gauge tag filter. Defaults to "e2e" for the full suite.
+  credentials:
+  - mount_path: /var/run/secrets/openshift-pipelines-e2e-credentials
+    name: openshift-pipelines-e2e-credentials
+    namespace: test-credentials
+  documentation: |-
+    Runs the OpenShift Pipelines full e2e test suite.
+    Credentials are loaded from the openshift-pipelines-e2e-credentials secret.
+    This step is intentionally separate from openshift-pipelines-tests (interop)
+    so interop jobs are never affected.
