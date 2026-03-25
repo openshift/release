@@ -270,6 +270,36 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
+- as: debug-winc-vsphere-ipi-byoh-wait
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      BYOH_NUM_WORKERS: "1"
+      SLEEP_DURATION: 2h
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      WINDOWS_NODE_REPLICAS: "1"
+    post:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-ovn-winc-deprovision
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest
+    - chain: ipi-install
+    - ref: ipi-install-vsphere-registry
+    - ref: enable-qe-catalogsource
+    - ref: ssh-bastion
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-vsphere-windows-machineset
+    - ref: windows-byoh-provision
+    - ref: cucushift-installer-wait
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
