@@ -7,6 +7,9 @@ set -euo pipefail
 # Verifies that referenced-resource annotations on secrets and configmaps
 # are properly removed when a HostedCluster is deleted, regardless of
 # whether the HostedControlPlane is deleted first.
+#
+# Prerequisites: HostedCluster already created by hypershift-aws-create chain.
+# KUBECONFIG is inherited from CI framework (nested management cluster).
 # =============================================================================
 
 PASS_COUNT=0
@@ -20,9 +23,21 @@ skip() { echo "[SKIP] $1"; SKIP_COUNT=$((SKIP_COUNT + 1)); }
 ANNOTATION_PREFIX="referenced-resource.hypershift.openshift.io/"
 HC_NAMESPACE="clusters"
 
-# KUBECONFIG is inherited from the CI framework (set by the nested management
-# cluster setup chain via SHARED_DIR/kubeconfig). Do NOT override it.
+# Derive cluster name the same way as hypershift-aws-create chain
+CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
 echo "Using KUBECONFIG: ${KUBECONFIG}"
+echo "Cluster name: ${CLUSTER_NAME}"
+
+# Determine AWS credentials and domain (same logic as hypershift-aws-destroy chain)
+AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+
+if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}" == "true" ]]; then
+  AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+  DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+fi
+DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}"
+HC_REGION="${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}"
 
 # --- Step 0: Pre-flight ---
 echo ""
@@ -38,81 +53,18 @@ else
   exit 1
 fi
 
-# --- Step 1: Create HostedCluster ---
-echo ""
-echo "=== Step 1: Create HostedCluster ==="
-
-AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
-  echo "AWS credentials file not found at ${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
-  exit 1
-fi
-
-RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
-if [[ -z "${RELEASE_IMAGE}" ]]; then
-  echo "RELEASE_IMAGE_LATEST is not set"
-  exit 1
-fi
-
-DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
-if [[ -z "${DOMAIN}" ]]; then
-  if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
-    DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
-  fi
-fi
-DOMAIN="${DOMAIN:-ci.hypershift.devcluster.openshift.com}"
-
-HASH="$(echo -n "${PROW_JOB_ID}"|sha256sum)"
-CLUSTER_NAME="${HASH:0:20}"
-INFRA_ID="${HASH:20:5}"
-echo "Using cluster name: ${CLUSTER_NAME}, infra ID: ${INFRA_ID}"
-
-# Save cluster info for cleanup
-echo "CLUSTER_NAME=${CLUSTER_NAME}" > "${SHARED_DIR}/hosted_cluster.txt"
-echo "INFRA_ID=${INFRA_ID}" >> "${SHARED_DIR}/hosted_cluster.txt"
-
-# Generate pull secret
-oc registry login --to="${SHARED_DIR}/pull-secret-build-farm.json"
-if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
-  jq -s '.[0] * .[1]' "${SHARED_DIR}/pull-secret-build-farm.json" /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret.json
+# Verify the HC exists (created by hypershift-aws-create chain)
+if oc get hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" &>/dev/null; then
+  pass "HostedCluster ${CLUSTER_NAME} exists"
 else
-  cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret.json
+  fail "HostedCluster ${CLUSTER_NAME} not found (should have been created by hypershift-aws-create)"
+  echo "RESULT: PRE-FLIGHT FAILED"
+  exit 1
 fi
 
-EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
-
-echo "Creating HostedCluster ${CLUSTER_NAME}..."
-bin/hypershift create cluster aws \
-  --name "${CLUSTER_NAME}" \
-  --infra-id "${INFRA_ID}" \
-  --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
-  --instance-type "m5.xlarge" \
-  --base-domain "${DOMAIN}" \
-  --region "${HYPERSHIFT_AWS_REGION}" \
-  --pull-secret /tmp/pull-secret.json \
-  --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
-  --release-image "${RELEASE_IMAGE}" \
-  --annotations "prow.k8s.io/job=${JOB_NAME}" \
-  --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
-  --annotations "hypershift.openshift.io/cleanup-cloud-resources=false" \
-  --additional-tags "expirationDate=${EXPIRATION_DATE}" \
-  --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
-  --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
-
-echo "Waiting for HostedCluster to become available..."
-oc wait --timeout=30m --for=condition=Available --namespace="${HC_NAMESPACE}" "hostedcluster/${CLUSTER_NAME}" || {
-  echo "Cluster did not become available"
-  mkdir -p "${ARTIFACT_DIR}/hypershift-snapshot"
-  oc get hostedcluster "${CLUSTER_NAME}" --namespace="${HC_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/hypershift-snapshot/hostedcluster_failed.yaml" || true
-  fail "HostedCluster did not become available within 30m"
-  echo "RESULT: SETUP FAILED"
-  exit 1
-}
-pass "HostedCluster ${CLUSTER_NAME} is available"
-
-# --- Step 2: Verify annotations are SET on referenced resources ---
+# --- Step 1: Verify annotations are SET on referenced resources ---
 echo ""
-echo "=== Step 2: Verify annotations are set on referenced resources ==="
+echo "=== Step 1: Verify annotations are set on referenced resources ==="
 
 ANNOTATION_KEY="${ANNOTATION_PREFIX}${CLUSTER_NAME}"
 
@@ -155,16 +107,15 @@ echo "--- Pre-deletion annotation evidence ---" > "${ARTIFACT_DIR}/annotation-ev
 echo "Annotated secrets: ${ANNOTATED_SECRETS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
 echo "Annotated configmaps: ${ANNOTATED_CMS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
 
-# --- Step 3: Delete HostedCluster ---
+# --- Step 2: Delete HostedCluster ---
 echo ""
-echo "=== Step 3: Delete HostedCluster ==="
+echo "=== Step 2: Delete HostedCluster ==="
 
 echo "Deleting HostedCluster ${CLUSTER_NAME}..."
 bin/hypershift destroy cluster aws \
   --aws-creds="${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
   --name "${CLUSTER_NAME}" \
-  --infra-id "${INFRA_ID}" \
-  --region "${HYPERSHIFT_AWS_REGION}" \
+  --region "${HC_REGION}" \
   --base-domain "${DOMAIN}" \
   --cluster-grace-period 10m
 
@@ -184,9 +135,9 @@ while oc get hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" &>/dev/null; d
 done
 pass "HostedCluster ${CLUSTER_NAME} fully deleted"
 
-# --- Step 4: Verify annotations are REMOVED (core verification) ---
+# --- Step 3: Verify annotations are REMOVED (core verification) ---
 echo ""
-echo "=== Step 4: Verify annotations are removed (CORE CHECK) ==="
+echo "=== Step 3: Verify annotations are removed (CORE CHECK) ==="
 
 # Check secrets - no annotation should remain for the deleted HC
 REMAINING_SECRET_ANNOTATIONS=$(oc get secrets -n "${HC_NAMESPACE}" -o json | \
@@ -224,9 +175,9 @@ echo "--- Post-deletion annotation evidence ---" >> "${ARTIFACT_DIR}/annotation-
 echo "Remaining secret annotations: ${REMAINING_SECRET_ANNOTATIONS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
 echo "Remaining configmap annotations: ${REMAINING_CM_ANNOTATIONS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
 
-# --- Step 5: Verify no stale annotations from ANY deleted HC ---
+# --- Step 4: Verify no stale annotations from ANY deleted HC ---
 echo ""
-echo "=== Step 5: Verify no orphaned referenced-resource annotations ==="
+echo "=== Step 4: Verify no orphaned referenced-resource annotations ==="
 
 # Check for any referenced-resource annotations that reference non-existent HCs
 ALL_ANNOTATION_KEYS=$(oc get secrets,configmaps -n "${HC_NAMESPACE}" -o json | \
