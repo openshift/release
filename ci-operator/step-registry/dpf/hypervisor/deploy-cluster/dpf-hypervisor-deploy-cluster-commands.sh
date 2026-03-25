@@ -25,7 +25,7 @@ chmod 600 /tmp/id_rsa
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-### DEBUG: add a ong timeout to troubleshoot from pod
+### DEBUG: add a long timeout to troubleshoot from pod
 ## echo "Sleeping for 999999999 seconds ...."
 ## sleep 999999999
 
@@ -45,7 +45,7 @@ fi
 
 # Bypassing env vars set in prepare-environment for now
 ## OPENSHIFT_DPF_BRANCH="dpf-25.10"
-# This needs ot be main branch
+# This needs to be main branch
 OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 CLUSTER_NAME="doca8"
@@ -120,7 +120,7 @@ ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; sed -i
 echo "Sleeping for 600 seconds ...."
 sleep 600
 
-# SSH session to 
+# SSH session to hypervisor
 echo "Starting DPF deployment with 'make all'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
@@ -150,6 +150,15 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf && m
 else
   CLEAN_ALL_SUCCESS=false
   echo "DPF pre-deployment clean-all failed, CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
+  exit 1
+fi
+
+echo "Update hypervisor file ${REMOTE_MAIN_WORK_DIR}/last-openshift-dir.sh with path to latest openshift-dpf install dir"
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}; \
+  sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' last-openshift-dpf-dir.sh"; then
+  echo "Updated variable LAST_OPENSHIFT_DPF with path '${REMOTE_WORK_DIR}/openshift-dpf' in hypervisor file '${REMOTE_MAIN_WORK_DIR}/last-openshift-dpf-dir.sh'"
+else
+  echo "Failed to update variable LAST_OPENSHIFT_DPF in hypervisor file '${REMOTE_MAIN_WORK_DIR}/last-openshift-dpf-dir.sh'"
   exit 1
 fi
 
@@ -225,5 +234,5 @@ else
     exit 1
 fi
 
-## end ofg global multi-line comment
+## end of global multi-line comment
 GLOBALCOMMENT

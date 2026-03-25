@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
+REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
