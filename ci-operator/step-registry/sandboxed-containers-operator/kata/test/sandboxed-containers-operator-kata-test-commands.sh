@@ -16,23 +16,22 @@ if [[ "${WORKLOAD_TO_TEST}" != "kata" ]]; then
 	exit 0
 fi
 
-echo "Installing required packages"
-if ! command -v git &>/dev/null; then
-	dnf install -y git-core
-fi
-
 KATA_REPO="${KATA_REPO:-https://github.com/openshift/kata-containers.git}"
 KATA_BRANCH="${KATA_BRANCH:-osc-release}"
 KATA_DIR="/tmp/kata-containers"
 
-echo "Cloning ${KATA_REPO} (branch: ${KATA_BRANCH})"
-git clone --depth 1 --branch "${KATA_BRANCH}" "${KATA_REPO}" "${KATA_DIR}"
+# Convert git URL to tarball URL (works for github.com repos)
+TARBALL_URL="${KATA_REPO%.git}/archive/refs/heads/${KATA_BRANCH}.tar.gz"
+
+echo "Downloading ${TARBALL_URL}"
+curl -sL "${TARBALL_URL}" | tar xz -C /tmp
+mv "/tmp/kata-containers-${KATA_BRANCH}" "${KATA_DIR}"
 
 echo "Installing test dependencies"
 # bats
 if ! command -v bats &>/dev/null; then
-	git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
-	pushd /tmp/bats-core
+	curl -sL "https://github.com/bats-core/bats-core/archive/refs/heads/master.tar.gz" | tar xz -C /tmp
+	pushd /tmp/bats-core-master
 	./install.sh /usr/local
 	popd
 fi
