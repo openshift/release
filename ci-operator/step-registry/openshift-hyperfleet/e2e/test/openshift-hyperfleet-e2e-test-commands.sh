@@ -25,5 +25,13 @@ export TESTDATA_DIR="/e2e/testdata"
 NAMESPACE=$(cat "${SHARED_DIR}/namespace_name")
 export NAMESPACE
 
+# Export adapter parameters for the test
+export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
+export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
+export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
+export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
+export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+
 # Run e2e tests via --label-filter
 hyperfleet-e2e test --label-filter=${LABEL_FILTER} --junit-report ${ARTIFACT_DIR}/junit.xml
