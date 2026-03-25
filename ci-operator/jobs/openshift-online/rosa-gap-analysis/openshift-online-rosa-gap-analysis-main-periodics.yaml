@@ -4,9 +4,7 @@ periodics:
   cron: 0 6 * * *
   decorate: true
   decoration_config:
-    oauth_token_secret:
-      key: oauth
-      name: github-credentials-openshift-ci-robot-private-git-cloner
+    skip_cloning: true
   extra_refs:
   - base_ref: main
     org: openshift-online
@@ -14,7 +12,7 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-gap-analysis-main-rosa-gap-analysis-nightly
+  name: periodic-ci-openshift-online-rosa-gap-analysis-main-nightly
   spec:
     containers:
     - args:
@@ -22,7 +20,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
-      - --target=rosa-gap-analysis-nightly
+      - --target=nightly
       command:
       - ci-operator
       env:
@@ -57,6 +55,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
