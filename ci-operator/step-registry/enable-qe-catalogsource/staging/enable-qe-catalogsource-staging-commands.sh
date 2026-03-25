@@ -5,7 +5,8 @@ set -u
 set -o pipefail
 
 CATALOGSOURCE_NAME="qe-app-registry"
-MIRROR_POLICY_NAME="stage-registry"
+ICSP_NAME="stage-registry"
+IDMS_NAME="stage-registry-idms"
 ART_SECRET_PATH="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
 STAGE_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
@@ -119,7 +120,7 @@ function create_mirror_policy() {
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
-  name: ${MIRROR_POLICY_NAME}
+  name: ${ICSP_NAME}
 spec:
   repositoryDigestMirrors:
   - mirrors:
@@ -132,7 +133,7 @@ EOF
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
-  name: ${MIRROR_POLICY_NAME}
+  name: ${IDMS_NAME}
 spec:
   imageDigestMirrors:
   - mirrors:
