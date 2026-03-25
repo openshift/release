@@ -1,6 +1,7 @@
 build_root:
   project_image:
     dockerfile_path: ci/Containerfile
+  use_build_cache: true
 images:
 - dockerfile_path: ci/Containerfile
   to: rosa-gap-analysis
@@ -15,7 +16,8 @@ tests:
 - as: nightly
   commands: |
     set -euo pipefail
-    ./scripts/gap-all.sh
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports ./scripts/gap-all.sh
   container:
     from: rosa-gap-analysis
   cron: 0 6 * * *
