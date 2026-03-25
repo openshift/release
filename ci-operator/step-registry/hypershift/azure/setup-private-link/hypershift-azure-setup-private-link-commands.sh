@@ -20,9 +20,10 @@ set -o xtrace
 #      to manage Private Link Services. This is what gets passed to
 #      --azure-private-creds during HO install, matching the customer experience.
 #
-# Required Azure RBAC for the private-link credential (scoped to mgmt RG):
-#   - Microsoft.Network/privateLinkServices/read,write,delete
-#   - Microsoft.Network/loadBalancers/read
+# Required Azure RBAC for the private-link credential:
+#   - Microsoft.Network/privateLinkServices/read,write,delete (scoped to mgmt infra RG)
+#   - Microsoft.Network/loadBalancers/read (scoped to mgmt infra RG)
+#   - Microsoft.Network/virtualNetworks/subnets/join/action (scoped to NAT subnet, granted below)
 
 # Login to Azure using the broad infra credentials (for subnet creation)
 set +x
@@ -87,6 +88,20 @@ NAT_SUBNET_ID=$(az network vnet subnet show \
   --query id -o tsv)
 
 echo "NAT subnet ID: ${NAT_SUBNET_ID}"
+
+# Grant the private link service principal "Network Contributor" on the NAT subnet.
+# Creating a PLS requires Microsoft.Network/virtualNetworks/subnets/join/action on
+# the NAT subnet. The private link SP already has PLS write permissions on the infra
+# RG, but the NAT subnet lives in the VNet RG — Azure's LinkedAuthorization check
+# requires explicit permission on the linked subnet scope.
+PRIVATE_SP_CLIENT_ID="$(<"${AZURE_PRIVATE_LINK_CREDS}" jq -r '.clientId')"
+PRIVATE_SP_OBJECT_ID=$(az ad sp show --id "${PRIVATE_SP_CLIENT_ID}" --query id -o tsv)
+echo "Granting Network Contributor on NAT subnet to private link SP (${PRIVATE_SP_CLIENT_ID})"
+az role assignment create \
+  --assignee-object-id "${PRIVATE_SP_OBJECT_ID}" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Network Contributor" \
+  --scope "${NAT_SUBNET_ID}"
 
 # Save for downstream steps (hypershift-install and e2e test runner)
 echo "${MGMT_INFRA_RG}" > "${SHARED_DIR}/azure_pls_resource_group"
