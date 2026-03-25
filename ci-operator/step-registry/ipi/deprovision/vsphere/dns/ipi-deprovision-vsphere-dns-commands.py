@@ -114,6 +114,8 @@ def main():
         logger.critical("JOB_NAME_SAFE is undefined")
         sys.exit(1)
 
+    vsphere_additional_cluster = os.environ.get("VSPHERE_ADDITIONAL_CLUSTER", "false")
+
     base_domain = "vmc-ci.devcluster.openshift.com"
     namespace = os.environ.get("NAMESPACE")
     unique_name = os.environ.get("UNIQUE_HASH")
@@ -123,8 +125,9 @@ def main():
     with open(f"{shared_dir}/vips.txt", "r") as vip_file:
         vips = vip_file.readlines()
 
-    if len(vips) < 2:
-        logger.critical("reading vips.txt resulted in a list less than 2, exiting")
+    min_vips = 4 if vsphere_additional_cluster == "true" else 2
+    if len(vips) < min_vips:
+        logger.critical(f"reading vips.txt resulted in {len(vips)} vips, need at least {min_vips}, exiting")
         sys.exit(1)
 
     # empty change dictionary for batch and change_resource_record_sets
@@ -147,6 +150,14 @@ def main():
     # api.<cluster_domain>
     # *.apps.<cluster_domain> wildcard
     resource_names = [f"api.{cluster_domain}", f"*.apps.{cluster_domain}"]
+
+    # When VSPHERE_ADDITIONAL_CLUSTER is true, also delete spoke cluster DNS records
+    if vsphere_additional_cluster == "true":
+        additional_cluster_name = f"hive-{cluster_name}-spoke"
+        additional_cluster_domain = f"{additional_cluster_name}.{base_domain}"
+        resource_names.append(f"api.{additional_cluster_domain}")
+        resource_names.append(f"*.apps.{additional_cluster_domain}")
+        logger.info(f"will delete spoke cluster DNS records for {additional_cluster_domain}")
 
     # Windows nodes _still_ require api-int.<cluster_domain>
     # This _should_ _not_ be here as we are not properly testing
