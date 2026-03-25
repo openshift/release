@@ -224,9 +224,9 @@ CONFIG = {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
-        'northcentralus': 10,
-        'westus2': 10,
-        'centralus': 10
+        'northcentralus': 15,
+        'westus2': 15,
+        'centralus': 15
     },
     'azure-observability-quota-slice': {
         'westus': 3
