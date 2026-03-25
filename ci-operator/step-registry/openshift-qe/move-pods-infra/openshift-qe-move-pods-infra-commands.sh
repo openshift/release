@@ -102,6 +102,17 @@ function check_monitoring_statefulset_status()
             for pod in $(oc get pods -n openshift-monitoring --no-headers | grep -v Running | awk '{print $1}'); do
                 oc describe pod $pod -n openshift-monitoring
             done
+            echo "-------------------------------------------------------------------------------------------"
+            echo "PVC status in openshift-monitoring:"
+            oc get pvc -n openshift-monitoring
+            echo "-------------------------------------------------------------------------------------------"
+            echo "PVC details:"
+            for pvc in $(oc get pvc -n openshift-monitoring --no-headers | awk '{print $1}'); do
+                oc describe pvc $pvc -n openshift-monitoring
+            done
+            echo "-------------------------------------------------------------------------------------------"
+            echo "CSI provisioner logs:"
+            oc logs -n openshift-cluster-csi-drivers -l app=nutanix-csi-controller -c ntnx-csi-plugin --tail=50 2>/dev/null || true
             echo "error: monitoring statefulsets/pods didn't become Running in time, failing"
             exit 1
         fi
