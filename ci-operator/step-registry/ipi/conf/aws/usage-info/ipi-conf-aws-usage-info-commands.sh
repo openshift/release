@@ -4,6 +4,14 @@
 #set -o errexit
 #set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 set +e
 
 env > "${ARTIFACT_DIR}/prow-ci-env.log"
@@ -55,7 +63,7 @@ ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 11 )) || (( ocp_major_version > 4 )); then
     while read -r TAG VALUE
     do
       printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"

@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
   echo "This step is not required when EXTRACT_MANIFEST_INCLUDED is set to true"
   exit 0
@@ -48,7 +56,7 @@ rm /tmp/pull-secret
 
 echo "OCP Version: $ocp_version"
 
-if (( ocp_minor_version <=10 && ocp_major_version == 4 )) || (( ocp_major_version < 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version <= 10 )) || (( ocp_major_version < 4 )); then
   echo "This step is not required for ${ocp_version}, exit now"
   exit 0
 fi
@@ -126,7 +134,7 @@ enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITIES" |
 echo "Enabled Capability Set: $enabled_operators"
 
 # Remove openshift-cluster-csi-drivers, >= 4.12
-if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 12 )) || (( ocp_major_version > 4 )); then
   if [[ ! "${enabled_operators}" =~ "Storage" ]]; then
       namespace="openshift-cluster-csi-drivers"
       remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
@@ -134,7 +142,7 @@ if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
 fi
 
 # Remove openshift-machine-api/openshift-image-registry secret, >= 4.14
-if (( ocp_minor_version >=14 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
   if [[ ! "${enabled_operators}" =~ "MachineAPI" ]]; then 
       namespace="openshift-machine-api"
       remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1

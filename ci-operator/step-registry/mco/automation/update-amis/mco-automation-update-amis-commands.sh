@@ -62,18 +62,22 @@ GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
 readonly GITHUB_TOKEN
 info "cfg: GitHub token loaded successfully"
 
-# Configuration: Load Jira token from file (optional - bug creation will be skipped if not available)
+# Configuration: Load Jira credentials from files (optional - bug creation will be skipped if not available)
+# Jira Cloud uses Basic Auth: email:api_token. Both files must be present.
 JIRA_TOKEN=""
-if [[ -n "${JIRA_TOKEN_PATH:-}" ]] && [[ -f "${JIRA_TOKEN_PATH}" ]]; then
-  info "cfg: loading Jira token"
+JIRA_EMAIL=""
+if [[ -n "${JIRA_TOKEN_PATH:-}" ]] && [[ -f "${JIRA_TOKEN_PATH}" ]] && \
+   [[ -n "${JIRA_EMAIL_PATH:-}" ]] && [[ -f "${JIRA_EMAIL_PATH}" ]]; then
+  info "cfg: loading Jira credentials"
   JIRA_TOKEN=$(cat "${JIRA_TOKEN_PATH}")
-  info "cfg: Jira token loaded successfully"
+  JIRA_EMAIL=$(cat "${JIRA_EMAIL_PATH}")
+  info "cfg: Jira credentials loaded successfully"
 else
-  info "cfg: Jira token not configured, bug creation will be skipped"
+  info "cfg: Jira credentials not configured, bug creation will be skipped"
 fi
 
 # Jira API base URL
-JIRA_API="https://issues.redhat.com/rest/api/2"
+JIRA_API="https://redhat.atlassian.net/rest/api/2"
 
 # GitHub API base URL
 GITHUB_API="https://api.github.com"
@@ -116,6 +120,7 @@ github_api() {
 
 # Jira API helper function
 # Security: Uses -s (silent) to prevent token exposure in error messages
+# Jira Cloud uses Basic Auth with email:api_token (Bearer tokens no longer supported)
 jira_api() {
   local method="$1"
   local endpoint="$2"
@@ -123,13 +128,13 @@ jira_api() {
 
   if [[ -n "${data}" ]]; then
     curl -s -X "${method}" \
-      -H "Authorization: Bearer ${JIRA_TOKEN}" \
+      -u "${JIRA_EMAIL}:${JIRA_TOKEN}" \
       -H "Content-Type: application/json" \
       -d "${data}" \
       "${JIRA_API}${endpoint}"
   else
     curl -s -X "${method}" \
-      -H "Authorization: Bearer ${JIRA_TOKEN}" \
+      -u "${JIRA_EMAIL}:${JIRA_TOKEN}" \
       -H "Content-Type: application/json" \
       "${JIRA_API}${endpoint}"
   fi
@@ -175,7 +180,7 @@ fields = {
 target_version = '${target_version}'
 if target_version:
     fields['versions'] = [{'name': target_version}]
-    fields['customfield_12319940'] = [{'name': target_version}]  # Target Version
+    fields['customfield_10855'] = [{'name': target_version}]  # Target Version
 print(json.dumps({'fields': fields}))
 ")
 
@@ -222,9 +227,12 @@ info "git: configure git user and email"
 git config user.name "${GITHUB_PR_USER}"
 git config user.email "${GITHUB_PR_EMAIL}"
 
-# Run make update-amis
+# Run make update-amis and capture output for use in PR/bug descriptions
 info "mco: running make update-amis"
-make update-amis
+AMI_UPDATE_OUTPUT=$(make update-amis 2>&1)
+echo "${AMI_UPDATE_OUTPUT}"
+# Extract bullet-point summary lines (e.g. "  - Added 72 new AMI(s)"), stripping ANSI codes
+AMI_SUMMARY=$(echo "${AMI_UPDATE_OUTPUT}" | sed 's/\x1b\[[0-9;]*m//g' | grep -E '^\[INFO\]\s+-' | sed 's/\[INFO\] *//')
 
 # Check if there are any changes
 if [[ $(git status --porcelain) == "" ]]; then
@@ -273,27 +281,73 @@ if [[ -n "${EXISTING_PR_INFO}" ]]; then
 
   info "github: changes differ from existing PR, updating it"
 
-  # Stash changes, checkout the existing branch, apply changes
-  git stash
-  git checkout -B "${EXISTING_BRANCH}" "${FORK_REMOTE}/${EXISTING_BRANCH}"
-  git stash pop
+  # Capture the base branch tip before switching, used below to find the merge base
+  # so we can squash all commits on the PR branch into one clean commit.
+  BASE_COMMIT=$(git rev-parse HEAD)
 
-  # Commit and force-push to update the existing PR
-  info "git: committing AMI updates"
+  # Save the AMI-updated files before switching branches.
+  # Re-running make update-amis on the PR branch would fail: the PR branch
+  # may already contain more AMIs than the git history traversal finds,
+  # causing update_amis.py to exit 1 with "No new AMIs to add".
+  CHANGED_FILES=$(git diff --name-only --cached)
+  TEMP_PATCH_DIR=$(mktemp -d)
+  while IFS= read -r f; do
+    mkdir -p "${TEMP_PATCH_DIR}/$(dirname "${f}")"
+    cp "${f}" "${TEMP_PATCH_DIR}/${f}"
+  done <<< "${CHANGED_FILES}"
+
+  # Reset staged changes (used only for comparison), then force-checkout
+  # the existing PR branch.
+  git reset HEAD
+  git checkout -f -B "${EXISTING_BRANCH}" "${FORK_REMOTE}/${EXISTING_BRANCH}"
+
+  # Squash all commits on the PR branch down to one by soft-resetting to
+  # the common ancestor with the base branch. This ensures a clean single
+  # commit regardless of how many previous automation runs have pushed to it.
+  MERGE_BASE=$(git merge-base HEAD "${BASE_COMMIT}")
+  git reset --soft "${MERGE_BASE}"
+
+  # Restore the AMI-updated files from the initial make update-amis run
+  info "mco: restoring AMI updates onto PR branch"
+  while IFS= read -r f; do
+    cp "${TEMP_PATCH_DIR}/${f}" "${f}"
+  done <<< "${CHANGED_FILES}"
+  rm -rf "${TEMP_PATCH_DIR}"
+
+  # Commit as a single squashed commit and force-push
+  info "git: committing AMI updates as single squashed commit"
   git add -A
   git commit -m "chore: update AMIs
 
 This is an automated commit to update AMI IDs.
 "
 
-  info "git: pushing updates to existing branch on fork"
+  info "git: force-pushing to existing branch on fork"
   git push --force-with-lease "${FORK_REMOTE}" "${EXISTING_BRANCH}"
 
-  # Add a comment to the PR indicating it was updated
-  COMMENT_BODY="Updated with latest AMI changes at $(date +%Y-%m-%dT%H:%M:%S%z)"
-  COMMENT_JSON=$(python3 -c "import json; print(json.dumps({'body': '${COMMENT_BODY}'}))")
-  github_api POST "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/issues/${EXISTING_PR_NUMBER}/comments" \
-    "${COMMENT_JSON}" > /dev/null
+  # Update the PR description to reflect the new changes
+  DIFF_STAT=$(git diff HEAD~1 --stat)
+  PR_BODY="## Summary
+This automated PR updates AMI IDs to the latest versions.
+
+## AMI Changes
+${AMI_SUMMARY}
+
+## File Changes
+\`\`\`
+${DIFF_STAT}
+\`\`\`
+
+---
+**Generated by:** periodic-ci-openshift-machine-config-operator-update-amis
+**Last updated:** $(date +%Y-%m-%dT%H:%M:%S%z)
+
+> **Note:** The linked Jira bug description is not automatically updated on PR updates. Please update it manually if needed."
+
+  PR_BODY_JSON=$(python3 -c "import json; print(json.dumps({'body': '''${PR_BODY}'''}))")
+  github_api PATCH "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls/${EXISTING_PR_NUMBER}" \
+    "${PR_BODY_JSON}" > /dev/null
+  info "github: PR description updated"
 
   info "github: PR updated at ${EXISTING_PR_URL}"
 else
@@ -321,6 +375,8 @@ This is an automated commit to update AMI IDs.
     BUG_SUMMARY="[Automated] ${GITHUB_PR_TITLE}"
     BUG_DESCRIPTION="This is an automated bug to track AMI ID updates for the Machine Config Operator.
 
+${AMI_SUMMARY}
+
 A pull request will be created with the updated AMI IDs.
 
 This bug was automatically created by the periodic-ci-openshift-machine-config-operator-update-amis job."
@@ -343,7 +399,10 @@ This bug was automatically created by the periodic-ci-openshift-machine-config-o
   PR_BODY="## Summary
 This automated PR updates AMI IDs to the latest versions.
 
-## Changes
+## AMI Changes
+${AMI_SUMMARY}
+
+## File Changes
 \`\`\`
 ${DIFF_STAT}
 \`\`\`
