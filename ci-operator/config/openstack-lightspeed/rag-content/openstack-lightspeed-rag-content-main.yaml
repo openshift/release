@@ -24,11 +24,60 @@ resources:
     requests:
       cpu: "4"
       memory: 8Gi
+images:
+- dockerfile_path: Containerfile
+  to: rag-content-openstack
+  build_args:
+  - name: FLAVOR
+    value: cpu
+  - name: NUM_WORKERS
+    value: "4"
+  - name: OS_VERSION
+    value: "2025.2"
+  - name: BUILD_UPSTREAM_DOCS
+    value: "true"
+  - name: BUILD_OPERATORS_DOCS
+    value: "true"
+  - name: INDEX_NAME
+    value: os-docs-2025.2
+  - name: VECTOR_DB_TYPE
+    value: faiss
+  - name: BUILD_OCP_DOCS
+    value: "false"
+  - name: BUILD_OKP_CONTENT
+    value: "false"
+  - name: HERMETIC
+    value: "false"
+  - name: RHOSO_DOCS_GIT_URL
+    value: ""
+  - name: RHOSO_DOCS_GIT_BRANCH
+    value: ""
+  - name: RHOSO_CA_CERT_URL
+    value: ""
+  - name: DOCS_LINK_UNREACHABLE_ACTION
+    value: warn
+  - name: OKP_CONTENT
+    value: all
+  - name: RHOSO_IGNORE_LIST
+    value: ""
+  - name: OPERATORS_REPO_URL
+    value: https://github.com/openstack-k8s-operators/openstack-operator.git
+  - name: OPERATORS_BRANCH
+    value: main
 tests:
-- as: hello-world
-  commands: 'echo "Hello from OpenShift CI! Repository: openstack-lightspeed/rag-content"'
+- as: build-rag-content-image
+  commands: |
+    echo "====================================="
+    echo "RAG Content Vector DB Image Build"
+    echo "====================================="
+    echo "Image: rag-content-openstack"
+    echo "Index: os-docs-2025.2"
+    echo "Docs: Upstream OpenStack + Operators"
+    echo "====================================="
+    echo "Build completed successfully!"
   container:
-    from: src
+    from: rag-content-openstack
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openstack-lightspeed
