@@ -144,8 +144,9 @@ check_resource ".*vpc/vpc-.*"
 # # check_resource ".*openshift-bootstrap-data-${INFRA_ID}"
 
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ocp_minor_version >= 16 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 16 )) || (( ocp_major_version > 4 )); then
   check_resource ".*targetgroup/additional-listener-.*"
   check_resource ".*targetgroup/apiserver-target-.*"
   check_resource ".*listener/net/${INFRA_ID}-ext/.*"
