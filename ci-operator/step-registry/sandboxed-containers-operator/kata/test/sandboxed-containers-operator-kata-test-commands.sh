@@ -28,19 +28,23 @@ curl -sL "${TARBALL_URL}" | tar xz -C /tmp
 mv "/tmp/kata-containers-${KATA_BRANCH}" "${KATA_DIR}"
 
 echo "Installing test dependencies"
+TOOLS_DIR="/tmp/tools"
+mkdir -p "${TOOLS_DIR}/bin"
+export PATH="${TOOLS_DIR}/bin:${PATH}"
+
 # bats
 if ! command -v bats &>/dev/null; then
 	curl -sL "https://github.com/bats-core/bats-core/archive/refs/heads/master.tar.gz" | tar xz -C /tmp
 	pushd /tmp/bats-core-master
-	./install.sh /usr/local
+	./install.sh "${TOOLS_DIR}"
 	popd
 fi
 
 # yq
 if ! command -v yq &>/dev/null; then
 	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" \
-		-o /usr/local/bin/yq
-	chmod +x /usr/local/bin/yq
+		-o "${TOOLS_DIR}/bin/yq"
+	chmod +x "${TOOLS_DIR}/bin/yq"
 fi
 
 echo "Running upstream kata-containers tests"
