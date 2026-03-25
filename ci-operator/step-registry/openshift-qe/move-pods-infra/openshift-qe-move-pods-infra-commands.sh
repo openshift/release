@@ -102,17 +102,6 @@ function check_monitoring_statefulset_status()
             for pod in $(oc get pods -n openshift-monitoring --no-headers | grep -v Running | awk '{print $1}'); do
                 oc describe pod $pod -n openshift-monitoring
             done
-            echo "-------------------------------------------------------------------------------------------"
-            echo "PVC status in openshift-monitoring:"
-            oc get pvc -n openshift-monitoring
-            echo "-------------------------------------------------------------------------------------------"
-            echo "PVC details:"
-            for pvc in $(oc get pvc -n openshift-monitoring --no-headers | awk '{print $1}'); do
-                oc describe pvc $pvc -n openshift-monitoring
-            done
-            echo "-------------------------------------------------------------------------------------------"
-            echo "CSI provisioner logs:"
-            oc logs -n openshift-cluster-csi-drivers -l app=nutanix-csi-controller -c ntnx-csi-plugin --tail=50 2>/dev/null || true
             echo "error: monitoring statefulsets/pods didn't become Running in time, failing"
             exit 1
         fi
@@ -451,32 +440,6 @@ default_sc=$(oc get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclas
 
 if [[ -n $default_sc ]]; then
     set_storage_class
-    # On Nutanix, wait for the CSI node DaemonSet to be fully ready before
-    # creating PVCs — the controller deployment being Available is not sufficient
-    if [[ "$platform_type" == "nutanix" ]]; then
-        echo "Nutanix platform detected: waiting for nutanix-csi-node DaemonSet to be fully ready..."
-        csi_timeout=300
-        csi_elapsed=0
-        csi_interval=10
-        desired=0
-        ready=0
-        while [ $csi_elapsed -lt $csi_timeout ]; do
-            desired=$(oc get daemonset nutanix-csi-node -n openshift-cluster-csi-drivers -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
-            ready=$(oc get daemonset nutanix-csi-node -n openshift-cluster-csi-drivers -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
-            echo "nutanix-csi-node DaemonSet: ${ready}/${desired} ready (${csi_elapsed}s/${csi_timeout}s)"
-            if [ "$desired" -gt 0 ] && [ "$ready" -eq "$desired" ]; then
-                echo "nutanix-csi-node DaemonSet is fully ready."
-                break
-            fi
-            sleep $csi_interval
-            csi_elapsed=$((csi_elapsed + csi_interval))
-        done
-        if [ "$ready" -ne "$desired" ]; then
-            echo "ERROR: nutanix-csi-node DaemonSet did not become fully ready within ${csi_timeout}s (${ready}/${desired} ready)."
-            oc get daemonset nutanix-csi-node -n openshift-cluster-csi-drivers
-            exit 1
-        fi
-    fi
     apply_monitoring_configmap_withpvc
 else
     apply_monitoring_configmap
