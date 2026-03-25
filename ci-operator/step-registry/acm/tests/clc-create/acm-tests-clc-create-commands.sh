@@ -15,6 +15,12 @@ fi
 
 cp "${secretsDir}/clc-interop/secret-options-yaml" "${optionFile}"
 
+# Update AWS cluster architecture to amd64
+echo "Updating AWS cluster architecture to amd64..."
+yq eval '.options.clusters.aws.architecture = "amd64"' -i "${optionFile}"
+yq eval '.options.clusters.aws.masterInstanceType = "m6i.xlarge"' -i "${optionFile}"
+yq eval '.options.clusters.aws.workerInstanceType = "m6i.xlarge"' -i "${optionFile}"
+
 # Update the AWS credentials in options.yaml from cluster profile
 if [[ -f "${awsCredFile}" ]]; then
     typeset awsAccKeyID=
