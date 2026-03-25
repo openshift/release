@@ -217,6 +217,21 @@ if test -f "${SHARED_DIR}/securitygroups"; then
 	" "$INSTALL_CONFIG"
 fi
 
+# Configure server group policy for control plane and compute nodes
+if [ -n "${OPENSTACK_CONTROLPLANE_SERVER_GROUP_POLICY:-}" ]; then
+	echo "Setting controlPlane serverGroupPolicy to '${OPENSTACK_CONTROLPLANE_SERVER_GROUP_POLICY}'"
+	yq --yaml-output --in-place ".
+		| .controlPlane.platform.openstack.serverGroupPolicy = \"${OPENSTACK_CONTROLPLANE_SERVER_GROUP_POLICY}\"
+	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${OPENSTACK_COMPUTE_SERVER_GROUP_POLICY:-}" ]; then
+	echo "Setting compute serverGroupPolicy to '${OPENSTACK_COMPUTE_SERVER_GROUP_POLICY}'"
+	yq --yaml-output --in-place ".
+		| .compute[0].platform.openstack.serverGroupPolicy = \"${OPENSTACK_COMPUTE_SERVER_GROUP_POLICY}\"
+	" "$INSTALL_CONFIG"
+fi
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the OpenStack endpoint. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
