@@ -20,8 +20,9 @@ skip() { echo "[SKIP] $1"; SKIP_COUNT=$((SKIP_COUNT + 1)); }
 ANNOTATION_PREFIX="referenced-resource.hypershift.openshift.io/"
 HC_NAMESPACE="clusters"
 
-echo "Set KUBECONFIG to management cluster"
-export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+# KUBECONFIG is inherited from the CI framework (set by the nested management
+# cluster setup chain via SHARED_DIR/kubeconfig). Do NOT override it.
+echo "Using KUBECONFIG: ${KUBECONFIG}"
 
 # --- Step 0: Pre-flight ---
 echo ""
@@ -53,12 +54,13 @@ if [[ -z "${RELEASE_IMAGE}" ]]; then
   exit 1
 fi
 
-if [[ -z "${HYPERSHIFT_BASE_DOMAIN}" ]]; then
+DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
+if [[ -z "${DOMAIN}" ]]; then
   if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
-    HYPERSHIFT_BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+    DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
   fi
 fi
-DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-ci.hypershift.devcluster.openshift.com}"
+DOMAIN="${DOMAIN:-ci.hypershift.devcluster.openshift.com}"
 
 HASH="$(echo -n "${PROW_JOB_ID}"|sha256sum)"
 CLUSTER_NAME="${HASH:0:20}"
@@ -80,7 +82,7 @@ fi
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 
 echo "Creating HostedCluster ${CLUSTER_NAME}..."
-/usr/bin/hypershift create cluster aws \
+bin/hypershift create cluster aws \
   --name "${CLUSTER_NAME}" \
   --infra-id "${INFRA_ID}" \
   --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
@@ -117,7 +119,7 @@ ANNOTATION_KEY="${ANNOTATION_PREFIX}${CLUSTER_NAME}"
 # Check secrets
 ANNOTATED_SECRETS=$(oc get secrets -n "${HC_NAMESPACE}" -o json | \
   jq -r --arg key "${ANNOTATION_KEY}" \
-  '.items[] | select(.metadata.annotations[$key] != null) | .metadata.name')
+  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
 
 if [[ -n "${ANNOTATED_SECRETS}" ]]; then
   echo "Secrets with referenced-resource annotation for ${CLUSTER_NAME}:"
@@ -133,7 +135,7 @@ fi
 # Check configmaps
 ANNOTATED_CMS=$(oc get configmaps -n "${HC_NAMESPACE}" -o json | \
   jq -r --arg key "${ANNOTATION_KEY}" \
-  '.items[] | select(.metadata.annotations[$key] != null) | .metadata.name')
+  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
 
 if [[ -n "${ANNOTATED_CMS}" ]]; then
   echo "ConfigMaps with referenced-resource annotation for ${CLUSTER_NAME}:"
@@ -148,6 +150,7 @@ else
 fi
 
 # Save evidence
+mkdir -p "${ARTIFACT_DIR}"
 echo "--- Pre-deletion annotation evidence ---" > "${ARTIFACT_DIR}/annotation-evidence.txt"
 echo "Annotated secrets: ${ANNOTATED_SECRETS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
 echo "Annotated configmaps: ${ANNOTATED_CMS:-none}" >> "${ARTIFACT_DIR}/annotation-evidence.txt"
@@ -157,7 +160,7 @@ echo ""
 echo "=== Step 3: Delete HostedCluster ==="
 
 echo "Deleting HostedCluster ${CLUSTER_NAME}..."
-/usr/bin/hypershift destroy cluster aws \
+bin/hypershift destroy cluster aws \
   --aws-creds="${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
   --name "${CLUSTER_NAME}" \
   --infra-id "${INFRA_ID}" \
@@ -188,7 +191,7 @@ echo "=== Step 4: Verify annotations are removed (CORE CHECK) ==="
 # Check secrets - no annotation should remain for the deleted HC
 REMAINING_SECRET_ANNOTATIONS=$(oc get secrets -n "${HC_NAMESPACE}" -o json | \
   jq -r --arg key "${ANNOTATION_KEY}" \
-  '.items[] | select(.metadata.annotations[$key] != null) | .metadata.name')
+  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
 
 if [[ -z "${REMAINING_SECRET_ANNOTATIONS}" ]]; then
   pass "No referenced-resource annotations for ${CLUSTER_NAME} remain on secrets"
@@ -203,7 +206,7 @@ fi
 # Check configmaps - no annotation should remain for the deleted HC
 REMAINING_CM_ANNOTATIONS=$(oc get configmaps -n "${HC_NAMESPACE}" -o json | \
   jq -r --arg key "${ANNOTATION_KEY}" \
-  '.items[] | select(.metadata.annotations[$key] != null) | .metadata.name')
+  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
 
 if [[ -z "${REMAINING_CM_ANNOTATIONS}" ]]; then
   pass "No referenced-resource annotations for ${CLUSTER_NAME} remain on configmaps"
@@ -227,8 +230,7 @@ echo "=== Step 5: Verify no orphaned referenced-resource annotations ==="
 
 # Check for any referenced-resource annotations that reference non-existent HCs
 ALL_ANNOTATION_KEYS=$(oc get secrets,configmaps -n "${HC_NAMESPACE}" -o json | \
-  jq -r '.items[].metadata.annotations // {} | keys[] | select(startswith("referenced-resource.hypershift.openshift.io/"))' | \
-  sort -u)
+  jq -r '[.items[].metadata.annotations // {} | keys[] | select(startswith("referenced-resource.hypershift.openshift.io/"))] | unique | .[]' || true)
 
 ORPHANED=0
 if [[ -n "${ALL_ANNOTATION_KEYS}" ]]; then
