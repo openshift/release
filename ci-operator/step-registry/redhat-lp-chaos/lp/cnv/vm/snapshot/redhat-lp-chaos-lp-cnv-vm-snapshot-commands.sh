@@ -1,4 +1,29 @@
 #!/bin/bash
+# JUnit Support Start
+JUNIT_REPORT="${ARTIFACT_DIR}/junit_cnv_vm_snapshot.xml"
+START_TIME=$(date +%s)
+
+function finalize_junit() {
+    local exit_code=$?
+    local duration=$(( $(date +%s) - START_TIME ))
+    if [[ ${exit_code} -eq 0 ]]; then
+        cat <<EOF > "${JUNIT_REPORT}"
+<testsuite name="lp-cnv-chaos" tests="1" failures="0" time="${duration}">
+  <testcase name="vm-snapshot-verification" classname="cnv-chaos-snapshot" time="${duration}" />
+</testsuite>
+EOF
+    else
+        cat <<EOF > "${JUNIT_REPORT}"
+<testsuite name="lp-cnv-chaos" tests="1" failures="1" time="${duration}">
+  <testcase name="vm-snapshot-verification" classname="cnv-chaos-snapshot" time="${duration}">
+    <failure message="Step failed">Exit code: ${exit_code}. Check build-log.txt for details.</failure>
+  </testcase>
+</testsuite>
+EOF
+    fi
+}
+trap finalize_junit EXIT
+
 set -euxo pipefail; shopt -s inherit_errexit
 
 # Load target VM list
