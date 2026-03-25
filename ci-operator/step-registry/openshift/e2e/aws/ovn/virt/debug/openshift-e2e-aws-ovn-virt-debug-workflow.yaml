@@ -1,0 +1,33 @@
+workflow:
+  as: openshift-e2e-aws-ovn-virt-debug
+  steps:
+    env:
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK: "true"
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf
+      - chain: ipi-install
+      - ref: kubevirt-install
+    test:
+      - ref: openshift-e2e-aws-ovn-virt-debug
+    post:
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+  documentation: |-
+    Debug workflow for OpenShift virtualization on AWS with OVN-Kubernetes.
+
+    This workflow provisions an AWS cluster with dual-stack networking, installs
+    KubeVirt operator, and then sleeps for 8 hours to allow manual debugging and
+    investigation. The cluster remains accessible during this period.
+
+    This is identical to openshift-e2e-aws-ovn-virt workflow except the test phase
+    is replaced with an 8-hour sleep instead of running automated tests.
+
+    Use this workflow when you need to:
+    - Debug cluster setup issues
+    - Manually test virtualization features
+    - Investigate networking configurations
+    - Validate cluster state before running tests
+
+    The cluster will be automatically cleaned up after the 8-hour sleep period ends.
