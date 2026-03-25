@@ -99,9 +99,10 @@ critical_check_result=0
 
 echo "---------- Check worker nodes urn and hyperV generation ----------"
 echo "Expected worker_image_urn: ${worker_image_urn}, expected worker_generation: ${worker_generation}"
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 node_filter=""
-if (( ${ocp_minor_version} < 19 )); then
+if (( ocp_major_version == 4 && ocp_minor_version < 19 )); then
     # No rhel worker is provisioned on 4.19+
     node_filter="node.openshift.io/os_id=rhcos,"
 fi

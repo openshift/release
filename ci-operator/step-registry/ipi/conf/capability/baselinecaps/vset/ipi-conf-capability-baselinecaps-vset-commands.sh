@@ -60,7 +60,9 @@ latest_version_set="v418_set"
 
 # the content of each capset
 v411="baremetal marketplace openshift-samples"
-(( ocp_minor_version > 13 )) && v411="${v411} MachineAPI"
+if (( ocp_major_version == 4 && ocp_minor_version > 13 )) || (( ocp_major_version > 4 )); then
+    v411="${v411} MachineAPI"
+fi
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} Build DeploymentConfig ImageRegistry"
