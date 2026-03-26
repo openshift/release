@@ -177,6 +177,17 @@ rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -f ${INSTALL_DIR}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${INSTALL_DIR}/manifests/cluster-scheduler-02-config.yml
 
+# Copy manifests from SHARED_DIR to installer directory (required for features like OVN hybrid networking)
+echo "Copying manifests from SHARED_DIR to installer directory:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  echo "  Copying ${manifest}"
+  cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
 echo "Creating ignition configs"
 openshift-install --dir=${INSTALL_DIR} create ignition-configs &
 wait "$!"
@@ -406,7 +417,7 @@ add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf
 add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_bootstrap}"
 
 # For OCP <= 4.9, there is no BootstrapInstanceType param in UPI template
-if (( ocp_minor_version >= 10 && ocp_major_version >= 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 10 )) || (( ocp_major_version > 4 )); then
   add_param_to_json BootstrapInstanceType "${BOOTSTRAP_INSTANCE_TYPE}" "${cf_params_bootstrap}"
 fi
 

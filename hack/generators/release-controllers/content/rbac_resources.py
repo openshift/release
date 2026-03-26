@@ -178,10 +178,10 @@ def generate_release_admin_rbac(config):
         _release_admins_cluster_role(gendoc)
         _release_controller_developers_cluster_role(gendoc)
         _release_payload_modifiers_cluster_role(gendoc)
+        _add_release_controller_developers_cluster_role_bindings(gendoc)
 
         for private in (False, True):
             for arch in config.arches:
                 context = Context(config, arch, private)
                 _add_release_admin_role_bindings(gendoc, context.is_namespace)
-                _add_release_controller_developers_cluster_role_bindings(gendoc)
                 _add_release_payload_modifiers_role_bindings(gendoc, context.is_namespace)

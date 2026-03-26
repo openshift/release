@@ -13,13 +13,13 @@ spec:
     targetPort: 8888
   type: ClusterIP
 ---
-kind: PersistentVolumeClaim
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  namespace: ci
   labels:
     app: prow
     component: tot
+  namespace: ci
   name: tot-storage
 spec:
   accessModes:
@@ -27,6 +27,9 @@ spec:
   resources:
     requests:
       storage: 1Gi
+  storageClassName: gp2
+  volumeMode: Filesystem
+  volumeName: pvc-24ed8b7a-ca84-4517-a913-1236ff46acab
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -67,26 +70,8 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: tot
-        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260310-6097a43c8
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260325-947fd1958
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -118,6 +103,24 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: tot-volume
         persistentVolumeClaim:

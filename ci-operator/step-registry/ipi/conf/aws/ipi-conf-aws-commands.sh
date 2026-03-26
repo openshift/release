@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
@@ -322,7 +330,7 @@ rm /tmp/pull-secret
 RHCOS_AMI=
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
-  if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+  if (( ocp_major_version == 4 && ocp_minor_version <= 9 )); then
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
     RHCOS_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)

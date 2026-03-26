@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST, 
@@ -49,6 +57,8 @@ if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
 else
   AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
 fi
+
+echo "${AZURE_BASE_DOMAIN}" > "${SHARED_DIR}/basedomain.txt"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -169,6 +179,34 @@ platform:
     userProvisionedDNS: Enabled
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# Configure dual-stack networking if IP_FAMILY is set
+if [[ -n "${IP_FAMILY:-}" ]]; then
+  echo "Configuring Azure dual-stack networking with IP_FAMILY: ${IP_FAMILY}"
+  patch_dualstack="${SHARED_DIR}/install-config-dualstack.yaml.patch"
+  
+  cat > "${patch_dualstack}" << EOF
+platform:
+  azure:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  - cidr: fd00::/64
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  - cidr: fd01::/64
+    hostPrefix: 64
+  serviceNetwork:
+  - 172.30.0.0/16
+  - fd02::/112
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
+  cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
+  echo "Dual-stack networking configuration added to install-config.yaml"
 fi
 
 # starting from 4.19, cluster sp only needs Contributor role

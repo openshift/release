@@ -57,6 +57,7 @@ spec:
           - config:
               claimMapping:
                 preferred_username: preferred_username
+                groups: groups
               clientID: $CLIENT_ID
               clientSecret: $CLIENT_SECRET
               getUserInfo: true
@@ -66,6 +67,7 @@ spec:
               - openid
               - profile
               - email
+              - groups
             id: sso
             name: SSO
             type: oidc
@@ -183,6 +185,11 @@ spec:
             redirectURIs:
             - https://oauth-openshift.apps.build05.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
             secretEnv: BUILD05-SECRET
+          - idEnv: GRAFANA-CI-MONITORING-ID
+            name: grafana-ci-monitoring
+            redirectURIs:
+            - https://grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com/login/generic_oauth
+            secretEnv: GRAFANA-CI-MONITORING-SECRET
           storage:
             config:
               inCluster: true
@@ -440,6 +447,16 @@ spec:
             secretKeyRef:
               key: build05-secret
               name: build05-secret
+        - name: GRAFANA-CI-MONITORING-ID
+          valueFrom:
+            secretKeyRef:
+              key: grafana-ci-monitoring-id
+              name: grafana-ci-monitoring-secret
+        - name: GRAFANA-CI-MONITORING-SECRET
+          valueFrom:
+            secretKeyRef:
+              key: grafana-ci-monitoring-secret
+              name: grafana-ci-monitoring-secret
         image: ghcr.io/dexidp/dex:v2.31.0
         name: dex
         ports:

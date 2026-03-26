@@ -1139,6 +1139,18 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: aws-upi-ovn-winc-f7
+  cron: 0 23 4,11,18,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
 - as: vsphere-ipi-proxy-ovn-winc-f28
   cron: 57 15 14 * *
   steps:
@@ -2214,6 +2226,19 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-hypershift-guest
+- as: azure-ipi-ovn-hypershift-productcli-f7
+  cron: 15 13 4,11,20,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ASSIGN_SERVICE_PRINCIPAL_ROLES: "false"
+      AUTO_ASSIGN_ROLES: "true"
+      CLI: /usr/bin/hcp
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest
 - as: azure-ipi-ovn-hypershift-no-marketplace-guest-f14
   cron: 26 4 4,18 * *
   steps:
@@ -2314,6 +2339,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-generation
+- as: azure-mag-ipi-custom-dns-tp-f28-destructive
+  cron: 6 18 24 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-custom-dns
+- as: azure-mag-ipi-custom-dns-tp-f7
+  cron: 2 22 1,8,15,24 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-custom-dns
 - as: azure-mag-ipi-f7-longduration-hive
   cron: 5 20 3,12,19,26 * *
   steps:
@@ -2396,6 +2441,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-ipi
+- as: azure-stack-ipi-private-f28
+  cluster: build01
+  cron: 40 18 5 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      E2E_RUN_TAGS: not @storage
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-private
+- as: azure-stack-ipi-private-f28-destructive
+  cluster: build01
+  cron: 10 20 3 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      E2E_RUN_TAGS: not @storage
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-private
 - as: azure-stack-ipi-proxy-f14-disasterrecovery
   cluster: build01
   cron: 35 2 14,30 * *
