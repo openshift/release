@@ -10,6 +10,11 @@ base_images:
 build_root:
   from_repository: true
 images:
+- dockerfile_path: ci-images/Dockerfile.base
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  to: assisted-service-generate
 - dockerfile_path: ./Dockerfile.assisted-service.ocp
   from: base
   to: agent-installer-api-server
@@ -64,6 +69,11 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
+- as: verify-generated-code
+  skip_if_only_changed: ^openshift/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

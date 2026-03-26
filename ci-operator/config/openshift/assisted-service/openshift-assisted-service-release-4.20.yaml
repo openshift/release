@@ -6,6 +6,11 @@ base_images:
 build_root:
   from_repository: true
 images:
+- dockerfile_path: ci-images/Dockerfile.base
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  to: assisted-service-generate
 - dockerfile_path: ./Dockerfile.assisted-service.ocp
   to: agent-installer-api-server
 promotion:
@@ -81,6 +86,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
     workflow: agent-e2e-generic
+- as: verify-generated-code
+  skip_if_only_changed: ^openshift/|^\.tekton/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 - as: verify-deps
   steps:
     env:
