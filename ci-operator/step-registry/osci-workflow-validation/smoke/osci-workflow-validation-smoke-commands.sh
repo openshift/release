@@ -2,15 +2,38 @@
 
 set -euo pipefail
 
-trap 'echo "ERROR: osci-workflow-validation-smoke step failed" >&2' ERR
-
 NAMESPACE=$(cat "${SHARED_DIR}/ephemeral-namespace")
-export KUBECONFIG="${SHARED_DIR}/ephemeral-kubeconfig"
+
+diagnostics() {
+    echo "--- Diagnostics ---"
+    oc get pods -n "${NAMESPACE}" -l app=osci-workflow-validation -o wide 2>/dev/null || true
+    oc describe pods -n "${NAMESPACE}" -l app=osci-workflow-validation 2>/dev/null || true
+    oc get events -n "${NAMESPACE}" --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+    oc logs -n "${NAMESPACE}" -l app=osci-workflow-validation --tail=50 2>/dev/null || true
+    echo "--- End Diagnostics ---"
+}
+
+trap 'diagnostics; echo "ERROR: osci-workflow-validation-smoke step failed" >&2' ERR
 
 echo "Deploying osci-workflow-validation into namespace ${NAMESPACE}..."
 echo "Image: ${OSCI_WORKFLOW_VALIDATION_IMAGE}"
 
+# ---------------------------------------------------------------------------
+# Create an image-pull secret so the ephemeral cluster can pull the CI image
+# ---------------------------------------------------------------------------
+echo "Generating CI registry pull credentials..."
+KUBECONFIG="" oc registry login --to=/tmp/ci-pull-creds.json 2>/dev/null
+
+export KUBECONFIG="${SHARED_DIR}/ephemeral-kubeconfig"
 oc project "${NAMESPACE}"
+
+oc create secret docker-registry ci-pull-secret \
+    --from-file=.dockerconfigjson=/tmp/ci-pull-creds.json \
+    --namespace="${NAMESPACE}" 2>/dev/null || \
+    oc set data secret/ci-pull-secret \
+    --from-file=.dockerconfigjson=/tmp/ci-pull-creds.json \
+    --namespace="${NAMESPACE}"
+rm -f /tmp/ci-pull-creds.json
 
 cat <<EOF | oc apply -f -
 apiVersion: apps/v1
@@ -30,6 +53,8 @@ spec:
       labels:
         app: osci-workflow-validation
     spec:
+      imagePullSecrets:
+      - name: ci-pull-secret
       containers:
       - name: server
         image: ${OSCI_WORKFLOW_VALIDATION_IMAGE}
