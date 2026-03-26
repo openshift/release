@@ -4,7 +4,7 @@ base_images:
     namespace: chaos
     tag: cerberus-prow
   cli:
-    name: "4.21"
+    name: "4.23"
     namespace: ocp
     tag: cli
   ocp-qe-perfscale-ci:
@@ -14,22 +14,21 @@ base_images:
 build_root:
   from_repository: true
 images:
-  items:
-  - dockerfile_path: cerberus/Dockerfile_prow
-    from: cerberus.prow
-    to: cerberus-main-prow-421
-  - dockerfile_literal: |-
-      FROM ocp-qe-perfscale-ci
-      RUN ls
-      RUN cp oc /bin
-    from: ocp-qe-perfscale-ci
-    to: perfscale-observer
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-423
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.23"
 resources:
   '*':
     limits:
@@ -39,17 +38,16 @@ resources:
       memory: 200Mi
 tests:
 - as: krkn-hub-aws
-  cron: 0 4 * * *
+  cron: 0 3 * * 2,5
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      ES_RUN_TAG: cr
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
-      TELEMETRY_GROUP: prow-ocp-4.21-component-readiness
+      TELEMETRY_GROUP: prow-ocp-4.23-component-readiness
       USER_TAGS: |
         TicketId 421
     observers:
@@ -62,4 +60,4 @@ zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: prow-scripts
-  variant: cr-4.21-nightly
+  variant: cr-4.23-nightly
