@@ -52,7 +52,7 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=egressip
 
-EXTRA_FLAGS="--gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --addresses-per-iteration=$ADDRESSES_PER_ITERATION --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=false --pod-ready-threshold=$POD_READY_THRESHOLD --addresses-per-iteration=$ADDRESSES_PER_ITERATION --profile-type=${PROFILE_TYPE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
