@@ -103,7 +103,8 @@ ansible-playbook ./playbooks/ran/collect-metrics.yml \
   --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
     ran_spoke_kubeconfig=${SPOKE_KUBECONFIG} \
     ran_ci_lane='${CI_LANE}' \
-    ran_output_file=${METRICS_FILE}" || true
+    ran_output_file=${METRICS_FILE} \
+    ran_metrics_list=${RAN_METRICS_LIST}" || true
 
 REPORTS_PORTAL_ATTRIBUTES=""
 if [[ -f "${METRICS_FILE}" ]]; then
