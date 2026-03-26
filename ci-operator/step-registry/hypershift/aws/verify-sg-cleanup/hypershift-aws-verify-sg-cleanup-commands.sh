@@ -7,16 +7,6 @@ echo "--- Verifying security group cleanup after private cluster deletion ---"
 export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
 export AWS_DEFAULT_REGION="${HYPERSHIFT_AWS_REGION}"
 
-# Install AWS CLI
-if ! command -v aws &>/dev/null; then
-  echo "Installing AWS CLI..."
-  pushd /tmp
-  curl -sSfL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip -q awscliv2.zip
-  ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli
-  popd
-fi
-
 PASS_COUNT=0
 FAIL_COUNT=0
 
