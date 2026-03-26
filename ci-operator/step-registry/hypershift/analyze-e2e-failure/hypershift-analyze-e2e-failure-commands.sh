@@ -4,31 +4,64 @@ set -euo pipefail
 echo "=== HyperShift E2E Failure Analyzer ==="
 
 # ---------------------------------------------------------------------------
-# 1. Detect test failures — exit early if none
+# 1. Construct GCS base path and detect test failures
 # ---------------------------------------------------------------------------
+JOB_NAME="${JOB_NAME:-unknown}"
+BUILD_ID="${BUILD_ID:-unknown}"
+JOB_TYPE="${JOB_TYPE:-}"
+PULL_NUMBER="${PULL_NUMBER:-}"
+REPO_OWNER="${REPO_OWNER:-}"
+REPO_NAME="${REPO_NAME:-}"
+
+# Build GCS bucket path from CI env vars
+if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$PULL_NUMBER" ]]; then
+  GCS_BUCKET_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+else
+  GCS_BUCKET_PATH="logs/${JOB_NAME}/${BUILD_ID}"
+fi
+
+GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+PROW_JOB_URL="${GCSWEB_BASE}/${GCS_BUCKET_PATH}"
+
+# Extract the test target name (e.g., e2e-aws from pull-ci-openshift-hypershift-main-e2e-aws)
+JOB_NAME_SHORT="${JOB_NAME##*-main-}"
+
+# Check for test failures by fetching finished.json from test step artifacts in GCS.
+# Each CI step uploads its own finished.json with {"passed":true/false} upon completion.
+# By the time post-steps run, test step artifacts are already in GCS.
+echo "Checking for test failures in GCS..."
+
 FAILURE_DETECTED=false
+ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_BUCKET_PATH}/artifacts/${JOB_NAME_SHORT}"
 
-# Method 1: JUnit XML with failures > 0
-if find "${ARTIFACT_DIR}" -name "junit*.xml" -type f 2>/dev/null | head -1 | \
-   xargs grep -q 'failures="[1-9]' 2>/dev/null; then
-  echo "Detected test failures via JUnit XML"
-  FAILURE_DETECTED=true
-fi
+# List step directories and check each finished.json for failures
+STEP_LIST_URL="${ARTIFACTS_BASE}/"
+STEP_DIRS=$(curl -sL "$STEP_LIST_URL" | grep -oP 'href="[^"]*/"' | grep -oP '/[^/"]+/$' | tr -d '/' | grep -v '^$' || true)
 
-# Method 2: Marker file written by test step
-if [[ "$FAILURE_DETECTED" == "false" ]] && \
-   { [[ -f "${SHARED_DIR}/test-failures" ]] || [[ -f "${ARTIFACT_DIR}/test-failures" ]]; }; then
-  echo "Detected test failure marker file"
-  FAILURE_DETECTED=true
-fi
-
-# Method 3: build-log.txt with FAIL
-if [[ "$FAILURE_DETECTED" == "false" ]]; then
-  BUILD_LOG=$(find "${ARTIFACT_DIR}" -name "build-log.txt" -type f 2>/dev/null | head -1 || true)
-  if [[ -n "$BUILD_LOG" ]] && grep -qiE '(^FAIL\b|FAIL\s|--- FAIL:)' "$BUILD_LOG" 2>/dev/null; then
-    echo "Detected test failures in build-log.txt"
-    FAILURE_DETECTED=true
-  fi
+if [[ -z "$STEP_DIRS" ]]; then
+  echo "Warning: Could not list step directories from GCS — checking build-log directly"
+  # Fallback: try to fetch the build-log from the most common test step names
+  for STEP_NAME in hypershift-aws-run-e2e-external hypershift-azure-run-e2e hypershift-aws-run-e2e; do
+    FINISHED_URL="${ARTIFACTS_BASE}/${STEP_NAME}/finished.json"
+    FINISHED_JSON=$(curl -sL "$FINISHED_URL" 2>/dev/null || true)
+    if echo "$FINISHED_JSON" | jq -e '.passed == false' &>/dev/null; then
+      echo "Detected test failure in ${STEP_NAME}/finished.json"
+      FAILURE_DETECTED=true
+      break
+    fi
+  done
+else
+  for STEP_DIR in $STEP_DIRS; do
+    # Skip our own step and gather/cleanup steps
+    [[ "$STEP_DIR" == "hypershift-analyze-e2e-failure" ]] && continue
+    FINISHED_URL="${ARTIFACTS_BASE}/${STEP_DIR}/finished.json"
+    FINISHED_JSON=$(curl -sL "$FINISHED_URL" 2>/dev/null || true)
+    if echo "$FINISHED_JSON" | jq -e '.passed == false' &>/dev/null; then
+      echo "Detected test failure in ${STEP_DIR}/finished.json"
+      FAILURE_DETECTED=true
+      break
+    fi
+  done
 fi
 
 if [[ "$FAILURE_DETECTED" == "false" ]]; then
@@ -72,40 +105,23 @@ fi
 echo "Skill files loaded."
 
 # ---------------------------------------------------------------------------
-# 4. Construct Prow job URL and extract failed test names
+# 4. Extract failed test names from GCS build-log
 # ---------------------------------------------------------------------------
-JOB_NAME="${JOB_NAME:-unknown}"
-BUILD_ID="${BUILD_ID:-unknown}"
-JOB_TYPE="${JOB_TYPE:-}"
-PULL_NUMBER="${PULL_NUMBER:-}"
-REPO_OWNER="${REPO_OWNER:-}"
-REPO_NAME="${REPO_NAME:-}"
-
-
-# Construct the gcsweb URL from CI environment variables
-if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$PULL_NUMBER" ]]; then
-  PROW_JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-elif [[ "$JOB_TYPE" == "periodic" ]]; then
-  PROW_JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-else
-  PROW_JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-fi
-
 echo "Prow job URL: $PROW_JOB_URL"
 
-# Extract failed test names from build-log
-BUILD_LOG=$(find "${ARTIFACT_DIR}" -name "build-log.txt" -type f 2>/dev/null | head -1 || true)
+# Download test step build-log from GCS to extract failed test names
 FAILED_TESTS=""
-if [[ -n "$BUILD_LOG" ]]; then
-  # Extract Go test failures (--- FAIL: TestName)
-  FAILED_TESTS=$(grep -oP '(?<=--- FAIL: )\S+' "$BUILD_LOG" 2>/dev/null | head -10 || true)
-fi
-
-# If no Go test failures found, try JUnit XML
-if [[ -z "$FAILED_TESTS" ]]; then
-  FAILED_TESTS=$(find "${ARTIFACT_DIR}" -name "junit*.xml" -type f -print0 2>/dev/null \
-    | xargs -0 grep -oP 'testcase name="\K[^"]+' 2>/dev/null | head -10 || true)
-fi
+for STEP_NAME in hypershift-aws-run-e2e-external hypershift-azure-run-e2e hypershift-aws-run-e2e; do
+  BUILD_LOG_URL="${ARTIFACTS_BASE}/${STEP_NAME}/build-log.txt"
+  BUILD_LOG_CONTENT=$(curl -sL "$BUILD_LOG_URL" 2>/dev/null | tail -200 || true)
+  if [[ -n "$BUILD_LOG_CONTENT" ]]; then
+    FAILED_TESTS=$(echo "$BUILD_LOG_CONTENT" | grep -oP '(?<=--- FAIL: )\S+' 2>/dev/null | head -10 || true)
+    if [[ -n "$FAILED_TESTS" ]]; then
+      echo "Extracted failed tests from ${STEP_NAME}/build-log.txt"
+      break
+    fi
+  fi
+done
 
 if [[ -z "$FAILED_TESTS" ]]; then
   FAILED_TESTS="unknown-test-failure"
@@ -126,8 +142,9 @@ SYSTEM_PROMPT="You are analyzing a CI test failure using the Prow Job Analyze Te
 
 IMPORTANT CI CONTEXT:
 - You are running inside the CI job itself as a post-step.
-- The job artifacts are available locally at: ${ARTIFACT_DIR}
-- You also have network access to download additional artifacts from GCS if needed.
+- This step's artifact directory is: ${ARTIFACT_DIR}
+- Other steps' artifacts (build-log, JUnit, intervals) are available via GCS at: ${PROW_JOB_URL}
+- You have network access to download artifacts from GCS using curl or gcloud.
 - Use --fast mode (skip must-gather prompting — do NOT use AskUserQuestion).
 - Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.md
 - Do NOT prompt for JIRA export — just write the markdown analysis.
@@ -308,8 +325,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$PULL_NUMBER" ]] && [[ -n "${REPO_
       # Construct the report URL (artifacts will be uploaded to GCS after post steps complete)
       # The step name in the artifact path matches the test name from ci-operator config
       # For presubmit jobs, we need to figure out the test target name
-      JOB_NAME_SHORT="${JOB_NAME##*-main-}"  # e.g., pull-ci-openshift-hypershift-main-e2e-aws -> e2e-aws
-      REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SHORT}/hypershift-analyze-e2e-failure/artifacts/failure-analysis-report.html"
+      REPORT_URL="${ARTIFACTS_BASE}/hypershift-analyze-e2e-failure/artifacts/failure-analysis-report.html"
 
       # Build a concise summary for the PR comment
       FAILED_TEST_LIST=$(echo "$FAILED_TESTS" | head -5 | sed 's/^/- `/' | sed 's/$/`/')
