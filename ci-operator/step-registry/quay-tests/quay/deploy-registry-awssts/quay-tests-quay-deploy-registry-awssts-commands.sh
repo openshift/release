@@ -60,6 +60,16 @@ DISTRIBUTED_STORAGE_CONFIG:
       s3_region: us-east-2
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
+FEATURE_IMMUTABLE_TAGS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_SPARSE_INDEX: true
+FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_IMAGE_PULL_STATS: true
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+PULL_METRICS_REDIS:
+  host: quay-quay-redis
+  port: 6379
+  db: 1
 EOF
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
