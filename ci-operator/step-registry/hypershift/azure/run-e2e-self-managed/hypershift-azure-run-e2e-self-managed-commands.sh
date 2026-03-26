@@ -72,6 +72,19 @@ if [[ -n "${PRIVATE_CREDS}" && -n "${PLS_RG}" ]]; then
 fi
 export AZURE_PRIVATE_NAT_SUBNET_ID="${NAT_SUBNET}"
 
+# KMS/ETCD encryption args - read from pre-configured KMS infrastructure
+KMS_ARGS=""
+AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure-e2e/kms-info.json"
+if [[ -f "${AZURE_KMS_INFO_LOCATION}" ]]; then
+  AZURE_KMS_KEY="$(jq -r '."kms-key"' "${AZURE_KMS_INFO_LOCATION}")"
+  AZURE_KMS_CREDENTIALS_SECRET="$(jq -r '."kms-credentials-secret-name"' "${AZURE_KMS_INFO_LOCATION}")"
+
+  if [[ -n "${AZURE_KMS_KEY}" && "${AZURE_KMS_KEY}" != "null" ]]; then
+    KMS_ARGS="--e2e.azure-encryption-key-id=${AZURE_KMS_KEY} \
+      --e2e.azure-kms-credentials-secret-name=${AZURE_KMS_CREDENTIALS_SECRET}"
+  fi
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -87,6 +100,10 @@ hack/ci-test-e2e.sh -test.v \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${EXTERNAL_DNS_ARGS:-} \
     ${AZURE_PRIVATE_ARGS:-} \
+    ${KMS_ARGS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
+
+# Sleep for 2 hours to allow debugging of hosted clusters
+sleep 7200
