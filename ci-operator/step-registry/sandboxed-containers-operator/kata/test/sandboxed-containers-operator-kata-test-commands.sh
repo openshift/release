@@ -51,5 +51,7 @@ echo "Running upstream kata-containers tests"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export TESTS_FILTER="${KATA_TESTS_FILTER:-}"
 export K8S_TEST_FAIL_FAST="${KATA_TESTS_FAIL_FAST:-no}"
+# Set target_branch so upstream common.bash skips `git remote show origin`
+export target_branch="${KATA_BRANCH}"
 
 "${KATA_DIR}/redhat/tests/run-tests.sh"
