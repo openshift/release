@@ -20,6 +20,22 @@ pass() { echo "[PASS] $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 fail() { echo "[FAIL] $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 skip() { echo "[SKIP] $1"; SKIP_COUNT=$((SKIP_COUNT + 1)); }
 
+# Helper: list resource names that have a specific annotation key set.
+# Usage: get_annotated_names <resource-type> <namespace> <annotation-key>
+get_annotated_names() {
+  local resource_type="$1" ns="$2" ann_key="$3"
+  oc get "${resource_type}" -n "${ns}" \
+    -o go-template='{{range .items}}{{if index .metadata.annotations "'"${ann_key}"'"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' 2>/dev/null || true
+}
+
+# Helper: list all annotation keys matching a prefix across resources.
+# Usage: get_annotation_keys_with_prefix <resource-type> <namespace> <prefix>
+get_annotation_keys_with_prefix() {
+  local resource_type="$1" ns="$2" prefix="$3"
+  oc get "${resource_type}" -n "${ns}" \
+    -o go-template='{{range .items}}{{range $k, $v := .metadata.annotations}}{{if hasPrefix "'"${prefix}"'" $k}}{{$k}}{{"\n"}}{{end}}{{end}}{{end}}' 2>/dev/null | sort -u || true
+}
+
 ANNOTATION_PREFIX="referenced-resource.hypershift.openshift.io/"
 HC_NAMESPACE="clusters"
 
@@ -69,9 +85,7 @@ echo "=== Step 1: Verify annotations are set on referenced resources ==="
 ANNOTATION_KEY="${ANNOTATION_PREFIX}${CLUSTER_NAME}"
 
 # Check secrets
-ANNOTATED_SECRETS=$(oc get secrets -n "${HC_NAMESPACE}" -o json | \
-  jq -r --arg key "${ANNOTATION_KEY}" \
-  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
+ANNOTATED_SECRETS=$(get_annotated_names secrets "${HC_NAMESPACE}" "${ANNOTATION_KEY}")
 
 if [[ -n "${ANNOTATED_SECRETS}" ]]; then
   echo "Secrets with referenced-resource annotation for ${CLUSTER_NAME}:"
@@ -85,9 +99,7 @@ else
 fi
 
 # Check configmaps
-ANNOTATED_CMS=$(oc get configmaps -n "${HC_NAMESPACE}" -o json | \
-  jq -r --arg key "${ANNOTATION_KEY}" \
-  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
+ANNOTATED_CMS=$(get_annotated_names configmaps "${HC_NAMESPACE}" "${ANNOTATION_KEY}")
 
 if [[ -n "${ANNOTATED_CMS}" ]]; then
   echo "ConfigMaps with referenced-resource annotation for ${CLUSTER_NAME}:"
@@ -141,9 +153,7 @@ echo ""
 echo "=== Step 3: Verify annotations are removed (CORE CHECK) ==="
 
 # Check secrets - no annotation should remain for the deleted HC
-REMAINING_SECRET_ANNOTATIONS=$(oc get secrets -n "${HC_NAMESPACE}" -o json | \
-  jq -r --arg key "${ANNOTATION_KEY}" \
-  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
+REMAINING_SECRET_ANNOTATIONS=$(get_annotated_names secrets "${HC_NAMESPACE}" "${ANNOTATION_KEY}")
 
 if [[ -z "${REMAINING_SECRET_ANNOTATIONS}" ]]; then
   pass "No referenced-resource annotations for ${CLUSTER_NAME} remain on secrets"
@@ -156,9 +166,7 @@ else
 fi
 
 # Check configmaps - no annotation should remain for the deleted HC
-REMAINING_CM_ANNOTATIONS=$(oc get configmaps -n "${HC_NAMESPACE}" -o json | \
-  jq -r --arg key "${ANNOTATION_KEY}" \
-  '[.items[] | select(.metadata.annotations[$key] != null) | .metadata.name] | .[]' || true)
+REMAINING_CM_ANNOTATIONS=$(get_annotated_names configmaps "${HC_NAMESPACE}" "${ANNOTATION_KEY}")
 
 if [[ -z "${REMAINING_CM_ANNOTATIONS}" ]]; then
   pass "No referenced-resource annotations for ${CLUSTER_NAME} remain on configmaps"
@@ -181,8 +189,10 @@ echo ""
 echo "=== Step 4: Verify no orphaned referenced-resource annotations ==="
 
 # Check for any referenced-resource annotations that reference non-existent HCs
-ALL_ANNOTATION_KEYS=$(oc get secrets,configmaps -n "${HC_NAMESPACE}" -o json | \
-  jq -r '[.items[].metadata.annotations // {} | keys[] | select(startswith("referenced-resource.hypershift.openshift.io/"))] | unique | .[]' || true)
+ALL_ANNOTATION_KEYS=$(get_annotation_keys_with_prefix secrets "${HC_NAMESPACE}" "${ANNOTATION_PREFIX}")
+ALL_ANNOTATION_KEYS+=$'\n'
+ALL_ANNOTATION_KEYS+=$(get_annotation_keys_with_prefix configmaps "${HC_NAMESPACE}" "${ANNOTATION_PREFIX}")
+ALL_ANNOTATION_KEYS=$(echo "${ALL_ANNOTATION_KEYS}" | sort -u | grep -v '^$' || true)
 
 ORPHANED=0
 if [[ -n "${ALL_ANNOTATION_KEYS}" ]]; then
