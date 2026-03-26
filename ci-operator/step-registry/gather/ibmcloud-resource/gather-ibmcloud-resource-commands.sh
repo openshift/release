@@ -299,6 +299,8 @@ ssh_instances() {
 }
 
 ibmcloud_login
+"${IBMCLOUD_CLI}" account show -q
+"${IBMCLOUD_CLI}" plugin list -q
 
 ##in order to avoid "runtime error: invalid memory address or nil pointer dereference in 'ibmcloud is images -q'"
 if [ -f ${SHARED_DIR}/metadata.json ]; then
