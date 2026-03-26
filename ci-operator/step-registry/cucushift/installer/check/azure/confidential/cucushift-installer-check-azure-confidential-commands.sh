@@ -174,10 +174,11 @@ done
 
 # gen2 image definition check
 echo -e "\nGen2 image definition check..."
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 expected_image_security_type="${master_security_type:-$worker_security_type}"
 expected_image_security_type="${expected_image_security_type/VM/Vm}"
-if (( ${ocp_minor_version} > 16 )); then
+if (( ocp_major_version == 4 && ocp_minor_version > 16 )) || (( ocp_major_version > 4 )); then
     expected_image_security_type="${expected_image_security_type}Supported"
 fi
 image_def_security_type=$(az sig image-definition show --gallery-image-definition ${INFRA_ID}-gen2 --gallery-name gallery_${INFRA_ID//-/_} -g ${RESOURCE_GROUP} --query "features[?name=='SecurityType'].value" -otsv)

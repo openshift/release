@@ -120,15 +120,21 @@ case ${baselinecaps_from_config} in
   ;;
 "v4.11")
   enabled_capability_set="${v411}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.12")
   enabled_capability_set="${v412}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.13")
   enabled_capability_set="${v413}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.14")
   enabled_capability_set="${v414}"

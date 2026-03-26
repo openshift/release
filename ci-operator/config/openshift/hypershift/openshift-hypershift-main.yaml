@@ -34,11 +34,6 @@ images:
   to: hypershift-tests
 - dockerfile_literal: |
     FROM base
-    RUN dnf install -y python3-pip
-  from: src
-  to: custom-verify-src
-- dockerfile_literal: |
-    FROM base
     RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
   from: src
   to: docs-build-src
@@ -126,26 +121,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  unit:
-    limits:
-      cpu: 4000m
-      memory: 8Gi
-    requests:
-      cpu: 4000m
-      memory: 8Gi
-  verify:
-    limits:
-      cpu: 4000m
-      memory: 8Gi
-    requests:
-      cpu: 4000m
-      memory: 8Gi
 tests:
-- as: verify
-  commands: make verify-ci
-  container:
-    from: custom-verify-src
-  timeout: 1h0m0s
 - as: docs-preview
   optional: true
   run_if_changed: ^docs/
@@ -153,11 +129,6 @@ tests:
     test:
     - ref: hypershift-docs-build-and-deploy
     - ref: hypershift-docs-preview-comment
-- as: unit
-  commands: make test
-  container:
-    from: src
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
 - always_run: false
   as: e2e-aks
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
@@ -225,6 +196,8 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
   steps:
     cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
 - always_run: false
   as: e2e-azure-self-managed

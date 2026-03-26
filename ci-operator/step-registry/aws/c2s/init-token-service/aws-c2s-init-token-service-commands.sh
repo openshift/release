@@ -385,7 +385,7 @@ ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 12 )) || (( ocp_major_version > 4 )); then
   echo "For 4.12+, using batch API version: batch/v1"
   cat <<EOF > /tmp/cap-token-cronjob_412plus-patch.yaml
 apiVersion: batch/v1
