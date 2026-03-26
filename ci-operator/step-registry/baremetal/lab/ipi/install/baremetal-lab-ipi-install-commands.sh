@@ -94,6 +94,8 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
+echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 
 # The extraction may be done from the release-multi-latest image, so that we can extract the openshift-baremetal-install
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
