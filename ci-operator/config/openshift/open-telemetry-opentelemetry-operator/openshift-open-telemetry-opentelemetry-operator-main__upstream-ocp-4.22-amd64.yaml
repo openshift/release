@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: cli
   operator-sdk:
@@ -92,7 +92,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -107,26 +107,17 @@ tests:
       SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
     workflow: openshift-ci-security
 - as: opentelemetry-upstream-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
   steps:
+    cluster_profile: gcp-observability
     env:
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.3", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.3", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"}
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
+        tests/e2e-openshift/export-to-cluster-logging-lokistack
     test:
     - as: install
       cli: latest
@@ -145,9 +136,9 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: upstream-ocp-4.20-amd64-aws
+  variant: upstream-ocp-4.22-amd64
