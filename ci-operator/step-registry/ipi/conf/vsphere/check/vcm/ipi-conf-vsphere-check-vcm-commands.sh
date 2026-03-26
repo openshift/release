@@ -48,17 +48,17 @@ declare PORTGROUP_RETVAL
 declare LEASES
 
 
-declare MULTI_TENANT_CAPABLE_WORKFLOWS
+declare SINGLE_TENANT_LEASE_JOB_SAFE_NAMES
 # shellcheck source=/dev/null
 source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
 
 LEASES=()
 
-DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"single-tenant"}
-for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
-  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
-    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
-    DEFAULT_NETWORK_TYPE="multi-tenant"
+DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"multi-tenant"}
+for job_safe_name in ${SINGLE_TENANT_LEASE_JOB_SAFE_NAMES}; do
+  if [ "${job_safe_name}" == "${JOB_NAME_SAFE}" ]; then
+    log "job ${JOB_NAME_SAFE} requires a single-tenant lease. will request a single-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="single-tenant"
     break
   fi
 done
