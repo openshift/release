@@ -5,7 +5,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 typeset region="${LEASED_RESOURCE}"
 typeset infraId=''
-infraId=$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")
+[ -f "${SHARED_DIR}/metadata.json" ]
+infraId="$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")"
 
 # See: https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=aws-red-hat-openshift-configuration
 typeset workerSgId=''
@@ -40,11 +41,11 @@ function AddIngressRule () {
     --group-owner "${accountId}" \
     2>&1 1>&3; } 3>&2); then
     true
-  elif [[ "${stderr}" == *'InvalidPermission.Duplicate'* ]]; then
-    true
   else
-    printf '%s\n' "${stderr}" >&2
-    return 1
+    if [[ "${stderr}" != *'InvalidPermission.Duplicate'* ]]; then
+      printf '%s\n' "${stderr}" >&2
+      return 1
+    fi
   fi
 
   true

@@ -1,148 +1,135 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔄 Testing CNV VM lifecycle operations with IBM Storage Scale shared storage..."
+# Purpose: Exercise VM create, start, stop, and delete lifecycle using shared storage and emit JUnit for each phase.
+# Inputs: FA__CNV__TEST_NAMESPACE, FA__CNV__SHARED_STORAGE_CLASS, FA__CNV__VM_NAME, FA__CNV__VM_MEMORY_REQUEST, FA__CNV__VM_CPU_REQUEST, ARTIFACT_DIR (step ref env for FA__CNV__*).
+# Non-obvious: JUnit helpers EscapeXml and RecordTest wrap VM API operations.
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-lifecycle-test}"
-VM_NAME="${VM_NAME:-test-lifecycle-vm}"
-VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
-VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
-
-# JUnit XML test results
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_lifecycle_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
+typeset junitResultsFile="${ARTIFACT_DIR}/junit_vm_lifecycle_tests.xml"
+typeset -i testStartTime="${SECONDS}"
+typeset -i testsTotal=0
+typeset -i testsFailed=0
+typeset testCases=""
+typeset -i testStart=0
+typeset testStatus=''
+typeset testMessage=''
+typeset vmStatus=''
+typeset pvcStatus=''
 
 # Function to escape XML special characters
-escape_xml() {
-  local text="$1"
-  # Escape XML special characters: & must be first to avoid double-escaping
-  echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+function EscapeXml () {
+  typeset text="${1}"; (($#)) && shift
+  printf '%s' "${text}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+
+  true
 }
 
 # Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-VMLifecycleTests}"
-  
-  # Escape XML special characters in user-provided strings
-  test_name=$(escape_xml "$test_name")
-  test_message=$(escape_xml "$test_message")
-  test_classname=$(escape_xml "$test_classname")
-  
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
-  
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+function AddTestResult () {
+  typeset -n totalRef="${1}"; (($#)) && shift
+  typeset -n failedRef="${1}"; (($#)) && shift
+  typeset -n casesRef="${1}"; (($#)) && shift
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-VMLifecycleTests}"; (($#)) && shift
+
+  typeset escapedName=''
+  escapedName="$(EscapeXml "${testName}")"
+  typeset escapedMessage=''
+  escapedMessage="$(EscapeXml "${testMessage}")"
+  typeset escapedClassName=''
+  escapedClassName="$(EscapeXml "${testClassName}")"
+
+  totalRef=$((totalRef + 1))
+
+  if [[ "${testStatus}" == "passed" ]]; then
+    casesRef="${casesRef}
+    <testcase name=\"${escapedName}\" classname=\"${escapedClassName}\" time=\"${testDuration}\"/>"
   else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    failedRef=$((failedRef + 1))
+    casesRef="${casesRef}
+    <testcase name=\"${escapedName}\" classname=\"${escapedClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${escapedMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
-  
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+function GenerateJunitXml () {
+  typeset -i totalDuration=0
+  totalDuration=$((SECONDS - testStartTime))
+
+  cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="VM Lifecycle Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
+  <testsuite name="VM Lifecycle Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
+${testCases}
   </testsuite>
 </testsuites>
 EOF
-  
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
-  
-  # Copy to SHARED_DIR for data router reporter (if available)
-  if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/junit_vm_lifecycle_tests.xml"
-    echo "  ✅ Results copied to SHARED_DIR"
-  fi
-}
 
-start_test() {
-  local test_description="$1"
-  : "🧪 ${test_description}..."
-  echo "$SECONDS"
+  # Copy to SHARED_DIR for data router reporter (if available)
+  if [[ -d "${SHARED_DIR}" ]]; then
+    cp "${junitResultsFile}" "${SHARED_DIR}/junit_vm_lifecycle_tests.xml"
+  fi
+
+  true
 }
 
 # Helper function to record test result (eliminates repetitive duration calculation)
-record_test() {
-  local test_start="$1"
-  local test_name="$2"
-  local test_status="$3"
-  local test_message="${4:-}"
-  
-  local test_duration=$((SECONDS - test_start))
-  add_test_result "$test_name" "$test_status" "$test_duration" "$test_message"
+function RecordTest () {
+  typeset totalName="${1}"; (($#)) && shift
+  typeset failedName="${1}"; (($#)) && shift
+  typeset casesName="${1}"; (($#)) && shift
+  typeset testStart="${1}"; (($#)) && shift
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+
+  typeset -i testDuration=0
+  testDuration=$((SECONDS - testStart))
+  AddTestResult "${totalName}" "${failedName}" "${casesName}" "${testName}" "${testStatus}" "${testDuration}" "${testMessage}"
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
-
-echo "📋 Configuration:"
-echo "  CNV Namespace: ${CNV_NAMESPACE}"
-echo "  Test Namespace: ${TEST_NAMESPACE}"
-echo "  Shared Storage Class: ${SHARED_STORAGE_CLASS}"
-echo "  VM Name: ${VM_NAME}"
-echo "  VM CPU Request: ${VM_CPU_REQUEST}"
-echo "  VM Memory Request: ${VM_MEMORY_REQUEST}"
-echo ""
+trap '{( GenerateJunitXml; true )}' EXIT
 
 # Create test namespace
-echo "📁 Creating test namespace..."
-if oc get namespace "${TEST_NAMESPACE}" >/dev/null; then
-  echo "  ✅ Test namespace already exists: ${TEST_NAMESPACE}"
-else
-  oc create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-  oc wait --for=jsonpath='{.status.phase}'=Active namespace/"${TEST_NAMESPACE}" --timeout=300s
-  echo "  ✅ Test namespace created: ${TEST_NAMESPACE}"
+if ! oc get namespace "${FA__CNV__TEST_NAMESPACE}"; then
+  oc create namespace "${FA__CNV__TEST_NAMESPACE}" --dry-run=client -o yaml --save-config | oc apply -f -
+  if ! oc wait "namespace/${FA__CNV__TEST_NAMESPACE}" --for=create --timeout=300s; then
+    oc get namespace "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    exit 1
+  fi
 fi
 
 # Check if shared storage class exists
-echo ""
-echo "🔍 Checking shared storage class..."
-if oc get storageclass "${SHARED_STORAGE_CLASS}" >/dev/null; then
-  echo "  ✅ Shared storage class found"
-  PROVISIONER=$(oc get storageclass "${SHARED_STORAGE_CLASS}" -o jsonpath='{.provisioner}' 2>/dev/null || echo "Unknown")
-  echo "  📊 Provisioner: ${PROVISIONER}"
-else
-  echo "  ❌ Shared storage class not found"
-  echo "  Please ensure the shared storage class is created before running this test"
+if ! oc get storageclass "${FA__CNV__SHARED_STORAGE_CLASS}"; then
+  oc get storageclass "${FA__CNV__SHARED_STORAGE_CLASS}" -o yaml --ignore-not-found
   exit 1
 fi
 
 # Create DataVolume for VM
-echo ""
-echo "📦 Creating DataVolume for VM..."
-if oc apply -f - <<EOF
+if {
+  oc create -f - --dry-run=client -o json --save-config |
+  jq -c \
+    --arg name "${FA__CNV__VM_NAME}" \
+    --arg ns "${FA__CNV__TEST_NAMESPACE}" \
+    --arg sc "${FA__CNV__SHARED_STORAGE_CLASS}" \
+    '.metadata.name = ($name + "-dv") | .metadata.namespace = $ns | .spec.pvc.storageClassName = $sc' |
+  yq -p json -o yaml eval .
+} 0<<'YAML' | oc apply -f -; then
 apiVersion: cdi.kubevirt.io/v1beta1
 kind: DataVolume
 metadata:
-  name: ${VM_NAME}-dv
-  namespace: ${TEST_NAMESPACE}
+  name: placeholder-dv
+  namespace: placeholder-ns
 spec:
   source:
     registry:
@@ -153,34 +140,34 @@ spec:
     resources:
       requests:
         storage: 5Gi
-    storageClassName: ${SHARED_STORAGE_CLASS}
-EOF
-then
-  echo "  ✅ DataVolume created successfully"
-  
+    storageClassName: placeholder-sc
+YAML
   # Wait for DataVolume to be ready
-  echo "  ⏳ Waiting for DataVolume to be ready (10m timeout)..."
-  if oc wait datavolume "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=10m; then
-    echo "  ✅ DataVolume is ready"
-  else
-    echo "  ❌ DataVolume not ready within timeout"
-    oc get datavolume "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o yaml
+  if ! oc wait datavolume "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" --for=condition=Ready --timeout=10m; then
+    oc get datavolume "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
     exit 1
   fi
 else
-  echo "  ❌ Failed to create DataVolume"
+  oc get datavolume "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
   exit 1
 fi
 
 # Create VM with shared storage
-echo ""
-echo "🖥️  Creating VM with shared storage..."
-if oc apply -f - <<EOF
+if {
+  oc create -f - --dry-run=client -o json --save-config |
+  jq -c \
+    --arg name "${FA__CNV__VM_NAME}" \
+    --arg ns "${FA__CNV__TEST_NAMESPACE}" \
+    --arg mem "${FA__CNV__VM_MEMORY_REQUEST}" \
+    --arg cpu "${FA__CNV__VM_CPU_REQUEST}" \
+    '.metadata.name = $name | .metadata.namespace = $ns | .spec.template.metadata.labels["kubevirt.io/vm"] = $name | .spec.template.spec.domain.resources.requests.memory = $mem | .spec.template.spec.domain.resources.requests.cpu = $cpu | .spec.template.spec.volumes[1].persistentVolumeClaim.claimName = ($name + "-dv")' |
+  yq -p json -o yaml eval .
+} 0<<'YAML' | oc apply -f -; then
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
-  name: ${VM_NAME}
-  namespace: ${TEST_NAMESPACE}
+  name: placeholder-vm
+  namespace: placeholder-ns
   labels:
     app: lifecycle-test
 spec:
@@ -188,13 +175,13 @@ spec:
   template:
     metadata:
       labels:
-        kubevirt.io/vm: ${VM_NAME}
+        kubevirt.io/vm: placeholder-vm
     spec:
       domain:
         resources:
           requests:
-            memory: ${VM_MEMORY_REQUEST}
-            cpu: ${VM_CPU_REQUEST}
+            memory: placeholder-mem
+            cpu: placeholder-cpu
         devices:
           disks:
           - name: disk0
@@ -209,226 +196,120 @@ spec:
           image: quay.io/kubevirt/fedora-cloud-container-disk-demo:latest
       - name: disk1
         persistentVolumeClaim:
-          claimName: ${VM_NAME}-dv
-EOF
-then
-  echo "  ✅ VM created successfully"
-  
+          claimName: placeholder-claim
+YAML
   # Wait for VM to be created
-  echo "  ⏳ Waiting for VM resource to be available..."
-  if oc wait --for=jsonpath='{.metadata.name}'="${VM_NAME}" vm/"${VM_NAME}" -n "${TEST_NAMESPACE}" --timeout=60s; then
-    echo "  ✅ VM resource available"
-  else
-    echo "  ❌ VM resource not available"
+  if ! oc wait "vm/${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --for=create --timeout=60s; then
+    oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
     exit 1
   fi
 else
-  echo "  ❌ Failed to create VM"
+  oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
   exit 1
 fi
 
 # Test 1: Start VM
-test_start=$(start_test "FA-CNV-1011 Prerequisite: Starting VM")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🚀 Starting VM by setting spec.running=true..."
-if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
-  echo "  ✅ VM start command sent"
-  
-  # Wait for VMI to be created
-  echo "  ⏳ Waiting for VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ VMI created successfully"
-    
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
-    if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status: ${VM_STATUS}"
-      
-      test_status="passed"
-    else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout"
-      oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
-    fi
+if oc patch vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
+  # Wait for VMI to be running
+  if oc wait "vmi/${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --for=jsonpath='{.status.phase}'=Running --timeout=300s; then
+    testStatus="passed"
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout"
-    oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
+    testMessage="VMI not running within 5m timeout"
+    oc get vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    if ! oc describe vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}"; then
+      true
+    fi
   fi
 else
-  echo "  ❌ Failed to start VM"
-  test_message="Failed to patch VM spec.running=true"
+  testMessage="Failed to patch VM spec.running=true"
+  oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
 fi
 
-record_test "$test_start" "fa_cnv_1011_prerequisite_start_vm" "$test_status" "$test_message"
+RecordTest "testsTotal" "testsFailed" "testCases" "${testStart}" "fa_cnv_1011_prerequisite_start_vm" "${testStatus}" "${testMessage}"
 
 # If VM didn't start, we can't continue with remaining tests
-if [[ "$test_status" != "passed" ]]; then
-  echo ""
-  echo "❌ VM failed to start - cannot continue with lifecycle tests"
+if [[ "${testStatus}" != "passed" ]]; then
   exit 1
 fi
 
 # Test 2: FA-CNV-1011 - Stop VM
-test_start=$(start_test "FA-CNV-1011: Stopping VM with shared storage")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🛑 Stopping VM by setting spec.running=false..."
-if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}'; then
-  echo "  ✅ VM stop command sent"
-  
+if oc patch vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}'; then
   # Wait for VMI to be deleted
-  echo "  ⏳ Waiting for VMI to be deleted (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_DELETED=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if ! oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_DELETED=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_DELETED" == "true" ]]; then
-    echo "  ✅ VMI deleted successfully"
-    
-    # Verify VM status shows Stopped
-    VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-    echo "  📊 VM Status after stop: ${VM_STATUS}"
-    
-    if [[ "$VM_STATUS" == "Stopped" ]]; then
-      echo "  ✅ VM status is Stopped"
-      test_status="passed"
+  typeset isVmiDeleted=false
+  if oc wait "vmi/${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --for=delete --timeout=300s; then
+    isVmiDeleted=true
+  fi
+
+  if [[ "${isVmiDeleted}" == "true" ]]; then
+    if ! vmStatus="$(oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}')"; then
+      testMessage="Failed to get VM status after VMI deletion"
+      oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    elif [[ "${vmStatus}" == "Stopped" ]]; then
+      testStatus="passed"
     else
-      echo "  ⚠️  VM status is not Stopped (status: ${VM_STATUS})"
-      test_message="VM status not 'Stopped' after VMI deletion (status: ${VM_STATUS})"
+      testMessage="VM status not 'Stopped' after VMI deletion (status: ${vmStatus})"
     fi
   else
-    echo "  ⚠️  VMI not deleted within timeout"
-    test_message="VMI not deleted within 5m timeout"
-    oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
+    testMessage="VMI not deleted within 5m timeout"
+    oc get vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    if ! oc describe vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}"; then
+      true
+    fi
   fi
 else
-  echo "  ❌ Failed to stop VM"
-  test_message="Failed to patch VM spec.running=false"
+  testMessage="Failed to patch VM spec.running=false"
+  oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
 fi
 
-record_test "$test_start" "fa_cnv_1011_stop_vm_with_shared_storage" "$test_status" "$test_message"
+RecordTest "testsTotal" "testsFailed" "testCases" "${testStart}" "fa_cnv_1011_stop_vm_with_shared_storage" "${testStatus}" "${testMessage}"
 
 # Test 3: FA-CNV-1012 - Restart VM
-test_start=$(start_test "FA-CNV-1012: Restarting VM with shared storage")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🔄 Restarting VM by setting spec.running=true..."
-if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
-  echo "  ✅ VM restart command sent"
-  
-  # Wait for new VMI to be created
-  echo "  ⏳ Waiting for new VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ New VMI created successfully"
-    
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
-    if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running after restart"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status after restart: ${VM_STATUS}"
-      
-      # Verify PVC is still bound (data persistence check)
-      PVC_STATUS=$(oc get pvc "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-      echo "  📊 PVC Status: ${PVC_STATUS}"
-      
-      if [[ "$PVC_STATUS" == "Bound" ]]; then
-        echo "  ✅ PVC still bound - data persistence verified"
-        test_status="passed"
-      else
-        echo "  ⚠️  PVC not bound (status: ${PVC_STATUS})"
-        test_message="PVC not bound after VM restart (status: ${PVC_STATUS})"
-      fi
+if oc patch vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
+  # Wait for VMI to be running after restart
+  if oc wait "vmi/${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --for=jsonpath='{.status.phase}'=Running --timeout=300s; then
+    if ! pvcStatus="$(oc get pvc "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.status.phase}')"; then
+      testMessage="Failed to get PVC status after VM restart"
+      oc get pvc "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    elif [[ "${pvcStatus}" == "Bound" ]]; then
+      testStatus="passed"
     else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout after restart"
-      oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
+      testMessage="PVC not bound after VM restart (status: ${pvcStatus})"
     fi
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout after restart"
-    oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
+    testMessage="VMI not running within 5m timeout after restart"
+    oc get vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
+    if ! oc describe vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}"; then
+      true
+    fi
   fi
 else
-  echo "  ❌ Failed to restart VM"
-  test_message="Failed to patch VM spec.running=true for restart"
+  testMessage="Failed to patch VM spec.running=true for restart"
+  oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" -o yaml --ignore-not-found
 fi
 
-record_test "$test_start" "fa_cnv_1012_restart_vm_with_shared_storage" "$test_status" "$test_message"
+RecordTest "testsTotal" "testsFailed" "testCases" "${testStart}" "fa_cnv_1012_restart_vm_with_shared_storage" "${testStatus}" "${testMessage}"
 
 # Cleanup
-echo ""
-echo "🧹 Cleaning up test resources..."
-echo "  🗑️  Stopping VM..."
-if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-  oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
-  sleep 10
+if oc get vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}"; then
+  if ! oc patch vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}'; then
+    true
+  fi
 fi
+oc delete vmi "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
+oc delete vm "${FA__CNV__VM_NAME}" -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
+oc delete datavolume "${FA__CNV__VM_NAME}-dv" -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
+oc delete namespace "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
 
-echo "  🗑️  Deleting VM..."
-oc delete vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting DataVolume..."
-oc delete datavolume "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting test namespace..."
-oc delete namespace "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  ✅ Cleanup completed"
-
-echo ""
-echo "📊 VM Lifecycle Test Summary"
-echo "============================"
-echo "✅ FA-CNV-1011: VM stop operation tested"
-echo "✅ FA-CNV-1012: VM restart operation tested"
-echo "✅ Data persistence verified across VM lifecycle"
-echo ""
-echo "🎉 VM lifecycle operations with IBM Storage Scale shared storage completed!"
-
-
+true

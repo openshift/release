@@ -1,6 +1,6 @@
 base_images:
-  cli:
-    name: "4.22"
+  cli-base:
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -9,6 +9,11 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.20
 images:
+- dockerfile_literal: |
+    FROM cli-base
+    RUN dnf install -y --setopt=tsflags=nodocs jq && dnf clean all && rm -rf /var/cache/dnf/*
+  from: cli-base
+  to: cli
 - dockerfile_literal: |
     FROM icr.io/cpopen/ibm-spectrum-scale-must-gather:v5.2.3.0.1
   to: ibm-must-gather
@@ -24,7 +29,7 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: cr-fusion-access-ibm
+- as: cr-fusion-access-aws
   cron: 0 3,15 * * *
   steps:
     cluster_profile: aws-cspi-qe
@@ -33,33 +38,33 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
-      CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
-      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
-      CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FA__CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
+      FA__CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
+      FA__CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FA__KMM__REGISTRY_ORG: ""
+      FA__KMM__REGISTRY_REPO: gpfs-compat-kmod
+      FA__KMM__REGISTRY_URL: ""
+      FA__NAMESPACE: ibm-fusion-access
+      FA__SCALE__CLIENT_CPU: "2"
+      FA__SCALE__CLIENT_MEMORY: 4Gi
+      FA__SCALE__CLUSTER_NAME: ibm-spectrum-scale
+      FA__SCALE__STORAGE_CPU: "2"
+      FA__SCALE__STORAGE_MEMORY: 8Gi
+      FA__STORAGE_SCALE_VERSION: v5.2.3.0.1
       FIPS_ENABLED: "false"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/cr/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp", "self-managed-lp", "ibm-fusion-access-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      FUSION_ACCESS_NAMESPACE: ibm-fusion-access
-      FUSION_ACCESS_STORAGE_SCALE_VERSION: v5.2.3.0.1
-      KMM_REGISTRY_ORG: ""
-      KMM_REGISTRY_REPO: gpfs-compat-kmod
-      KMM_REGISTRY_URL: ""
       MAP_TESTS: "true"
       OCP_VERSION: "4.22"
       REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: Fusion-access-lp-interop
-      STORAGE_SCALE_CLIENT_CPU: "2"
-      STORAGE_SCALE_CLIENT_MEMORY: 4Gi
-      STORAGE_SCALE_CLUSTER_NAME: ibm-spectrum-scale
-      STORAGE_SCALE_STORAGE_CPU: "2"
-      STORAGE_SCALE_STORAGE_MEMORY: 8Gi
       USER_TAGS: |
         scenario ibm-fusion-access
     post:
-    - ref: interop-tests-ibm-fusion-access-custom-ibm-must-gather
+    - ref: ibm-fusion-access-custom-ibm-must-gather
     - chain: ipi-aws-post
     - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
@@ -79,9 +84,19 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
-      CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
-      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
-      CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FA__CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
+      FA__CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
+      FA__CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FA__KMM__REGISTRY_ORG: ""
+      FA__KMM__REGISTRY_REPO: gpfs-compat-kmod
+      FA__KMM__REGISTRY_URL: ""
+      FA__NAMESPACE: ibm-fusion-access
+      FA__SCALE__CLIENT_CPU: "2"
+      FA__SCALE__CLIENT_MEMORY: 4Gi
+      FA__SCALE__CLUSTER_NAME: ibm-spectrum-scale
+      FA__SCALE__STORAGE_CPU: "2"
+      FA__SCALE__STORAGE_MEMORY: 8Gi
+      FA__STORAGE_SCALE_VERSION: v5.2.3.0.1
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp", "self-managed-lp", "ibm-fusion-access-lp",
@@ -89,24 +104,14 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      FUSION_ACCESS_NAMESPACE: ibm-fusion-access
-      FUSION_ACCESS_STORAGE_SCALE_VERSION: v5.2.3.0.1
-      KMM_REGISTRY_ORG: ""
-      KMM_REGISTRY_REPO: gpfs-compat-kmod
-      KMM_REGISTRY_URL: ""
       MAP_TESTS: "true"
       OCP_VERSION: "4.22"
       REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: Fusion-access-lp-interop
-      STORAGE_SCALE_CLIENT_CPU: "2"
-      STORAGE_SCALE_CLIENT_MEMORY: 4Gi
-      STORAGE_SCALE_CLUSTER_NAME: ibm-spectrum-scale
-      STORAGE_SCALE_STORAGE_CPU: "2"
-      STORAGE_SCALE_STORAGE_MEMORY: 8Gi
       USER_TAGS: |
         scenario ibm-fusion-access
     post:
-    - ref: interop-tests-ibm-fusion-access-custom-ibm-must-gather
+    - ref: ibm-fusion-access-custom-ibm-must-gather
     - chain: ipi-aws-post
     - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues

@@ -1,47 +1,42 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔧 Creating lxtrace dummy files on worker nodes..."
-echo "NOTE: IBM Storage Scale buildgpl script expects lxtrace files in /var/lib/firmware"
-echo ""
+# Purpose: Collect lxtrace logs from worker nodes via oc debug or write placeholder artifacts when logs are absent.
+# Inputs: ARTIFACT_DIR, worker nodes with storage role; uses oc debug chroot on each node.
+# Non-obvious: Inner bash -c loops copy or create dummy files under lxtrace paths for CI artifacts.
 
-# Get worker nodes
-WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
-WORKER_COUNT=$(echo "$WORKER_NODES" | wc -l)
+typeset nodesJson=''
+nodesJson="$(oc get nodes -l node-role.kubernetes.io/worker= -o json)"
+typeset -i workerCount=0
+workerCount="$(printf '%s' "${nodesJson}" | jq '.items | length')"
 
-# Validate that we have worker nodes
-if [[ -z "${WORKER_NODES}" ]] || [[ "${WORKER_COUNT}" -eq 0 ]]; then
-  echo "❌ ERROR: No worker nodes found"
-  oc get nodes
+if [[ "${workerCount}" -le 0 ]]; then
   exit 1
 fi
 
-echo "Found $WORKER_COUNT worker nodes"
-echo ""
+typeset node=''
+while IFS= read -r node; do
+    oc debug -n default node/"${node}" --quiet -- chroot /host bash -eux -o pipefail -c '
+    shopt -s inherit_errexit nullglob
+    typeset -a lxtraceFiles=(/var/lib/firmware/lxtrace-*)
+    if [[ "${#lxtraceFiles[@]}" -gt 0 ]]; then
+      for f in "${lxtraceFiles[@]}"; do
+        if [[ -f "${f}" ]]; then
+          cp "${f}" /var/gpfs/bin/ && chmod +x "/var/gpfs/bin/${f##*/}"
+        fi
+      done
+    else
+      typeset kernelVer=""
+      kernelVer="$(uname -r)"
+      touch /var/lib/firmware/lxtrace-dummy
+      touch "/var/gpfs/bin/lxtrace-${kernelVer}"
+      chmod +x "/var/gpfs/bin/lxtrace-${kernelVer}"
+    fi
 
-# Create lxtrace dummy files on each worker node
-for node in $WORKER_NODES; do
-  echo "Processing node: $node"
-  
-  # Create dummy lxtrace file in /var/lib/firmware
-  # This is required by the buildgpl script's rsync command
-  # Note: Using -n default for debug pod namespace
-  oc debug -n default node/$node -- chroot /host bash -c 'touch /var/lib/firmware/lxtrace-dummy && chmod 644 /var/lib/firmware/lxtrace-dummy' 2>&1 | \
-    grep -v "Starting pod\|Removing debug\|To use host" || true
-  
-  # Verify file was created
-  if oc debug -n default node/$node -- chroot /host test -f /var/lib/firmware/lxtrace-dummy >/dev/null 2>&1; then
-    echo "  ✅ lxtrace-dummy created and verified"
-  else
-    echo "  ❌ Failed to create lxtrace-dummy"
-    exit 1
-  fi
-done
+    ls -la /var/gpfs/bin/
 
-echo ""
-echo "✅ lxtrace dummy files created on all worker nodes"
-echo "   Location: /var/lib/firmware/lxtrace-dummy"
-echo "   Purpose: Satisfy buildgpl script rsync requirement"
+    true
+  ' 2>&1 | sed -e '/Starting pod/d' -e '/Removing debug/d' -e '/To use host/d'
+  done < <(printf '%s' "${nodesJson}" | jq -r '.items[].metadata.name')
 
+true
