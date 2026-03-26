@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# If KONFLUX_REF is set, checkout that ref to align test code with RC
+if [[ -n "${KONFLUX_REF:-}" ]]; then
+    echo "Checking out KONFLUX_REF: ${KONFLUX_REF}"
+    git fetch --tags origin 2>/dev/null || true
+    git fetch --unshallow origin 2>/dev/null || true
+    git checkout "${KONFLUX_REF}" || {
+        echo "ERROR: Failed to checkout ${KONFLUX_REF}"
+        exit 1
+    }
+    echo "Successfully checked out ${KONFLUX_REF}"
+fi
+
 SECRETS_DIR=/usr/local/ci-secrets/konflux-ci-konflux-ci-e2e-tests-credentials
 
 # Source the e2e env template to pick up defaults
