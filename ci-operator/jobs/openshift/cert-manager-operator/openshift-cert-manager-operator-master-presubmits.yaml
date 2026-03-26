@@ -991,7 +991,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: rhcos10-ubi10
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi10-ci-bundle-cert-manager-operator-bundle
     rerun_command: /test rhcos10-ubi10-ci-bundle-cert-manager-operator-bundle
@@ -1041,13 +1041,179 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build10
+    context: ci/prow/rhcos10-ubi10-e2e-operator
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: rhcos10-ubi10
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi10-e2e-operator
+    rerun_command: /test rhcos10-ubi10-e2e-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator
+        - --variant=rhcos10-ubi10
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos10-ubi10-e2e-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/rhcos10-ubi10-e2e-operator-fips
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: rhcos10-ubi10
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi10-e2e-operator-fips
+    rerun_command: /test rhcos10-ubi10-e2e-operator-fips
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator-fips
+        - --variant=rhcos10-ubi10
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos10-ubi10-e2e-operator-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build08
     context: ci/prow/rhcos10-ubi10-images
     decorate: true
     labels:
       ci-operator.openshift.io/variant: rhcos10-ubi10
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi10-images
     rerun_command: /test rhcos10-ubi10-images
@@ -1097,96 +1263,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
-    context: ci/prow/rhcos10-ubi10-rhcos10-cluster-ubi9-e2e-operator
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-      ci-operator.openshift.io/variant: rhcos10-ubi10
-      ci.openshift.io/generator: prowgen
-      job-release: "4.21"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi10-rhcos10-cluster-ubi9-e2e-operator
-    rerun_command: /test rhcos10-ubi10-rhcos10-cluster-ubi9-e2e-operator
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=rhcos10-cluster-ubi9-e2e-operator
-        - --variant=rhcos10-ubi10
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos10-ubi10-rhcos10-cluster-ubi9-e2e-operator,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
     cluster: build08
     context: ci/prow/rhcos10-ubi9-ci-bundle-cert-manager-operator-bundle
     decorate: true
     labels:
       ci-operator.openshift.io/variant: rhcos10-ubi9
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi9-ci-bundle-cert-manager-operator-bundle
     rerun_command: /test rhcos10-ubi9-ci-bundle-cert-manager-operator-bundle
@@ -1236,13 +1319,179 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build10
+    context: ci/prow/rhcos10-ubi9-e2e-operator
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: rhcos10-ubi9
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi9-e2e-operator
+    rerun_command: /test rhcos10-ubi9-e2e-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator
+        - --variant=rhcos10-ubi9
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos10-ubi9-e2e-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/rhcos10-ubi9-e2e-operator-fips
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: rhcos10-ubi9
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi9-e2e-operator-fips
+    rerun_command: /test rhcos10-ubi9-e2e-operator-fips
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator-fips
+        - --variant=rhcos10-ubi9
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos10-ubi9-e2e-operator-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build08
     context: ci/prow/rhcos10-ubi9-images
     decorate: true
     labels:
       ci-operator.openshift.io/variant: rhcos10-ubi9
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi9-images
     rerun_command: /test rhcos10-ubi9-images
@@ -1292,96 +1541,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
-    context: ci/prow/rhcos10-ubi9-rhcos10-cluster-ubi9-e2e-operator
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-      ci-operator.openshift.io/variant: rhcos10-ubi9
-      ci.openshift.io/generator: prowgen
-      job-release: "4.21"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-rhcos10-ubi9-rhcos10-cluster-ubi9-e2e-operator
-    rerun_command: /test rhcos10-ubi9-rhcos10-cluster-ubi9-e2e-operator
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=rhcos10-cluster-ubi9-e2e-operator
-        - --variant=rhcos10-ubi9
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos10-ubi9-rhcos10-cluster-ubi9-e2e-operator,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
     cluster: build08
     context: ci/prow/rhcos9-ubi10-ci-bundle-cert-manager-operator-bundle
     decorate: true
     labels:
       ci-operator.openshift.io/variant: rhcos9-ubi10
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-ci-bundle-cert-manager-operator-bundle
     rerun_command: /test rhcos9-ubi10-ci-bundle-cert-manager-operator-bundle
@@ -1431,74 +1597,18 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build08
-    context: ci/prow/rhcos9-ubi10-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: rhcos9-ubi10
-      ci.openshift.io/generator: prowgen
-      job-release: "4.21"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-images
-    rerun_command: /test rhcos9-ubi10-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=rhcos9-ubi10
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos9-ubi10-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
     cluster: build10
-    context: ci/prow/rhcos9-ubi10-rhcos10-cluster-ubi9-e2e-operator
+    context: ci/prow/rhcos9-ubi10-e2e-operator
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci-operator.openshift.io/variant: rhcos9-ubi10
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-rhcos10-cluster-ubi9-e2e-operator
-    rerun_command: /test rhcos9-ubi10-rhcos10-cluster-ubi9-e2e-operator
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-e2e-operator
+    rerun_command: /test rhcos9-ubi10-e2e-operator
     spec:
       containers:
       - args:
@@ -1507,7 +1617,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=rhcos10-cluster-ubi9-e2e-operator
+        - --target=e2e-operator
         - --variant=rhcos9-ubi10
         command:
         - ci-operator
@@ -1564,7 +1674,146 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos9-ubi10-rhcos10-cluster-ubi9-e2e-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhcos9-ubi10-e2e-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/rhcos9-ubi10-e2e-operator-fips
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: rhcos9-ubi10
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-e2e-operator-fips
+    rerun_command: /test rhcos9-ubi10-e2e-operator-fips
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator-fips
+        - --variant=rhcos9-ubi10
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos9-ubi10-e2e-operator-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build08
+    context: ci/prow/rhcos9-ubi10-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: rhcos9-ubi10
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-rhcos9-ubi10-images
+    rerun_command: /test rhcos9-ubi10-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=rhcos9-ubi10
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhcos9-ubi10-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
