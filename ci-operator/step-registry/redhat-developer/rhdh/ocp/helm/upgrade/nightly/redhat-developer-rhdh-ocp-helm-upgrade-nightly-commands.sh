@@ -1,4 +1,5 @@
 #!/bin/bash
+set +x
 
 echo "========== Repository, Branch, and PR Variables =========="
 GITHUB_ORG_NAME="redhat-developer"
@@ -64,15 +65,23 @@ else
     exit 1
 fi
 
-timeout --foreground 5m bash <<-"EOF"
+if ! timeout --foreground 10m bash <<-"EOF"; then
     while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
-            sleep 20
+            echo "Login failed, retrying in 30s..."
+            sleep 30
     done
 EOF
-if [ $? -ne 0 ]; then
     echo "Timed out waiting for login"
     exit 1
 fi
+
+echo "========== Cluster Health Check =========="
+echo "Waiting for all nodes to be ready..."
+if ! oc wait --for=condition=Ready nodes --all --timeout=300s; then
+    echo "Timed out waiting for nodes to become ready"
+    exit 1
+fi
+echo "All nodes are ready"
 
 echo "========== Cluster Service Account and Token Management =========="
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
