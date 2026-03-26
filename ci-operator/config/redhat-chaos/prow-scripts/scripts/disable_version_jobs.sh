@@ -62,3 +62,7 @@ done
 
 echo ""
 echo "Done! All tests for OCP ${VERSION} have always_run: false"
+echo ""
+echo "Running make jobs..."
+RELEASE_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+make -C "$RELEASE_ROOT" jobs
