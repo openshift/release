@@ -1,42 +1,39 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
-  cron: 15 1 6 1 *
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-3.11
+  - base_ref: release-4.23
     org: openshift
-    repo: openshift-ansible
+    repo: kubernetes
+  interval: 48h
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.23"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-ansible-release-3.11-e2e-gcp-nightly
+  name: periodic-ci-openshift-kubernetes-release-4.23-periodics-e2e-aws-hpa
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=e2e-gcp-nightly
-      - --template=/usr/local/e2e-gcp-nightly
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-hpa
+      - --variant=periodics
       command:
       - ci-operator
       env:
-      - name: CLUSTER_TYPE
-        value: gcp
       - name: HTTP_SERVER_IP
         valueFrom:
           fieldRef:
             fieldPath: status.podIP
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp-nightly
-      - name: RPM_REPO_OPENSHIFT_ORIGIN
-        value: https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-origin-v3.11/
-      - name: TEST_COMMAND
-        value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
-          run-tests
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -47,12 +44,15 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-nightly
-        name: job-definition
-        subPath: cluster-launch-e2e.yaml
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -64,9 +64,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - configMap:
-        name: prow-job-cluster-launch-e2e
-      name: job-definition
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

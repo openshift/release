@@ -99,11 +99,12 @@ METRICS_FILE="/tmp/metrics/ran-metrics.txt"
 
 echo "Collect metrics from hub and spoke clusters"
 ansible-playbook ./playbooks/ran/collect-metrics.yml \
-  -i ./inventories/ocp-deployment/build-inventory.py \
+  -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
     ran_spoke_kubeconfig=${SPOKE_KUBECONFIG} \
     ran_ci_lane='${CI_LANE}' \
-    ran_output_file=${METRICS_FILE}" || true
+    ran_output_file=${METRICS_FILE} \
+    ran_metrics_list=${RAN_METRICS_LIST}" || true
 
 REPORTS_PORTAL_ATTRIBUTES=""
 if [[ -f "${METRICS_FILE}" ]]; then
