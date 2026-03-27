@@ -27,6 +27,9 @@ set -o pipefail
 echo "Creating /usr/local/bin/fix-openshift-firewall.sh..."
 sudo tee /usr/local/bin/fix-openshift-firewall.sh > /dev/null <<'EOFSCRIPT'
 #!/bin/bash
+set -o nounset
+set -o errexit
+set -o pipefail
 # Configure nftables rules for OpenShift NoOverlay pod to kubernetes service connectivity on bootstrap node
 
 echo "$(date): Applying nftables rules for OpenShift NoOverlay pod to kubernetes service on bootstrap node connectivity..."
@@ -46,13 +49,13 @@ add_forward_rules() {
 
     # Check if egress rule exists
     if ! nft list chain "${family}" filter FORWARD 2>/dev/null | grep -q "iifname \"${INTERFACE_NAME}\" ${family} saddr ${cluster_network}"; then
-        sudo nft insert rule "${family}" filter FORWARD iifname "${INTERFACE_NAME}" "${family}" saddr "${cluster_network}" accept || true
+        sudo nft insert rule "${family}" filter FORWARD iifname "${INTERFACE_NAME}" "${family}" saddr "${cluster_network}" accept
         echo "Added ${family} FORWARD rule for cluster network egress"
     fi
 
     # Check if return traffic rule exists
     if ! nft list chain "${family}" filter FORWARD 2>/dev/null | grep -q "oifname \"${INTERFACE_NAME}\" ${family} daddr ${cluster_network}.*established"; then
-        sudo nft insert rule "${family}" filter FORWARD oifname "${INTERFACE_NAME}" "${family}" daddr "${cluster_network}" ct state related,established accept || true
+        sudo nft insert rule "${family}" filter FORWARD oifname "${INTERFACE_NAME}" "${family}" daddr "${cluster_network}" ct state related,established accept
         echo "Added ${family} FORWARD rule for cluster network return traffic"
     fi
 }
@@ -64,7 +67,7 @@ add_masquerade_rule() {
 
     # Check if masquerade rule exists
     if ! nft list chain "${family}" nat POSTROUTING 2>/dev/null | grep -q "${family} saddr ${cluster_network}.*masquerade"; then
-        sudo nft insert rule "${family}" nat POSTROUTING "${family}" saddr "${cluster_network}" "${family}" daddr != "${bootstrap_network}" masquerade || true
+        sudo nft insert rule "${family}" nat POSTROUTING "${family}" saddr "${cluster_network}" "${family}" daddr != "${bootstrap_network}" masquerade
         echo "Added ${family} MASQUERADE rule for cluster network egress"
     fi
 }
@@ -74,8 +77,8 @@ systemctl stop firewalld || true
 systemctl disable firewalld || true
 
 # Enable IP forwarding (CRITICAL for NoOverlay routing)
-sysctl -w net.ipv4.ip_forward=1 || true
-sysctl -w net.ipv6.conf.all.forwarding=1 || true
+sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv6.conf.all.forwarding=1
 
 # Remove ct state invalid drop rule from NETAVARK_FORWARD
 if nft list chain ip filter NETAVARK_FORWARD 2>/dev/null | grep -q "ct state invalid.*drop"; then
@@ -92,9 +95,9 @@ if nft list chain ip nat LIBVIRT_PRT 2>/dev/null > /dev/null; then
     if ! nft list chain ip nat LIBVIRT_PRT 2>/dev/null | head -5 | grep -q "${CLUSTER_NETWORK_V4}"; then
         HANDLE=$(nft --handle list chain ip nat LIBVIRT_PRT 2>/dev/null | grep "${CLUSTER_NETWORK_V4}" | awk '{print $NF}' | head -1)
         if [ -n "$HANDLE" ]; then
-            sudo nft delete rule ip nat LIBVIRT_PRT handle "$HANDLE" || true
+            sudo nft delete rule ip nat LIBVIRT_PRT handle "$HANDLE"
         fi
-        sudo nft insert rule ip nat LIBVIRT_PRT index 0 ip saddr "${BOOTSTRAP_NETWORK}" ip daddr "${CLUSTER_NETWORK_V4}" counter return || true
+        sudo nft insert rule ip nat LIBVIRT_PRT index 0 ip saddr "${BOOTSTRAP_NETWORK}" ip daddr "${CLUSTER_NETWORK_V4}" counter return
         echo "Added NAT RETURN rule at top of LIBVIRT_PRT for cluster-to-pod traffic"
     fi
 fi
@@ -117,6 +120,9 @@ sudo chmod +x /usr/local/bin/fix-openshift-firewall.sh
 echo "Creating /usr/local/bin/wait-and-apply-firewall-rules.sh..."
 sudo tee /usr/local/bin/wait-and-apply-firewall-rules.sh > /dev/null <<'EOFWAIT'
 #!/bin/bash
+set -o nounset
+set -o errexit
+set -o pipefail
 echo "$(date): Waiting for master VMs to appear in virsh list..."
 TIMEOUT=3600   # 1 hour max wait
 ELAPSED=0
@@ -125,9 +131,12 @@ INTERVAL=300    # Check every 300 seconds
 while true; do
     if command -v virsh &>/dev/null && virsh list --state-running 2>/dev/null | grep -qi "master"; then
         echo "$(date): Master VMs detected, applying nftables rules..."
-        /usr/local/bin/fix-openshift-firewall.sh
-        echo "$(date): nftables rules applied successfully."
-        exit 0
+        if /usr/local/bin/fix-openshift-firewall.sh; then
+            echo "$(date): nftables rules applied successfully."
+            exit 0
+        fi
+        echo "$(date): ERROR: Failed to apply nftables rules." >&2
+        exit 1
     fi
     if [ "${ELAPSED}" -ge "${TIMEOUT}" ]; then
         echo "$(date): WARNING: Timed out after ${TIMEOUT}s waiting for master VMs."
