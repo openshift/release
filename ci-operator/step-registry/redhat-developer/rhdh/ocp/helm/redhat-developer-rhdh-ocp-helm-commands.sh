@@ -159,7 +159,7 @@ PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.opencode|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
