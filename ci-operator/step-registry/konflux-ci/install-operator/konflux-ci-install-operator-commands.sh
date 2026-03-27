@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# If KONFLUX_REF is set, checkout that ref to align scripts/manifests with RC
+if [[ -n "${KONFLUX_REF:-}" ]]; then
+    echo "Checking out KONFLUX_REF: ${KONFLUX_REF}"
+    git fetch --tags origin 2>/dev/null || true
+    git fetch --unshallow origin 2>/dev/null || true
+    git checkout "${KONFLUX_REF}" || {
+        echo "ERROR: Failed to checkout ${KONFLUX_REF}"
+        exit 1
+    }
+    echo "Successfully checked out ${KONFLUX_REF}"
+fi
+
 export GITHUB_APP_ID GITHUB_PRIVATE_KEY WEBHOOK_SECRET QUAY_TOKEN QUAY_ORGANIZATION SMEE_CHANNEL
 
 GITHUB_APP_ID=$(cat /usr/local/ci-secrets/konflux-ci-konflux-ci-e2e-tests-credentials/github-app-id)
