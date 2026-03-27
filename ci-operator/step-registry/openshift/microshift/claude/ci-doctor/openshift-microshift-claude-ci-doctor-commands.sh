@@ -1,8 +1,20 @@
 #!/bin/bash
 set -euo pipefail
-set -x
 
 echo "Starting MicroShift Claude CI Doctor"
+
+# Load secrets with command tracing disabled to prevent leaking credentials in logs
+set +x
+if [ -f "${GITHUB_TOKEN_PATH}" ]; then
+    export GITHUB_TOKEN
+    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    echo "GitHub token loaded."
+else
+    echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
+fi
+
+# Enable command tracing
+set -x
 
 # Install gcloud CLI for GCS artifact access (no root required)
 echo "Installing gcloud CLI..."
@@ -13,7 +25,9 @@ echo "gcloud CLI installed."
 
 # Clone the MicroShift repository
 SRC_DIR="/tmp/microshift"
-git clone https://github.com/openshift/microshift.git "${SRC_DIR}"
+# TODO: Clone from the main branch
+# git clone -b main https://github.com/openshift/microshift.git "${SRC_DIR}"
+git clone -b analyze-ci-reorg https://github.com/ggiguash/microshift.git "${SRC_DIR}"
 cd "${SRC_DIR}"
 
 # Set the work directory
@@ -42,29 +56,49 @@ copy_reports() {
 }
 trap copy_reports EXIT TERM INT
 
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+# ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
-SYSTEM_PROMPT="
-You are a diligent senior OpenShift release engineer analyzing CI for MicroShift releases.
+# SYSTEM_PROMPT="
+# You are a diligent senior OpenShift release engineer analyzing CI for MicroShift releases.
 
-**CRITICAL**: You have many analyze-ci skills at your disposal.
-You MUST load the relevant analyze-ci skills using the Skill tool BEFORE you begin any work.
-Do NOT improvise or guess.
-"
+# **CRITICAL**: You have many analyze-ci skills at your disposal.
+# You MUST load the relevant analyze-ci skills using the Skill tool BEFORE you begin any work.
+# Do NOT improvise or guess.
+# "
 
-RELEASE_VERSIONS="main,4.22"
+#    --allowedTools "${ALLOWED_TOOLS}" \
+#    --max-turns 100 \
+#    --append-system-prompt "${SYSTEM_PROMPT}" \
+
+# Configure Claude settings
+CLAUDE_HOME="/home/claude/.claude"
+mkdir -p "${CLAUDE_HOME}"
+cat > "${CLAUDE_HOME}/settings.json" <<EOF
+{
+  "model": "${CLAUDE_MODEL}",
+  "enabledPlugins": {
+    "jira@ai-helpers": true
+  },
+  "extraKnownMarketplaces": {
+    "ai-helpers": {
+      "source": {
+        "source": "github",
+        "repo": "openshift-eng/ai-helpers"
+      }
+    }
+  },
+  "effortLevel": "medium",
+  "skipDangerousModePermissionPrompt": true
+}
+EOF
 
 timeout 3600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
-    --max-turns 100 \
-    --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/analyze-ci-for-release-manager ${RELEASE_VERSIONS}" \
+    -p "/analyze-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
 
 # Check if we produced a report
-if ls "${WORKDIR}"/*.html 1>/dev/null 2>&1; then
+if ls "${WORKDIR}"/*.html &>/dev/null; then
     echo "Analysis complete."
 else
     echo "Warning: No HTML report was generated."
