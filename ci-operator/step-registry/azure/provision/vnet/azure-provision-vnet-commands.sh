@@ -201,7 +201,7 @@ vnet_ipv6=""
 master_ipv6=""
 compute_ipv6_subnets=()
 compute_ipv4_subnets=()
-if [[ "${IPSTACK}" == "dualstack" ]]; then
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
     vnet_ipv6="${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-fd00:29cc:9e56::/48}"    
     master_ipv6="${AZURE_CONTROL_PLANE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56::/64}"
     worker_ipv6="${AZURE_COMPUTE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56:1::/64}"
