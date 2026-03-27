@@ -1,0 +1,50 @@
+ref:
+  as: hypershift-azure-aks-oadp-setup
+  from: upi-installer
+  cli: latest
+  commands: hypershift-azure-aks-oadp-setup-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    name: hypershift-ci-jobs-azurecreds
+    namespace: test-credentials
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  env:
+  - name: OADP_AZURE_BUCKET_NAME
+    documentation: |-
+      The Azure blob storage bucket name for OADP backups.
+      If empty, a bucket will be created using the cluster name.
+    default: ""
+  - name: OADP_OPERATOR_SUB_PACKAGE
+    documentation: The package name of the OADP Operator to install.
+    default: redhat-oadp-operator
+  - name: OADP_OPERATOR_SUB_SOURCE
+    documentation: The catalog source name.
+    default: redhat-operators
+  - name: OADP_OPERATOR_SUB_CHANNEL
+    documentation: The channel from which to install the package.
+    default: 'stable'
+  - name: OADP_OPERATOR_SUB_INSTALL_NAMESPACE
+    documentation: The namespace into which the operator will be installed.
+    default: openshift-adp
+  - name: OADP_SUB_TARGET_NAMESPACES
+    documentation: A comma-separated list of namespaces the operator will target. The special value "!install" will set the target namespace to the operator's installation namespace.
+    default: openshift-adp
+  - name: OLM_NAMESPACE
+    documentation: The namespace where OLM and catalog sources are installed.
+    default: olm
+  - name: REDHAT_OPERATORS_INDEX_TAG
+    documentation: The tag for the Red Hat operator index image.
+    default: v4.21
+  documentation: |-
+    Sets up OADP for HyperShift backup/restore tests on AKS: creates a storage
+    account, deploys the Red Hat Operators CatalogSource, subscribes to the OADP
+    operator (namespace, OperatorGroup, Subscription, CSV wait), patches service
+    accounts with pull secrets, applies missing OpenShift CRDs, creates Azure
+    credentials secret, and deploys DataProtectionApplication with Azure backup
+    and snapshot locations.
