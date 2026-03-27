@@ -72,10 +72,10 @@ else
 fi
 
 if ! timeout --foreground 10m bash <<-"EOF"; then
-        while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
-                echo "Login failed, retrying in 30s..."
-                sleep 30
-        done
+    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+            echo "Login failed, retrying in 30s..."
+            sleep 30
+    done
 EOF
     echo "Timed out waiting for login"
     exit 1
@@ -108,7 +108,7 @@ echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
 export CONTAINER_PLATFORM="ocp"
 echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
 echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
@@ -169,7 +169,7 @@ elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
         TAG_NAME="next"
     fi
     echo "TAG_NAME: $TAG_NAME"
-elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]]; then
+elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     IMAGE_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
@@ -185,14 +185,14 @@ else
     IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
         # Timeout configuration for waiting for Docker image availability
-        MAX_WAIT_TIME_SECONDS=$((60 * 60)) # Maximum wait time in minutes * seconds
-        POLL_INTERVAL_SECONDS=60           # Check every 60 seconds
+        MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+        POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
         ELAPSED_TIME=0
 
         while true; do
             # Check image availability
-            response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
+            response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
 
             # Use jq to parse the JSON and see if the tag exists
             tag_count=$(echo $response | jq '.tags | length')
@@ -224,8 +224,8 @@ export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
+IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
 if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
-    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 else
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"

@@ -40,7 +40,7 @@ echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
 export CONTAINER_PLATFORM="osd-gcp"
 echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
 echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
@@ -104,7 +104,7 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
         TAG_NAME="next"
     fi
     echo "TAG_NAME: $TAG_NAME"
-elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]]; then
+elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     IMAGE_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
@@ -116,50 +116,42 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]]; then
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
-    IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
-    if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
-        # Timeout configuration for waiting for Docker image availability
-        MAX_WAIT_TIME_SECONDS=$((60 * 60)) # Maximum wait time in minutes * seconds
-        POLL_INTERVAL_SECONDS=60           # Check every 60 seconds
+    # Timeout configuration for waiting for Docker image availability
+    MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+    POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
-        ELAPSED_TIME=0
+    ELAPSED_TIME=0
 
-        while true; do
-            # Check image availability
-            response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
+    while true; do
+        # Check image availability
+        response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
 
-            # Use jq to parse the JSON and see if the tag exists
-            tag_count=$(echo $response | jq '.tags | length')
+        # Use jq to parse the JSON and see if the tag exists
+        tag_count=$(echo $response | jq '.tags | length')
 
-            if [ "$tag_count" -gt "0" ]; then
-                echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
-                break
-            fi
+        if [ "$tag_count" -gt "0" ]; then
+            echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
+            break
+        fi
 
-            # Wait for the interval duration
-            sleep $POLL_INTERVAL_SECONDS
+        # Wait for the interval duration
+        sleep $POLL_INTERVAL_SECONDS
 
-            # Increment the elapsed time
-            ELAPSED_TIME=$(($ELAPSED_TIME + $POLL_INTERVAL_SECONDS))
+        # Increment the elapsed time
+        ELAPSED_TIME=$(($ELAPSED_TIME + $POLL_INTERVAL_SECONDS))
 
-            # If the elapsed time exceeds the timeout, exit with an error
-            if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME_SECONDS ]; then
-                echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
-                exit 1
-            fi
-        done
-    else
-        echo "INFO: Skipping image availability check for non-quay.io registry: ${IMAGE_REGISTRY}"
-    fi
+        # If the elapsed time exceeds the timeout, exit with an error
+        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME_SECONDS ]; then
+            echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
+            exit 1
+        fi
+    done
 fi
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
-IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
-QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
-export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
+IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
 if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
-    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 else
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"

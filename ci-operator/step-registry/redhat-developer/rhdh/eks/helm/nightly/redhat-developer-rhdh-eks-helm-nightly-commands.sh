@@ -63,14 +63,14 @@ aws configure set default.region "${AWS_DEFAULT_REGION}"
 
 echo "Verifying kubeconfig file from Mapt exists in SHARED_DIR..."
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
-    echo "Error: kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
-    exit 1
+  echo "Error: kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
+  exit 1
 fi
 
 echo "Setting kubeconfig permissions..."
 if ! chmod 600 "${SHARED_DIR}/kubeconfig"; then
-    echo "Error: Failed to set kubeconfig permissions"
-    exit 1
+  echo "Error: Failed to set kubeconfig permissions"
+  exit 1
 fi
 
 echo "Setting KUBECONFIG environment variable..."
@@ -78,15 +78,15 @@ KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
 echo "Verifying kubeconfig file..."
-if ! kubectl config view >/dev/null 2>&1; then
-    echo "Error: Invalid kubeconfig file"
-    exit 1
+if ! kubectl config view > /dev/null 2>&1; then
+  echo "Error: Invalid kubeconfig file"
+  exit 1
 fi
 
 echo "Verifying cluster connectivity..."
-if ! kubectl cluster-info >/dev/null 2>&1; then
-    echo "Error: Cannot connect to cluster."
-    exit 1
+if ! kubectl cluster-info > /dev/null 2>&1; then
+  echo "Error: Cannot connect to cluster."
+  exit 1
 fi
 
 echo "========== Cluster Service Account and Token Management =========="
@@ -97,23 +97,23 @@ sa_binding_name="${sa_name}-binding"
 sa_secret_name="${sa_name}-secret"
 
 if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
-    K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
-    echo "Acquired existing token for the service account into K8S_CLUSTER_TOKEN"
+  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
+  echo "Acquired existing token for the service account into K8S_CLUSTER_TOKEN"
 else
-    echo "Creating service account"
-    if ! kubectl get serviceaccount ${sa_name} -n ${sa_namespace} &>/dev/null; then
-        echo "Creating service account ${sa_name}..."
-        kubectl create serviceaccount ${sa_name} -n ${sa_namespace}
-        echo "Creating cluster role binding..."
-        kubectl create clusterrolebinding ${sa_binding_name} \
-            --clusterrole=cluster-admin \
-            --serviceaccount=${sa_namespace}:${sa_name}
-        echo "Service account and binding created successfully"
-    else
-        echo "Service account ${sa_name} already exists in namespace ${sa_namespace}"
-    fi
-    echo "Creating secret for service account"
-    kubectl apply --namespace="${sa_namespace}" -f - <<EOF
+  echo "Creating service account"
+  if ! kubectl get serviceaccount ${sa_name} -n ${sa_namespace} &> /dev/null; then
+    echo "Creating service account ${sa_name}..."
+    kubectl create serviceaccount ${sa_name} -n ${sa_namespace}
+    echo "Creating cluster role binding..."
+    kubectl create clusterrolebinding ${sa_binding_name} \
+        --clusterrole=cluster-admin \
+        --serviceaccount=${sa_namespace}:${sa_name}
+    echo "Service account and binding created successfully"
+  else
+    echo "Service account ${sa_name} already exists in namespace ${sa_namespace}"
+  fi
+  echo "Creating secret for service account"
+  kubectl apply --namespace="${sa_namespace}" -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -124,22 +124,22 @@ metadata:
 type: kubernetes.io/service-account-token
 EOF
 
-    retries=12
-    sleep_time=5
-    for ((i = 1; i <= retries; i++)); do
-        if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
-            echo "Successfully got token on attempt $i."
-            break
-        elif [ $i -eq $retries ]; then
-            echo "Failed to get token after $i attempts. Exiting..."
-            exit 1
-        else
-            echo "Failed to get token on attempt $i, retrying..."
-        fi
-        sleep $sleep_time
-    done
-    K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
-    echo "Acquired token for the service account into K8S_CLUSTER_TOKEN"
+  retries=12
+  sleep_time=5
+  for ((i=1; i <= retries; i++)); do
+    if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
+      echo "Successfully got token on attempt $i."
+      break
+    elif [ $i -eq $retries ]; then
+      echo "Failed to get token after $i attempts. Exiting..."
+      exit 1
+    else
+      echo "Failed to get token on attempt $i, retrying..."
+    fi
+    sleep $sleep_time
+  done
+  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
+  echo "Acquired token for the service account into K8S_CLUSTER_TOKEN"
 fi
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
 export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
@@ -151,7 +151,7 @@ echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
 export CONTAINER_PLATFORM="eks"
 echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
 echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2>/dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
@@ -209,7 +209,7 @@ elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
         TAG_NAME="next"
     fi
     echo "TAG_NAME: $TAG_NAME"
-elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]]; then
+elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     IMAGE_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
@@ -225,14 +225,14 @@ else
     IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
         # Timeout configuration for waiting for Docker image availability
-        MAX_WAIT_TIME_SECONDS=$((60 * 60)) # Maximum wait time in minutes * seconds
-        POLL_INTERVAL_SECONDS=60           # Check every 60 seconds
+        MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+        POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
         ELAPSED_TIME=0
 
         while true; do
             # Check image availability
-            response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
+            response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
 
             # Use jq to parse the JSON and see if the tag exists
             tag_count=$(echo $response | jq '.tags | length')
@@ -264,8 +264,8 @@ export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
+IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
 if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
-    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 else
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"
