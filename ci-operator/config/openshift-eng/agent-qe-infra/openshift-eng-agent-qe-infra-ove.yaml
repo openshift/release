@@ -1,0 +1,53 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.21"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        stream: 4-stable
+        upper: 4.22.0-0
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: baremetal-compact-disc-konflux
+  capabilities:
+  - intranet
+  cron: 2 6 16 */2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      OVE_ISO_STORAGE_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      SNAPSHOT: '{"application":"ove-ui-4-21","components":[{"name":"ove-ui-iso-4-21","containerImage":"quay.io/redhat-user-workloads/ocp-agent-based-installer-tenant/ove-ui-iso-4-21@sha256:c5c5269aec05dd1b16fedfd762b312f0f7b0858633d1f0850d17969f09e3df33","source":{"git":{"url":"https://github.com/openshift/agent-installer-utils","revision":"d5e584590355867515ff90bb9ccd2e9019073441"}}}],"artifacts":{}}'
+      VENDOR: dell
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: agent-qe-baremetal-install-ove-disconnected-konflux
+zz_generated_metadata:
+  branch: ove
+  org: openshift-eng
+  repo: agent-qe-infra
