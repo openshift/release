@@ -101,20 +101,25 @@ EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.
 if [[ -n "${HC_CLUSTER_NAME}" ]]; then
   echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
   DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
-  DNS_RECORDS=$(gcloud dns record-sets list \
+  if ! DNS_RECORDS=$(gcloud dns record-sets list \
     --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
     --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
     --filter="name ~ ${DNS_SUFFIX}" \
-    --format="csv[no-heading](name,type)" 2>/dev/null || true)
+    --format="csv[no-heading](name,type)"); then
+    echo "WARNING: Failed to list DNS records - check service account permissions"
+    DNS_RECORDS=""
+  fi
 
   if [[ -n "${DNS_RECORDS}" ]]; then
     while IFS=, read -r name type; do
       [[ -z "${name}" ]] && continue
       echo "Deleting DNS record: ${name} ${type}"
-      gcloud dns record-sets delete "${name}" \
+      if ! gcloud dns record-sets delete "${name}" \
         --type="${type}" \
         --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet || true
+        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet; then
+        echo "WARNING: Failed to delete DNS record ${name} ${type}"
+      fi
     done <<< "${DNS_RECORDS}"
   else
     echo "No DNS records found matching ${DNS_SUFFIX}"
