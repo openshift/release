@@ -86,6 +86,29 @@ image_type: "minimal-iso"
 reset_idrac: $RESET_IDRAC
 EOF
 
+# IPv6 proxy configuration for CLIOT-275 testing
+if [[ "$IPV6_PROXY" == "true" ]]; then
+  echo "Enabling IPv6 proxy configuration..."
+  cat <<EOF >>/tmp/all.yml
+ipv6_enabled: true
+ipv6_proxy: true
+dual_stack: true
+primary_ip_family: "IPv6"
+EOF
+
+  # Create IPv6-specific proxy configuration
+  if [[ $PUBLIC_VLAN == "false" ]]; then
+    echo "Configuring IPv6 proxy for private VLAN deployment..."
+    # Update the proxy configuration to handle IPv6
+    cat >> ${SHARED_DIR}/proxy-conf.sh << 'IPV6_PROXY_EOF'
+
+# IPv6 proxy configuration for CLIOT-275
+echo "Setting up IPv6 proxy configuration"
+export IPV6_PROXY_ENABLED=true
+IPV6_PROXY_EOF
+  fi
+fi
+
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
   sed -i "s/^enable_bond: .*/enable_bond: $BOND/" /tmp/all.yml

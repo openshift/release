@@ -1,0 +1,32 @@
+ref:
+  as: openshift-qe-retis-packet-analysis
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  commands: openshift-qe-retis-packet-analysis-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: RUN_RETIS
+      default: "false"
+      documentation: |-
+        Enable Retis packet drop analysis collection
+    - name: WORKLOAD_TYPE
+      default: "netperf"
+      documentation: |-
+        Type of workload being tested for packet analysis
+  documentation: |-
+    This step runs Retis packet drop analysis for IPv6 CNI performance testing.
+    
+    It deploys Retis as a DaemonSet to collect packet drop information during
+    network performance tests, then analyzes the results to identify silent
+    packet drops and IPv4 vs IPv6 performance differences.
+    
+    Required environment variables:
+    - WORKLOAD_TYPE: Type of workload being tested (e.g., ipv6-netperf)
+    - RUN_RETIS: Set to "true" to enable Retis collection
