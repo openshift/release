@@ -3,11 +3,6 @@ base_images:
     name: aro-hcp-e2e-tools
     namespace: aro-hcp
     tag: latest
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.20"
 resources:
   '*':
     requests:
@@ -21,13 +16,11 @@ tests:
 - as: delete-expired-kusto-role-assignments
   cron: 0 4 * * *
   steps:
-    cluster_profile: aro-hcp-dev
     test:
     - ref: aro-hcp-deprovision-kusto-role-assignments
 - as: delete-expired-development-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-dev
     env:
       CLEANUP_MODE: no-rp
     test:
@@ -35,25 +28,21 @@ tests:
 - as: delete-expired-integration-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-int
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-stage-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-stg
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-prod-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-prod
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: integration-e2e-parallel
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: aro-hcp-int
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
@@ -67,7 +56,6 @@ tests:
 - as: stage-e2e-parallel
   cron: 0 2 * * *
   steps:
-    cluster_profile: aro-hcp-stg
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
@@ -81,7 +69,6 @@ tests:
 - as: prod-e2e-parallel
   cron: 0 2 * * *
   steps:
-    cluster_profile: aro-hcp-prod
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
