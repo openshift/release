@@ -9,11 +9,30 @@ echo "************ hypershift nutanix conf workers command ************"
 # This step creates Nutanix VMs for HyperShift hosted cluster workers
 # It can be used instead of pre-creating VMs manually
 
-NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT}"
-NUTANIX_USER="${NUTANIX_USER:-admin}"
-NUTANIX_PASSWORD="${NUTANIX_PASSWORD}"
-NUTANIX_CLUSTER="${NUTANIX_CLUSTER}"
-NUTANIX_SUBNET_UUID="${NUTANIX_SUBNET_UUID}"
+# Source Nutanix context from IPI workflow
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+    echo "Loading Nutanix context from IPI workflow..."
+    source "${SHARED_DIR}/nutanix_context.sh"
+
+    # Map IPI workflow variables to our naming convention
+    NUTANIX_ENDPOINT="${NUTANIX_HOST}"
+    NUTANIX_USER="${NUTANIX_USERNAME}"
+    # NUTANIX_PASSWORD is already set from nutanix_context.sh
+    NUTANIX_CLUSTER_NAME="${PE_NAME//\"/}"  # Remove quotes from PE_NAME
+    NUTANIX_CLUSTER_UUID="${PE_UUID//\"/}"  # Remove quotes from PE_UUID
+    NUTANIX_SUBNET_UUID="${SUBNET_UUID//\"/}"  # Remove quotes from SUBNET_UUID
+
+    echo "Using Nutanix endpoint: ${NUTANIX_ENDPOINT}"
+    echo "Using Nutanix cluster: ${NUTANIX_CLUSTER_NAME} (UUID: ${NUTANIX_CLUSTER_UUID})"
+else
+    echo "WARNING: nutanix_context.sh not found, using environment variables directly"
+    NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT}"
+    NUTANIX_USER="${NUTANIX_USER:-admin}"
+    NUTANIX_PASSWORD="${NUTANIX_PASSWORD}"
+    NUTANIX_CLUSTER_NAME="${NUTANIX_CLUSTER}"
+    NUTANIX_CLUSTER_UUID=""  # Will be looked up
+    NUTANIX_SUBNET_UUID="${NUTANIX_SUBNET_UUID}"
+fi
 
 NUM_WORKERS="${NUM_EXTRA_WORKERS:-3}"
 WORKER_VCPU="${NUTANIX_WORKER_VCPU:-8}"
@@ -24,20 +43,27 @@ WORKER_NAME_PREFIX="${NUTANIX_WORKER_VM_PREFIX:-hypershift-worker}"
 echo "Creating ${NUM_WORKERS} Nutanix worker VMs..."
 echo "Configuration: ${WORKER_VCPU} vCPU, ${WORKER_MEMORY_MB} MB RAM, ${WORKER_DISK_GB} GB disk"
 
-# Get Nutanix cluster UUID
-CLUSTER_UUID=$(curl -k -s -X POST \
-    -u "${NUTANIX_USER}:${NUTANIX_PASSWORD}" \
-    "https://${NUTANIX_ENDPOINT}:9440/api/nutanix/v3/clusters/list" \
-    -H 'Content-Type: application/json' \
-    -d "{\"kind\":\"cluster\",\"filter\":\"name==${NUTANIX_CLUSTER}\"}" \
-    | jq -r '.entities[0].metadata.uuid')
+# Get Nutanix cluster UUID if not already set from IPI context
+if [[ -z "${NUTANIX_CLUSTER_UUID}" ]]; then
+    echo "Looking up Nutanix cluster UUID by name: ${NUTANIX_CLUSTER_NAME}"
+    CLUSTER_UUID=$(curl -k -s -X POST \
+        -u "${NUTANIX_USER}:${NUTANIX_PASSWORD}" \
+        "https://${NUTANIX_ENDPOINT}:9440/api/nutanix/v3/clusters/list" \
+        -H 'Content-Type: application/json' \
+        -d "{\"kind\":\"cluster\",\"filter\":\"name==${NUTANIX_CLUSTER_NAME}\"}" \
+        | jq -r '.entities[0].metadata.uuid')
 
-if [[ -z "${CLUSTER_UUID}" ]] || [[ "${CLUSTER_UUID}" == "null" ]]; then
-    echo "ERROR: Could not find Nutanix cluster: ${NUTANIX_CLUSTER}"
-    exit 1
+    if [[ -z "${CLUSTER_UUID}" ]] || [[ "${CLUSTER_UUID}" == "null" ]]; then
+        echo "ERROR: Could not find Nutanix cluster: ${NUTANIX_CLUSTER_NAME}"
+        exit 1
+    fi
+else
+    # Use cluster UUID from IPI context
+    CLUSTER_UUID="${NUTANIX_CLUSTER_UUID}"
+    echo "Using cluster UUID from IPI context: ${CLUSTER_UUID}"
 fi
 
-echo "Nutanix cluster UUID: ${CLUSTER_UUID}"
+echo "Nutanix cluster: ${NUTANIX_CLUSTER_NAME} (UUID: ${CLUSTER_UUID})"
 
 # Create VMs
 VM_UUIDS=()

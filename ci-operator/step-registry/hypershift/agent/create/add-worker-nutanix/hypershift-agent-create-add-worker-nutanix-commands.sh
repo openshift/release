@@ -6,12 +6,27 @@ set -o pipefail
 
 echo "************ add-worker nutanix command ************"
 
-# Nutanix environment configuration
-# These variables should be passed from environment or SHARED_DIR
-NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT}"
-NUTANIX_USER="${NUTANIX_USER}"
-NUTANIX_PASSWORD="${NUTANIX_PASSWORD}"
-NUTANIX_CLUSTER="${NUTANIX_CLUSTER}"
+# Source Nutanix context from IPI workflow
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+    echo "Loading Nutanix context from IPI workflow..."
+    source "${SHARED_DIR}/nutanix_context.sh"
+
+    # Map IPI workflow variables to our naming convention
+    NUTANIX_ENDPOINT="${NUTANIX_HOST}"
+    NUTANIX_USER="${NUTANIX_USERNAME}"
+    # NUTANIX_PASSWORD is already set from nutanix_context.sh
+    NUTANIX_CLUSTER_NAME="${PE_NAME//\"/}"  # Remove quotes
+
+    echo "Using Nutanix endpoint: ${NUTANIX_ENDPOINT}"
+    echo "Using Nutanix cluster: ${NUTANIX_CLUSTER_NAME}"
+else
+    echo "WARNING: nutanix_context.sh not found, using environment variables directly"
+    NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT}"
+    NUTANIX_USER="${NUTANIX_USER}"
+    NUTANIX_PASSWORD="${NUTANIX_PASSWORD}"
+    NUTANIX_CLUSTER_NAME="${NUTANIX_CLUSTER}"
+fi
+
 NUM_EXTRA_WORKERS="${NUM_EXTRA_WORKERS:-1}"
 
 # Get HostedCluster information

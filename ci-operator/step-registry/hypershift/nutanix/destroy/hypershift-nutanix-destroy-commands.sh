@@ -6,10 +6,23 @@ set -o pipefail
 
 echo "************ hypershift nutanix destroy command ************"
 
-# Nutanix configuration
-NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT}"
-NUTANIX_USER="${NUTANIX_USER:-admin}"
-NUTANIX_PASSWORD="${NUTANIX_PASSWORD}"
+# Source Nutanix context from IPI workflow
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+    echo "Loading Nutanix context from IPI workflow..."
+    source "${SHARED_DIR}/nutanix_context.sh"
+
+    # Map IPI workflow variables to our naming convention
+    NUTANIX_ENDPOINT="${NUTANIX_HOST}"
+    NUTANIX_USER="${NUTANIX_USERNAME}"
+    # NUTANIX_PASSWORD is already set from nutanix_context.sh
+
+    echo "Using Nutanix endpoint: ${NUTANIX_ENDPOINT}"
+else
+    echo "WARNING: nutanix_context.sh not found, using environment variables directly"
+    NUTANIX_ENDPOINT="${NUTANIX_ENDPOINT:-}"
+    NUTANIX_USER="${NUTANIX_USER:-admin}"
+    NUTANIX_PASSWORD="${NUTANIX_PASSWORD:-}"
+fi
 
 # Get HostedCluster information
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' 2>/dev/null || echo "")
