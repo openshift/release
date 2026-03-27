@@ -107,7 +107,9 @@ export -f _lease__jq_bin
 #   -c|--count: Number of leases to acquire. Optional, default to 1.
 #   --scope: If `test` save the acquired lease names into`${SHARED_DIR}/leases`. Otherwise save
 #     them in a temporary file.
-#   --jitter: Delay the execution by a random value chosen from the range [0, ${jitter}]. 
+#   -o|--output-file: Path to a file where acquired lease names will be appended. Optional.
+#     This is in addition to `--scope=test` behavior — both can be used together.
+#   --jitter: Delay the execution by a random value chosen from the range [0, ${jitter}].
 #     Only minutes and seconds are allowed, but not a combination of them: 10s, 15m.
 #
 # Environment:
@@ -125,6 +127,7 @@ function lease__acquire() {
     local scope='test'
     local jitter=''
     local jitter_defined=0
+    local output_file=''
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -146,6 +149,14 @@ function lease__acquire() {
                 ;;
             --scope=*)
                 scope="${1#*=}"
+                shift
+                ;;
+            -o|--output-file)
+                output_file="$2"
+                shift 2
+                ;;
+            --output-file=*)
+                output_file="${1#*=}"
                 shift
                 ;;
             --jitter=*)
@@ -248,6 +259,13 @@ function lease__acquire() {
                     # same line.
                     if ! printf '%s\n' "$names" >>"$test_leases"; then
                         printf "Failed to store lease names in \"%s\"\n" "$test_leases"
+                        return 1
+                    fi
+                fi
+
+                if [ -n "$output_file" ]; then
+                    if ! printf '%s\n' "$names" >>"$output_file"; then
+                        printf "Failed to store lease names in \"%s\"\n" "$output_file"
                         return 1
                     fi
                 fi
