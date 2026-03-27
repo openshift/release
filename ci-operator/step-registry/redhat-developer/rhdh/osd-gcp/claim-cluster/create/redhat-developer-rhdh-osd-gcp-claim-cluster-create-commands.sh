@@ -34,10 +34,10 @@ git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-	# If executed as PR check of the repository, switch to PR branch.
-	git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
-	git checkout PR"${GIT_PR_NUMBER}"
-	git merge origin/$RELEASE_BRANCH_NAME --no-edit
+    # If executed as PR check of the repository, switch to PR branch.
+    git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
+    git checkout PR"${GIT_PR_NUMBER}"
+    git merge origin/$RELEASE_BRANCH_NAME --no-edit
 fi
 
 echo "############## Current branch ##############"
@@ -48,3 +48,4 @@ bash ./.ci/pipelines/cluster/osd-gcp/create-osd.sh
 cp -v /tmp/rhdh/osdcluster/cluster-info.name "${SHARED_DIR}/"
 cp -v /tmp/rhdh/osdcluster/cluster-info.id "${SHARED_DIR}/"
 cp -v /tmp/rhdh/osdcluster/kubeconfig "${SHARED_DIR}/"
+
