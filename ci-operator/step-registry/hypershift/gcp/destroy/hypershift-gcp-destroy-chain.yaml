@@ -1,0 +1,31 @@
+chain:
+  as: hypershift-gcp-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    commands: |-
+      set -exuo pipefail
+
+      CLUSTER_NAME="$(cat ${SHARED_DIR}/cluster-name)"
+      echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
+      bin/hypershift destroy cluster gcp \
+        --name "${CLUSTER_NAME}" \
+        --namespace clusters \
+        --cluster-grace-period 40m
+      echo "$(date) Finished deleting cluster"
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
+    best_effort: true
+  documentation: |-
+    Destroys a GCP HostedCluster by deleting the HostedCluster CR and
+    waiting for finalizers to complete.
+
+    The underlying GCP infrastructure (VPC, WIF, projects) is cleaned up
+    separately by hypershift-gcp-gke-deprovision via project deletion.
+
+    Reads cluster-name from SHARED_DIR (saved by hypershift-gcp-create).
