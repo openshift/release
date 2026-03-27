@@ -221,7 +221,7 @@ spec:
     spec:
       expireAfter: Never
       nodeClassRef:
-        apiVersion: karpenter.azure.com/v1beta1
+        group: karpenter.azure.com
         kind: AKSNodeClass
         name: default
       requirements:
@@ -234,6 +234,7 @@ ${ZONE_REQ}
   limits:
     cpu: "200"
   disruption:
+    consolidateAfter: Never
     budgets:
       - nodes: "0"
 EOF
@@ -251,7 +252,7 @@ spec:
     spec:
       expireAfter: Never
       nodeClassRef:
-        apiVersion: karpenter.azure.com/v1beta1
+        group: karpenter.azure.com
         kind: AKSNodeClass
         name: default
       requirements:
@@ -264,6 +265,7 @@ ${ZONE_REQ}
   limits:
     cpu: "200"
   disruption:
+    consolidateAfter: Never
     budgets:
       - nodes: "0"
 EOF
