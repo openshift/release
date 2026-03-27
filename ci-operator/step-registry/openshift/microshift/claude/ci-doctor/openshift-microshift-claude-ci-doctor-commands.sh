@@ -13,7 +13,7 @@ echo "gcloud CLI installed."
 
 # Clone the MicroShift repository
 SRC_DIR="/tmp/microshift"
-git clone https://github.com/openshift/microshift.git /tmp
+git clone https://github.com/openshift/microshift.git "${SRC_DIR}"
 cd "${SRC_DIR}"
 
 # Set the work directory
