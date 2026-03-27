@@ -62,6 +62,31 @@ tests:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
 - always_run: false
+  as: e2e-ocp-v4-16-helm-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  cron: 30 2 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    env:
+      OC_CLIENT_VERSION: stable-4.16
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
   as: e2e-ocp-v4-17-helm-nightly
   cluster_claim:
     architecture: amd64
@@ -78,7 +103,7 @@ tests:
   steps:
     allow_skip_on_success: true
     env:
-      OC_CLIENT_VERSION: stable-4.16
+      OC_CLIENT_VERSION: stable-4.17
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
