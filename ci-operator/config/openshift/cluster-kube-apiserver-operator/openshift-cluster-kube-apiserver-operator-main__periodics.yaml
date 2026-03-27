@@ -3,6 +3,14 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -51,13 +59,23 @@ tests:
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/event-ttl
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-event-ttl
-  interval: 12h
+  cron: 12 1 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/event-ttl
     workflow: openshift-e2e-vsphere
+- as: e2e-metal-event-ttl
+  cron: 12 1 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/event-ttl
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
