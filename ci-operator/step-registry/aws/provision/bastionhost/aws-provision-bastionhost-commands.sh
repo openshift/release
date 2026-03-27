@@ -66,8 +66,8 @@ echo "VpcId: $VpcId"
 echo "PublicSubnet: $PublicSubnet"
 echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
 EnableIpv6="no"
-if [[ "${IPSTACK}" == "dualstack" ]]; then
-    echo "IPSTACK: $IPSTACK"
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    echo "IP_FAMILY: $IP_FAMILY"
     EnableIpv6="yes"
     VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
 fi
