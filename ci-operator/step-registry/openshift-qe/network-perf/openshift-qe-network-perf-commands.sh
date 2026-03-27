@@ -41,5 +41,4 @@ fi
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 export LOCAL=$LOCAL; export EXTERNAL_SERVER_ADDRESS=$EXTERNAL_SERVER_ADDRESS; export WORKLOAD=$WORKLOAD; export CLEAN_UP=$CLEAN_UP;
-sleep 10
 ./run.sh

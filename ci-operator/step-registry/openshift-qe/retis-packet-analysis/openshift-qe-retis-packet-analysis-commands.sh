@@ -6,7 +6,7 @@ set -euo pipefail
 # This script integrates Retis eBPF packet tracing with netperf testing
 
 echo "🔍 Starting Retis packet drop analysis for ${WORKLOAD_TYPE:-unknown}"
-
+sleep 5
 if [[ "${RUN_RETIS:-false}" != "true" ]]; then
     echo "ℹ️ Retis analysis disabled (RUN_RETIS != true)"
     exit 0
