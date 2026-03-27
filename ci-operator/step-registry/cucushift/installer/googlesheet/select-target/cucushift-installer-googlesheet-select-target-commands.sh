@@ -40,6 +40,9 @@ if [ "${SHEET_NAME_PREFIX}" == "" ]; then
   gcp)
     SHEET_NAME_PREFIX="GCP_${TEST_OBJECT}"
     ;;
+  ibmcloud)
+    SHEET_NAME_PREFIX="IBMCloud_${TEST_OBJECT}"
+    ;;
   *)
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1

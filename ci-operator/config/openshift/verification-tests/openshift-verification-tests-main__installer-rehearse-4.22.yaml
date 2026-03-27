@@ -144,22 +144,24 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
-- as: installer-rehearse-ibmcloud-mirror
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe-2
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.22.0-ec.3-x86_64
-      MIRROR_BIN: oc-mirror
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "Region", "value": "au-syd", "operator": "equals"}
+          ]
+        ]
+      SLEEP_DURATION: 5h
+      SPREADSHEET_NAME: test_only
+      TEST_FILTERS: "57148"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-cases-clusters-deprovision
+    - ref: send-results-to-reportportal
     test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-ibmcloud-cases-clusters
 zz_generated_metadata:
   branch: main
   org: openshift
