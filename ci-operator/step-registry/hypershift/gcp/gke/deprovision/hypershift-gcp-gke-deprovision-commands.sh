@@ -16,8 +16,16 @@ fi
 # Load cluster info from provision and hosted-cluster-setup steps
 CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
 CP_CLUSTER_NAME="$(<"${SHARED_DIR}/control-plane-cluster-name")"
-HC_CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
 GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+
+# hosted-cluster-name may not exist if job was aborted before hosted-cluster-setup ran
+if [[ -f "${SHARED_DIR}/hosted-cluster-name" ]]; then
+    HC_CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
+else
+    HC_CLUSTER_NAME=""
+    echo "WARNING: hosted-cluster-name not found - hosted cluster setup may not have completed"
+    echo "Will skip DNS cleanup but still deprovision GKE cluster and projects"
+fi
 
 # Hosted Cluster project file path (may not exist if provision failed early)
 HC_PROJECT_FILE="${SHARED_DIR}/hosted-cluster-project-id"
@@ -90,25 +98,29 @@ gcloud projects delete "${CP_PROJECT_ID}" --quiet || true
 EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.com"
 
 # Clean up DNS records from the CI zone (DNS records use the hosted cluster name)
-echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
-DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
-DNS_RECORDS=$(gcloud dns record-sets list \
-  --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-  --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
-  --filter="name ~ ${DNS_SUFFIX}" \
-  --format="csv[no-heading](name,type)" 2>/dev/null || true)
+if [[ -n "${HC_CLUSTER_NAME}" ]]; then
+  echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
+  DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
+  DNS_RECORDS=$(gcloud dns record-sets list \
+    --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
+    --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
+    --filter="name ~ ${DNS_SUFFIX}" \
+    --format="csv[no-heading](name,type)" 2>/dev/null || true)
 
-if [[ -n "${DNS_RECORDS}" ]]; then
-  while IFS=, read -r name type; do
-    [[ -z "${name}" ]] && continue
-    echo "Deleting DNS record: ${name} ${type}"
-    gcloud dns record-sets delete "${name}" \
-      --type="${type}" \
-      --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-      --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet || true
-  done <<< "${DNS_RECORDS}"
+  if [[ -n "${DNS_RECORDS}" ]]; then
+    while IFS=, read -r name type; do
+      [[ -z "${name}" ]] && continue
+      echo "Deleting DNS record: ${name} ${type}"
+      gcloud dns record-sets delete "${name}" \
+        --type="${type}" \
+        --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
+        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet || true
+    done <<< "${DNS_RECORDS}"
+  else
+    echo "No DNS records found matching ${DNS_SUFFIX}"
+  fi
 else
-  echo "No DNS records found matching ${DNS_SUFFIX}"
+  echo "Skipping DNS cleanup - hosted cluster name not available"
 fi
 
 # Remove ExternalDNS WIF bindings
