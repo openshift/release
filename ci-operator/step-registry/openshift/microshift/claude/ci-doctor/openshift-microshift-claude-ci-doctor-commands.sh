@@ -71,7 +71,7 @@ trap copy_reports EXIT TERM INT
 #    --append-system-prompt "${SYSTEM_PROMPT}" \
 
 # Configure Claude settings
-CLAUDE_HOME="/home/claude/.claude"
+CLAUDE_HOME="${HOME}/.claude"
 mkdir -p "${CLAUDE_HOME}"
 cat > "${CLAUDE_HOME}/settings.json" <<EOF
 {
