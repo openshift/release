@@ -1,0 +1,19 @@
+workflow:
+  as: hypershift-aws-e2e-cvo-manifest-filtering
+  documentation: |-
+    Verifies that CVO manifest feature-set annotation filtering works correctly.
+    Creates a hosted cluster and inspects the CVO pod's /var/payload/manifests/
+    directory to verify manifests are filtered based on their
+    release.openshift.io/feature-set annotation. (OCPBUGS-78705)
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - ref: hypershift-aws-verify-cvo-manifests
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
