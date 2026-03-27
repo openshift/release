@@ -1,4 +1,5 @@
 language: en-US
+inheritance: true
 early_access: false
 enable_free_tier: false
 reviews:
@@ -8,11 +9,6 @@ reviews:
   poem: false
   review_status: true
   collapse_walkthrough: false
-  path_filters:
-    - "!**/vendor/**"
-    - "!vendor/**"
-    - "!**/zz_generated*"
-    - "!boilerplate/**"
   auto_review:
     enabled: true
     drafts: true
@@ -69,8 +65,7 @@ reviews:
       - name: "AI Scope: Approved vs Unapproved Activities"
         mode: error
         instructions: |
-          The existing Acceptable Innovation Activities (AIA) authorization covers these
-          AI use cases:
+          The existing authorization covers these AI use cases:
           - Reading public Jira cards
           - Editing code via code assistant (human reviews all changes before merge)
           - Examining CI and test results (read-only analysis of logs, artifacts, Sippy)
@@ -101,12 +96,10 @@ reviews:
 
           2. **Never echo/print credentials.** Scripts must not `echo`, `printf`, `cat`,
              or otherwise print passwords, tokens, API keys, kubeconfig contents, or
-             certificate data to stdout/stderr. Use file redirection to `${SHARED_DIR}`
-             instead.
+             certificate data to stdout/stderr.
 
           3. **No credentials in command-line arguments.** Avoid passing secrets as CLI
-             arguments (visible in `ps` output and trace logs). Use environment variables
-             or files in `${SHARED_DIR}` instead.
+             arguments (visible in `ps` output and trace logs).
 
           4. **Default script header should be `set -euo pipefail`** (without `-x`).
              If `-x` is added for debugging, it must be accompanied by the tracing
@@ -114,5 +107,18 @@ reviews:
 
           Flag any script that uses `set -x` globally without guarding credential
           operations, or that echoes/prints values from sensitive variables.
+      - name: "Deprecated Template Usage"
+        mode: warning
+        instructions: |
+          The `ci-operator/templates/` directory contains legacy black-box test workflows.
+          All new test workflows must use the step registry (`ci-operator/step-registry/`)
+          instead.
+
+          Flag any PR that adds new files to `ci-operator/templates/` or adds new
+          references to templates in `ci-operator/config/` files. Suggest migrating to
+          a step-registry workflow instead.
+
+          Modifications to existing templates for bug fixes are acceptable but should
+          include a comment noting the template is legacy and encouraging future migration.
 chat:
   auto_reply: true
