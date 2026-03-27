@@ -135,7 +135,17 @@ case "${PLATFORM}" in
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
+    echo "Updating featureset configuration if found set"
+    if [[ -n "${GUEST_FEATURE_SET}" ]] ; then
+      if [[ ! "${GUEST_FEATURE_SET}" =~ ^(TechPreviewNoUpgrade|DevPreviewNoUpgrade|CustomNoUpgrade)$ ]]; then
+        echo "invalid GUEST_FEATURE_SET=${GUEST_FEATURE_SET}, TechPreviewNoUpgrade,DevPreviewNoUpgrade,CustomNoUpgrade are only allowed"
+        exit 1
+      fi
+      ARGS+=( --feature-set "${GUEST_FEATURE_SET}")
+    fi
+
     echo "Creating cluster with the following arguments:"
+    echo "${ARGS[@]}"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
@@ -203,7 +213,6 @@ case "${PLATFORM}" in
     exit 1
     ;;
 esac
-
 
 echo "Wait to check if release image is valid"
 n=0
@@ -275,6 +284,26 @@ until \
     oc get clusterversion 2>/dev/null || true
     sleep 5s
 done
+
+if [[ -n "${GUEST_FEATURE_SET}" ]]; then
+  echo "checking if cluster has expected featureset"
+  value_set=
+  for _ in {1..3}; do
+    cluster_featureset=$(oc get featuregates.config.openshift.io/cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null) || cluster_featureset=""
+    if [[ "$cluster_featureset" == "${GUEST_FEATURE_SET}" ]]; then
+      echo "Cluster has expected featureset=${GUEST_FEATURE_SET}"
+      value_set=1
+      break
+    fi
+    echo "Cluster featureset not ready yet (expected: ${GUEST_FEATURE_SET}, got: ${cluster_featureset}), retrying in 10s"
+    sleep 10
+  done
+
+  if [[ -z "${value_set}" ]]; then
+    echo "ERROR: Cluster does not have the expected featureset after 3 attempts (expected: ${GUEST_FEATURE_SET}, got: ${cluster_featureset})"
+    exit 1
+  fi
+fi
 
 # Data for cluster bot.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
