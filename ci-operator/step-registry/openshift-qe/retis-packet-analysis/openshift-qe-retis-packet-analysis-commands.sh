@@ -193,7 +193,8 @@ collect_retis_results() {
         
         # Count drops in this node's data
         if [[ -f "$results_dir/${node}-drops.json" ]]; then
-            local node_drops=$(grep -c '"function_name".*"kfree_skb"' "$results_dir/${node}-drops.json" 2>/dev/null || echo "0")
+            local node_drops
+            node_drops=$(grep -c '"function_name".*"kfree_skb"' "$results_dir/${node}-drops.json" 2>/dev/null || echo "0")
             total_drops=$((total_drops + node_drops))
             echo "📈 Node $node: $node_drops packet drops detected"
         fi
