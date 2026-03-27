@@ -214,7 +214,7 @@ else
 
         while true; do
             # Check image availability
-            response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
+            response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
 
             # Use jq to parse the JSON and see if the tag exists
             tag_count=$(echo $response | jq '.tags | length')
@@ -246,8 +246,8 @@ export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
-IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
 if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 else
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"

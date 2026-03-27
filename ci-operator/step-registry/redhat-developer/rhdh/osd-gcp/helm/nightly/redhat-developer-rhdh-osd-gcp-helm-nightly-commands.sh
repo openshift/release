@@ -150,8 +150,8 @@ fi
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
-IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
 if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 else
     echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"
