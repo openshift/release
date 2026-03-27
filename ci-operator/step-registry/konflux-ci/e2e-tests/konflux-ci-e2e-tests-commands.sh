@@ -4,7 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# If KONFLUX_REF is set, checkout that ref to align test code with RC
+# Handle Gangway API override - derive KONFLUX_REF from OPERATOR_IMAGE tag
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OPERATOR_IMAGE:-}" ]]; then
+    # Derive KONFLUX_REF from image tag (e.g., quay.io/org/image:v0.1.5 -> v0.1.5)
+    KONFLUX_REF="${MULTISTAGE_PARAM_OVERRIDE_OPERATOR_IMAGE##*:}"
+    echo "Derived KONFLUX_REF=${KONFLUX_REF} from Gangway override"
+fi
+
+# If KONFLUX_REF is set, checkout that ref to align test code with the image
 if [[ -n "${KONFLUX_REF:-}" ]]; then
     echo "Checking out KONFLUX_REF: ${KONFLUX_REF}"
     git fetch --tags origin 2>/dev/null || true
