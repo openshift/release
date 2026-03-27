@@ -51,7 +51,12 @@ router bgp 64512
  neighbor NODES peer-group
  neighbor NODES remote-as 64512
  bgp listen range 192.168.111.0/24 peer-group NODES
+ bgp listen range fd2e:6f44:5dd8:c956::/64 peer-group NODES
  address-family ipv4 unicast
+  neighbor NODES activate
+  neighbor NODES route-reflector-client
+ exit-address-family
+ address-family ipv6 unicast
   neighbor NODES activate
   neighbor NODES route-reflector-client
  exit-address-family
@@ -139,6 +144,15 @@ spec:
             prefixes:
             - ge: 23
               prefix: 10.128.0.0/14
+      - address: fd2e:6f44:5dd8:c956::1
+        asn: 64512
+        disableMP: true
+        toReceive:
+          allowed:
+            mode: filtered
+            prefixes:
+            - ge: 64
+              prefix: fd01::/48
 EOF
     cat > "${SHARED_DIR}/manifest_route-advertisements-no-overlay.yaml" <<EOF
 apiVersion: k8s.ovn.org/v1

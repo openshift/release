@@ -42,10 +42,10 @@ IP6TABLES="$SUDO ip6tables"
 
 source ~/dev-scripts-additional-config
 
-# Skip this step if routing mode is Managed (not applicable for no-overlay with managed routing)
+skip_external_bgp_setup=false
 if [ "${NO_OVERLAY_ROUTING:-}" = "Managed" ]; then
-  echo "Routing mode is Managed, skipping baremetalds-e2e-ovn-bgp-pre setup"
-  exit 0
+  skip_external_bgp_setup=true
+  echo "Routing mode is Managed; only external FRR/BGP pre-setup will be skipped"
 fi
 
 clone_frr() {
@@ -244,6 +244,11 @@ if [ "$local_gateway_mode" = "true" ]; then
     fi
 fi
 
+if [ "${skip_external_bgp_setup}" = "true" ]; then
+  echo "Managed routing: LGW workaround applied, skipping external FRR/BGP setup"
+  exit 0
+fi
+
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
 vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
@@ -403,6 +408,10 @@ ${network_selector}
 EOF
 done
 
+echo "Cleaning stale host kernel routes learned via BGP (IPv4/IPv6), if any"
+$IP route show proto bgp | grep '^10\.' | awk '{print $1}' | xargs -I {} $IP route delete {} || true
+$IP -6 route show proto bgp | grep '^fd01\:' | awk '{print $1}' | xargs -I {} $IP -6 route delete {} || true
+
 CLUSTER_NETWORK_V4="10.128.0.0/14"
 $IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
 $IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
@@ -414,10 +423,6 @@ $IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || 
 $IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
 $IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 $IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
-
-echo "since frr changed from 192.168.111.1 to 192.168.111.3.Clean stale host kernel routes learned via BGP (IPv4/IPv6), if any"
-$IP route show proto bgp | grep '^10\.' | awk '{print $1}' | xargs -I {} $IP route delete {} || true
-$IP -6 route show proto bgp | grep '^fd01\:' | awk '{print $1}' | xargs -I {} $IP -6 route delete {} || true
 echo "--------------------------------"
 echo "IPv4 routes:"
 $IP route
