@@ -1,0 +1,28 @@
+workflow:
+  as: rosa-regional-platform-ephemeral-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: rosa-regional-platform-image-push
+    - ref: rosa-regional-platform-provision
+    test:
+    - ref: rosa-regional-platform-e2e
+    post:
+    - ref: rosa-regional-platform-teardown
+  documentation: |-
+    Provisions an ephemeral rosa-regional-platform environment with an optional
+    component image override, runs e2e tests, and tears down the environment.
+
+    Usage from a CI config:
+      tests:
+      - as: rosa-regionality-compatibility-e2e
+        steps:
+          workflow: rosa-regional-platform-ephemeral-e2e
+          dependencies:
+            CI_COMPONENT_IMAGE: <pipeline-image-name>
+          env:
+            ROSA_REGIONAL_COMPONENT_NAME: "<component-name>"
+            ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
+              <yaml-fragment-with-IMAGE_REPO-and-IMAGE_TAG-placeholders>
+            ROSA_REGIONAL_HELM_VALUES_FILE: "argocd/config/regional-cluster/<component-name>/values.yaml"
+            ROSA_REGIONAL_QUAY_DEST_REPO: "quay.io/rrp-dev-ci/<component>"
