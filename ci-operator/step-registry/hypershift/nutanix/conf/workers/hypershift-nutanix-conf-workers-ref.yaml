@@ -1,0 +1,62 @@
+ref:
+  as: hypershift-nutanix-conf-workers
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  grace_period: 15m
+  commands: hypershift-nutanix-conf-workers-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: nutanix-credentials
+    mount_path: /etc/nutanix
+  env:
+  - name: NUTANIX_ENDPOINT
+    default: ""
+    documentation: "Nutanix Prism Central endpoint"
+  - name: NUTANIX_USER
+    default: "admin"
+    documentation: "Nutanix username"
+  - name: NUTANIX_CLUSTER
+    default: ""
+    documentation: "Nutanix cluster name where VMs will be created"
+  - name: NUTANIX_SUBNET_UUID
+    default: ""
+    documentation: "Nutanix subnet UUID for VM network interfaces"
+  - name: NUM_EXTRA_WORKERS
+    default: "3"
+    documentation: "Number of worker VMs to create"
+  - name: NUTANIX_WORKER_VCPU
+    default: "8"
+    documentation: "Number of vCPUs per worker VM"
+  - name: NUTANIX_WORKER_MEMORY
+    default: "16384"
+    documentation: "Memory size in MB per worker VM"
+  - name: NUTANIX_WORKER_DISK
+    default: "120"
+    documentation: "Disk size in GB per worker VM"
+  - name: NUTANIX_WORKER_VM_PREFIX
+    default: "hypershift-worker"
+    documentation: "Prefix for worker VM names (will be appended with -0, -1, etc.)"
+  documentation: |-
+    Create Nutanix VMs for HyperShift hosted cluster workers.
+
+    This step dynamically creates Nutanix VMs that will be used as workers
+    for the HyperShift hosted cluster. The VMs are created in powered-off state.
+
+    The step:
+    1. Creates VMs with specified CPU, memory, and disk resources
+    2. Configures boot order (CDROM first, then DISK)
+    3. Attaches VMs to the specified network subnet
+    4. Saves VM UUIDs to SHARED_DIR for use by subsequent steps
+
+    Output:
+    - ${SHARED_DIR}/nutanix-worker-vm-uuids: Comma-separated list of VM UUIDs
+    - ${SHARED_DIR}/nutanix-worker-config: Environment variables for worker config
+
+    Note: This step is optional. If you have pre-created VMs, skip this step
+    and directly provide NUTANIX_WORKER_VM_UUIDS to the add-worker step.

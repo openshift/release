@@ -1,0 +1,50 @@
+ref:
+  as: hypershift-agent-create-add-worker-nutanix
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  grace_period: 10m
+  commands: hypershift-agent-create-add-worker-nutanix-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: nutanix-credentials
+    mount_path: /etc/nutanix
+  env:
+  - name: NUTANIX_ENDPOINT
+    default: ""
+    documentation: "Nutanix Prism Central endpoint (IP or hostname)"
+  - name: NUTANIX_USER
+    default: "admin"
+    documentation: "Nutanix username for API access"
+  - name: NUTANIX_CLUSTER
+    default: ""
+    documentation: "Nutanix cluster name where VMs are located"
+  - name: NUM_EXTRA_WORKERS
+    default: "1"
+    documentation: "Number of Nutanix worker VMs to add to the hosted cluster"
+  - name: NUTANIX_WORKER_VM_UUIDS
+    default: ""
+    documentation: "Comma-separated list of Nutanix VM UUIDs to use as workers. If empty, will search by name pattern."
+  documentation: |-
+    Add worker nodes to a HyperShift hosted cluster using Nutanix VMs in Agent mode.
+
+    This step:
+    1. Creates an InfraEnv to generate the Agent ISO
+    2. Uploads the ISO to Nutanix Image Service
+    3. Mounts the ISO to specified Nutanix VMs as CDROM
+    4. Powers on the VMs to boot from the Agent ISO
+    5. Waits for Agent resources to register
+    6. Approves the Agents
+    7. Scales the NodePool to include the new workers
+    8. Waits for workers to join the hosted cluster
+
+    Prerequisites:
+    - A running HyperShift hosted cluster
+    - Pre-created Nutanix VMs with sufficient resources (8 vCPU, 16GB RAM, 100GB disk recommended)
+    - Nutanix credentials with permissions to manage VMs and images
+    - Network connectivity from Nutanix VMs to the management cluster
