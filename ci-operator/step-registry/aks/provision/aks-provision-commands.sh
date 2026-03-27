@@ -179,21 +179,8 @@ if [[ "${ENABLE_NAP:-}" == "true" ]]; then
         done
     fi
 
-    NODEPOOL_YAML=$(cat <<EOF
-apiVersion: karpenter.sh/v1
-kind: NodePool
-metadata:
-  name: default
-spec:
-  template:
-    spec:
-      expireAfter: Never
-      nodeClassRef:
-        apiVersion: karpenter.azure.com/v1beta1
-        kind: AKSNodeClass
-        name: default
-      requirements:
-        - key: kubernetes.io/arch
+    # Common requirements shared by both NodePools
+    COMMON_REQS="        - key: kubernetes.io/arch
           operator: In
           values:
             - amd64
@@ -205,30 +192,75 @@ spec:
           operator: In
           values:
             - on-demand
-        - key: karpenter.azure.com/sku-family
-          operator: In
-          values:
-            - "${NAP_SKU_FAMILY:-D}"
         - key: karpenter.azure.com/sku-cpu
           operator: In
           values:
-            - "${NAP_SKU_CPU:-16}"
-        - key: karpenter.azure.com/sku-version
+            - \"${NAP_SKU_CPU:-16}\"
+        - key: karpenter.azure.com/sku-memory
+          operator: Gt
+          values:
+            - \"63\""
+
+    ZONE_REQ=""
+    if [[ -n "$ZONE_VALUES" ]]; then
+        ZONE_REQ="        - key: topology.kubernetes.io/zone
           operator: In
           values:
-            - "2"
-            - "3"
-            - "4"
-            - "5"
-            - "6"
-$(if [[ -n "$ZONE_VALUES" ]]; then
-cat <<ZONES
-        - key: topology.kubernetes.io/zone
+${ZONE_VALUES}"
+    fi
+
+    # Primary NodePool: D-family (general purpose, lower cost)
+    NODEPOOL_YAML=$(cat <<EOF
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  weight: 50
+  template:
+    spec:
+      expireAfter: Never
+      nodeClassRef:
+        apiVersion: karpenter.azure.com/v1beta1
+        kind: AKSNodeClass
+        name: default
+      requirements:
+${COMMON_REQS}
+        - key: karpenter.azure.com/sku-family
           operator: In
           values:
-${ZONE_VALUES}
-ZONES
-fi)
+            - "D"
+${ZONE_REQ}
+  limits:
+    cpu: "200"
+  disruption:
+    budgets:
+      - nodes: "0"
+EOF
+)
+
+    # Fallback NodePool: E-family (memory optimized, used when D-family capacity is unavailable)
+    NODEPOOL_FALLBACK_YAML=$(cat <<EOF
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default-fallback
+spec:
+  weight: 10
+  template:
+    spec:
+      expireAfter: Never
+      nodeClassRef:
+        apiVersion: karpenter.azure.com/v1beta1
+        kind: AKSNodeClass
+        name: default
+      requirements:
+${COMMON_REQS}
+        - key: karpenter.azure.com/sku-family
+          operator: In
+          values:
+            - "E"
+${ZONE_REQ}
   limits:
     cpu: "200"
   disruption:
@@ -253,8 +285,9 @@ spec:
 EOF
 )
 
-    echo "Applying Karpenter NodePool"
+    echo "Applying Karpenter NodePools"
     echo "$NODEPOOL_YAML" | oc apply -f -
+    echo "$NODEPOOL_FALLBACK_YAML" | oc apply -f -
 
     echo "Applying Karpenter AKSNodeClass"
     echo "$NODECLASS_YAML" | oc apply -f -
@@ -301,7 +334,14 @@ EOF
         echo "Collecting NAP artifacts"
         oc get nodepool.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodepools.yaml" 2>&1 || true
         oc get aksnodeclass -o yaml > "${ARTIFACT_DIR}/karpenter-aksnodeclasses.yaml" 2>&1 || true
+        oc get nodeclaims.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodeclaims.yaml" 2>&1 || true
         oc get nodes -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone,INSTANCE-TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,READY:.status.conditions[-1:].status' > "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>&1 || true
+
+        echo "Collecting Karpenter controller logs"
+        oc logs -n kube-system -l app.kubernetes.io/name=karpenter --tail=200 > "${ARTIFACT_DIR}/karpenter-controller-logs.txt" 2>&1 || true
+
+        echo "Collecting pending pod events"
+        oc get events -n default --field-selector reason=FailedScheduling --sort-by='.lastTimestamp' > "${ARTIFACT_DIR}/nap-failedscheduling-events.txt" 2>&1 || true
 
         echo "NAP node zone distribution:"
         cat "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
