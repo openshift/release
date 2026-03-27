@@ -1,6 +1,6 @@
 # Internal use only: Return the path to the jq binary. Download it if it's not available on the system.
 function _lease__jq_bin() {
-    if command -v jq; then
+    if command -v jq &>/dev/null; then
         printf 'jq'
         return
     fi
