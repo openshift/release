@@ -33,6 +33,7 @@ copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying reports to artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${SHARED_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
