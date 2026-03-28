@@ -1,0 +1,39 @@
+ref:
+  as: openshift-microshift-claude-ci-doctor
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-microshift-claude-ci-doctor-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: claude-payload-agent-github-token
+    mount_path: /var/run/github-token
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "us-east5"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6[1m]"
+  - name: GITHUB_TOKEN_PATH
+    default: "/var/run/github-token/token"
+  - name: RELEASE_VERSIONS
+    default: "4.18,4.19,4.20,4.21,4.22,main"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  documentation: |-
+    Analyzes MicroShift periodic jobs and pull requests using Claude AI.
+    Runs the analyze-ci:doctor command to analyze the releases and pull requests.
+    Generates a HTML report consolidating all results.
