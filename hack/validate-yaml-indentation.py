@@ -87,9 +87,10 @@ def validate_yaml_syntax(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Try to parse YAML
+        # Try to parse YAML (multi-document streams use the first document for structure checks)
         try:
-            data = yaml.safe_load(content)
+            docs = list(yaml.safe_load_all(content))
+            data = docs[0] if docs else None
         except yaml.YAMLError as e:
             error_msg = f"{file_path}: YAML syntax error"
             if hasattr(e, 'problem_mark'):
