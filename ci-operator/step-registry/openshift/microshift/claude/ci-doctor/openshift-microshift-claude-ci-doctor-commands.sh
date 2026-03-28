@@ -106,6 +106,7 @@ claude \
 
 # Check if the report was produced
 if ls "${WORKDIR}"/*.html &>/dev/null; then
+    touch "${SHARED_DIR}/claude-report-available"
     echo "Analysis complete"
 else
     echo "ERROR: No HTML report was generated"
