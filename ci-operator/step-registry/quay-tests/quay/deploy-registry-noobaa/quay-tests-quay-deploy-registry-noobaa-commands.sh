@@ -104,3 +104,4 @@ for i in {1..60}; do
   echo "Wait for quay registry ready $((i*15+300))s"
 done
 echo "Timed out waiting for Quay to become ready afer 20 mins" >&2
+

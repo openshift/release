@@ -54,5 +54,35 @@ for _ in {1..60}; do
     fi
     sleep 10
 done
+
+# Wait for the QuayRegistry CRD to be installed by the operator so that the next step
+# (e.g. deploy-registry-noobaa) can create QuayRegistry resources without racing.
+echo "Waiting for QuayRegistry CRD to be installed..."
+for _ in {1..30}; do
+    if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+        echo "QuayRegistry CRD is available"
+        break
+    fi
+    sleep 10
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "ERROR: QuayRegistry CRD was not installed after CSV succeeded"
+    echo "Dumping operator state for debugging:"
+    oc -n "${QUAYNAMESPACE}" get subscription,operatorgroup,csv -o yaml || true
+    oc get crd | grep -E 'NAME|quay' || true
+    oc -n "${QUAYNAMESPACE}" get pods -o wide || true
+    exit 1
+fi
+
+# Dump operator state to artifacts for easier debugging if a later step fails
+if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    echo "Saving operator diagnostics to ${ARTIFACT_DIR}"
+    oc -n "${QUAYNAMESPACE}" get subscription quay-operator -o yaml > "${ARTIFACT_DIR}/quay-subscription.yaml" || true
+    oc -n "${QUAYNAMESPACE}" get csv -o yaml > "${ARTIFACT_DIR}/quay-csvs.yaml" || true
+    oc get crd | grep -E 'NAME|quay' > "${ARTIFACT_DIR}/quay-crds.txt" || true
+    oc -n "${QUAYNAMESPACE}" get pods -o wide > "${ARTIFACT_DIR}/quay-operator-pods.txt" || true
+fi
+
 echo "Quay Operator is deployed successfully"
+
 

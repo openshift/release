@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Ensure nvm is loaded so node/yarn from the image are on PATH (quay-test-console installs them via nvm)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    source "$NVM_DIR/nvm.sh"
+fi
+
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 
