@@ -113,6 +113,6 @@ if [[ -f "${METRICS_FILE}" ]]; then
 fi
 
 echo "Upload reports to Polarion and Report Portal"
-ansible-playbook ./playbooks/cnf/upload-report.yaml \
+ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_standard' reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
