@@ -655,7 +655,7 @@ CONFIG = {
         'default': 1,
     },
     'amd-gpu-quota-slice': {
-        '10.1.178.14': 1,
+        '10.8.231.19': 1,
     },
     'aws-osp-qe-quota-slice': {
         'us-east-1': 10,
