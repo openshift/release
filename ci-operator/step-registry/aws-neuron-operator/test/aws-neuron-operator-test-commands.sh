@@ -109,9 +109,12 @@ echo "Running tests with labels: ${ECO_TEST_LABELS}"
 
 # Run test suites in explicit order: vllm -> metrics -> upgrade
 # Each suite gets its own jUnit report for granular results.
+# The vLLM workload is kept alive through the metrics phase so neuron-monitor
+# has an active Neuron runtime and emits neuroncore_utilization_ratio.
 TEST_EXIT_CODE=0
 
 echo "=== Phase 1: vLLM inference tests ==="
+export ECO_SKIP_VLLM_CLEANUP=true
 ginkgo --label-filter="${ECO_TEST_LABELS} && vllm" \
     --timeout=1h \
     --v \
@@ -137,6 +140,9 @@ ginkgo --label-filter="${ECO_TEST_LABELS} && upgrade" \
     --output-dir="${ARTIFACT_DIR}" \
     ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
 dump_debug_info "phase3-upgrade"
+
+echo "=== Cleanup: removing test namespaces ==="
+oc delete namespace neuron-vllm-test --wait=true --timeout=5m 2>/dev/null || true
 
 # Write operator version after tests (operator is deployed during test execution)
 NEURON_CSV=$(oc get csv -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -i neuron | head -1 || echo "")
