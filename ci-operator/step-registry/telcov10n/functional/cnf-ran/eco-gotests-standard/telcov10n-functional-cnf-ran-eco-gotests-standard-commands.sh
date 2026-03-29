@@ -81,7 +81,7 @@ HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/kni-qe-99"
 
 cd /eco-ci-cd
 
-ansible-playbook ./playbooks/cnf/deploy-run-eco-gotests.yaml \
+ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${SPOKE_KUBECONFIG} features=deploymenttypes labels='!no-container' additional_test_env_variables='-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true' hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH} eco_gotests_tag=latest" \
   --extra-vars "eco_cnf_core_net_switch_user='' eco_cnf_core_net_switch_pass='' eco_worker_label=''"

@@ -68,7 +68,7 @@ echo "Setup test script"
 cd /eco-ci-cd
 
 # shellcheck disable=SC2154
-ansible-playbook ./playbooks/cnf/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
+ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "features=${FEATURES} labels=${LABELS} \
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig additional_test_env_variables='${ECO_GOTESTS_ENV_VARS}'"
 
