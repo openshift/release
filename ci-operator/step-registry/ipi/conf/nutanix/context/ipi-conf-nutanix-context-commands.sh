@@ -25,6 +25,7 @@ declare prism_element_port
 declare prism_element_username
 declare prism_element_password
 declare prism_element_storage_container
+declare prism_element_storage_container_uuid
 declare override_rhcos_image
 declare one_net_mode_network_name
 declare awk_ip_program
@@ -120,6 +121,7 @@ export PE_PASSWORD='${prism_element_password}'
 export PE_UUID='${pe_uuid}'
 export PE_NAME='${pe_name}'
 export PE_STORAGE_CONTAINER='${prism_element_storage_container}'
+export PE_STORAGE_CONTAINER_UUID='${prism_element_storage_container_uuid}'
 export SUBNET_UUID='${subnet_uuid}'
 export API_VIP='${API_VIP}'
 export INGRESS_VIP='${INGRESS_VIP}'
