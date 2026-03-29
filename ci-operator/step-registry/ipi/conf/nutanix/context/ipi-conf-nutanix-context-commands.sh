@@ -41,6 +41,8 @@ data="{
   \"kind\": \"cluster\"
 }"
 
+sleep 3600
+
 clusters_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
 # Find PE by prism_element_host in vault
 pe_uuid=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .metadata.uuid" | head -n 1)
