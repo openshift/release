@@ -11,11 +11,27 @@ mkdir -p "${CLAUDE_HOME}"
 
 load_secrets() {
     if [ -f "${GITHUB_TOKEN_PATH}" ]; then
-        export GITHUB_TOKEN
         GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+        export GITHUB_TOKEN
         echo "GitHub token loaded."
     else
-        echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
+        echo "WARNING: GitHub token not found at ${GITHUB_TOKEN_PATH}. GutHub operations will not be available."
+    fi
+
+    if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
+        JIRA_API_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
+        export JIRA_API_TOKEN
+        echo "Jira API token loaded."
+    else
+        echo "WARNING: Jira API token not found at ${JIRA_API_TOKEN_PATH}. Jira operations will not be available."
+    fi
+
+    if [ -f "${JIRA_USERNAME_PATH}" ]; then
+        JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
+        export JIRA_USERNAME
+        echo "Jira username loaded."
+    else
+        echo "WARNING: Jira username not found at ${JIRA_USERNAME_PATH}. Jira operations will not be available."
     fi
 }
 
@@ -31,9 +47,9 @@ install_prerequisites() {
 # Copy reports and session logs to artifacts
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
-        echo "Copying reports to artifact directory..."
+        echo "Copying reports to artifact and shared directories..."
         find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${SHARED_DIR}/" \; || true
+        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${SHARED_DIR}/"   \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
@@ -49,31 +65,29 @@ copy_reports() {
 configure_claude() {
     echo "Configuring Claude..."
 
-    # Create empty configuration file to avoid the following warning:
-    # Claude configuration file not found at: /home/claude/.claude/.claude.json
+    # Create an empty configuration file to avoid the "Claude configuration file
+    # not found at: /home/claude/.claude/.claude.json" warning
     if [ ! -f "${CLAUDE_HOME}/.claude.json" ]; then
         echo "{}" > "${CLAUDE_HOME}/.claude.json"
     fi
 
-    # Configure Claude settings
-    cat > "${CLAUDE_HOME}/settings.json" <<EOF
-{
-  "model": "${CLAUDE_MODEL}",
-  "enabledPlugins": {
-    "jira@ai-helpers": true
-  },
-  "extraKnownMarketplaces": {
-    "ai-helpers": {
-      "source": {
-        "source": "github",
-        "repo": "openshift-eng/ai-helpers"
-      }
-    }
-  },
-  "effortLevel": "medium",
-  "skipDangerousModePermissionPrompt": true
-}
-EOF
+    # Configure JIRA MCP
+    if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
+        echo "Configuring JIRA MCP..."
+
+        pip install uv --user --upgrade
+        # Load secrets with command tracing disabled to prevent leaking credentials in logs
+        {
+          set +x
+          claude mcp add \
+              -e JIRA_URL="${JIRA_URL}" -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" -e JIRA_USERNAME="${JIRA_USERNAME}" \
+              --transport stdio jira -- uvx mcp-atlassian
+          set -x
+        }
+        echo "JIRA MCP configured."
+    else
+        echo "WARNING: Jira API token or username not available. Jira MCP will not be available."
+    fi
 }
 
 #
@@ -94,6 +108,7 @@ cd "${SRC_DIR}"
 {
     set +x
     load_secrets
+    set -x
 }
 install_prerequisites
 configure_claude
