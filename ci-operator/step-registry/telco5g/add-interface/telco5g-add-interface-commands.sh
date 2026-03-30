@@ -26,25 +26,15 @@ unzip -o /tmp/terraform.zip -d /tmp/ 1>/dev/null
 chmod +x /tmp/terraform
 terraform version
 
-# Discover the region and master instance
-env > "${ARTIFACT_DIR}/mainenv"
-echo "NAMESPACE=${NAMESPACE:-}"
-echo "OPENSHIFT_BUILD_NAMESPACE=${OPENSHIFT_BUILD_NAMESPACE:-}"
-echo "RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:-}"
-INSTANCE_PREFIX="${NAMESPACE:-}"
-echo "Detected NAMESPACE=${NAMESPACE:-}"
+INSTANCE_PREFIX="$(grep "name: ci-op-" "$SHARED_DIR/install-config.yaml" | sed "s/.*name: //g")"
 if [[ -z "${INSTANCE_PREFIX}" ]]; then
-    echo "NAMESPACE is empty, trying OPENSHIFT_BUILD_NAMESPACE"
-    INSTANCE_PREFIX="${OPENSHIFT_BUILD_NAMESPACE:-}"
-fi
-if [[ -z "${INSTANCE_PREFIX}" && -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
-    echo "OPENSHIFT_BUILD_NAMESPACE is empty, trying RELEASE_IMAGE_LATEST"
-    INSTANCE_PREFIX="$(echo $RELEASE_IMAGE_LATEST | cut -d'/' -f2)"
+    INSTANCE_PREFIX="$(grep "name: ci-op-" "$SHARED_DIR/kubeconfig" | sed "s/.*name: //g")"
 fi
 if [[ -z "${INSTANCE_PREFIX}" ]]; then
     echo "Can not find INSTANCE_PREFIX, exiting"
     exit 1
 fi
+echo "Detected INSTANCE_PREFIX=${INSTANCE_PREFIX}"
 
 AWS_REGION=""
 MASTER_INSTANCE_ID=""
