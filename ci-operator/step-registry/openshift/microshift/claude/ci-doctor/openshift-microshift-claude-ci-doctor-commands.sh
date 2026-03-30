@@ -10,6 +10,12 @@ CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
 load_secrets() {
+    # Disable command tracing to prevent leaking credentials in logs
+    # and restore it after the secrets are loaded
+    trap 'set -x' RETURN
+    set +x
+
+    echo "Loading secrets..."
     if [ -f "${GITHUB_TOKEN_PATH}" ]; then
         GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
         export GITHUB_TOKEN
@@ -104,12 +110,7 @@ SRC_DIR="/tmp/microshift"
 git clone -b main https://github.com/openshift/microshift.git "${SRC_DIR}"
 cd "${SRC_DIR}"
 
-# Load secrets with command tracing disabled to prevent leaking credentials in logs
-{
-    set +x
-    load_secrets
-    set -x
-}
+load_secrets
 install_prerequisites
 configure_claude
 
