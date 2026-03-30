@@ -136,7 +136,7 @@ function getInstanceType {
   )
   local cpu_number=${instance_map[${instance_type}]:-$DefaultCPUNumber}
 
-  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep ”${instance_type}-${cpu_number}x“ | awk '{print $1}')
+  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep "${instance_type}-${cpu_number}x" | awk '{print $1}')
   if [[ -z "$instance_type" ]]; then    
     echo "ERROR: No instance type found for family ${instance_type} cpu $cpu_number."
     return ""
