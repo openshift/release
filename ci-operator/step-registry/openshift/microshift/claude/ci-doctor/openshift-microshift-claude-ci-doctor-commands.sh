@@ -114,10 +114,12 @@ load_secrets
 install_prerequisites
 configure_claude
 
-# Run analysis on all releases and open rebase PRs
+# Run analysis on all releases and open rebase PRs.
+# Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-claude \
+timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
+    --max-turns 50 \
     --output-format stream-json \
     -p "/analyze-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
