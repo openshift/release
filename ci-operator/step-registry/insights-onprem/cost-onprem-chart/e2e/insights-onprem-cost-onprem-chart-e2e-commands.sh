@@ -185,7 +185,77 @@ if [ "${DEPLOY_S4:-false}" == "true" ]; then
     DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
 fi
 
+# Add IQE test flags if enabled
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "IQE tests enabled with profile: ${IQE_PROFILE:-smoke}"
+    DEPLOY_ARGS+=(--run-iqe)
+    DEPLOY_ARGS+=(--iqe-profile "${IQE_PROFILE:-smoke}")
+    DEPLOY_ARGS+=(--listener-cpu "${LISTENER_CPU:-max}")
+    
+    # Set up Quay pull secret for IQE image
+    SECRETS_DIR="/tmp/secrets/ci"
+    if [[ -f "${SECRETS_DIR}/username" ]] && [[ -f "${SECRETS_DIR}/password" ]]; then
+        echo "Creating Quay pull secret for IQE image..."
+        # Disable tracing due to password handling
+        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+        set +x
+        QUAY_USER=$(cat "${SECRETS_DIR}/username")
+        QUAY_PASS=$(cat "${SECRETS_DIR}/password")
+        oc create secret docker-registry iqe-pull-secret \
+            --docker-server=quay.io \
+            --docker-username="${QUAY_USER}" \
+            --docker-password="${QUAY_PASS}" \
+            -n "${NAMESPACE}" \
+            --dry-run=client -o yaml | oc apply -f -
+        $WAS_TRACING && set -x
+        echo "Quay pull secret created"
+    else
+        echo "WARNING: Quay credentials not found at ${SECRETS_DIR}, IQE image pull may fail"
+    fi
+fi
+
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
 bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
+
+# Copy test artifacts to CI artifact directory
+echo "========== Collecting Test Artifacts =========="
+if [ -d "./tests/reports" ]; then
+    echo "Found test reports directory, copying artifacts..."
+    
+    # Copy all files from reports directory
+    cp -r ./tests/reports/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    
+    # Rename junit files for Prow recognition (must be prefixed with junit)
+    # IQE test results
+    if [ -f "${ARTIFACT_DIR}/iqe_junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/iqe_junit.xml" "${ARTIFACT_DIR}/junit_iqe.xml"
+        echo "  - junit_iqe.xml (IQE test results)"
+    fi
+    
+    # Chart pytest results
+    if [ -f "${ARTIFACT_DIR}/junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/junit.xml" "${ARTIFACT_DIR}/junit_chart.xml"
+        echo "  - junit_chart.xml (chart test results)"
+    fi
+    
+    # HTML report
+    if [ -f "${ARTIFACT_DIR}/report.html" ]; then
+        echo "  - report.html (HTML test report)"
+    fi
+    
+    # IQE output log
+    if [ -f "${ARTIFACT_DIR}/iqe_output.log" ]; then
+        echo "  - iqe_output.log (IQE test output)"
+    fi
+    
+    # Screenshots directory
+    if [ -d "${ARTIFACT_DIR}/screenshots" ]; then
+        echo "  - screenshots/ (UI test screenshots)"
+    fi
+    
+    echo "Artifacts collected to ${ARTIFACT_DIR}"
+else
+    echo "No test reports directory found"
+fi
