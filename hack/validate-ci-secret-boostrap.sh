@@ -16,4 +16,7 @@ exec ${BOOTSTRAP_BINARY} \
 		--vault-prefix=kv \
 		--config=core-services/ci-secret-bootstrap/_config.yaml \
 		--generator-config=core-services/ci-secret-generator/_config.yaml \
+		--enable-gsm=true \
+		--gsm-config=core-services/ci-secret-bootstrap/gsm-config.yaml \
+		--gsm-project-config=core-services/ci-secret-bootstrap/gsm-project-config.yaml \
 		--validate-only
