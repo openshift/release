@@ -21,7 +21,7 @@ build_root:
 canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools
+  from: tools-openstack
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   to: hello-openshift
@@ -29,6 +29,12 @@ promotion:
   to:
   - name: 4.17-priv
     namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-17.ocp.svc > /etc/yum.repos.d/base-openstack-4-17.repo
+    from: tools
+    to: tools-openstack
 releases:
   initial:
     integration:
