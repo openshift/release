@@ -48,10 +48,64 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.20"
   run_if_changed: ^(cost-onprem/|scripts/|tests/|openshift-values\.yaml)
   steps:
+    env:
+      IQE_PROFILE: smoke
+      RUN_IQE: "true"
+    test:
+    - ref: insights-onprem-cost-onprem-chart-e2e
+    workflow: insights-onprem-cost-onprem-chart-claim
+- as: e2e-iqe-extended
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      IQE_PROFILE: extended
+      RUN_IQE: "true"
+    test:
+    - ref: insights-onprem-cost-onprem-chart-e2e
+    workflow: insights-onprem-cost-onprem-chart-claim
+- as: e2e-iqe-stable
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      IQE_PROFILE: stable
+      RUN_IQE: "true"
+    test:
+    - ref: insights-onprem-cost-onprem-chart-e2e
+    workflow: insights-onprem-cost-onprem-chart-claim
+- as: e2e-iqe-full
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.20"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      IQE_PROFILE: full
+      RUN_IQE: "true"
     test:
     - ref: insights-onprem-cost-onprem-chart-e2e
     workflow: insights-onprem-cost-onprem-chart-claim
