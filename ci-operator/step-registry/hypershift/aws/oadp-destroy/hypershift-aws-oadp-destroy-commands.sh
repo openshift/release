@@ -13,20 +13,19 @@ fi
 BUCKET_NAME=$(cat "${SHARED_DIR}/oadp-bucket-name")
 echo "Cleaning up S3 bucket ${BUCKET_NAME}..."
 
-aws s3 rm "s3://${BUCKET_NAME}" --recursive --region "${REGION}" 2>/dev/null || true
-aws s3api delete-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" 2>/dev/null || true
+aws s3 rb "s3://${BUCKET_NAME}" --force --region "${REGION}" 2>/dev/null || true
 
 # Verify bucket was deleted to avoid resource leaks
 if aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" 2>/dev/null; then
-    echo "WARNING: Bucket ${BUCKET_NAME} still exists after initial cleanup, retrying force delete..."
+    echo "WARNING: Bucket ${BUCKET_NAME} still exists after initial cleanup, retrying..."
+    sleep 10
     aws s3 rb "s3://${BUCKET_NAME}" --force --region "${REGION}" 2>/dev/null || true
     if aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" 2>/dev/null; then
         echo "ERROR: Failed to delete bucket ${BUCKET_NAME} - manual cleanup may be required"
+        exit 1
     else
         echo "Bucket ${BUCKET_NAME} successfully deleted on retry"
     fi
-else
-    echo "Verified: bucket ${BUCKET_NAME} has been deleted"
 fi
 
 echo "S3 bucket cleanup done"
