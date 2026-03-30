@@ -26,7 +26,6 @@ resources:
 tests:
 - always_run: false
   as: control-plane-24nodes
-  cron: 0 2 * * 3
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -121,8 +120,8 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts-hcp
-- always_run: false
-  as: control-plane-24nodes-onperfsector
+- as: control-plane-24nodes-onperfsector
+  cron: 0 2,14 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -132,6 +131,7 @@ tests:
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       DISABLE_WORKLOAD_MONITORING: "false"
+      E2E_VERSION: master
       ENABLE_AUTOSCALING: "false"
       HOSTED_CP: "true"
       INDEX_ENABLED: "true"
@@ -145,14 +145,13 @@ tests:
       READY_WAIT_TIMEOUT: 30m
       REGION: us-east-2
       REPLICAS: "24"
+      RUN_ORION: "true"
       ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-credentials-hypershift-mgmt
     - chain: openshift-qe-hypershift-infra
-    - ref: openshift-qe-cluster-density-v2
-    - ref: openshift-qe-node-density
-    - ref: openshift-qe-node-density-cni
-    - ref: openshift-qe-crd-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
     workflow: rosa-aws-sts-hcp-mp
 - always_run: false
   as: control-plane-120nodes-onperfsector
