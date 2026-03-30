@@ -164,7 +164,7 @@ COMPUTE_INSTANCE_TYPE_FAMILY="$(jq -r '.CFamily' "${OUT_SELECT_DICT}")"
 
 if is_empty "$ARCH" || [[ "${$ARCH,,}" == "amd64" ]]; then
   ARCH="amd64"
-else then
+else
   echo "ERROR: Unsupported arch ${ARCH}, exiting"
   exit 1
 fi
