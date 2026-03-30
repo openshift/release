@@ -60,6 +60,7 @@ copy_reports() {
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
+    # These are used by the openshift-claude-post step to generate the continue-session page.
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session logs..."
         if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
