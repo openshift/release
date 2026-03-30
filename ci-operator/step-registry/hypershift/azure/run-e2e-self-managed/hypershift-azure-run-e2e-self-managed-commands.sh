@@ -14,7 +14,6 @@ AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
-sleep 2h
 set -x
 
 set -o nounset
