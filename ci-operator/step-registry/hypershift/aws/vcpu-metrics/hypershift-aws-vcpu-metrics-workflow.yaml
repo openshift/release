@@ -1,0 +1,20 @@
+workflow:
+  as: hypershift-aws-vcpu-metrics
+  documentation: |-
+    Verifies OCPBUGS-50003: ConfigMap fallback and EC2 error caching for vCPU
+    metrics resolution in the HyperShift operator.
+
+    Creates a HostedCluster, deploys a rosa-cpus-instance-types-config ConfigMap,
+    and verifies the hypershift_cluster_vcpus metric reports correct values.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-aws-vcpu-metrics-setup
+    test:
+    - ref: hypershift-hostedcluster-create-hostedcluster
+    - ref: hypershift-aws-vcpu-metrics-verify
+    post:
+    - chain: hypershift-hostedcluster-destroy
+    - chain: hypershift-destroy-nested-management-cluster
