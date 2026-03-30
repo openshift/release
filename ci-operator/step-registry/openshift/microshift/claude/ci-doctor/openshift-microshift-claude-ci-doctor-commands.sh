@@ -113,12 +113,29 @@ cd "${SRC_DIR}"
 install_prerequisites
 configure_claude
 
+# Run analysis on all releases and open rebase PRs
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 claude \
     --model "${CLAUDE_MODEL}" \
     --output-format stream-json \
     -p "/analyze-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
+
+# After the analysis, run automatic approval of rebase PRs with all tests passing
+echo "Running automatic approval of rebase PRs with all tests passing..."
+.claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
+    --mode approve \
+    --filter "NO-ISSUE: rebase-release-"
+echo "Automatic approval of rebase PRs with all tests passing completed"
+
+# After the analysis, attempt to restart failed rebase PRs tests. If the
+# restarted tests complete successfully, the PR will be automatically
+# approved next time the analysis runs.
+echo "Running automatic restart of failed rebase PRs tests..."
+.claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
+    --mode restart \
+    --filter "NO-ISSUE: rebase-release-"
+echo "Automatic restart of failed rebase PRs tests completed"
 
 # Check if the report was produced
 if ls "${WORKDIR}"/*.html &>/dev/null; then
