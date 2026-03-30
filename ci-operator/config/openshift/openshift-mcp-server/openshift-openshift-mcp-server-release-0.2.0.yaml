@@ -8,6 +8,9 @@ resources:
     requests:
       cpu: 500m
       memory: 200Mi
+tag_specification:
+  name: "4.22"
+  namespace: ocp
 tests:
 - as: lint
   commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
@@ -23,6 +26,25 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- always_run: false
+  as: helm-chart-aws-eval
+  optional: true
+  skip_if_only_changed: ^(?:docs|doc|\.tekton)/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      MCP_SERVER_IMAGE: openshift-mcp-server
+    test:
+    - as: eval
+      cli: latest
+      commands: |
+        sleep 2h
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-mcp-server-aws-helm-chart
 zz_generated_metadata:
   branch: release-0.2.0
   org: openshift

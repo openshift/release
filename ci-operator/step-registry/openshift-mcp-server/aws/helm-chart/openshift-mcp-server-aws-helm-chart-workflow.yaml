@@ -1,0 +1,18 @@
+workflow:
+  as: openshift-mcp-server-aws-helm-chart
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: openshift-mcp-server-install-helm-chart
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    This workflow installs the MCP Server via Helm chart on an AWS IPI cluster.
