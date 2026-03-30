@@ -98,23 +98,31 @@ gcloud projects delete "${CP_PROJECT_ID}" --quiet || true
 EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.com"
 
 # Clean up DNS records from the CI zone (DNS records use the hosted cluster name)
+DNS_CLEANUP_FAILED=false
 if [[ -n "${HC_CLUSTER_NAME}" ]]; then
   echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
   DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
-  DNS_RECORDS=$(gcloud dns record-sets list \
+  if ! DNS_RECORDS=$(gcloud dns record-sets list \
     --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
     --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
     --filter="name ~ ${DNS_SUFFIX}" \
-    --format="csv[no-heading](name,type)" 2>/dev/null || true)
+    --format="csv[no-heading](name,type)"); then
+    echo "ERROR: Failed to list DNS records - check service account permissions"
+    DNS_CLEANUP_FAILED=true
+    DNS_RECORDS=""
+  fi
 
   if [[ -n "${DNS_RECORDS}" ]]; then
     while IFS=, read -r name type; do
       [[ -z "${name}" ]] && continue
       echo "Deleting DNS record: ${name} ${type}"
-      gcloud dns record-sets delete "${name}" \
+      if ! gcloud dns record-sets delete "${name}" \
         --type="${type}" \
         --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet || true
+        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet; then
+        echo "ERROR: Failed to delete DNS record ${name} ${type}"
+        DNS_CLEANUP_FAILED=true
+      fi
     done <<< "${DNS_RECORDS}"
   else
     echo "No DNS records found matching ${DNS_SUFFIX}"
@@ -136,5 +144,10 @@ gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --member="${WIF_MEMBER}" \
   --project="${HYPERSHIFT_GCP_CI_PROJECT}" || true
 set -x
+
+if [[ "${DNS_CLEANUP_FAILED}" == "true" ]]; then
+  echo "Cleanup complete but DNS cleanup failed - orphaned DNS records may remain"
+  exit 1
+fi
 
 echo "Cleanup complete"
