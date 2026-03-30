@@ -32,7 +32,14 @@ workflow:
     - ref: aws-neuron-operator-test
     post:
     - ref: aws-neuron-operator-gather
-    - chain: rosa-aws-sts-hcp-deprovision
+    # Inlined rosa-aws-sts-hcp-deprovision chain so we can use best_effort on stack cleanup
+    - chain: gather
+    - ref: rosa-cluster-deprovision
+    - ref: rosa-cluster-index
+    - ref: rosa-sts-operator-roles-delete
+    - ref: rosa-sts-oidc-config-delete
+    - ref: rosa-sts-account-roles-delete
+    - ref: aws-neuron-operator-deprovision-stacks
   documentation: |-
     This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
     compute nodes, then runs the AWS Neuron operator E2E tests using eco-gotests framework.
