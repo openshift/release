@@ -60,7 +60,7 @@ export ES_SERVER=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 mkdir -p ${ARTIFACT_DIR}/cluster-density

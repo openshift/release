@@ -1,0 +1,29 @@
+ref:
+  as: rosa-regional-platform-image-push
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: rosa-regional-platform-image-push-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-regional-platform-dev-ci-quay-push
+    mount_path: /var/run/quay-push-credentials
+  dependencies:
+  - name: src
+    env: CI_COMPONENT_IMAGE
+  env:
+  - name: ROSA_REGIONAL_QUAY_DEST_REPO
+    default: ""
+    documentation: |-
+      Quay.io destination repository for the component image
+      (e.g., quay.io/rrp-dev-ci/rosa-regional-platform-api).
+  documentation: |-
+    Copies a CI-built component image to a public quay.io repository so that
+    ephemeral EKS clusters can pull it without CI registry credentials.
+    Writes the pushed image reference to SHARED_DIR/component-image-override
+    for downstream steps to consume.
