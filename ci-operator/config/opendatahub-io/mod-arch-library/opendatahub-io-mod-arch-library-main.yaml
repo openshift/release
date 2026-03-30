@@ -1,0 +1,26 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: lint
+  commands: npm ci && npm run lint
+  container:
+    from: src
+- as: unit-tests
+  commands: npm ci && npm run test
+  container:
+    from: src
+- as: build
+  commands: npm ci && npm run build
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: mod-arch-library
