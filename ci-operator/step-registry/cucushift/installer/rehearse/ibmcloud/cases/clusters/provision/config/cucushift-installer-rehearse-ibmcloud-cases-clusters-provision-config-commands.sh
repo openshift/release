@@ -136,7 +136,7 @@ function getInstanceType {
   )
   local cpu_number=${instance_map[${instance_type}]:-$DefaultCPUNumber}
 
-  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep ”${instance_type}-$cpu_number}x“ | awk '{print $1}')
+  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep ”${instance_type}-${cpu_number}x“ | awk '{print $1}')
   if [[ -z "$instance_type" ]]; then    
     echo "ERROR: No instance type found for family ${instance_type} cpu $cpu_number."
     return ""
@@ -202,9 +202,6 @@ echo "$(date -u --rfc-3339=seconds) - Creating cluster in region ${REGION}:"
 echo "$(date -u --rfc-3339=seconds) - ARCH: $ARCH"
 echo "$(date -u --rfc-3339=seconds) - CONTROL_PLANE_INSTANCE*: $CONTROL_PLANE_INSTANCE_TYPE $CONTROL_PLANE_INSTANCE_TYPE_FAMILY"
 echo "$(date -u --rfc-3339=seconds) - COMPUTE_INSTANCE*: $COMPUTE_INSTANCE_TYPE $COMPUTE_INSTANCE_TYPE_FAMILY"
-
-INSTALL_RESULT=""
-CREATED_DATE="$(current_date)"
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 INSTALL_DIR=/tmp/install_dir

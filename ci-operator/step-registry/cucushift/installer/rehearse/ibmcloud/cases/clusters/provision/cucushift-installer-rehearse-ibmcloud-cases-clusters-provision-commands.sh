@@ -53,16 +53,17 @@ function post_actions() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${INSTALL_DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
 
-  # Writing result
-  # "Bucket": "$(echo "${JOB_SPEC}" | jq -r '.decoration_config.gcs_configuration.bucket')",
-  # "JobUrlPrefix": "$(echo "${JOB_SPEC}" | jq -r '.decoration_config.gcs_configuration.job_url_prefix')",
-  
-  update_result "Region" "${REGION}"
-  update_result "CPType" "${CONTROL_PLANE_INSTANCE_TYPE}"
-  update_result "CPamily" "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}"
-  update_result "CType" "${COMPUTE_INSTANCE_TYPE}"
-  update_result "CFamily" "${COMPUTE_INSTANCE_TYPE_FAMILY}"
-  update_result "Arch" "${ARCH}"
+  region=$(yq-v4 -r '.platform.ibmcloud.region' "${CONFIG}")
+  control_plane_type=$(yq-v4 '.controlPlane.platform.ibmcloud.type' "${CONFIG}")
+  computer_type=$(yq-v4 '.compute[0].platform.ibmcloud.type' "${CONFIG}")
+  arch=$(yq-v4 -r '.controlPlane.architecture' "${CONFIG}")
+
+  update_result "Region" "${region}"
+  update_result "CPType" "${control_plane_type}"
+  update_result "CPamily" "${control_plane_type%%-*}"
+  update_result "CType" "${computer_type}"
+  update_result "CFamily" "${computer_type%%-*}"
+  update_result "Arch" "${arch}"
   update_result "Install" "${INSTALL_RESULT}"
   update_result "CreatedDate" "${CREATED_DATE}"
   update_result "Job" "$(echo "${JOB_SPEC}" | jq -r '.job')"
@@ -95,7 +96,6 @@ CREATED_DATE="$(current_date)"
 
 ret=0
 
-CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 INSTALL_DIR=/tmp/install_dir
 mkdir -p ${INSTALL_DIR}
 
@@ -129,20 +129,24 @@ mkdir -p ~/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+CREATED_DATE="$(current_date)"
 
-set +o errexit
+set +e
 echo "=============== openshift-install version =============="
 openshift-install version
 
 echo "=============== Create manifests =============="
-${INSTALLER_BINARY} --dir="${INSTALL_DIR}" create manifests &
+openshift-install --dir="${INSTALL_DIR}" create manifests &
 wait "$!"
 ret="$?"
 if test "${ret}" -ne 0 ; then
 	echo "Create manifests exit code: $ret"
-	exit "${ret}"
+	INSTALL_RESULT="FAIL"
+else
+  echo "$(date -u --rfc-3339=seconds) - Created manifests."
 fi
-set -o errexit
+
+set -e
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
@@ -152,3 +156,44 @@ do
   manifest="$( basename "${item}" )"
   cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
+
+# ---------------------------------------
+
+echo "$(date -u --rfc-3339=seconds) - Create ignition configs"
+
+set +e
+openshift-install create ignition-configs --dir ${INSTALL_DIR} &
+wait "$!"
+install_ret="$?"
+set -e
+
+ret=$((ret + install_ret))
+if [ $install_ret -ne 0 ]; then
+  echo "$(date -u --rfc-3339=seconds) - Failed to ignition configs. Exit code: $install_ret"
+  INSTALL_RESULT="FAIL"
+else
+  echo "$(date -u --rfc-3339=seconds) - Created ignition configs."
+fi
+
+# ---------------------------------------
+
+echo "$(date -u --rfc-3339=seconds) - Create cluster"
+
+set +e
+openshift-install create cluster --dir ${INSTALL_DIR} 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+wait "$!"
+install_ret="$?"
+set -e
+
+if [ $install_ret -ne 0 ]; then
+  echo "$(date -u --rfc-3339=seconds) - Failed to create clusters ($install_ret)"
+  INSTALL_RESULT="FAIL"
+else
+  echo "$(date -u --rfc-3339=seconds) - Created cluster."
+  INSTALL_RESULT="PASS"
+fi
+ret=$((ret + install_ret))
+
+echo "Exit code: $ret"
+exit $ret
