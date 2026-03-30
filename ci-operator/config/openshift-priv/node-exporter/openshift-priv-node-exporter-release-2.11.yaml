@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.21-linux
+canonical_go_repository: github.com/stolostron/node-exporter
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  to: node-exporter
+promotion:
+  to:
+  - disabled: true
+    name: "2.11"
+    namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: 4.21-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.21-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: make -f Makefile.prow test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: node-exporter
+    env:
+      IMAGE_REPO: node-exporter
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-e2e
+  commands: make -f Makefile.prow test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+zz_generated_metadata:
+  branch: release-2.11
+  org: openshift-priv
+  repo: node-exporter
