@@ -20,7 +20,7 @@ EXTRA_FLAGS=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');

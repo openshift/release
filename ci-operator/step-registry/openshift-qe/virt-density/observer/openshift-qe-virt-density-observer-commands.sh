@@ -46,7 +46,7 @@ fi
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=virt-density
 
-EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --vms-per-node=$VMS_PER_NODE --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS}"
+EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=false --vms-per-node=$VMS_PER_NODE --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS}"
 
 export ES_SERVER=""
 
@@ -57,7 +57,7 @@ fi
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 mkdir -p ${ARTIFACT_DIR}/virt-density
