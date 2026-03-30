@@ -323,8 +323,20 @@ function upgrade_paused() {
 
 # Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then
+    if [[ -n "${TEST_FOCUS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+        echo "${TESTS}" | grep "${TEST_FOCUS}" >/tmp/tests &&
+        echo "Focusing on tests:" &&
+        echo "${TESTS}" | grep "${TEST_FOCUS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_FOCUS regex:'; echo "$TEST_FOCUS"; return $exit_code; } &&
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    fi &&
+
+    if [[ -n "${TEST_SKIPS}" ]]; then
+        if [[ -z "${TEST_FOCUS}" ]]; then
+            TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+        else
+            TESTS="$(cat /tmp/tests)"
+        fi &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&

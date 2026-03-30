@@ -315,12 +315,27 @@ function suite() {
         HYPERVISOR_ARGS=("--with-hypervisor-json={\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}")
     fi
 
-    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
+    if [[ -n "${TEST_FOCUS}" ]]; then
         TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
+        echo "${TESTS}" | grep "${TEST_FOCUS}" >/tmp/tests &&
+        echo "Focusing on tests:" &&
+        echo "${TESTS}" | grep "${TEST_FOCUS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_FOCUS regex:'; echo "$TEST_FOCUS"; return $exit_code; } &&
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    fi
+
+    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
+        if [[ -z "${TEST_FOCUS}" ]]; then
+            TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")"
+        else
+            TESTS="$(cat /tmp/tests)"
+        fi &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    fi
+
+    if [[ -f /tmp/tests ]]; then
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
     fi
 
