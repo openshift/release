@@ -11,6 +11,15 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+# These lines are added for pj-rehearse with unmerged release PR + origin PR
+# TODO: remove these lines
+echo "Checking custom test binary for pj-rehearse with unmerged release PR + origin PR"
+mkdir -p /tmp/custom-bin
+oc image extract --path /usr/bin/openshift-tests:/tmp/custom-bin/ quay.io/rh_ee_saldawam/openshift-tests:external-oidc
+chmod a+x /tmp/custom-bin/openshift-tests
+export PATH=/tmp/custom-bin:$PATH
+which openshift-tests
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
