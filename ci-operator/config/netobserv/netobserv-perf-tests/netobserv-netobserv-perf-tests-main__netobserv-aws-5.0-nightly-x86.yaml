@@ -4,7 +4,7 @@ base_images:
     namespace: chaos
     tag: cerberus-prow
   cli:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: cli
   flowlogs-pipeline:
@@ -19,8 +19,8 @@ base_images:
     name: netobserv-perfscale
     namespace: ci
     tag: latest
-  ocp-qe-perfscale-ci:
-    name: ocp-qe-perfscale-ci
+  netobserv-perf-tests:
+    name: netobserv-perf-tests
     namespace: ci
     tag: latest
 build_root:
@@ -37,7 +37,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -45,7 +45,7 @@ resources:
       memory: 200Mi
 tests:
 - as: node-density-heavy-25nodes
-  cron: '@daily'
+  cron: '@monthly'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -53,9 +53,8 @@ tests:
       EBPFAGENT_PR_IMAGE: ""
       FLP_PR_IMAGE: ""
     env:
-      ACK_FILE: https://raw.githubusercontent.com/netobserv/perf-tests/refs/heads/main/scripts/orion/ack.yaml
+      ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
       BASE_DOMAIN: qe.devcluster.openshift.com
-      CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
       COMPUTE_NODE_REPLICAS: "25"
       COMPUTE_NODE_TYPE: m6i.4xlarge
       DISPLAY: noo_bundle_info
@@ -66,17 +65,17 @@ tests:
       EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
       FLP_CONSUMER_REPLICAS: "6"
       LOKISTACK_SIZE: 1x.small
-      LOOKBACK: "30"
+      LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/netobserv/perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
+      ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
       RUN_ORION: "true"
       SIZE_VARIANT: large
-      VERSION: "4.22"
+      VERSION: "5.0"
       WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
         -c 'Ready'
       WORKLOAD: node-density-heavy
@@ -95,7 +94,7 @@ tests:
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
 - as: node-density-heavy-25nodes-service-without-loki
-  cron: '@weekly'
+  cron: '@monthly'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -103,7 +102,7 @@ tests:
       EBPFAGENT_PR_IMAGE: ""
       FLP_PR_IMAGE: ""
     env:
-      ACK_FILE: https://raw.githubusercontent.com/netobserv/perf-tests/refs/heads/main/scripts/orion/ack.yaml
+      ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "25"
       COMPUTE_NODE_TYPE: m6i.4xlarge
@@ -119,14 +118,14 @@ tests:
       LOOKBACK: "30"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-node-density-heavy-service.yaml
+      ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion-node-density-heavy-service.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Service
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
       RUN_ORION: "true"
       SIZE_VARIANT: large
-      VERSION: "4.22"
+      VERSION: "5.0"
       WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
         -c 'Ready'
       WORKLOAD: node-density-heavy
@@ -145,7 +144,7 @@ tests:
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
 - as: cluster-density-v2-250nodes
-  cron: '@weekly'
+  cron: '@monthly'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -153,9 +152,8 @@ tests:
       EBPFAGENT_PR_IMAGE: ""
       FLP_PR_IMAGE: ""
     env:
-      ACK_FILE: https://raw.githubusercontent.com/netobserv/perf-tests/refs/heads/main/scripts/orion/ack.yaml
+      ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
       BASE_DOMAIN: qe.devcluster.openshift.com
-      CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
       COMPUTE_NODE_REPLICAS: "250"
       COMPUTE_NODE_TYPE: m6i.4xlarge
       DISPLAY: noo_bundle_info
@@ -171,13 +169,13 @@ tests:
       LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/netobserv/perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
+      ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=250,WORKLOAD=cluster-density-v2,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       RUN_ORION: "true"
       SIZE_VARIANT: large
-      VERSION: "4.22"
+      VERSION: "5.0"
       WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
         -c 'Ready'
       WORKLOAD: cluster-density-v2
@@ -195,48 +193,8 @@ tests:
     - chain: netobserv-perf-test-post-workload
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
-- as: cluster-density-v2-500nodes
-  cron: 0 0 1 1 *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    dependencies:
-      EBPFAGENT_PR_IMAGE: ""
-      FLP_PR_IMAGE: ""
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "500"
-      COMPUTE_NODE_TYPE: m6i.4xlarge
-      EXTRA_FLAGS: --churn-delay=60s --churn-duration=10m --churn-percent=10 --timeout=5h
-        --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
-      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
-      FLP_CONSUMER_REPLICAS: "18"
-      ITERATION_MULTIPLIER_ENV: "2"
-      LOKISTACK_SIZE: 1x.medium
-      MULTISTAGE_PARAM_OVERRIDE_SAMPLING: "50"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      PATCH_EBPFAGENT_IMAGE: "false"
-      PATCH_FLOWLOGS_IMAGE: "false"
-      SIZE_VARIANT: large
-      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
-        -c 'Ready'
-      WORKLOAD: cluster-density-v2
-      ZONES_COUNT: "3"
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-    post:
-    - ref: netobserv-cerberus-report
-    - chain: netobserv-perf-test-post
-    test:
-    - ref: redhat-chaos-observer-start
-    - ref: netobserv-perf-test-deploy
-    - ref: openshift-qe-kube-burner-ingress-perf
-    - chain: netobserv-perf-test-post-workload
-    workflow: openshift-qe-installer-aws
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: netobserv
-  repo: perf-tests
-  variant: netobserv-aws-4.22-nightly-x86
+  repo: netobserv-perf-tests
+  variant: netobserv-aws-5.0-nightly-x86
