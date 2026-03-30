@@ -16,6 +16,8 @@ sleep 60
 cd policy-collection/deploy/ 
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
+e=400; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+
 sleep 120
 
 # wait for policies to be compliant

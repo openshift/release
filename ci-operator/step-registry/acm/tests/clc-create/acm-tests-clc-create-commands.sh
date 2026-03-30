@@ -61,4 +61,6 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 : "Copying artifacts..."
 cp -r reports "${ARTIFACT_DIR}/"
 
+e=400; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+
 true
