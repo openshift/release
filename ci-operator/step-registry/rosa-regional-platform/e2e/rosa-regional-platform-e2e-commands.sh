@@ -36,7 +36,8 @@ if [[ -n "${ROSA_REGIONAL_E2E_REF:-}" ]]; then
   export E2E_REF="${ROSA_REGIONAL_E2E_REF}"
   export E2E_REPO="${ROSA_REGIONAL_E2E_REPO:-${DEFAULT_E2E_REPO}}"
 elif [[ "${REPO_NAME:-}" == "rosa-regional-platform-api" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-  export E2E_REPO=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+  E2E_REPO=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+  export E2E_REPO
   export E2E_REF="${PULL_HEAD_REF}"
   echo "Auto-detected from ${REPO_NAME} PR #${PULL_NUMBER}:"
   echo "  E2E_REPO=${E2E_REPO}"
