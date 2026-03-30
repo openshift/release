@@ -15,12 +15,15 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 source "${SHARED_DIR}/proxy-conf.sh"
 
+NODE_ZERO=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
+HOST_ID=$(<"${SHARED_DIR}"/host-id.txt)
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key"
+  -p $((14000+"${HOST_ID}")))
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
@@ -34,7 +37,7 @@ KONFLUX_SNAPSHOT=$(echo ${SNAPSHOT} | jq -r '.components[].containerImage' )
 
 echo "Konflux snapshot ID: ${KONFLUX_SNAPSHOT}"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${OVE_ISO_STORAGE_HOST}" extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 10m ssh "${SSHOPTS[@]}" core@access."${NODE_ZERO}" extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
 
 # APPLY MANOJ'S PATCH FOR BAREMETAL SERIAL CONSOLE
 
@@ -45,4 +48,4 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${OVE_ISO_STORAGE_HOST}" extract_ove_
 # Add necessary kernel arguments to support serial console communication
 # console=ttyS0,115200n8
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${OVE_ISO_STORAGE_HOST}" patch_ove_iso.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 10m ssh "${SSHOPTS[@]}" core@access."${NODE_ZERO}" patch_ove_iso.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso"
