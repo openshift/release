@@ -7,7 +7,7 @@ images:
 - dockerfile_path: Containerfile
   to: rosa-e2e
 - dockerfile_literal: |
-    FROM quay.io/gbranco_openshift/ocmtest:latest
+    FROM quay.io/redhat-services-prod/ocmci/ocmci:latest
   to: ocm-fvt
 resources:
   '*':
@@ -27,18 +27,32 @@ tests:
     make lint
   container:
     from: src
-- as: ocm-fvt-periodic
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   commands: |
     export AWS_SHARED_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-cred
     export AWS_SHARED_VPC_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-shared-vpc-credentials
     source /usr/local/cs-qe-credentials/ocm-tokens
-    echo "Running ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main"
     ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main
   container:
     from: ocm-fvt
     memory_backed_volume:
       size: 1Gi
   cron: 0 8 * * *
+  reporter_config:
+    slack:
+      channel: '#ocm-fvt-prow'
+      job_states_to_report:
+      - success
+      report_template: ':rainbow: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+    jira:
+      project: OCMQE
+      issue_type: Bug
+      priority: Major
+      component: rosa-backend-tests
+      labels:
+      - prow-failure
+      - auto-filed
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
