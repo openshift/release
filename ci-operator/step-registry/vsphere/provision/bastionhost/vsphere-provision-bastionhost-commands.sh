@@ -33,6 +33,7 @@ if [[ -z "${vsphere_bastion_portgroup:-}" ]]; then
   echo "Not defined vsphere_bastion_portgroup, bastion host will be provisioned in network defined as vsphere_portgroup..."
   vsphere_bastion_portgroup=${vsphere_portgroup}
 fi
+echo "$(date -u --rfc-3339=seconds) vsphere_bastion_portgroup: ${vsphere_bastion_portgroup:-}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null

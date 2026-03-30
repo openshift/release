@@ -43,7 +43,7 @@ declare vsphere_url
 # into: primary router hostname, datacenter and vlan id
 
 cp ${SUBNETS_CONFIG} "${SHARED_DIR}"
-
+echo "LEASED_RESOURCE: ${LEASED_RESOURCE}"
 router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
 phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
 vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
@@ -129,6 +129,7 @@ export primaryrouterhostname="${primaryrouterhostname:-unset}"
 EOF
 
   if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
+    echo "VSPHERE_BASTION_LEASED_RESOURCE: ${VSPHERE_BASTION_LEASED_RESOURCE}"
     vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_BASTION_LEASED_RESOURCE}"))
     vsphere_bastion_portgroup="ci-vlan-${vlanid_2}"
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF

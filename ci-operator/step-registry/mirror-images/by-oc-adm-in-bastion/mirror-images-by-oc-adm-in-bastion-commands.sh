@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt

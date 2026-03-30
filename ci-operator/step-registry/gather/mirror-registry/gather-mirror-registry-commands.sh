@@ -25,6 +25,12 @@ if ! whoami &> /dev/null; then
   fi
 fi
 
+# test bastion internet connection
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
+      "curl -L -I www.google.com" || true
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
+      "curl -L -I quay.io" || true
+
 declare -a registry_ports=("5000" "6001" "6002")
 for port in "${registry_ports[@]}"; do
   ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
