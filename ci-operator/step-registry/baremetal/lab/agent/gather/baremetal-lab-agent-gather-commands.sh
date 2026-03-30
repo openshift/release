@@ -28,11 +28,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 echo "Trying to gather agent logs on the host ${HOST_ID}"
 
-if [ "$CLUSTER_WIDE_PROXY" == "true" ] || [ "$DISCONNECTED" == "true" ]; then
- source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-if ssh "${SSHOPTS[@]}" core@api."${NODE_ZERO}" agent-gather -O >"${ARTIFACT_DIR}"/agent-gather.tar.xz; then
+if ssh "${SSHOPTS[@]}" core@access."${NODE_ZERO}" agent-gather -O >"${ARTIFACT_DIR}"/agent-gather.tar.xz; then
   echo "Agent logs have been collected and published to the artifact directory as 'agent-gather.tar.xz'"
 elif [ $? == 127 ]; then
   echo "Skip gathering agent logs, the agent-gather script is not present on the host ${HOST_ID}."
