@@ -30,7 +30,7 @@ IC_COMPUTE_NODE_COUNT=2
 IC_CONTROL_PLANE_NODE_COUNT=3
 DefaultCPUNumber=4
 
-local zones_count=3
+ZONES_COUNT=3
 
 if [ ! -f "${OUT_SELECT}" ]; then
   echo "ERROR: Not found OUT_SELECT file."
@@ -64,17 +64,16 @@ function create_install_config() {
   local install_dir=$2
   local master_type=$3
   local compute_type=$4
-  
-  local r_zones=("${REGION}-1" "${REGION}-2" "${REGION}-3")
-  local zones="${R_ZONES[*]:0:${ZONES_COUNT}}"
-  local zones_str="[ ${zones// /, } ]"
-  local zones_raw=$(ibmcloud is zones ${REGION} -q | awk '(NR>1) {print $1}')
+  local r_zones zones zones_str zones_raw formatted_zones config
+  r_zones=("${REGION}-1" "${REGION}-2" "${REGION}-3")
+  zones="${r_zones[*]:0:${ZONES_COUNT}}"
+  zones_str="[ ${zones// /, } ]"
+  zones_raw=$(ibmcloud is zones ${REGION} -q | awk '(NR>1) {print $1}')
 
-  local formatted_zones="[$(echo "$zones_raw" | paste -sd, - | sed 's/,/, /g')]"
+  formatted_zones="[$(echo "${zones_raw}" | paste -sd, - | sed 's/,/, /g')]"
 
   echo "$formatted_zones"
 
-  local config
   config=${install_dir}/install-config.yaml
 
   cat > "${config}" << EOF
@@ -116,7 +115,6 @@ EOF
 # IBM Cloud CLI login
 function ibmcloud_login {
   export IBMCLOUD_CLI=ibmcloud
-  export IBMCLOUD_HOME=/output
   region="${1}"
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
@@ -127,21 +125,21 @@ function ibmcloud_login {
 
 function getInstanceType {
   local instance_type=$1
-  local declare -A instance_map
-
+  local cpu_number
+  declare -A instance_map
   instance_map=( 
       ["gx2"]=8 
       ["gx3"]=16 
       ["gx3d"]=24 
   )
-  local cpu_number=${instance_map[${instance_type}]:-$DefaultCPUNumber}
+  cpu_number=${instance_map[${instance_type}]:-$DefaultCPUNumber}
 
   instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep "${instance_type}-${cpu_number}x" | awk '{print $1}')
   if [[ -z "$instance_type" ]]; then    
     echo "ERROR: No instance type found for family ${instance_type} cpu $cpu_number."
-    return ""
+    echo ""
   fi
-  return "$instance_type"
+  echo "$instance_type"
 }
 
 # creating cluster
@@ -178,7 +176,6 @@ fi
 
 ibmcloud_login "${REGION}"
 
-allowlist_instance_types=
 if is_empty "$CONTROL_PLANE_INSTANCE_TYPE" ; then
   CONTROL_PLANE_INSTANCE_TYPE=$(getInstanceType "$CONTROL_PLANE_INSTANCE_TYPE_FAMILY")
 fi
