@@ -64,15 +64,11 @@ function create_install_config() {
   local install_dir=$2
   local master_type=$3
   local compute_type=$4
-  local r_zones zones zones_str zones_raw formatted_zones config
-  r_zones=("${REGION}-1" "${REGION}-2" "${REGION}-3")
-  zones="${r_zones[*]:0:${ZONES_COUNT}}"
-  zones_str="[ ${zones// /, } ]"
+  local zones_raw formatted_zones config
+
   zones_raw=$(ibmcloud is zones ${REGION} -q | awk '(NR>1) {print $1}')
-
   formatted_zones="[$(echo "${zones_raw}" | paste -sd, - | sed 's/,/, /g')]"
-
-  echo "$formatted_zones"
+  echo "zones: ${formatted_zones}"
 
   config=${install_dir}/install-config.yaml
 
@@ -160,7 +156,7 @@ CONTROL_PLANE_INSTANCE_TYPE_FAMILY="$(jq -r '.CPFamily' "${OUT_SELECT_DICT}")"
 COMPUTE_INSTANCE_TYPE="$(jq -r '.CType' "${OUT_SELECT_DICT}")"
 COMPUTE_INSTANCE_TYPE_FAMILY="$(jq -r '.CFamily' "${OUT_SELECT_DICT}")"
 
-if is_empty "$ARCH" || [[ "${$ARCH,,}" == "amd64" ]]; then
+if is_empty "$ARCH" || [[ "${ARCH,,}" == "amd64" ]]; then
   ARCH="amd64"
 else
   echo "ERROR: Unsupported arch ${ARCH}, exiting"
