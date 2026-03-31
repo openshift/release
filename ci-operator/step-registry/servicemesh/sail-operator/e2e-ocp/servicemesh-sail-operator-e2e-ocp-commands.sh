@@ -21,6 +21,7 @@
 #   - MAISTRA_NAMESPACE: The namespace where the test pod is running.
 #   - MAISTRA_SC_POD: The name of the test pod.
 #   - ARTIFACT_DIR: The local directory to store test artifacts.
+#   - OLM (optional): Set to "false" to avoid creating and deploying the operator using the OLM bundle.
 #   - VERSIONS_YAML_CONFIG (optional): Path to versions YAML config.
 #   - E2E_COMMAND (optional): Replace with the specific test command to run.
 # ==============================================================================
@@ -99,6 +100,7 @@ run_tests() {
     export HUB=\"${HUB:-quay.io/sail-dev}\"
     export USE_INTERNAL_REGISTRY=\"false\"
     export PR_NUMBER=\"${PULL_NUMBER:-}\"
+    export OLM=\"${OLM:-true}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
