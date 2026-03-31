@@ -29,6 +29,8 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+EXTRA_FLAGS+=" --frr-external-ip=${bastion}"
+
 # shellcheck disable=SC2087
 ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
     set -e
