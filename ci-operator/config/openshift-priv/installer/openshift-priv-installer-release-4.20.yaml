@@ -39,6 +39,10 @@ base_images:
     name: 4.20-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.20_base-rhel9:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: base-rhel9
   splat-ci-virtctl:
     name: splat-virtctl
     namespace: ci
@@ -59,6 +63,11 @@ images:
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
+  from: openstack-base
+  inputs:
+    openstack-base:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   to: baremetal-installer
@@ -103,6 +112,12 @@ promotion:
     - src-oc
     name: 4.20-priv
     namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-20.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-20.repo
+    from: ocp_4.20_base-rhel9
+    to: openstack-base
 releases:
   initial:
     integration:
