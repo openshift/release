@@ -257,10 +257,15 @@ oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
 oc wait --timeout=5m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
 oc wait --timeout=15m --for=condition=Ready pod -l app=assisted-image-service -n "${ASSISTED_NAMESPACE}"
 
-echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
-oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true}}'
-sleep 10 # Wait for the operator to notice our patch
-timeout 15m oc rollout status -n openshift-machine-api deployment/metal3
-oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/cluster-baremetal-operator=metal3-state --for=condition=Ready
+# Enable BMH configuration outside of openshift-machine-api namespace (only for bare metal platforms)
+if oc get provisioning provisioning-configuration &>/dev/null; then
+  echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
+  oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true}}'
+  sleep 10 # Wait for the operator to notice our patch
+  timeout 15m oc rollout status -n openshift-machine-api deployment/metal3
+  oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/cluster-baremetal-operator=metal3-state --for=condition=Ready
+else
+  echo "Provisioning resource not found - skipping BMH configuration (not a bare metal platform)"
+fi
 
 echo "Configuration of Assisted Installer operator passed successfully!"
