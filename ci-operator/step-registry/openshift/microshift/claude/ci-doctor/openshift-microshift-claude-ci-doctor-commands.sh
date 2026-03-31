@@ -100,13 +100,19 @@ configure_claude() {
     if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
         echo "Configuring JIRA MCP..."
 
+        # Install uv to manage MCP dependencies
         pip install uv --user --upgrade
+        export PATH="${HOME}/.local/bin:${PATH}"
+
         # Load secrets with command tracing disabled to prevent leaking credentials in logs
         {
           set +x
           claude mcp add \
-              -e JIRA_URL="${JIRA_URL}" -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" -e JIRA_USERNAME="${JIRA_USERNAME}" \
-              --transport stdio jira -- uvx mcp-atlassian
+              -e JIRA_URL="${JIRA_URL}" \
+              -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
+              -e JIRA_USERNAME="${JIRA_USERNAME}" \
+              --transport stdio \
+              jira -- uvx mcp-atlassian@0.21.0
           set -x
         }
 
