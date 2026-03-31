@@ -65,6 +65,11 @@ spec:
     defaultObjectStorageConfig:
       name: thanos-object-storage
       key: thanos.yaml
+    additionalArgs:
+    - --tsdb.wal-compression
+    - --tsdb.min-block-duration=10m
+    - --tsdb.max-block-duration=10m
+    - --tsdb.out-of-order.time-window=30m
     additionalEnv:
     - name: AWS_ROLE_ARN
       valueFrom:
@@ -87,7 +92,7 @@ spec:
       readOnly: true
     hashrings:
     - name: default
-      replicas: 5
+      replicas: 13
       externalLabels:
         replica: "$(POD_NAME)"
       affinity:
@@ -109,16 +114,16 @@ spec:
                   app.kubernetes.io/component: thanos-receive-ingester
               topologyKey: kubernetes.io/hostname
       tsdbConfig:
-        retention: 15d
+        retention: 1d
       storage:
         size: 100Gi
       resourceRequirements:
         limits:
-          cpu: "4"
-          memory: 48Gi
+          cpu: "8"
+          memory: 54Gi
         requests:
-          cpu: "4"
-          memory: 48Gi
+          cpu: "8"
+          memory: 54Gi
 ---
 apiVersion: v1
 kind: Service
