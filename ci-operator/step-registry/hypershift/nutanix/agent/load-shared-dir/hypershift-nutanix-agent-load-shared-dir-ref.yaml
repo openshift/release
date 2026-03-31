@@ -1,0 +1,48 @@
+ref:
+  as: hypershift-nutanix-agent-load-shared-dir
+  from: cli
+  commands: hypershift-nutanix-agent-load-shared-dir-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-pool-aws-credentials
+    mount_path: /etc/hypershift-pool-aws-credentials
+  env:
+  - name: ARTIFACTS_SOURCE_URL
+    default: ""
+    documentation: |-
+      S3 bucket path containing the management cluster artifacts.
+      Example: s3://my-bucket/mgmt-cluster-artifacts/
+
+      The bucket must be accessible using hypershift-pool-aws-credentials.
+  documentation: |-
+    Load pre-existing management cluster artifacts from private S3 bucket into SHARED_DIR.
+
+    This step syncs all required artifacts from S3 to SHARED_DIR, allowing debug
+    workflows to skip the management cluster provision phase.
+
+    Required files in S3:
+    - kubeconfig: Management cluster kubeconfig
+    - nutanix_context.sh: Nutanix environment variables (NUTANIX_ENDPOINT, NUTANIX_CLUSTER, etc.)
+    - proxy-conf.sh: Proxy configuration (optional)
+    - *.pem: SSH keys or certificates (optional)
+
+    Authentication:
+    - Uses hypershift-pool-aws-credentials from test-credentials namespace
+    - Credentials are automatically mounted and configured
+
+    Usage:
+    1. Upload artifacts to private S3 bucket:
+       aws s3 cp kubeconfig s3://my-bucket/mgmt-cluster/
+       aws s3 cp nutanix_context.sh s3://my-bucket/mgmt-cluster/
+       aws s3 cp proxy-conf.sh s3://my-bucket/mgmt-cluster/
+
+    2. Set ARTIFACTS_SOURCE_URL environment variable:
+       ARTIFACTS_SOURCE_URL: "s3://my-bucket/mgmt-cluster/"
+
+    3. Run the debug workflow
+
+    The step uses 'aws s3 sync' to download all matching files efficiently.

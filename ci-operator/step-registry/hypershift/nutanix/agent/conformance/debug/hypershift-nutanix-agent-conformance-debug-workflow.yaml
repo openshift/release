@@ -2,8 +2,9 @@ workflow:
   as: hypershift-nutanix-agent-conformance-debug
   steps:
     pre:
-    # Skip provision - assume management cluster already exists
-    # You need to manually set KUBECONFIG or extract it from a running job
+    # Load pre-existing management cluster artifacts
+    - ref: hypershift-nutanix-agent-load-shared-dir
+    # Create hosted cluster
     - chain: hypershift-nutanix-agent-create
     test:
     - chain: hypershift-conformance
@@ -12,27 +13,31 @@ workflow:
   documentation: |-
     Debug workflow for Nutanix HyperShift Agent conformance tests.
 
-    This workflow SKIPS the management cluster provision phase, allowing you to:
-    1. Create a long-running management cluster manually or via a separate job
-    2. Extract the KUBECONFIG from that cluster
-    3. Run only the test steps quickly for iteration
+    This workflow SKIPS the management cluster provision phase and loads
+    pre-existing cluster artifacts from an external source.
+
+    Workflow:
+    1. Load management cluster artifacts (kubeconfig, nutanix_context.sh, proxy-conf.sh)
+    2. Create HyperShift hosted cluster with Agent-based workers
+    3. Run conformance tests
+    4. Clean up hosted cluster resources
 
     Prerequisites:
     - A Nutanix management cluster must already exist
-    - KUBECONFIG must be available in ${SHARED_DIR}/kubeconfig
-    - Nutanix context must be available in ${SHARED_DIR}/nutanix_context.sh
+    - Artifacts must be available at ARTIFACTS_SOURCE_URL
+
+    Required artifacts:
+    - kubeconfig: Management cluster kubeconfig
+    - nutanix_context.sh: Nutanix environment variables
+    - proxy-conf.sh: Proxy configuration (optional)
 
     Usage:
-    1. First, create a management cluster (one-time or long-running):
-       - Run a provision job or use an existing cluster
-
-    2. Extract artifacts from the provision job:
-       - kubeconfig
-       - nutanix_context.sh
-
-    3. Run this debug workflow with those artifacts pre-populated
+    Set ARTIFACTS_SOURCE_URL to point to your artifacts:
+    - GCS: gs://bucket/path/to/artifacts/
+    - HTTP: https://server.com/artifacts/
+    - Local: /path/to/artifacts/
 
     Benefits:
-    - Provision takes ~45 minutes
-    - Debug iterations take ~20 minutes
-    - Can iterate multiple times on same management cluster
+    - Skip 45-minute provision phase
+    - Fast iteration (20 minutes per test)
+    - Reuse existing management cluster
