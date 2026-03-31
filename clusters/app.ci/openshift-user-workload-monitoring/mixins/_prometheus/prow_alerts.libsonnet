@@ -66,23 +66,23 @@
           },
           {
             alert: 'TriggeredProwJobsPileup',
-            expr: 'max_over_time((sum by (cluster) (prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 500',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Triggered prowjobs peaked above 500 in the last 5 minutes in cluster {{ $labels.cluster }} (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
+              message: 'Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak',
             }
           },
           {
             alert: 'SchedulingProwJobsPileup',
-            expr: 'max_over_time((sum by (cluster) (prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
             labels: {
               severity: 'warning',
             },
             annotations: {
-              message: 'Scheduling prowjobs peaked above 300 in the last 5 minutes in cluster {{ $labels.cluster }} (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
+              message: 'Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak',
             }
           },
