@@ -114,6 +114,19 @@ for _ in {1..60}; do
 done
 echo "Quay Operator is deployed successfully"
 
+echo "Waiting for QuayRegistry CRD to be available..."
+for _ in {1..30}; do
+  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "QuayRegistry CRD is available"
+    break
+  fi
+  sleep 5
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  echo "Timed out waiting for QuayRegistry CRD" >&2
+  exit 1
+fi
+
 #Deploy Quay, here disable monitoring component
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
