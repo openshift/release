@@ -18,6 +18,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 function getlogs() {
   echo "### Downloading logs..."
   scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.tar*" "${ARTIFACT_DIR}"
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.log" "${ARTIFACT_DIR}" || true
 }
 
 # Gather logs regardless of what happens after this
@@ -68,6 +69,18 @@ then
   podman cp external-squid:/var/log/squid/cache.log /tmp/squid-logs-$NAMESPACE || true
   tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
 fi
+
+echo "Get pacemaker and podman etcd logs from master nodes..."
+for (( n=0; n<\$NUM_MASTERS; n++ ))
+do
+  master_name=\$(printf \$MASTER_HOSTNAME_FORMAT \$n)
+  master_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$master_name']/@ip)" -)
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${master_ip} \
+    sudo cat /var/log/pacemaker/pacemaker.log > /tmp/artifacts/pacemaker_\${master_name//:/_}.log || true
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${master_ip} \
+    sudo podman logs etcd > /tmp/artifacts/podman-etcd_\${master_name//:/_}.log 2>&1 || true
+done
+
 
 # Exit if we have access to the API, the other gather steps will get logs
 if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
