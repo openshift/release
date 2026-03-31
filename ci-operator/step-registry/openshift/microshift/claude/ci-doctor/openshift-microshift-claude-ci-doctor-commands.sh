@@ -69,6 +69,24 @@ copy_reports() {
     fi
 }
 
+wait_for_mcp_status() {
+    local -r service="$1"
+    local -r status="$2"
+    local -r timeout="${3:-120}"  # seconds
+    local -r interval="${4:-5}"   # seconds
+
+    local -r attempts=$((timeout / interval))
+    for ((i=0; i<attempts; i++)); do
+        if claude mcp list | grep "^${service}:" | grep -q "${status}"; then
+            return 0
+        fi
+        sleep "${interval}"
+    done
+
+    echo "ERROR: MCP service '${service}' did not reach status '${status}' after ${timeout} seconds."
+    return 1
+}
+
 configure_claude() {
     echo "Configuring Claude..."
 
@@ -91,7 +109,10 @@ configure_claude() {
               --transport stdio jira -- uvx mcp-atlassian
           set -x
         }
-        echo "JIRA MCP configured."
+
+        echo "Waiting for JIRA MCP to become available..."
+        wait_for_mcp_status "jira" "Connected"
+        echo "JIRA MCP is available."
     else
         echo "WARNING: Jira API token or username not available. Jira MCP will not be available."
     fi
