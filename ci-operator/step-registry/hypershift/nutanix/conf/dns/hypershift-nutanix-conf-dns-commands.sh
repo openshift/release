@@ -40,23 +40,19 @@ CLUSTER_DOMAIN="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring DNS for: ${CLUSTER_DOMAIN}"
 
-# Get management cluster worker node IPs (for NodePort access)
-WORKER_IPS=($(oc get nodes -l node-role.kubernetes.io/worker \
-    -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'))
+# Get INGRESS_VIP from nutanix_context.sh (set during management cluster IPI installation)
+source "${SHARED_DIR}/nutanix_context.sh"
 
-if [ ${#WORKER_IPS[@]} -eq 0 ]; then
-    echo "$(date -u --rfc-3339=seconds) - ERROR: No worker nodes found in management cluster"
+if [ -z "${INGRESS_VIP:-}" ]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: INGRESS_VIP not found in nutanix_context.sh"
+    echo "$(date -u --rfc-3339=seconds) - This should have been set during management cluster IPI installation"
     exit 1
 fi
 
-echo "$(date -u --rfc-3339=seconds) - Management cluster worker IPs: ${WORKER_IPS[@]}"
+echo "$(date -u --rfc-3339=seconds) - Management cluster INGRESS_VIP: ${INGRESS_VIP}"
 
-# Build ResourceRecords JSON array
-RESOURCE_RECORDS="["
-for ip in "${WORKER_IPS[@]}"; do
-    RESOURCE_RECORDS+="{\"Value\": \"${ip}\"},"
-done
-RESOURCE_RECORDS="${RESOURCE_RECORDS%,}]"  # Remove trailing comma
+# Build ResourceRecords JSON array with INGRESS_VIP
+RESOURCE_RECORDS="[{\"Value\": \"${INGRESS_VIP}\"}]"
 
 echo "$(date -u --rfc-3339=seconds) - Finding Route 53 hosted zone for ${BASE_DOMAIN}"
 

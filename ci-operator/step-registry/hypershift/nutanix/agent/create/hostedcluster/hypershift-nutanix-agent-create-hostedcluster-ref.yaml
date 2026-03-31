@@ -1,0 +1,52 @@
+ref:
+  as: hypershift-nutanix-agent-create-hostedcluster
+  from_image:
+    namespace: hypershift
+    name: hypershift-tests
+    tag: latest
+  cli: latest
+  commands: hypershift-nutanix-agent-create-hostedcluster-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-pool-aws-credentials
+    name: hypershift-pool-aws-credentials
+    namespace: test-credentials
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  dependencies:
+  - env: OCP_IMAGE_LATEST
+    name: release:latest
+  - env: OCP_IMAGE_PREVIOUS
+    name: release:initial
+  env:
+  - default: "2.11"
+    name: MCE_VERSION
+    documentation: MCE version to use for the hosted cluster
+  - default: ""
+    name: AGENT_NAMESPACE
+    documentation: Namespace for Agent resources
+  - default: ""
+    name: HYPERSHIFT_HC_RELEASE_IMAGE
+    documentation: Release image override for hosted cluster
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 5m0s
+  timeout: 40m0s
+  documentation: |-
+    Create HyperShift hosted cluster on Nutanix using Agent-based installation with Route publishing strategy.
+
+    This step wraps hypershift-mce-agent-create-hostedcluster and modifies the service
+    publishing strategy to use Route for all services (APIServer, OAuthServer, Konnectivity, Ignition).
+
+    This is necessary for Nutanix because:
+    - Worker nodes only have InternalIP (not accessible externally)
+    - Management cluster has INGRESS_VIP configured by IPI
+    - DNS points to INGRESS_VIP
+    - All services are exposed via Routes through the management cluster ingress
+
+    The step:
+    1. Renders the HostedCluster YAML using hcp create cluster agent --render
+    2. Modifies all service publishing strategies to use Route
+    3. Applies the modified YAML to create the HostedCluster
