@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -59,8 +65,7 @@ fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 no_critical_check_result=0
 echo "Checking if storage account is publicly accessible in ${RESOURCE_GROUP}"
@@ -85,7 +90,7 @@ do
         no_critical_check_result=1
     fi
 
-    if (( ocp_major_version == 4 && ocp_minor_version > 15 )) || (( ocp_major_version > 4 )); then
+    if version_gt "${ocp_version}" "4.15"; then
         cross_tenant_replication=$(echo $line | awk -F' ' '{print $3}')
         if [[ "${cross_tenant_replication}" == "False" ]]; then
             echo "INFO: property allowCrossTenantReplication is False, expected!"
