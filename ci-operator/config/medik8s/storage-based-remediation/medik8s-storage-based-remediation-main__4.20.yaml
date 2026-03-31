@@ -17,6 +17,8 @@ operator:
   - as: my-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+  - as: sbd-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/medik8s/sbd-operator:.*
     with: pipeline:storage-based-remediation
@@ -124,6 +126,96 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: openshift-e2e-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OO_INDEX: ci-index-sbd-operator-bundle
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: sbd-operator-system
+      OO_PACKAGE: sbd-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: configure-namespace
+      cli: latest
+      commands: |
+        # Workaround for agent pods not running with restricted PSA
+        oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: inject-ci-agent-image
+      cli: latest
+      commands: |
+        # Inject CI-built agent image into the CSV so the operator uses it for DaemonSet pods
+        CSV_NAME=$(oc get csv -n "${OO_INSTALL_NAMESPACE}" -o name | grep sbd-operator)
+        oc -n "${OO_INSTALL_NAMESPACE}" patch "$CSV_NAME" --type=json -p '[
+          {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_SBR_AGENT","value":"'"${SBR_AGENT_IMAGE}"'"}}
+        ]'
+        echo "CSV patched with CI agent image, waiting for deployment update..."
+        # Wait for OLM to propagate CSV changes to the deployment
+        timeout 120 bash -c 'until oc get deployment sbd-operator-controller-manager \
+          -n "${OO_INSTALL_NAMESPACE}" -o json | grep -q RELATED_IMAGE_SBR_AGENT; do
+          echo "Waiting for OLM to update deployment..."
+          sleep 5
+        done'
+        oc rollout status deployment/sbd-operator-controller-manager \
+          -n "${OO_INSTALL_NAMESPACE}" --timeout=120s
+      dependencies:
+      - env: SBR_AGENT_IMAGE
+        name: sbd-agent
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: set-odf-on-cluster
+      cli: latest
+      commands: |
+        # Force ODF setup binary to use test-cluster admin kubeconfig (it prefers
+        # InClusterConfig() otherwise, which may not have namespace create permission).
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+
+        make setup-odf-storage
+        make run-setup-odf-storage-retry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test-command
+      cli: latest
+      commands: |
+        # kubectl is not available in the CI test pod; create a symlink to oc which is a superset
+        which kubectl || { mkdir -p /tmp/bin && ln -s "$(which oc)" /tmp/bin/kubectl && export PATH="/tmp/bin:${PATH}"; }
+        export OPERATOR_NS="${OO_INSTALL_NAMESPACE}"
+        # Use cluster profile AWS credentials so e2e tests can make EC2 API calls (e.g. ec2:DescribeInstances, ec2:RebootInstances)
+        # The node's IAM role alone doesn't have these permissions
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        make test-e2e && TEST_EXIT_CODE=0 || TEST_EXIT_CODE=$?
+        # Copy test artifacts (logs, junit report) to CI artifact directory regardless of test outcome
+        cp -a .tests/. "$ARTIFACT_DIR/" 2>/dev/null || echo "WARNING: no artifacts to copy"
+        exit $TEST_EXIT_CODE
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
