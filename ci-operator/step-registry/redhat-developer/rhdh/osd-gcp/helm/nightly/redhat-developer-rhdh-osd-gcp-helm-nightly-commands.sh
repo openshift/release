@@ -48,8 +48,10 @@ echo "========== Cluster kubeadmin logout =========="
 oc logout
 
 echo "========== Git Repository Setup & Checkout =========="
-QUAY_REPO="rhdh-community/rhdh"
-export QUAY_REPO
+IMAGE_REPO="rhdh-community/rhdh"
+IMAGE_REGISTRY="quay.io"
+QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
+export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -79,7 +81,7 @@ PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.opencode|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
@@ -94,7 +96,7 @@ echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
 
 echo "========== Image Tag Resolution =========="
 if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    QUAY_REPO="rhdh/rhdh-hub-rhel9"
+    IMAGE_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
@@ -103,7 +105,7 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     fi
     echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
-    QUAY_REPO="rhdh-community/rhdh"
+    IMAGE_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
         VERSION="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
@@ -112,7 +114,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
         TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
-    echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
+    echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
     # Timeout configuration for waiting for Docker image availability
     MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
@@ -122,7 +124,7 @@ else
 
     while true; do
         # Check image availability
-        response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
+        response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
 
         # Use jq to parse the JSON and see if the tag exists
         tag_count=$(echo $response | jq '.tags | length')
@@ -148,8 +150,12 @@ fi
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
-IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
-echo "Using image: ${QUAY_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
+if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
+    echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
+else
+    echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"
+fi
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/configmap-scale
     decorate: true
     decoration_config:
@@ -95,7 +95,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
     decoration_config:
@@ -186,7 +186,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -277,7 +277,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-csi
     decorate: true
     decoration_config:
@@ -368,7 +368,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -459,7 +459,98 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
+    context: ci/prow/e2e-aws-hpa
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-kubernetes-release-4.21-e2e-aws-hpa
+    optional: true
+    path_alias: k8s.io/kubernetes
+    rerun_command: /test e2e-aws-hpa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-hpa
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-hpa,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build10
     context: ci/prow/e2e-aws-jenkins
     decorate: true
     decoration_config:
@@ -549,7 +640,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -640,7 +731,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-cgroupsv2
     decorate: true
     decoration_config:
@@ -730,7 +821,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-crun
     decorate: true
     decoration_config:
@@ -820,7 +911,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-downgrade
     decorate: true
     decoration_config:
@@ -911,7 +1002,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-fips
     decorate: true
     decoration_config:
@@ -1001,7 +1092,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -1092,7 +1183,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-runc
     decorate: true
     decoration_config:
@@ -1182,7 +1273,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     decoration_config:
@@ -1273,7 +1364,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-serial-2of2
     decorate: true
     decoration_config:
@@ -1364,7 +1455,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
@@ -1455,7 +1546,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-techpreview-serial-1of2
     decorate: true
     decoration_config:
@@ -1547,7 +1638,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-techpreview-serial-2of2
     decorate: true
     decoration_config:
@@ -1639,7 +1730,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -1730,7 +1821,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -1821,7 +1912,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -1912,7 +2003,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -2003,7 +2094,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-external-aws-ccm
     decorate: true
     decoration_config:
@@ -2457,7 +2548,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -2549,7 +2640,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-openstack-csi-cinder
     decorate: true
     decoration_config:
@@ -2640,7 +2731,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-openstack-csi-manila
     decorate: true
     decoration_config:
@@ -2822,7 +2913,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -2886,7 +2977,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -2957,7 +3048,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/k8s-e2e-aws
     decorate: true
     decoration_config:
@@ -3048,7 +3139,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/k8s-e2e-aws-ovn-serial
     decorate: true
     decoration_config:
@@ -3139,7 +3230,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/k8s-e2e-conformance-aws
     decorate: true
     decoration_config:
@@ -3500,7 +3591,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -3594,7 +3685,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -3660,7 +3751,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build11
+    cluster: build10
     context: ci/prow/perfscale-control-plane-6nodes
     decorate: true
     decoration_config:
@@ -3750,7 +3841,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3821,7 +3912,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -3892,7 +3983,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build10
+    cluster: build11
     context: ci/prow/verify-commits
     decorate: true
     decoration_config:
