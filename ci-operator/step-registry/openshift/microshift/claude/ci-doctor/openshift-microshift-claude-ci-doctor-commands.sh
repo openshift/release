@@ -129,7 +129,7 @@ timeout 3600 claude \
 echo "Running automatic approval of rebase PRs with all tests passing..."
 .claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
     --mode approve \
-    --filter "NO-ISSUE: rebase-release-"
+    --author 'microshift-rebase-script[bot]'
 echo "Automatic approval of rebase PRs with all tests passing completed"
 
 # After the analysis, attempt to restart failed rebase PRs tests. If the
@@ -138,7 +138,7 @@ echo "Automatic approval of rebase PRs with all tests passing completed"
 echo "Running automatic restart of failed rebase PRs tests..."
 .claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
     --mode restart \
-    --filter "NO-ISSUE: rebase-release-"
+    --author 'microshift-rebase-script[bot]'
 echo "Automatic restart of failed rebase PRs tests completed"
 
 # Check if the report was produced
