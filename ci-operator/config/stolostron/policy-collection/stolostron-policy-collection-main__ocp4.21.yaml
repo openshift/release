@@ -111,6 +111,45 @@ tests:
     - ref: acm-tests-grc
     - ref: acm-tests-alc
     - ref: openshift-extended-test
+- as: interop-opp-vsphere
+  capabilities:
+  - intranet
+  cron: 0 0 1,15 * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: vsphere-connected-2
+    env:
+      COMPUTE_NODE_REPLICAS: "6"
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8969
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.21"
+      OPENSHIFT_REQUIRED_CORES: "72"
+      OPENSHIFT_REQUIRED_MEMORY: "288"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      SIZE_VARIANT: large
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - chain: cucushift-installer-check-cluster-health
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-opp-app
+    - ref: interop-tests-ocs-tests
+    - ref: acm-tests-observability
+    - ref: acm-tests-grc
+    - ref: acm-tests-alc
+    - ref: openshift-extended-test
 zz_generated_metadata:
   branch: main
   org: stolostron
