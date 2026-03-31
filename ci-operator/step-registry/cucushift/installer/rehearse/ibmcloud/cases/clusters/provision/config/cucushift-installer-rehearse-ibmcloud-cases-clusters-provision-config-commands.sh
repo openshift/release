@@ -30,8 +30,6 @@ IC_COMPUTE_NODE_COUNT=2
 IC_CONTROL_PLANE_NODE_COUNT=3
 DefaultCPUNumber=4
 
-ZONES_COUNT=3
-
 if [ ! -f "${OUT_SELECT}" ]; then
   echo "ERROR: Not found OUT_SELECT file."
   exit 1
