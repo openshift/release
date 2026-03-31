@@ -27,6 +27,20 @@ tests:
     make lint
   container:
     from: src
+- as: ocm-fvt-cs-rosa-hcp-ad-staging-main
+  commands: |
+    export AWS_SHARED_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-cred
+    export AWS_SHARED_VPC_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-shared-vpc-credentials
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main
+  container:
+    from: ocm-fvt
+    memory_backed_volume:
+      size: 1Gi
+  optional: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
 - as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   commands: |
     export AWS_SHARED_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-cred
