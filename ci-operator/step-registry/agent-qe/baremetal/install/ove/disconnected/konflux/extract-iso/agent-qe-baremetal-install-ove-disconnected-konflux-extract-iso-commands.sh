@@ -38,6 +38,8 @@ KONFLUX_SNAPSHOT=$(echo ${SNAPSHOT} | jq -r '.components[].containerImage' )
 
 echo "Konflux snapshot ID: ${KONFLUX_SNAPSHOT}"
 
+sleep 14400
+
 timeout -s 9 10m ssh "${SSHOPTS[@]}" core@access."${NODE_ZERO}" extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
 
 # APPLY MANOJ'S PATCH FOR BAREMETAL SERIAL CONSOLE
