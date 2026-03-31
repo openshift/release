@@ -39,6 +39,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: cli
+  ocp_5.0_base-rhel9:
+    name: "5.0"
+    namespace: ocp
+    tag: base-rhel9
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -66,6 +70,11 @@ images:
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
+  from: openstack-base
+  inputs:
+    openstack-base:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   to: baremetal-installer
@@ -110,6 +119,12 @@ promotion:
     - src-oc
     name: "5.0"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-5-0.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-5-0.repo
+    from: ocp_5.0_base-rhel9
+    to: openstack-base
 releases:
   initial:
     integration:
