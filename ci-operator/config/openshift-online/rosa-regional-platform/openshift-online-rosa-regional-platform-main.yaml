@@ -42,7 +42,9 @@ tests:
   steps:
     post:
     - as: teardown-ephemeral
-      commands: ./ci/nightly.sh --teardown
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/nightly.sh --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -54,7 +56,9 @@ tests:
           memory: 200Mi
     pre:
     - as: provision-ephemeral
-      commands: ./ci/nightly.sh
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/nightly.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -66,7 +70,9 @@ tests:
           memory: 200Mi
     test:
     - as: e2e
-      commands: ./ci/e2e-tests.sh
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -81,7 +87,9 @@ tests:
   steps:
     test:
     - as: e2e
-      commands: ./ci/e2e-tests.sh
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-integration-creds
@@ -97,6 +105,7 @@ tests:
     post:
     - as: teardown-ephemeral
       commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
         ./ci/nightly.sh --teardown-fire-and-forget
@@ -112,6 +121,7 @@ tests:
     pre:
     - as: provision-ephemeral
       commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
         ./ci/nightly.sh
@@ -126,7 +136,9 @@ tests:
           memory: 200Mi
     test:
     - as: e2e
-      commands: ./ci/e2e-tests.sh
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -141,7 +153,9 @@ tests:
   steps:
     test:
     - as: ephemeral-resources-janitor
-      commands: ./ci/ephemeral-resources-janitor.sh
+      commands: |-
+        [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+        ./ci/ephemeral-resources-janitor.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
