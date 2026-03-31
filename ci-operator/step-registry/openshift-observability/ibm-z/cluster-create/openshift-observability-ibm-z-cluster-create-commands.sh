@@ -66,6 +66,8 @@ ls -l "$SSH_KEY_PATH" || true
 SSH_ARGS=(
   -i "$SSH_KEY_PATH"
   -o IdentitiesOnly=yes
+  -o IdentityAgent=none           # NEW: Disable SSH agent
+  -o PubkeyAcceptedKeyTypes=+ssh-ed25519  # NEW: Explicitly allow ED25519
   -o BatchMode=yes
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
