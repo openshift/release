@@ -95,6 +95,21 @@ tests:
     go build ./...
   container:
     from: src
+- as: verify-hypershift-integration
+  commands: |
+    dir=$GOPATH/src/github.com/openshift/hypershift
+    git clone https://github.com/openshift/hypershift --branch ${PULL_BASE_REF:-main} --single-branch $dir
+    rm -rf $dir/vendor/github.com/openshift/api/*
+    cp -Rf ./ $dir/openshift-api/
+    rm -rf $dir/api/vendor
+    cd $dir
+    echo "replace github.com/openshift/api => ./openshift-api" >> go.mod
+    echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
+    go mod vendor
+    make api test-envtest-api-all
+  container:
+    from: src
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
