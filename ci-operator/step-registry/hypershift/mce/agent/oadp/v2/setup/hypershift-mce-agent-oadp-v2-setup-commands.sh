@@ -85,10 +85,11 @@ spec:
       logLevel: debug
 EOF
 
+echo "Waiting for velero Deployment to be ready..."
+oc rollout status deployment/velero -n openshift-adp --timeout=300s
 
-echo "Waiting for Velero pod to be ready..."
-timeout 5m bash -c "until [[ \$(oc get deployment/velero -n openshift-adp -o jsonpath='{.status.conditions[?(@.type==\"Available\")].status}' 2>/dev/null) == \"True\" ]]; do sleep 15; done"
-
+echo "Waiting for node-agent DaemonSet to be ready..."
+oc rollout status daemonset/node-agent -n openshift-adp --timeout=600s
 
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 

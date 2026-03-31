@@ -215,7 +215,6 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --generate-ssh \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
-    --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
     ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
@@ -232,7 +231,6 @@ else
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
-    --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
