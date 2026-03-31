@@ -11,18 +11,21 @@ ref:
   - name: LEASED_RESOURCE
     default: "us-east-1"
     documentation: AWS region to use for IAM API calls.
+  - name: RELEASE_VERSION
+    default: "4.17.0"
+    documentation: OCP release version to validate managed policies against.
   documentation: |-
-    This step validates that ROSA HCP AWS-managed IAM policies grant all
-    permissions required by OCP components. It uses osdctl iampermissions
-    simulate to run SimulateCustomPolicy against each managed policy with
-    supplementary test scenarios that include condition-context edge cases
-    (e.g., ec2:CreateTags without ec2:CreateAction context, as in CFE-1131).
+    This step validates that ROSA managed IAM policies grant all permissions
+    required by OCP components. It uses osdctl iampermissions simulate to
+    auto-fetch managed policies from managed-cluster-config for the given
+    release version, extract CredentialsRequests from the release image, and
+    run SimulateCustomPolicy for each matched policy/CR pair.
 
     The step:
-    1. Fetches all 8 ROSA HCP AWS-managed operator policies from the IAM API
-    2. Loads supplementary test manifests defining expected permission scenarios
-    3. Runs SimulateCustomPolicy for each action/context combination
-    4. Produces JUnit XML results in ${ARTIFACT_DIR}/iam-policy-validation/
+    1. Fetches managed STS policies from managed-cluster-config for the version
+    2. Extracts CredentialsRequests from the OCP release image
+    3. Matches policies to CRs using the naming convention
+    4. Runs SimulateCustomPolicy for each action/context combination
+    5. Produces JUnit XML results in ${ARTIFACT_DIR}/iam-policy-validation/
 
-    Requires AWS credentials with iam:SimulateCustomPolicy, iam:GetPolicy,
-    and iam:GetPolicyVersion permissions.
+    Requires AWS credentials with iam:SimulateCustomPolicy permissions.
