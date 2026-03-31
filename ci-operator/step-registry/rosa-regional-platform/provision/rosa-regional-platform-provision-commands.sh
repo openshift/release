@@ -9,7 +9,7 @@ git clone --depth 1 --branch "${ROSA_REGIONAL_PLATFORM_REF}" \
   https://github.com/openshift-online/rosa-regional-platform.git "${WORK_DIR}/platform"
 cd "${WORK_DIR}/platform"
 
-# Set up AWS profiles from mounted credentials (backwards-compatible)
+# Set up AWS profiles from mounted credentials
 [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
 
 # Pin the exact commit SHA so e2e and teardown use the same code

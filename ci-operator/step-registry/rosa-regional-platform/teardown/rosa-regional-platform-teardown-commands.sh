@@ -18,7 +18,7 @@ git clone https://github.com/openshift-online/rosa-regional-platform.git "${WORK
 cd "${WORK_DIR}/platform"
 git checkout "${CLONE_REF}"
 
-# Set up AWS profiles from mounted credentials (backwards-compatible)
+# Set up AWS profiles from mounted credentials
 [[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
 
 echo "Starting ephemeral teardown (fire-and-forget)..."
