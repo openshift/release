@@ -1,7 +1,7 @@
 ref:
-  as: hypershift-aws-run-e2e
+  as: hypershift-aws-run-e2e-nested
   cli: latest
-  commands: hypershift-aws-run-e2e-commands.sh
+  commands: hypershift-aws-run-e2e-nested-commands.sh
   credentials:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
@@ -19,6 +19,14 @@ ref:
       name: release:initial
     - env: CI_HYPERSHIFT_OPERATOR
       name: hypershift-operator
+    - env: OCP_IMAGE_N1
+      name: release:latest
+    - env: OCP_IMAGE_N2
+      name: release:latest
+    - env: OCP_IMAGE_N3
+      name: release:latest
+    - env: OCP_IMAGE_N4
+      name: release:latest
   env:
     - default: "false"
       name: DISABLE_PKI_RECONCILIATION
@@ -36,7 +44,16 @@ ref:
       name: MGMT_PARENT_KUBECONFIG
     - default: "false"
       name: REQUEST_SERVING_COMPONENT_TEST
-  from: test-bin
+    - default: "false"
+      name: RUN_UPGRADE_TEST
+    - default: "0"
+      name: TEST_CPO_OVERRIDE
+    - default: "false"
+      name: TECH_PREVIEW_NO_UPGRADE
+    - default: ""
+      name: OAUTH_EXTERNAL_OIDC_PROVIDER
+      documentation: "supported value: keycloak, azure"
+  from: hypershift-tests
   grace_period: 30m0s
   resources:
     requests:
