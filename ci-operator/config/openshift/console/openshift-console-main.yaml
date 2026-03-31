@@ -95,6 +95,37 @@ tests:
           memory: 10Gi
       timeout: 6h0m0s
     workflow: ipi-gcp
+- as: e2e-gcp-console-parallel
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        echo "Running Cypress tests - Shard $((MATRIX_INDEX + 1))/4"
+        # SPLIT_TOTAL defaults to 4 in test-prow-e2e.sh
+        export SPLIT_INDEX=${MATRIX_INDEX}
+
+        # Run the test
+        ./test-prow-e2e.sh e2e-parallel
+      # Create 4 parallel pods
+      matrix:
+      - name: MATRIX_INDEX
+        values: ["0", "1", "2", "3"]
+      dependencies:
+      - env: CYPRESS_PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 3h0m0s
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift
