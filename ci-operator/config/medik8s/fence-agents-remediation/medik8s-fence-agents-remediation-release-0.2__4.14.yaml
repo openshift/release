@@ -1,0 +1,84 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream8
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  to: fence-agents-remediation
+operator:
+  bundles:
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
+    with: pipeline:fence-agents-remediation
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      OPERATOR_NAMESPACE: far-install
+    test:
+    - as: install-operator
+      cli: latest
+      commands: |
+        make create-ns
+
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        BUNDLE_IMG="$OO_BUNDLE" make bundle-run
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test-command
+      cli: latest
+      commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make ocp-aws-credentials
+        test-e2e
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-0.2
+  org: medik8s
+  repo: fence-agents-remediation
+  variant: "4.14"
