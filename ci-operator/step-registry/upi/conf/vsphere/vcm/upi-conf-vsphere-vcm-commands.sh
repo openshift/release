@@ -158,7 +158,7 @@ NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 # We expect this to have the correct number of addresses.  If we are short, we need to exit here with meaningful message.
 if jq -e --argjson IPS "$((end_worker_num + 1))" '.spec.ipAddresses | length < $IPS' "${NETWORK_CONFIG}"; then
   echo "SUBNETS.JSON does not contain enough addresses. This workflow is expected to be a single-tenant lease. Please check lease / network type."
-  cat "${SUBNETS_CONFIG}"
+  cat "${NETWORK_CONFIG}"
   exit 1
 fi
 

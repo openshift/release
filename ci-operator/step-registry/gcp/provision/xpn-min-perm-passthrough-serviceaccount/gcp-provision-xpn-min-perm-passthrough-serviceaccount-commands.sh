@@ -12,8 +12,15 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+if [[ "${XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS}" == "yes" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC, of CCO in Passthrough mode, and without DNS permissions in the host project, e.g. the 'dns.networks.bindPrivateDNSZone' permission"
+    echo "$(date -u --rfc-3339=seconds) - Note that the service account does has DNS permissions in the service project, due to the limitation of CCO for Passthrough mode. "
 
-# For now using the same service account as the user-tags testing, 
-# but it is possible to use another service account in future. 
-cp "${CLUSTER_PROFILE_DIR}/user_tags_sa.json" "${SHARED_DIR}/xpn_min_perm_passthrough.json"
+    cp "${CLUSTER_PROFILE_DIR}/ipi-xpn-minpt-no-dns-sa.json" "${SHARED_DIR}/xpn_min_perm_passthrough.json"
+else
+    echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC, of CCO in Passthrough mode..."
+
+    # For now using the same service account as the user-tags testing, 
+    # but it is possible to use another service account in future. 
+    cp "${CLUSTER_PROFILE_DIR}/user_tags_sa.json" "${SHARED_DIR}/xpn_min_perm_passthrough.json"
+fi

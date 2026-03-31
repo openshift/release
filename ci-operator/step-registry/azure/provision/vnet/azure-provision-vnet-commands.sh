@@ -201,7 +201,7 @@ vnet_ipv6=""
 master_ipv6=""
 compute_ipv6_subnets=()
 compute_ipv4_subnets=()
-if [[ "${IPSTACK}" == "dualstack" ]]; then
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
     vnet_ipv6="${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-fd00:29cc:9e56::/48}"    
     master_ipv6="${AZURE_CONTROL_PLANE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56::/64}"
     worker_ipv6="${AZURE_COMPUTE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56:1::/64}"
@@ -215,7 +215,12 @@ readarray -t compute_ipv4_subnets < <(get_next_subnet ${AZURE_COMPUTE_SUBNET_PRE
 compute_ipv4_subnets=("${AZURE_COMPUTE_SUBNET_PREFIX}" "${compute_ipv4_subnets[@]}")
 for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
     if [[ ${#compute_ipv6_subnets[@]} -eq 0 ]]; then
-        run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
+        run_command "az network vnet subnet create --name ${computeSubnet_name} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     else
         run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} ${compute_ipv6_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     fi
@@ -274,8 +279,13 @@ platform:
       role: control-plane
 EOF
     for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
         cat >> "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
-    - name: ${computeSubnet_prefix}-${i}
+    - name: ${computeSubnet_name}
       role: node
 EOF
     done
@@ -286,6 +296,6 @@ platform:
     networkResourceGroupName: ${RESOURCE_GROUP}
     virtualNetwork: ${vnet_name}
     controlPlaneSubnet: ${controlPlaneSubnet}
-    computeSubnet: ${computeSubnet_prefix}-0
+    computeSubnet: ${computeSubnet_prefix}
 EOF
 fi
