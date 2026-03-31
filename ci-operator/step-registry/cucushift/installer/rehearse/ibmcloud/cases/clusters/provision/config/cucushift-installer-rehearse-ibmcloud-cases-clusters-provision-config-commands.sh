@@ -13,14 +13,6 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-
-if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
-  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
-  exit 1
-fi
-
-echo "$(date -u --rfc-3339=seconds) - Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-
 OUT_SELECT=${SHARED_DIR}/select.json
 OUT_SELECT_DICT=${SHARED_DIR}/select.dict.json
 OUT_RESULT=${SHARED_DIR}/result.json
@@ -47,14 +39,6 @@ function is_empty() {
     return 0
   fi
   return 1
-}
-
-function current_date() { date -u +"%Y-%m-%d %H:%M:%S%z"; }
-
-function update_result() {
-  local k=$1
-  local v=${2:-}
-  cat <<< "$(jq -r --argjson kv "{\"$k\":\"$v\"}" '. + $kv' "$OUT_RESULT")" > "$OUT_RESULT"
 }
 
 function create_install_config() {
@@ -115,22 +99,23 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -q
   "${IBMCLOUD_CLI}" target -q
   echo "Login successful."
+  "${IBMCLOUD_CLI}" plugin list -q
 }
 
 function getInstanceType {
-  local instance_type=$1
-  local cpu_number
+  local instance_family=$1
+  local cpu_number instance_type
   declare -A instance_map
   instance_map=( 
       ["gx2"]=8 
       ["gx3"]=16 
       ["gx3d"]=24 
   )
-  cpu_number=${instance_map[${instance_type}]:-$DefaultCPUNumber}
+  cpu_number=${instance_map[${instance_family}]:-$DefaultCPUNumber}
 
-  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep "${instance_type}-${cpu_number}x" | awk '{print $1}')
+  instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep "${instance_family}-${cpu_number}x" | awk '{print $1}')
   if [[ -z "$instance_type" ]]; then    
-    echo "ERROR: No instance type found for family ${instance_type} cpu $cpu_number."
+    echo "ERROR: No instance type found for family ${instance_family} cpu $cpu_number."
     echo ""
   fi
   echo "$instance_type"
