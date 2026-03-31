@@ -91,8 +91,11 @@ spec:
           mountPath: /var/tmp
         resources:
           requests:
-            memory: "20Gi"
-            cpu: "4"
+            memory: "32Gi"
+            cpu: "6"
+          limits:
+            memory: "64Gi"
+            cpu: "6"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -121,3 +124,12 @@ spec:
           secretName: github-credentials-openshift-ci-robot
       - name: cache
         emptyDir: {}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "node.kubernetes.io/instance-type"
+                operator: In
+                values:
+                - r5.4xlarge

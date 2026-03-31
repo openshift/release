@@ -145,7 +145,7 @@ tests:
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
 - as: cluster-density-v2-250nodes
-  cron: '@weekly'
+  cron: 45 22 * * 6
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -195,46 +195,6 @@ tests:
     - chain: netobserv-perf-test-post-workload
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
-- as: cluster-density-v2-500nodes
-  cron: 0 0 1 1 *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
-    dependencies:
-      EBPFAGENT_PR_IMAGE: ""
-      FLP_PR_IMAGE: ""
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "500"
-      COMPUTE_NODE_TYPE: m6i.4xlarge
-      EXTRA_FLAGS: --churn-delay=60s --churn-duration=10m --churn-percent=10 --timeout=5h
-        --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
-      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
-      FLP_CONSUMER_REPLICAS: "18"
-      ITERATION_MULTIPLIER_ENV: "2"
-      LOKISTACK_SIZE: 1x.medium
-      MULTISTAGE_PARAM_OVERRIDE_SAMPLING: "50"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      PATCH_EBPFAGENT_IMAGE: "false"
-      PATCH_FLOWLOGS_IMAGE: "false"
-      SIZE_VARIANT: large
-      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
-        -c 'Ready'
-      WORKLOAD: cluster-density-v2
-      ZONES_COUNT: "3"
-    observers:
-      enable:
-      - redhat-chaos-cerberus
-    post:
-    - ref: netobserv-cerberus-report
-    - chain: netobserv-perf-test-post
-    test:
-    - ref: redhat-chaos-observer-start
-    - ref: netobserv-perf-test-deploy
-    - ref: openshift-qe-kube-burner-ingress-perf
-    - chain: netobserv-perf-test-post-workload
-    workflow: openshift-qe-installer-aws
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: netobserv-perf-tests
   org: openshift-eng
