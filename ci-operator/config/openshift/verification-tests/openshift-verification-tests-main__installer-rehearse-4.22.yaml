@@ -51,6 +51,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: cucushift-installer-rehearse-azure-ipi-custom-dns
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_NEW_PUBLIC_DNS_RECORD_WAITING_TIME: "600"
+    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns
+- as: installer-rehearse-vsphere-dis
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      SLEEP_DURATION: 20m
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: cucushift-installer-wait
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
@@ -69,8 +101,24 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns
+- as: installer-rehearse-gcp2
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns-private
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
