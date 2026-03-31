@@ -1,0 +1,29 @@
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosQuery
+metadata:
+  name: ci-query
+  namespace: ci-monitoring
+spec:
+  replicas: 3
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: query-layer
+          topologyKey: kubernetes.io/hostname
+  queryFrontend:
+    replicas: 2
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: query-frontend
+            topologyKey: kubernetes.io/hostname
+  replicaLabels:
+  - replica

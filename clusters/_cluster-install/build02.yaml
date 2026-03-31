@@ -6,6 +6,8 @@ onboard:
   hosted: false
   unmanaged: false
   useTokenFileInKubeconfig: true
+  multiarchBuilderController:
+    skip: true
   certificate:
     patches:
     - type: json-patch
@@ -36,8 +38,6 @@ onboard:
       ]
   ciSchedulingWebhook:
     skip: true
-  multiarchBuilderController:
-    skip: true
   machineSet:
     skip: true
   passthrough:
@@ -64,11 +64,27 @@ onboard:
                 effect: NoExecute
               volumeClaimTemplate:
                 spec:
-                  storageClassName: standard
+                  storageClassName: gp2
                   resources:
                     requests:
                       storage: 10Gi
             prometheusK8s:
+              externalLabels:
+                clusterName: build02
+              remoteWrite:
+                - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+                  tlsConfig:
+                    ca:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: ca.crt
+                    cert:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: client.crt
+                    keySecret:
+                      name: thanos-remote-write-tls
+                      key: client.key
               nodeSelector:
                 node-role.kubernetes.io/infra: ""
               tolerations:
@@ -80,7 +96,7 @@ onboard:
                 effect: NoExecute
               volumeClaimTemplate:
                 spec:
-                  storageClassName: standard
+                  storageClassName: gp2
                   resources:
                     requests:
                       storage: 400Gi
@@ -146,3 +162,4 @@ onboard:
                 effect: NoExecute
   multiarchTuningOperator:
     skip: true
+
