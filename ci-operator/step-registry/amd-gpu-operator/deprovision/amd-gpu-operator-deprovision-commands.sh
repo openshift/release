@@ -56,11 +56,23 @@ pci_devices: []
 wait_timeout: ${WAIT_TIMEOUT:-3600}
 no_wait: false
 version_channel: ${VERSION_CHANNEL:-stable}
+
+operators:
+  install: false
+  gpu_operator_version: "${GPU_OPERATOR_VERSION:-1.4}"
+  machine_config_role: worker
+  driver_version: "30.20.1"
+  enable_metrics: true
 EOF
 
 echo "Generated cluster config:"
 cat ${CONFIG_FILE}
 
 # Delete cluster using config file
-make cluster-delete CONFIG_FILE_PATH=${CONFIG_FILE}
+if [[ "${SKIP_CLUSTER_DELETE:-false}" != "true" ]]; then
+  echo "Deleting cluster..."
+  make cluster-delete CONFIG_FILE_PATH=${CONFIG_FILE}
+else
+  echo "SKIP_CLUSTER_DELETE is set to true, skipping cluster deletion"
+fi
 

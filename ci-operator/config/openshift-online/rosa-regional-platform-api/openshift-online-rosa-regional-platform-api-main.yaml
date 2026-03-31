@@ -1,0 +1,46 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Containerfile
+images:
+- dockerfile_path: Dockerfile
+  to: rosa-regional-platform-api
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: ./ci/lint.sh
+  container:
+    from: src
+- as: unit
+  commands: ./ci/unit-tests.sh
+  container:
+    from: src
+- as: verify
+  commands: ./ci/verify.sh
+  container:
+    from: src
+- always_run: false
+  as: rosa-regionality-compatibility-e2e
+  steps:
+    dependencies:
+      CI_COMPONENT_IMAGE: rosa-regional-platform-api
+    env:
+      ROSA_REGIONAL_COMPONENT_NAME: platform-api
+      ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
+        platformApi:
+          app:
+            image:
+              repository: IMAGE_REPO
+              tag: IMAGE_TAG
+      ROSA_REGIONAL_HELM_VALUES_FILE: argocd/config/regional-cluster/platform-api/values.yaml
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/rosa-regional-platform-api
+    workflow: rosa-regional-platform-ephemeral-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-regional-platform-api

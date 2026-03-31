@@ -55,41 +55,14 @@ else
     echo "oc is already installed"
 fi
 
-echo "========== MinIO Configuration =========="
+echo "========== Object Storage Configuration =========="
 
-# Read MinIO configuration from SHARED_DIR (set by insights-onprem-minio-deploy step)
-if [ -f "${SHARED_DIR}/minio-env" ]; then
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/minio-env"
-    
-    # Export the variables we need
-    export MINIO_HOST
-    export MINIO_PORT
-    export MINIO_ENDPOINT
-    export MINIO_NAMESPACE
-    export APP_NAMESPACE
-    
-    echo "MinIO host: ${MINIO_HOST}"
-    echo "MinIO port: ${MINIO_PORT}"
-    echo "MinIO endpoint (host:port): ${MINIO_ENDPOINT}"
-    echo "MinIO namespace: ${MINIO_NAMESPACE}"
-    echo "Application namespace: ${APP_NAMESPACE}"
-    
-    # Set NAMESPACE for the helm chart deployment
-    if [ -n "${APP_NAMESPACE:-}" ]; then
-        export NAMESPACE="${APP_NAMESPACE}"
-    fi
+if [ "${DEPLOY_S4:-false}" == "true" ]; then
+    echo "Deploying S4 storage to namespace: ${S4_NAMESPACE:-s4-test}"
+    echo "S4 configuration will be handled by deploy-test-cost-onprem.sh"
 else
-    echo "WARNING: MinIO configuration not found in SHARED_DIR"
-    echo "Make sure insights-onprem-minio-deploy step ran before this step"
-fi
-
-# Read credentials from separate files
-if [ -f "${SHARED_DIR}/minio-access-key" ]; then
-    MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
-    export MINIO_ACCESS_KEY
-    MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
-    export MINIO_SECRET_KEY
+    echo "Skipping S4 deployment (DEPLOY_S4=false)"
+    echo "Storage will be handled externally or is not required"
 fi
 
 echo "========== Installing Cost Management Operator =========="
@@ -174,69 +147,6 @@ fi
 
 fi  # end SKIP_COST_MGMT_INSTALL check
 
-echo "========== Configuring Helm for MinIO Storage =========="
-# Tell the Helm chart to use MinIO instead of ODF (NooBaa)
-# This prevents the chart from trying to lookup NooBaa CRDs which don't exist
-# when using MinIO for object storage
-
-# IMPORTANT: Find the REAL helm binary location BEFORE we create any wrappers
-# If helm was installed to /tmp/helm, we need to find the actual binary
-ORIGINAL_HELM=$(command -v helm)
-if [[ "${ORIGINAL_HELM}" == "/tmp/helm" ]]; then
-    # Helm was installed to /tmp, use the actual binary path
-    # Move it to a different location to avoid conflicts with the wrapper
-    mv /tmp/helm /tmp/helm-original
-    ORIGINAL_HELM="/tmp/helm-original"
-    echo "Moved original helm to ${ORIGINAL_HELM}"
-fi
-
-HELM_WRAPPER="/tmp/helm-wrapper"
-
-cat > "${HELM_WRAPPER}" << 'WRAPPER_EOF'
-#!/bin/bash
-# Helm wrapper that injects MinIO storage configuration
-# This intercepts helm calls and adds MinIO config
-# ONLY for the cost-onprem chart - other charts pass through unchanged
-
-ORIGINAL_HELM="__ORIGINAL_HELM__"
-
-# Only inject MinIO config for the cost-onprem chart installation
-# Check if this is an install/upgrade command for cost-onprem specifically
-if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
-    echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
-    # IMPORTANT: Do NOT set global.storageType=minio as that breaks OpenShift security contexts
-    # Instead, set odf.endpoint explicitly - the chart should skip NooBaa lookup when endpoint is provided
-    # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
-    echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST:-minio-storage}, port: ${MINIO_PORT:-9000}"
-    exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=${MINIO_HOST:-minio-storage}" \
-        --set "odf.port=${MINIO_PORT:-9000}" \
-        --set "odf.useSSL=false" \
-        --set "odf.bucket=${MINIO_BUCKET:-ros-data}" \
-        --set "odf.skipLookup=true"
-else
-    # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
-    exec "$ORIGINAL_HELM" "$@"
-fi
-WRAPPER_EOF
-
-# Replace placeholders with actual values
-sed -i "s|__ORIGINAL_HELM__|${ORIGINAL_HELM}|g" "${HELM_WRAPPER}"
-
-chmod +x "${HELM_WRAPPER}"
-
-# Create symlink so 'helm' resolves to our wrapper
-ln -sf "${HELM_WRAPPER}" /tmp/helm
-
-echo "Helm wrapper installed at /tmp/helm"
-echo "Original helm binary: ${ORIGINAL_HELM}"
-echo "MinIO storage type will be injected for cost-onprem chart only"
-
-# Ensure /tmp is at the front of PATH so our wrapper is found first
-export PATH="/tmp:${PATH}"
-echo "PATH updated: /tmp is now first in PATH"
-echo "helm resolves to: $(command -v helm)"
-
 echo "========== Configuring OpenShift SecurityContextConstraints =========="
 # Grant anyuid SCC to allow pods to run with runAsUser: 1000 when using storageType=minio
 # This is needed because the chart uses Kubernetes-style security contexts with minio
@@ -258,10 +168,94 @@ echo "========== Running E2E Tests =========="
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
 export USE_LOCAL_CHART="true"
+export COST_MGMT_NAMESPACE="${NAMESPACE}"
+export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
+
+# Build deployment script arguments
+DEPLOY_ARGS=(
+    --namespace "${NAMESPACE}"
+    --verbose
+)
+
+# Add S4 storage flags if enabled
+if [ "${DEPLOY_S4:-false}" == "true" ]; then
+    DEPLOY_ARGS+=(--deploy-s4)
+    # Use the same namespace as the application for S4 if S4_NAMESPACE is not explicitly set
+    # This ensures the storage credentials secret is created in the correct namespace
+    DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
+fi
+
+# Add IQE test flags if enabled
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "IQE tests enabled with profile: ${IQE_PROFILE:-smoke}"
+    DEPLOY_ARGS+=(--run-iqe)
+    DEPLOY_ARGS+=(--iqe-profile "${IQE_PROFILE:-smoke}")
+    DEPLOY_ARGS+=(--listener-cpu "${LISTENER_CPU:-max}")
+    
+    # Set up Quay pull secret for IQE image
+    SECRETS_DIR="/tmp/secrets/ci"
+    if [[ -f "${SECRETS_DIR}/username" ]] && [[ -f "${SECRETS_DIR}/password" ]]; then
+        echo "Creating Quay pull secret for IQE image..."
+        # Disable tracing due to password handling
+        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+        set +x
+        QUAY_USER=$(cat "${SECRETS_DIR}/username")
+        QUAY_PASS=$(cat "${SECRETS_DIR}/password")
+        oc create secret docker-registry iqe-pull-secret \
+            --docker-server=quay.io \
+            --docker-username="${QUAY_USER}" \
+            --docker-password="${QUAY_PASS}" \
+            -n "${NAMESPACE}" \
+            --dry-run=client -o yaml | oc apply -f -
+        $WAS_TRACING && set -x
+        echo "Quay pull secret created"
+    else
+        echo "WARNING: Quay credentials not found at ${SECRETS_DIR}, IQE image pull may fail"
+    fi
+fi
 
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
-bash ./scripts/deploy-test-cost-onprem.sh \
-    --namespace "${NAMESPACE}" \
-    --verbose
+bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
+
+# Copy test artifacts to CI artifact directory
+echo "========== Collecting Test Artifacts =========="
+if [ -d "./tests/reports" ]; then
+    echo "Found test reports directory, copying artifacts..."
+    
+    # Copy all files from reports directory
+    cp -r ./tests/reports/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    
+    # Rename junit files for Prow recognition (must be prefixed with junit)
+    # IQE test results
+    if [ -f "${ARTIFACT_DIR}/iqe_junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/iqe_junit.xml" "${ARTIFACT_DIR}/junit_iqe.xml"
+        echo "  - junit_iqe.xml (IQE test results)"
+    fi
+    
+    # Chart pytest results
+    if [ -f "${ARTIFACT_DIR}/junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/junit.xml" "${ARTIFACT_DIR}/junit_chart.xml"
+        echo "  - junit_chart.xml (chart test results)"
+    fi
+    
+    # HTML report
+    if [ -f "${ARTIFACT_DIR}/report.html" ]; then
+        echo "  - report.html (HTML test report)"
+    fi
+    
+    # IQE output log
+    if [ -f "${ARTIFACT_DIR}/iqe_output.log" ]; then
+        echo "  - iqe_output.log (IQE test output)"
+    fi
+    
+    # Screenshots directory
+    if [ -d "${ARTIFACT_DIR}/screenshots" ]; then
+        echo "  - screenshots/ (UI test screenshots)"
+    fi
+    
+    echo "Artifacts collected to ${ARTIFACT_DIR}"
+else
+    echo "No test reports directory found"
+fi

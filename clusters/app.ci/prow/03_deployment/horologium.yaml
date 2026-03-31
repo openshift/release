@@ -27,7 +27,7 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
@@ -37,24 +37,6 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=master
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: horologium
         args:
         - --config-path=/etc/config/config.yaml
@@ -62,7 +44,7 @@ spec:
         - --job-config-path=/var/repo/release/ci-operator/jobs
         - --projected-token-file=/var/sa-token/token
         - --dry-run=false
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260128-95b2a3412
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260325-947fd1958
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
@@ -75,6 +57,24 @@ spec:
           requests:
             memory: "7.5Gi"
             cpu: "150m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:

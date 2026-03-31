@@ -2,30 +2,18 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.21-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.21-linux
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
-  inputs:
-    stolostron_builder_go1.21-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
   to: prometheus-operator
 - dockerfile_path: cmd/prometheus-config-reloader/Dockerfile.prow
   from: base
-  inputs:
-    stolostron_builder_go1.21-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
   to: prometheus-config-reloader
 promotion:
   to:
@@ -34,12 +22,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -91,8 +79,7 @@ tests:
         export OSCI_COMPONENT_NAME="prometheus-operator"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -117,8 +104,7 @@ tests:
         export OSCI_COMPONENT_NAME="prometheus-config-reloader"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

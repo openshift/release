@@ -38,7 +38,7 @@ tests:
     from: test-bin
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-component
   steps:
@@ -53,13 +53,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-gcp-component-serial-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- as: e2e-gcp-component-serial-disruptive-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial-disruptive
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: verify-deps
   steps:

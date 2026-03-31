@@ -1,18 +1,17 @@
 base_images:
-  base-rhel9:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base-rhel9
   to: zero-trust-workload-identity-manager
 operator:
   bundles:
@@ -23,12 +22,14 @@ operator:
   - pullspec: openshift.io/zero-trust-workload-identity-manager:latest
     with: pipeline:zero-trust-workload-identity-manager
 releases:
+  initial:
+    integration:
+      name: "4.22"
+      namespace: ocp
   latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.20"
+    integration:
+      name: "4.22"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -55,21 +56,17 @@ tests:
     version: "4.20"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    dependencies:
-      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
-    env:
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
-      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n zero-trust-workload-identity-manager rollout status deployment zero-trust-workload-identity-manager-controller-manager
+        oc create namespace zero-trust-workload-identity-manager
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n zero-trust-workload-identity-manager "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n zero-trust-workload-identity-manager deployment zero-trust-workload-identity-manager-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -80,7 +77,73 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-generic-claim
+    workflow: generic-claim
+- always_run: false
+  as: e2e-operator-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-operator-rhcos10-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-operator-rhcos10
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift

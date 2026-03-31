@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -61,10 +61,72 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.16$
+    cluster: build11
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: opp
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-multicluster-observability-operator-release-2.16-opp-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opp
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -82,9 +144,17 @@ postsubmits:
         - --target=publish-endpoint-monitoring-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -116,7 +186,7 @@ postsubmits:
     always_run: false
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -134,9 +204,17 @@ postsubmits:
         - --target=publish-grafana-dashboard-loader
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -168,7 +246,7 @@ postsubmits:
     always_run: false
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -186,9 +264,17 @@ postsubmits:
         - --target=publish-metrics-collector
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -220,7 +306,7 @@ postsubmits:
     always_run: false
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -238,9 +324,17 @@ postsubmits:
         - --target=publish-multicluster-observability-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -272,7 +366,7 @@ postsubmits:
     always_run: false
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -290,9 +384,17 @@ postsubmits:
         - --target=publish-observability-e2e-test
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -324,7 +426,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.16$
-    cluster: build06
+    cluster: build11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -341,9 +443,17 @@ postsubmits:
         - --target=publish-rbac-query-proxy
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

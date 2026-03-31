@@ -61,6 +61,7 @@ tests:
     - as: e2e-hypershift-pao
       cli: latest
       commands: |-
+        export CLUSTER_TYPE=hypershift
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -83,6 +84,7 @@ tests:
     - as: e2e-pao-updating-profile-hypershift
       cli: latest
       commands: |-
+        export CLUSTER_TYPE=hypershift
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -97,11 +99,11 @@ tests:
     workflow: hypershift-aws-e2e-cluster
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -118,7 +120,7 @@ tests:
 - as: e2e-nightly
   cron: 42 20 * * 6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: nightly
       cli: latest
@@ -131,7 +133,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -191,7 +193,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local

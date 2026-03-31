@@ -37,33 +37,58 @@ echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 echo "Removing bastion self-reference from resolv.conf ..."
 ssh ${SSH_ARGS} root@${bastion} "sed -i '\$!{/^nameserver/d}' /etc/resolv.conf"
 
+# Override JETLAG_BRANCH to main when JETLAG_LATEST is true
+if [[ ${JETLAG_LATEST} == 'true' ]]; then
+  JETLAG_BRANCH=main
+fi
+
+# Clone jetlag on the bastion (needed before all.yml generation to copy sample file)
+jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
+ssh ${SSH_ARGS} root@${bastion} "
+   set -e
+   set -o pipefail
+   git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
+   cd ${jetlag_repo}
+   # JETLAG_PR or PULL_NUMBER can't be set at the same time
+   if [[ -n '${JETLAG_PR}' ]]; then
+     git pull origin pull/${JETLAG_PR}/head:${JETLAG_PR} --rebase
+     git switch ${JETLAG_PR}
+   elif [[ -n '${PULL_NUMBER}' ]] && [[ '${REPO_NAME}' == 'jetlag' ]]; then
+     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+     git switch ${PULL_NUMBER}
+   fi
+   git branch
+   source bootstrap.sh
+"
+# Save jetlag_repo for next Step(s) that may need this info
+echo $jetlag_repo > ${SHARED_DIR}/jetlag_repo
+
+# Copy the sample vars file from jetlag and fill in values with sed
+scp -q ${SSH_ARGS} root@${bastion}:${jetlag_repo}/ansible/vars/all.sample.yml /tmp/all.yml
+
+# Variables with empty defaults in sample — fill in values
+sed -i "s/^lab:$/lab: $LAB/" /tmp/all.yml
+sed -i "s/^lab_cloud:$/lab_cloud: $LAB_CLOUD/" /tmp/all.yml
+sed -i "s/^cluster_type:$/cluster_type: $TYPE/" /tmp/all.yml
+sed -i "s/^worker_node_count:$/worker_node_count: $NUM_WORKER_NODES/" /tmp/all.yml
+sed -i "s|^smcipmitool_url:$|smcipmitool_url: \"file:///root/smcipmitool.tar.gz\"|" /tmp/all.yml
+
+# Variables with defaults that need overriding
+sed -i "s/^public_vlan: .*/public_vlan: $PUBLIC_VLAN/" /tmp/all.yml
+sed -i "s/^enable_fips: .*/enable_fips: $FIPS/" /tmp/all.yml
+
+# Variables NOT in sample — append
 cat <<EOF >>/tmp/all.yml
----
-lab: $LAB
-lab_cloud: $LAB_CLOUD
-cluster_type: $TYPE
-worker_node_count: $NUM_WORKER_NODES
-public_vlan: $PUBLIC_VLAN
-sno_use_lab_dhcp: false
-enable_fips: $FIPS
-ssh_private_key_file: ~/.ssh/id_rsa
-ssh_public_key_file: ~/.ssh/id_rsa.pub
-pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
-smcipmitool_url: "file:///root/smcipmitool.tar.gz"
-bastion_cluster_config_dir: /root/{{ cluster_type }}
-setup_bastion_gogs: false
-setup_bastion_registry: false
-use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
+reset_idrac: $RESET_IDRAC
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
-  echo -e "enable_bond: $BOND" >> /tmp/all.yml
-  echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+  sed -i "s/^enable_bond: .*/enable_bond: $BOND/" /tmp/all.yml
 
   # Create proxy configuration for private VLAN deployments
   cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
@@ -75,15 +100,18 @@ cleanup_ssh() {
   # Kill the SOCKS proxy running on the jumphost
   ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true
   # Kill local SSH processes
-  pkill ssh
+  pkill ssh || true
 }
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 
-# Generate a random port between 10000-65535 for SOCKS proxy
-SOCKS_PORT=$((RANDOM % 55536 + 10000))
+# Generate a random port between 10000-32767 for SOCKS proxy (avoid ephemeral port range 32768-60999)
+SOCKS_PORT=$((RANDOM % 22768 + 10000))
+
+# Clean up any stale SOCKS proxy SSH processes from previous runs
+cleanup_ssh
 
 # Step 1: Start SOCKS proxy on jumphost connecting to bastion (runs in background on jumphost)
 ssh ${SSH_ARGS} root@${jumphost} "ssh root@${bastion} -fNT -D 0.0.0.0:${SOCKS_PORT}" &
@@ -215,37 +243,11 @@ for c in "${conns[@]}"; do
 done
 EOF
 
-# Override JETLAG_BRANCH to main when JETLAG_LATEST is true
-if [[ ${JETLAG_LATEST} == 'true' ]]; then
-  JETLAG_BRANCH=main
-fi
-
-# Setup Bastion
-jetlag_repo=/tmp/jetlag-${LAB}-${LAB_CLOUD}-$(date +%s)
-ssh ${SSH_ARGS} root@${bastion} "
-   set -e
-   set -o pipefail
-   git clone https://github.com/redhat-performance/jetlag.git --depth=1 --branch=${JETLAG_BRANCH:-main} ${jetlag_repo}
-   cd ${jetlag_repo}
-   # JETLAG_PR or PULL_NUMBER can't be set at the same time
-   if [[ -n '${JETLAG_PR}' ]]; then
-     git pull origin pull/${JETLAG_PR}/head:${JETLAG_PR} --rebase
-     git switch ${JETLAG_PR}
-   elif [[ -n '${PULL_NUMBER}' ]] && [[ '${REPO_NAME}' == 'jetlag' ]]; then
-     git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
-     git switch ${PULL_NUMBER}
-   fi
-   git branch
-   source bootstrap.sh
-"
-# Save jetlag_repo for next Step(s) that may need this info
-echo $jetlag_repo > ${SHARED_DIR}/jetlag_repo
-
 cp ${CLUSTER_PROFILE_DIR}/pull_secret /tmp/pull-secret
 oc registry login --to=/tmp/pull-secret
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/vars/all.yml
-scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull-secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 
 if [[ "$TYPE" == "hmno" || "$TYPE" == "vmno" ]]; then

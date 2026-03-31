@@ -45,9 +45,11 @@ function ci_copy_secrets() {
 
     # Set up the SSH keys at the expected location
     if [ -e /tmp/ssh-publickey ] && [ -e /tmp/ssh-privatekey ] ; then
-        cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
-        cp /tmp/ssh-privatekey ~/.ssh/id_rsa
-        chmod 0400 ~/.ssh/id_rsa*
+        cp /tmp/ssh-publickey  "${HOME}/.ssh/id_rsa.pub"
+        cp /tmp/ssh-privatekey "${HOME}/.ssh/id_rsa"
+
+        chmod 0400 "${HOME}/.ssh/id_rsa" "${HOME}/.ssh/id_rsa.pub"
+        rm -vf /tmp/ssh-publickey /tmp/ssh-privatekey
     fi
 
     # Set up the pull secret at the expected location
@@ -70,6 +72,19 @@ EOF
         else
             cp /tmp/pull-secret "${PULL_SECRET}"
         fi
+
+        chmod 0600 "${PULL_SECRET}"
+        rm -vf /tmp/pull-secret /tmp/pull-secret-stage /tmp/registry.stage.redhat.io
+    fi
+
+    # Set up the OCP mirror username and password at the expected location
+    if [ -e /tmp/ocp_mirror_username ] && [ -e /tmp/ocp_mirror_password ] ; then
+        echo "Setting up OCP mirror username and password"
+        cp /tmp/ocp_mirror_username "${HOME}/.ocp_mirror_username"
+        cp /tmp/ocp_mirror_password "${HOME}/.ocp_mirror_password"
+
+        chmod 0600 "${HOME}/.ocp_mirror_username" "${HOME}/.ocp_mirror_password"
+        rm -vf /tmp/ocp_mirror_username /tmp/ocp_mirror_password
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
@@ -96,6 +111,8 @@ EOF
 
         # Permissions and environment settings
         chmod -R go-rwx "${HOME}/.aws/"
+        rm -vf /tmp/aws_access_key_id /tmp/aws_secret_access_key
+
         export AWS_PROFILE=microshift-ci
         export AWS_BUCKET_NAME="microshift-build-cache-${cache_region}"
     fi
@@ -107,6 +124,8 @@ function ci_subscription_register() {
         return 0
     fi
 
+    # NOTE: Subscription files cannot be removed after the system is registered
+    # because they are used by RPM-based test scenarios
     if [ ! -e /tmp/subscription-manager-org ] || [ ! -e /tmp/subscription-manager-act-key ] ; then
         echo "ERROR: The subscription files do not exist in /tmp directory"
         return 1
@@ -182,6 +201,13 @@ function ci_get_clonerefs() {
 }
 
 function ci_clone_src() {
+    local force_clone="${1:-false}"
+
+    # Clusterbot variables override force_clone - they require explicit branch selection
+    if [ -n "${MICROSHIFT_PR:-}" ] || [ -n "${MICROSHIFT_GIT:-}" ] || [ -n "${MICROSHIFT_NIGHTLY:-}" ]; then
+        force_clone="true"
+    fi
+
     fails=0
     for _ in $(seq 3) ; do
         if ci_get_clonerefs; then
@@ -196,7 +222,41 @@ function ci_clone_src() {
         fi
     done
 
-    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+    if [ "${force_clone}" == "true" ]; then
+        # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
+        # Priority: MICROSHIFT_PR > MICROSHIFT_GIT > MICROSHIFT_NIGHTLY > JOB_SPEC extraction
+        local branch pr_number=""
+        if [ -n "${MICROSHIFT_PR:-}" ]; then
+            branch="main"
+            pr_number="${MICROSHIFT_PR}"
+        elif [ -n "${MICROSHIFT_GIT:-}" ]; then
+            branch="${MICROSHIFT_GIT}"
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] && [ -n "${OCP_VERSION:-}" ]; then
+            branch="release-${OCP_VERSION}"
+        else
+            branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
+            # MicroShift repo uses main instead of master
+            [ "${branch}" == "master" ] && branch="main"
+        fi
+
+        CLONEREFS_OPTIONS=$(jq -n \
+            --arg branch "${branch}" \
+            --arg pr "${pr_number}" \
+            '{
+                "src_root": "/go",
+                "log":"/dev/null",
+                "git_user_name": "ci-robot",
+                "git_user_email": "ci-robot@openshift.io",
+                "fail": true,
+                "refs": [{
+                    "org": "openshift",
+                    "repo": "microshift",
+                    "base_ref": $branch,
+                    "workdir": true
+                } + if $pr != "" then {"pulls": [{"number": ($pr | tonumber), "sha": ""}]} else {} end]
+            }')
+        export CLONEREFS_OPTIONS
+    elif [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
         CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [(select(.refs) | .refs), try(.extra_refs[])]}')
         export CLONEREFS_OPTIONS
@@ -690,6 +750,12 @@ function get_source_dir() {
     [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
     [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
     [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [bootc-releases-el9]="scenarios-bootc/el9/releases:scenarios-bootc"
+    [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
+    [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
+    [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
+    [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
+    [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
     [periodics]="scenarios/periodics:scenarios-periodics"

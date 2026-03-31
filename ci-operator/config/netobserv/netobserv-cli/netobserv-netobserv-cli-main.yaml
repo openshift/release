@@ -1,0 +1,51 @@
+base_images:
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  to: netobserv-cli
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/netobserv/netobserv-cli
+    COPY --from=builder /go/src/github.com/netobserv/netobserv-cli /go/src/github.com/netobserv/netobserv-cli
+  from: src
+  inputs:
+    src:
+      as:
+      - src
+  to: netobserv-cli-src
+promotion:
+  to:
+  - namespace: netobserv
+    tag: ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration-tests
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      NETOBSERV_COLLECTOR_IMAGE: ""
+    test:
+    - ref: netobserv-cli-tests
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: main
+  org: netobserv
+  repo: netobserv-cli

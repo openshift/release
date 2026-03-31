@@ -1,0 +1,73 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+- dockerfile_path: ./Dockerfile.aro-e2e
+  from: ubi9-minimal
+  inputs:
+    src:
+      as:
+      - ${BUILDER_REGISTRY}/openshift-release-dev/golang-builder--partner-share:rhel-9-golang-1.25-openshift-4.21
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/Azure/ARO-RP/.
+  to: aro-classic-e2e
+promotion:
+  to:
+  - name: aro-classic-ci-images
+    namespace: aro-classic
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: integration-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-classic-int
+    env:
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: stage-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-classic-stg
+    env:
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: prod-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-classic-prod
+    env:
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: e2e-parallel
+  steps:
+    cluster_profile: aro-classic-dev
+    env:
+      LOCATION: westus3
+    workflow: aro-classic-e2e
+zz_generated_metadata:
+  branch: master
+  org: Azure
+  repo: ARO-RP

@@ -214,7 +214,7 @@ tests:
   skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$|OWNERS$
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -293,9 +293,8 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -308,7 +307,7 @@ tests:
     cluster_profile: gcp-qe
     env:
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -322,7 +321,7 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -335,12 +334,26 @@ tests:
     cluster_profile: vsphere-connected-2
     env:
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: debug-winc-aws-upi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

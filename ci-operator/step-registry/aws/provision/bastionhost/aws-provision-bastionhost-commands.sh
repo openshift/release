@@ -66,8 +66,8 @@ echo "VpcId: $VpcId"
 echo "PublicSubnet: $PublicSubnet"
 echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
 EnableIpv6="no"
-if [[ "${IPSTACK}" == "dualstack" ]]; then
-    echo "IPSTACK: $IPSTACK"
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    echo "IP_FAMILY: $IP_FAMILY"
     EnableIpv6="yes"
     VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
 fi
@@ -285,6 +285,10 @@ Resources:
         FromPort: 8080
         ToPort: 8080
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
+        CidrIp: 0.0.0.0/0
       VpcId: !Ref VpcId
   BastionSecurityGroupIpv6:
     Condition: AssignIpv6
@@ -315,6 +319,14 @@ Resources:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
         CidrIpv6: ::/0
       VpcId: !Ref VpcId
   BastionInstance:

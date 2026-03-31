@@ -221,7 +221,7 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
@@ -234,7 +234,7 @@ tests:
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
@@ -247,14 +247,14 @@ tests:
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-proxy
 - always_run: false
   as: aws-private
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       PUBLISH: Internal
     post:
@@ -302,14 +302,14 @@ tests:
   as: e2e-aws-upi-proxy
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi-proxy
 - always_run: false
   as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -329,7 +329,7 @@ tests:
   as: e2e-aws-ovn-custom-iam-profile
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -352,7 +352,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -367,7 +367,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
@@ -376,7 +376,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
@@ -384,14 +384,14 @@ tests:
   as: e2e-aws-ovn-edge-zones-manifest-validation
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-installer-manifests-aws-edge-zones
 - always_run: false
   as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AWS_METADATA_SERVICE_AUTH: Required
@@ -401,7 +401,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       ADDITIONAL_SUBNETS_COUNT: "1"
       ASSIGN_ROLES_TO_SUBNETS: "yes"
@@ -493,7 +493,7 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -506,7 +506,7 @@ tests:
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       USER_TAGS: |
         keyA valueA
@@ -517,7 +517,7 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
@@ -531,7 +531,7 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
@@ -539,7 +539,7 @@ tests:
   as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
@@ -547,7 +547,7 @@ tests:
   as: e2e-azure-ovn-multidisk-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -571,18 +571,21 @@ tests:
         for a Gateway object \| The HAProxy router should pass the http2 tests \|
         The HAProxy router should pass the gRPC interoperability tests \| Services
         should fail health check node port if there are only terminating endpoints
+        \| when using openshift ovn-kubernetes should ensure egressfirewall is created
+        \| when using openshift ovn-kubernetes should ensure egressfirewall with wildcard
+        dns rules is created
       USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-azure-custom-dns
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-latestinstaller
 - as: e2e-aws-ovn-upi
   run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
@@ -615,7 +618,7 @@ tests:
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-upi
 - always_run: false
   as: e2e-gcp-upgrade
@@ -917,7 +920,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-metal-single-node-live-iso
@@ -931,7 +934,7 @@ tests:
   optional: true
   run_if_changed: aws|^(data/data/coreos)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -1007,8 +1010,7 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - collection: ""
-        mount_path: /var/secrets/registry-pull-secret
+      - mount_path: /var/secrets/registry-pull-secret
         name: registry-pull-credentials
         namespace: test-credentials
       dependencies:
@@ -1144,7 +1146,7 @@ tests:
   optional: true
   run_if_changed: /aws/subnet.go
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-publicsubnets
 - always_run: false
   as: e2e-openstack-dualstack
@@ -1156,7 +1158,7 @@ tests:
   as: e2e-aws-overlay-mtu-ovn-1200
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
@@ -1166,7 +1168,7 @@ tests:
   run_if_changed: azure
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: None
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -1232,7 +1234,7 @@ tests:
   run_if_changed: azure
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       BASTION_BOOT_IMAGE: azureopenshift:aro4:aro_417:417.94.20240701
       PUBLISH: Internal
@@ -1261,13 +1263,13 @@ tests:
   as: e2e-external-aws
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-external-aws
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
@@ -1276,7 +1278,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -1320,7 +1322,7 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
     leases:
@@ -1331,7 +1333,7 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool-disabled
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       AWS_PUBLIC_IPV4_POOL_ID: none
     workflow: openshift-e2e-aws
@@ -1344,7 +1346,7 @@ tests:
 - always_run: false
   as: e2e-azure-nat-gateway-single-zone
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       OUTBOUND_TYPE: NATGatewaySingleZone
     workflow: openshift-e2e-azure

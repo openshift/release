@@ -65,6 +65,28 @@
             }
           },
           {
+            alert: 'TriggeredProwJobsPileup',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak',
+            }
+          },
+          {
+            alert: 'SchedulingProwJobsPileup',
+            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              message: 'Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak',
+            }
+          },
+          {
             # We need this for a grafana variable, because grafana itself can only do extremely simplistic queries there
             record: 'github:identity_names',
             expr: 'count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)'

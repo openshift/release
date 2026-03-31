@@ -247,7 +247,7 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         log "Detected ROSA/OSD HyperShift cluster. Running health checks..."
         print_clusterversion
-        check_node_status || exit 1
+        retry check_node_status || exit 1
         retry check_cluster_operators || exit 1
         retry check_pod_status || exit 1
         log "✅ ROSA/OSD health checks passed."
@@ -274,7 +274,7 @@ log "Checking guest cluster..."
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 check_disabled_capability || exit 1
 print_clusterversion
-check_node_status || exit 1
+retry check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
 

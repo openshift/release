@@ -75,6 +75,15 @@ oc adm release extract --registry-config pull-secret --credentials-requests --cl
 rm pull-secret
 popd
 
+# TODO(OCPBUGS-77845): Temporary workaround - must be reverted when the bug is resolved.
+# The cluster-api credentials request changed from feature-set to feature-gate
+# annotation, but oc adm release extract does not yet filter on feature-gate.
+capi_cr="/tmp/credentials-request/0000_30_cluster-api_01_credentials-request.yaml"
+if [[ -f "${capi_cr}" ]]; then
+  echo "Removing cluster-api credentials request (feature-gate not supported by current tooling)"
+  rm -f "${capi_cr}"
+fi
+
 echo "CR manifest files:"
 ls /tmp/credentials-request
 files=$(ls -p /tmp/credentials-request/*.yaml | awk -F'/' '{print $NF}')

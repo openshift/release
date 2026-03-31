@@ -10,7 +10,7 @@ base_images:
   oadp-apps-deployer:
     name: oadp-apps-deployer
     namespace: oadp-qe
-    tag: master
+    tag: interop
   oadp-e2e-qe:
     name: oadp-e2e-qe
     namespace: oadp-qe
@@ -19,7 +19,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: rhel-9-release-golang-1.20-openshift-4.17
 images:
 - context_dir: .
   dockerfile_path: dockerfiles/testing/interop/Dockerfile
@@ -50,7 +50,7 @@ resources:
       memory: 200Mi
 tests:
 - as: oadp-interop-aws
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -75,9 +75,10 @@ tests:
       MAP_TESTS: "true"
       OADP_TEST_FOCUS: interop
       OCP_VERSION: "4.21"
-      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_OPERATOR_CHANNEL: stable-4.21
       ODF_STORAGE_CLUSTER_NAME: odf-operator
-      ODF_VERSION_MAJOR_MINOR: "4.20"
+      ODF_VERSION_MAJOR_MINOR: "4.21"
+      ODF_VOLUME_SIZE: "250"
       OPERATORS: |
         [
           {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"}
@@ -85,6 +86,7 @@ tests:
       RE_TRIGGER_ON_FAILURE: "false"
       REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: OADP-lp-interop
+      STORAGE_CLASS: odf-operator-ceph-rbd-virtualization
       USER_TAGS: |
         scenario oadp
     test:

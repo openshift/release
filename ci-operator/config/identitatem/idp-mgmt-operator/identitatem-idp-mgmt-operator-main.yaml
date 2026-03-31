@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -16,16 +12,8 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: idp-mgmt-operator
 - dockerfile_path: Dockerfile.cypress
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: idp-mgmt-operator-e2e-tests
 promotion:
   to:
@@ -129,16 +117,13 @@ tests:
         export VERSION_TAG=latest
         ./run-prow-e2e.sh
       credentials:
-      - collection: ""
-        mount_path: /etc/ocm-mgdsvcs-e2e-test
+      - mount_path: /etc/ocm-mgdsvcs-e2e-test
         name: ocm-mgdsvcs-e2e-test
         namespace: test-credentials
-      - collection: ""
-        mount_path: /etc/ocm-mgdsvcs-clusterpool
+      - mount_path: /etc/ocm-mgdsvcs-clusterpool
         name: ocm-mgdsvcs-clusterpool
         namespace: test-credentials
-      - collection: ""
-        mount_path: /etc/acm-cicd-quay-pull
+      - mount_path: /etc/acm-cicd-quay-pull
         name: acm-cicd-quay-pull
         namespace: test-credentials
       from: idp-mgmt-operator-e2e-tests

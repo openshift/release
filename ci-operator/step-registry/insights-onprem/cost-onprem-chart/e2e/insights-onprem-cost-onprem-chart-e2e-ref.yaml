@@ -6,16 +6,17 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: insights-qe-secrets
+    mount_path: /tmp/secrets/ci
   env:
-  - name: MINIO_HOST
-    default: "minio-storage"
-    documentation: "MinIO S3 hostname (just host, no port) - uses proxy service in app namespace"
-  - name: MINIO_PORT
-    default: "9000"
-    documentation: "MinIO S3 port"
-  - name: MINIO_BUCKET
-    default: "ros-data"
-    documentation: "MinIO bucket name for ROS data"
+  - name: DEPLOY_S4
+    default: "true"
+    documentation: "Set to 'true' to deploy S4 storage. When false, storage is handled externally or not required."
+  - name: S4_NAMESPACE
+    default: ""
+    documentation: "Namespace for S4 deployment when DEPLOY_S4=true. Defaults to same namespace as application if not specified."
   - name: COST_MGMT_CHANNEL
     default: "stable"
     documentation: "OLM channel for Cost Management Operator (stable, alpha, etc.)"
@@ -31,14 +32,33 @@ ref:
   - name: VERBOSE
     default: "true"
     documentation: "Enable verbose output from deployment script"
+  - name: RUN_IQE
+    default: "false"
+    documentation: "Set to 'true' to run IQE cost-management tests after deployment"
+  - name: IQE_PROFILE
+    default: "smoke"
+    documentation: "IQE test profile: smoke (~17min), extended (~33min), stable (~40min), full (~60min)"
+  - name: LISTENER_CPU
+    default: "max"
+    documentation: "CPU limit for listener during IQE tests (e.g., 500m, 1000m, or 'max' for dynamic)"
   documentation: |-
     This step runs the cost-onprem e2e tests by executing the
     deploy-test-cost-onprem.sh script from the cost-onprem-chart repository.
     
     It handles:
     - Dependency installation (yq, kubectl, helm, oc)
-    - MinIO configuration (from insights-onprem-minio-deploy step)
+    - S4 object storage deployment (when DEPLOY_S4=true, via --deploy-s4 flag)
     - Cost Management Operator installation (without hardcoded version)
-    - Helm wrapper for MinIO storage configuration
     - RHBK deployment, Strimzi/Kafka setup, Helm chart installation
     - TLS configuration and JWT authentication testing
+    - IQE cost-management tests (when RUN_IQE=true)
+    
+    Set DEPLOY_S4=true to deploy S4 storage. By default, S4 is deployed to 
+    the same namespace as the application to ensure storage credentials are 
+    accessible. Set S4_NAMESPACE to override. When DEPLOY_S4=false, storage 
+    is handled externally or not required.
+    
+    Set RUN_IQE=true to run IQE cost-management tests after deployment.
+    The IQE_PROFILE controls test scope: smoke (~17min), extended (~33min),
+    stable (~40min), or full (~60min). Requires insights-qe-secrets for
+    pulling the IQE container image from Quay.

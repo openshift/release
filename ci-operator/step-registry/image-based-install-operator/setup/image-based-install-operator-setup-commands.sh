@@ -32,9 +32,8 @@ result_format = yaml
 
 EOF
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/image-based-install-operator.tar.gz"
-
-echo "export IMG=${IMG}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export IBIO_IMAGE=${IBIO_IMAGE}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export IBIO_CODE_IMAGE=${IBIO_CODE_IMAGE}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
@@ -54,8 +53,11 @@ REPO_DIR="/home/image-based-install-operator"
 if [ ! -d "${REPO_DIR}" ]; then
   mkdir -p "${REPO_DIR}"
 
-  echo "### Untar image-based-install-operator code..."
-  tar -xzvf /root/image-based-install-operator.tar.gz -C "${REPO_DIR}"
+  sudo podman pull "${IBIO_CODE_IMAGE}"
+  IBIO_CODE_IMAGE_SRC_PATH=$(sudo podman inspect --format '{{ .Config.WorkingDir }}' "${IBIO_CODE_IMAGE}")
+  IBIO_CODE_IMAGE_CTR_ID=$(sudo podman create "${IBIO_CODE_IMAGE}")
+  sudo podman cp "${IBIO_CODE_IMAGE_CTR_ID}:${IBIO_CODE_IMAGE_SRC_PATH}/." "${REPO_DIR}/"
+  sudo podman rm -f "${IBIO_CODE_IMAGE_CTR_ID}"
 fi
 
 cd "${REPO_DIR}"
@@ -153,7 +155,7 @@ wait_for_condition "hiveconfig.hive.openshift.io/hive" "Ready" "10m"
 echo "Hive installed successfully"
 
 echo "### Installing IBIO"
-make deploy
+IMG=${IBIO_IMAGE} make deploy
 wait_for_condition "pod" "Ready" "10m" "image-based-install-operator" "app=image-based-install-operator"
 
 echo "IBIO installed successfully"

@@ -11,6 +11,10 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
+  rhel-coreos-base:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: rhel-coreos
   tests-private:
     name: tests-private
     namespace: ci
@@ -39,6 +43,9 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
+    rhel-coreos-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
   to: rhel-coreos
 promotion:
   to:
@@ -104,10 +111,16 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: verify-deps
+- as: verify-vendor-work
   commands: openshift-hack/verify-vendor.sh
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 - as: unit
   commands: openshift-hack/test-unit.sh
   container:

@@ -205,19 +205,29 @@ spec:
     rules:
     - alert: high-ci-operator-infra-error-rate
       annotations:
-        message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.
+        message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.
       expr: |
-        sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
-      for: 1m
+        (
+          sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+        )
+        and on (reason)
+        (
+          count by (reason) (
+            sum by (reason, job_name) (
+              rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
+            ) > 0
+          ) >= 3
+        )
+      for: 5m
       labels:
         severity: critical
   - name: ci-operator-error
     rules:
     - alert: high-ci-operator-error-rate
       annotations:
-        message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.
+        message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.
       expr: |
-        sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
+        sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
       for: 1m
       labels:
         severity: critical
@@ -243,7 +253,7 @@ spec:
         severity: critical
     - alert: ProbeFailing
       annotations:
-        message: Probing the instance {{ $labels.instance }} has been failing for the past minute.
+        message: Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
@@ -251,7 +261,7 @@ spec:
         severity: critical
     - alert: ProbeFailing-Lenient
       annotations:
-        message: Probing the instance {{ $labels.instance }} has been failing for the past five minutes.
+        message: Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.
       expr: |
         up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
       for: 5m
@@ -261,18 +271,39 @@ spec:
     rules:
     - alert: openshift-priv-image-building-jobs-failing
       annotations:
-        message: openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.
+        message: The priv image-building job branch-ci-openshift-priv-{{ $labels.job_tail }} is failing while the corresponding public job branch-ci-openshift-{{ $labels.job_tail }} remains healthy. See priv <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-openshift-priv-{{ $labels.job_tail }}|deck-internal> and public <https://prow.ci.openshift.org/?job=branch-ci-openshift-{{ $labels.job_tail }}|deck>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.
       expr: |
         (
-          sum(
-            rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state="success"}[12h])
+          sum by (job_tail) (
+            label_replace(
+              rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state="success"}[12h]),
+              "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+            )
           )
           /
-          sum(
-            rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
+          sum by (job_tail) (
+            label_replace(
+              rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-priv-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h]),
+              "job_tail", "$1", "job_name", "branch-ci-openshift-priv-(.*-images)"
+            )
           )
-        )
-        < 0.90
+        ) < 0.90
+        and on (job_tail)
+        (
+          sum by (job_tail) (
+            label_replace(
+              rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state="success"}[12h]),
+              "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+            )
+          )
+          /
+          sum by (job_tail) (
+            label_replace(
+              rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-openshift-.*-images",org="openshift",state=~"success|failure|aborted"}[12h]),
+              "job_tail", "$1", "job_name", "branch-ci-openshift-(.*-images)"
+            )
+          )
+        ) >= 0.90
       for: 1m
       labels:
         severity: critical
@@ -290,11 +321,11 @@ spec:
     rules:
     - alert: openshift-mirroring-failures
       annotations:
-        message: OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.
+        message: OpenShift image mirroring jobs have had no successful run in the last 6 hours. The primary recovery target is to restore at least one successful run after repeated failures. Check <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/openshift-mirroring-failures.md|SOP>.
       expr: |
         sum by (job_name) (
           rate(
-            prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
+            prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[6h]
           )
         )
         * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="image-mirroring",label_ci_openshift_io_area="openshift"}) == 0
@@ -306,9 +337,9 @@ spec:
     rules:
     - alert: ghproxy-too-many-pending-alerts
       annotations:
-        message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 5 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and if the metric is ramping up, consider whether changing ghproxy throttling parameters may be necessary
+        message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 10 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/ghproxy-too-many-pending-alerts.md|SOP>.
       expr: |
-        sum_over_time(pending_outbound_requests{container="ghproxy"}[5m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[5m]) > 150
+        sum_over_time(pending_outbound_requests{container="ghproxy"}[10m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[10m]) > 150
       labels:
         severity: critical
     - alert: ghproxy-specific-status-code-abnormal
@@ -479,6 +510,20 @@ spec:
       for: 10m
       labels:
         severity: critical
+    - alert: TriggeredProwJobsPileup
+      annotations:
+        message: Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
+        runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak
+      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
+      labels:
+        severity: critical
+    - alert: SchedulingProwJobsPileup
+      annotations:
+        message: Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
+        runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak
+      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
+      labels:
+        severity: warning
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
   - name: ci-chat-bot-down
@@ -509,6 +554,7 @@ spec:
       for: 5m
       labels:
         severity: critical
+        team: crt
   - name: release-controller-bugzilla-errors
     rules:
     - alert: releaseControllerBugzillaError

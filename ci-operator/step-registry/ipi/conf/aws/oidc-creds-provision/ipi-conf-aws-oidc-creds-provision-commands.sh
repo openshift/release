@@ -71,6 +71,18 @@ popd
 echo "CR manifest files:"
 ls "/tmp/credrequests"
 
+# TODO(OCPBUGS-77845): Temporary workaround - must be reverted when the bug is resolved.
+# The cluster-api credentials request changed from feature-set to feature-gate
+# annotation, but oc adm release extract does not yet filter on feature-gate.
+# Remove the cluster-api CR when FEATURE_SET is not set.
+if [[ -z "${FEATURE_SET:-}" ]]; then
+  capi_cr="/tmp/credrequests/0000_30_cluster-api_01_credentials-request.yaml"
+  if [[ -f "${capi_cr}" ]]; then
+    echo "Removing cluster-api credentials request (feature-gate not supported by current tooling)"
+    rm -f "${capi_cr}"
+  fi
+fi
+
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "Shared VPC is enabled"
   echo "Checking if ingress CR file exits"
@@ -85,7 +97,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   echo "OCP version: ${ocp_version}"
   
-  if (( ocp_minor_version <= 13 && ocp_major_version == 4 )); then
+  if (( ocp_major_version == 4 && ocp_minor_version <= 13 )); then
     if ! grep "sts:AssumeRole" ${ingress_cr_file}; then
       echo "WARN: Adding sts:AssumeRole to ingress role"
       sed -i '/      - tag:GetResources/a\ \ \ \ \ \ - sts:AssumeRole' ${ingress_cr_file}

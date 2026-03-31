@@ -38,8 +38,13 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
   exit 1
 fi
 
-BASE_DOMAIN="${LEASED_RESOURCE}.ci"
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  BASE_DOMAIN="phc-cicd.cis.ibm.net"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+else
+  BASE_DOMAIN="${LEASED_RESOURCE}.ci"
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+fi
 
 # Default UPI installation
 echo "Create the install-config.yaml file..."
@@ -79,6 +84,13 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 fips: true
+EOF
+fi
+
+if [ ! -z "${OS_IMAGE_STREAM}" ]; then
+	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
+	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+osImageStream: "${OS_IMAGE_STREAM}"
 EOF
 fi
 

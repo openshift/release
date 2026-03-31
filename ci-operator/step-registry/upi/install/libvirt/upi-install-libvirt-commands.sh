@@ -62,7 +62,11 @@ echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
 
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+else
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+fi
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
@@ -271,6 +275,19 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Check for the master mcp yaml config, and save it in the installation directory
+MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
+if [[ -f "${MCP_MASTER_YAML}" ]]; then
+  echo "Saving ${MCP_MASTER_YAML} to the install manifests directory..."
+  cp ${MCP_MASTER_YAML} "${INSTALL_DIR}/manifests/"
+fi
+
+# Check for the worker mcp yaml config, and save it in the installation directory
+MCP_WORKER_YAML="${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
+if [[ -f "${MCP_WORKER_YAML}" ]]; then
+  echo "Saving ${MCP_WORKER_YAML} to the install manifests directory..."
+  cp ${MCP_WORKER_YAML} "${INSTALL_DIR}/manifests/"
+fi
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then

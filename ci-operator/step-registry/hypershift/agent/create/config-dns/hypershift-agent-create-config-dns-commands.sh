@@ -24,6 +24,10 @@ HOSTEDCLUSTER_NAME="${2}"
 WORKER_IP=$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 
+# The .apps wildcard DNS entries point to the MetalLB ingress IPs configured in
+# the hypershift-agent-create-metallb step: 192.168.111.30 (IPv4) and
+# fd2e:6f44:5dd8:c956::1e (IPv6). These are from the dev-scripts default
+# external network (192.168.111.0/24, fd2e:6f44:5dd8:c956::/120).
 if [[ $IP_STACK == "v4v6" ]]; then
   IFS=' ' read -ra parts <<< "$WORKER_IP"
   WORKER_IP0="${parts[0]}"

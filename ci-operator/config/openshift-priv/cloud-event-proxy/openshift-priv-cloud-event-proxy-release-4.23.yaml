@@ -3,20 +3,12 @@ base_images:
     name: 4.23-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: github.com/redhat-cne/cloud-event-proxy
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: cloud-event-proxy
 - dockerfile_path: examples/consumer.Dockerfile
   to: cloud-event-consumer
@@ -52,17 +44,14 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
   steps:
-    cluster_profile: aws-telco
-    env:
-      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      USER_TAGS: |
-        ci-job-source prowci
-        ci-job-branch main
-        ci-job-fullname redhat-cne-cloud-event-proxy-main
-        ci-job-type e2e-aws
-        ci-repo-name cloud-event-proxy
-        ci-org-name redhat-cne
     test:
     - as: functests
       cli: latest
@@ -86,7 +75,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
 - always_run: false
   as: security
   optional: true

@@ -59,6 +59,29 @@ echo "Configured dns successfully"
 
 export SSH_PUB_KEY=$(cat /home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key.pub)
 
+echo "### Configuring ImageClusterInstall machineNetworks based on IP_STACK=${IP_STACK:-}"
+if [[ "${IP_STACK:-v4}" == "v4v6" ]]; then
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V4}
+  - cidr: ${EXTERNAL_SUBNET_V6}
+EOF_MN
+)"
+elif [[ "${IP_STACK:-v4}" == "v6v4" ]]; then
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V6}
+  - cidr: ${EXTERNAL_SUBNET_V4}
+EOF_MN
+)"
+else
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V4}
+EOF_MN
+)"
+fi
+
 tee <<EOCR | oc create -f -
 apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
@@ -81,7 +104,7 @@ spec:
   hostname: ostest-extraworker-0 
   imageSetRef:
     name: ibi-cluster-image-set
-  machineNetwork: ${EXTERNAL_SUBNET_V4}
+${MACHINE_NETWORKS_YAML}
   sshKey: ${SSH_PUB_KEY}
 ---
 apiVersion: hive.openshift.io/v1

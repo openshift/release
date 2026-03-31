@@ -28,6 +28,7 @@ done
 # Parse job spec
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER
 echo "Repository: ${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}"
 echo "Branch: ${RELEASE_BRANCH_NAME}, PR: ${GIT_PR_NUMBER}"
 
@@ -96,7 +97,7 @@ export RHDH_VERSION INSTALLATION_METHOD
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     RHDH_VERSION="$(echo "$RELEASE_BRANCH_NAME" | cut -d'-' -f2)"
 else
-    RHDH_VERSION="next"
+    RHDH_VERSION="1.10" # TODO: Change to next when RHIDP-12071 is fixed.
 fi
 INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
@@ -124,7 +125,8 @@ fi
 
 echo "Running tests for workspace: ${CHANGED_WORKSPACES}"
 cd "workspaces/${CHANGED_WORKSPACES}/e2e-tests"
-yarn install
+yarn install --immutable
+yarn playwright install chromium
 
 TEST_EXIT_CODE=0
 yarn test || TEST_EXIT_CODE=$?
@@ -133,5 +135,31 @@ yarn test || TEST_EXIT_CODE=$?
 echo "Copying test artifacts to ${ARTIFACT_DIR}"
 cp -a playwright-report "${ARTIFACT_DIR}/" 2>/dev/null || true
 cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+# Post GitHub comment with test results
+post_github_comment() {
+    set +ex  # Disable exit-on-error and tracing for token handling
+    [[ "$JOB_TYPE" != "presubmit" ]] && [[ -z "${REHEARSE_PR_NUMBER:-}" ]] && return 0
+    [[ -z "${VAULT_GITHUB_TEST_REPORTER_TOKEN:-}" ]] && { echo "WARNING: VAULT_GITHUB_TEST_REPORTER_TOKEN not set"; return 1; }
+
+    local gcs_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull"
+    local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-ocp-helm/redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local stats status comment
+
+    stats=$(jq -r '(.stats.duration // 0) / 1000 | floor | "\(. / 60 | floor)m \(. % 60)s"' playwright-report/results.json 2>/dev/null || echo "N/A")
+    counts=$(jq -r '"Passed: \(.stats.expected // 0) | Failed: \(.stats.unexpected // 0) | Flaky: \(.stats.flaky // 0) | Skipped: \(.stats.skipped // 0)"' playwright-report/results.json 2>/dev/null || echo "N/A")
+    [[ "$TEST_EXIT_CODE" -eq 0 ]] && status="✅ Passed" || status="❌ Failed"
+
+    comment="### ${status} E2E Tests - \`${CHANGED_WORKSPACES}\`
+**Platform:** ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION} | **RHDH Version:** ${RHDH_VERSION} | **Duration:** ${stats}
+${counts}
+[Playwright Report](${step_path}/artifacts/playwright-report/index.html) | [Build Log](${step_path}/build-log.txt) | [Artifacts](${step_path}/artifacts)"
+
+    curl -sS -X POST -H "Authorization: Bearer ${VAULT_GITHUB_TEST_REPORTER_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/issues/${GIT_PR_NUMBER}/comments" \
+        -d "$(jq -n --arg body "$comment" '{body: $body}')" > /dev/null && echo "Posted GitHub comment"
+}
+post_github_comment || echo "WARNING: Failed to post GitHub comment"
 
 exit $TEST_EXIT_CODE

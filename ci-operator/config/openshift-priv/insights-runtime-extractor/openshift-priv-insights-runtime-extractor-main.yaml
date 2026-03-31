@@ -78,11 +78,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-tests
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: e2e-tests
       cli: latest
@@ -97,6 +97,16 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      SCAN_NAMESPACE: openshift-insights
+    test:
+    - ref: tls-scanner-run
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-priv

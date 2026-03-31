@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 workdir=`mktemp -d`
 
@@ -89,7 +95,7 @@ EOF
 # not happen yet. So here make the proxy use ipv4 to resolve the
 # dual-stack websites as the default behavior.
 proxy_dns_config="dns_v4_first on"
-if [[ "${IPSTACK}" == "dualstack" ]]; then
+if [[ "$IP_FAMILY" == *"DualStackIPv6Primary"* ]]; then
     # when no setting, ipv6 DNS is preferred in squid process
     proxy_dns_config=""
 fi

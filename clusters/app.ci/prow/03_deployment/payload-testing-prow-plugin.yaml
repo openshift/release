@@ -86,7 +86,7 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
@@ -97,25 +97,6 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=master
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: payload-testing-prow-plugin
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-prow-plugin_latest
         imagePullPolicy: Always
@@ -174,6 +155,25 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       serviceAccountName: payload-testing-prow-plugin
       volumes:
       - name: hmac
