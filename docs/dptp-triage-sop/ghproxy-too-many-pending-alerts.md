@@ -55,6 +55,9 @@ sum(rate(github_request_wait_duration_seconds_bucket{le="10", token_hash="opensh
 
 1. Confirm whether the queue backlog is persistent (trend) rather than a short spike.
 2. Identify which plugin(s), API(s), or request type(s) are contributing most to delay.
-3. If sustained pressure is confirmed, and there is no significant 403s pressure (secondary rate limit error) tune `ghproxy` timing/throttling settings in:
+3. Check the two 403 ratio queries:
+   - if high, treat this primarily as rate-limit/token pressure
+   - if low, focus on plugin/API latency and queue throughput
+4. If sustained pressure is confirmed, and there is no significant 403 pressure (secondary rate-limit signal), tune `ghproxy` timing/throttling settings in:
    - [`clusters/app.ci/prow/03_deployment/ghproxy.yaml`](https://github.com/openshift/release/blob/main/clusters/app.ci/prow/03_deployment/ghproxy.yaml)
-4. After changes, monitor queue depth and request latency/403 ratios to confirm recovery.
+5. After changes, monitor queue depth and request latency/403 ratios to confirm recovery.
