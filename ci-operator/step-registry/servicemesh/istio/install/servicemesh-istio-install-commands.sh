@@ -168,18 +168,6 @@ spec:
       name: my-storage-secret
       type: s3
   storageSize: 1Gi
-  template:
-    querier:
-      resources:
-        limits:
-          cpu: "2"
-    queryFrontend:
-      component:
-        resources:
-          limits:
-            memory: 6Gi
-      jaegerQuery:
-        enabled: true
 EOF
 
 oc -n ${TEMPO_NAMESPACE} wait --for condition=Ready TempoStack/sample --timeout 150s || (oc describe -n ${TEMPO_NAMESPACE} TempoStack/sample; oc describe pods -n ${TEMPO_NAMESPACE}; exit 1)
