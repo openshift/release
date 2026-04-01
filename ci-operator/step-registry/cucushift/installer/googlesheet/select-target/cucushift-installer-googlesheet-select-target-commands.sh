@@ -84,9 +84,11 @@ function post_actions() {
   rm -f "${ACCESS_TOKEN_FILE}"
   rm -f /tmp/pull-secret
 
-  if -f "${OUT_SELECT}" && [ -s "${OUT_SELECT}" ]; then
-    echo "Copying select result to ARTIFACT_DIR for debugging ..."
+  echo "Copying select result to ARTIFACT_DIR for debugging ..."
+  if [[ -f "${OUT_SELECT}" ]]; then
     cp "${OUT_SELECT}" "${ARTIFACT_DIR}"/
+  fi
+  if [[ -f "${OUT_MATCH}" ]]; then
     cp "${OUT_MATCH}" "${ARTIFACT_DIR}"/
   fi
 }
