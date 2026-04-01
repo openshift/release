@@ -27,16 +27,17 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- to: hypershift-operator
-- dockerfile_path: Dockerfile.control-plane
-  to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  to: hypershift-tests
-- dockerfile_literal: |
-    FROM base
-    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
-  from: src
-  to: docs-build-src
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
+    from: src
+    to: docs-build-src
 promotion:
   to:
   - excluded_images:
@@ -148,6 +149,9 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aks-4-21
@@ -191,7 +195,10 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-v2-aws
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
@@ -220,6 +227,9 @@ tests:
       CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
 - always_run: false
   as: e2e-aws-minimal
@@ -235,7 +245,7 @@ tests:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-techpreview
   optional: true
@@ -250,7 +260,7 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-upgrade-hypershift-operator
   capabilities:
@@ -264,7 +274,7 @@ tests:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
   - build-tmpfs
@@ -275,7 +285,7 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-4-21
   capabilities:
@@ -293,7 +303,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
@@ -385,7 +395,7 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-openstack-aws-nfv
   optional: true
@@ -454,7 +464,7 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: verify-deps
   steps:
     env:

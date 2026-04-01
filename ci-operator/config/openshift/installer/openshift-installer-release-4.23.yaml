@@ -39,6 +39,10 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: cli
+  ocp_4.22_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -59,57 +63,69 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  to: installer
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  to: baremetal-installer
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
-    # Cache dir must be accessible when running the integration tests
-    RUN mkdir /.cache -m 0777
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    COPY virtctl /usr/bin/virtctl
-    COPY openshift-install /usr/bin/openshift-install
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    splat-ci-virtctl:
-      paths:
-      - destination_dir: .
-        source_path: /virtctl
-    upi-installer:
-      paths:
-      - destination_dir: .
-        source_path: /bin/openshift-install
-  to: virtctl
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    to: installer
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: openstack-base
+    inputs:
+      openstack-base:
+        as:
+        - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    to: baremetal-installer
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y nmstate
+      # Cache dir must be accessible when running the integration tests
+      RUN mkdir /.cache -m 0777
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      COPY virtctl /usr/bin/virtctl
+      COPY openshift-install /usr/bin/openshift-install
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      splat-ci-virtctl:
+        paths:
+        - destination_dir: .
+          source_path: /virtctl
+      upi-installer:
+        paths:
+        - destination_dir: .
+          source_path: /bin/openshift-install
+    to: virtctl
 promotion:
   to:
   - excluded_images:
     - src-oc
     name: "4.23"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-22.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-22.repo
+    from: ocp_4.22_base-rhel9
+    to: openstack-base
 releases:
   initial:
     integration:
@@ -643,6 +659,8 @@ tests:
     cluster_profile: azure-qe
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      COMPUTE_NODE_TYPE: Standard_D16s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
         to support the 1.17 Sample API Server using the current Aggregator \| Ensure
@@ -1482,6 +1500,17 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
+- always_run: false
+  as: e2e-aws-eusc-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws-eusc
+    env:
+      BASE_DOMAIN: ci-eusc.devcluster.openshift.com
+      COMPUTE_AMI: ami-0b78302f83217d149
+      CONTROL_PLANE_AMI: ami-0b78302f83217d149
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

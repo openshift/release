@@ -24,7 +24,7 @@ spec:
     server:
       root_url: "https://grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com"
     users:
-      viewers_can_edit: "true"
+      viewers_can_edit: "false"
     auth:
       disable_login_form: "true"
       disable_signout_menu: "false"
@@ -43,6 +43,16 @@ spec:
     spec:
       template:
         spec:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 90
+                preference:
+                  matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64
           containers:
           - name: grafana
             env:

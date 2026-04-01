@@ -209,7 +209,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: $QUAY_INDEX_IMAGE_BUILD
+  image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
   displayName: FBC Testing Operator Catalog
   publisher: grpc
 EOF
@@ -242,11 +242,11 @@ function check_catalog_source_status(){
 #"redhat-operators" is official catalog source for released build
 if [ $QUAY_OPERATOR_SOURCE == "redhat-operators" ]; then 
   echo "Installing Quay from released build"
-elif [ -z "$QUAY_INDEX_IMAGE_BUILD" ]; then 
-  echo "Installing from custom catalog source $QUAY_OPERATOR_SOURCE, but not provoide index image: $QUAY_INDEX_IMAGE_BUILD"
+elif [ -z "$MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE" ]; then
+  echo "Installing from custom catalog source $QUAY_OPERATOR_SOURCE, but not provoide index image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   exit 1
 else #Install Quay operator with fbc image
-  echo "Installing Quay from unreleased fbc image: $QUAY_INDEX_IMAGE_BUILD"
+  echo "Installing Quay from unreleased fbc image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   update_pull_secret
   create_icsp
   create_catalog_source

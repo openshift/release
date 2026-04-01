@@ -24,6 +24,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=breaking-changes
         command:
@@ -43,6 +44,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -63,6 +67,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -230,6 +240,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e
         command:
@@ -249,6 +260,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -269,6 +283,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -313,6 +333,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-oo
         command:
@@ -332,6 +353,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -352,6 +376,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -685,7 +715,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: app.ci
     context: ci/prow/secret-bootstrapper-validation
     decorate: true
     extra_refs:
@@ -730,6 +760,9 @@ presubmits:
       - args:
         - --config=../release/core-services/ci-secret-generator/_config.yaml
         - --bootstrap-config=../release/core-services/ci-secret-bootstrap/_config.yaml
+        - --enable-gsm-sync=true
+        - --gsm-config=../release/core-services/ci-secret-bootstrap/gsm-config.yaml
+        - --gsm-project-config=../release/core-services/ci-secret-bootstrap/gsm-project-config.yaml
         - --validate-only=true
         command:
         - go
@@ -766,6 +799,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=security
         command:
@@ -785,6 +819,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -805,6 +842,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config

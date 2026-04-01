@@ -327,31 +327,30 @@ rm /tmp/pull-secret
 # fi
 
 # custom rhcos ami for non-public regions
-RHCOS_AMI=
-if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && [[ -z "${COMPUTE_AMI}" ]]; then
   jq --version
   if (( ocp_major_version == 4 && ocp_minor_version <= 9 )); then
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
-    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
   else
     # 4.10 and above
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
-    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   fi
-  echo "RHCOS for C2S: ${RHCOS_AMI}"
+  COMPUTE_AMI="${CONTROL_PLANE_AMI}"
+  echo "RHCOS for C2S: ${CONTROL_PLANE_AMI}"
 fi
 
-if [ ! -z ${RHCOS_AMI} ]; then
-  echo "patching rhcos ami to install-config.yaml"
-  CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
-  cat >> "${CONFIG_PATCH_AMI}" << EOF
-platform:
-  aws:
-    amiID: ${RHCOS_AMI}
-EOF
-  yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
-  cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
+# Apply AMI configuration
+if [[ -n "${CONTROL_PLANE_AMI}" ]]; then
+  echo "Setting control plane AMI: ${CONTROL_PLANE_AMI}"
+  yq-v4 eval -i '.controlPlane.platform.aws.amiID = env(CONTROL_PLANE_AMI)' "${CONFIG}"
+fi
+
+if [[ -n "${COMPUTE_AMI}" ]]; then
+  echo "Setting compute AMI: ${COMPUTE_AMI}"
+  yq-v4 eval -i '.compute[0].platform.aws.amiID = env(COMPUTE_AMI)' "${CONFIG}"
 fi
 
 
@@ -588,6 +587,22 @@ networking:
   - 172.30.0.0/16
   - fd02::/112
 EOF
+  fi
+
+  # byo-vpc
+  vpc_info_json=${SHARED_DIR}/vpc_info.json
+  if [ -f "$vpc_info_json" ]; then
+    vpc_ipv4_cidr=$(jq -r '.vpc_ipv4_cidr' "$vpc_info_json")
+    vpc_ipv6_cidr=$(jq -r '.vpc_ipv6_cidr' "$vpc_info_json")
+    export vpc_ipv4_cidr
+    export vpc_ipv6_cidr
+    if [[ "${IP_FAMILY}" == "DualStackIPv6Primary" ]]; then
+      yq-v4 eval -i '.networking.machineNetwork[0].cidr = env(vpc_ipv6_cidr)' ${patch_dualstack}
+      yq-v4 eval -i '.networking.machineNetwork[1].cidr = env(vpc_ipv4_cidr)' ${patch_dualstack}
+    else
+      yq-v4 eval -i '.networking.machineNetwork[0].cidr = env(vpc_ipv4_cidr)' ${patch_dualstack}
+      yq-v4 eval -i '.networking.machineNetwork[1].cidr = env(vpc_ipv6_cidr)' ${patch_dualstack}
+    fi
   fi
 
   yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
