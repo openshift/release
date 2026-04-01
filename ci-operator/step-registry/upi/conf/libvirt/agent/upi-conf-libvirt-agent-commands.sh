@@ -45,16 +45,12 @@ fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Creating the agent-config.yaml file..."
-# Rendezvous must match the static DHCP IP for control-0 in network.xml when INSTALLER_TYPE=agent
-# (see upi-conf-libvirt-network: control-0 uses bootstrap[0].ip — there is no bootstrap VM). A
-# hardcoded 192.168.<subnet>.10 breaks VPN / orange-zone leases where bootstrap[0].ip != .10.
-RENDEZVOUS_IP="$(leaseLookup 'bootstrap[0].ip')"
 cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
-rendezvousIP: ${RENDEZVOUS_IP}
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
 hosts:
   - hostname: control-0.${BASE_URL}
     role: master
