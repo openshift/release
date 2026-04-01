@@ -9,7 +9,7 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ -z "${AGENT_ISO}" ] && { echo "\$AGENT_ISO is not filled. Failing."; exit 1; }
+#[ -z "${AGENT_ISO}" ] && { echo "\$AGENT_ISO is not filled. Failing."; exit 1; }
 [ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && { echo "Proxy conf file is not found. Failing."; exit 1; }
 
 source "${SHARED_DIR}/proxy-conf.sh"
