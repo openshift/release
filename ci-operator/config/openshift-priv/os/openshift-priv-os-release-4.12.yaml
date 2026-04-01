@@ -5,27 +5,28 @@ build_root:
     tag: testing-devel
 canonical_go_repository: github.com/openshift/os
 images:
-- dockerfile_literal: |
-    # COSA + source code
-    FROM registry.ci.openshift.org/coreos/coreos-assembler:4.12
-    WORKDIR /src
-    # Tell the build scripts that we have setup a directory for unprivileged build
-    ENV COSA_DIR=/tmp/cosa
-    RUN mkdir -p "${COSA_DIR}"
-    # Prow doesn't support emptydir for jobs today
-    ENV COSA_SKIP_OVERLAY=1
-    # Copy the source code
-    COPY . .
-    # We need to make sure that root can read / write to the COSA_DIR so that
-    # when this container is actually run, we have permissions to read and
-    # write to the COSA_DIR to allow the Kola tests to run.
-    USER root
-    RUN chgrp -Rf root "${COSA_DIR}" && \
-      chmod -Rf g+w "${COSA_DIR}"
-    # Go back to unprivileged user for COSA
-    USER builder
-    WORKDIR /tmp/cosa
-  to: build-image
+  items:
+  - dockerfile_literal: |
+      # COSA + source code
+      FROM registry.ci.openshift.org/coreos/coreos-assembler:4.12
+      WORKDIR /src
+      # Tell the build scripts that we have setup a directory for unprivileged build
+      ENV COSA_DIR=/tmp/cosa
+      RUN mkdir -p "${COSA_DIR}"
+      # Prow doesn't support emptydir for jobs today
+      ENV COSA_SKIP_OVERLAY=1
+      # Copy the source code
+      COPY . .
+      # We need to make sure that root can read / write to the COSA_DIR so that
+      # when this container is actually run, we have permissions to read and
+      # write to the COSA_DIR to allow the Kola tests to run.
+      USER root
+      RUN chgrp -Rf root "${COSA_DIR}" && \
+        chmod -Rf g+w "${COSA_DIR}"
+      # Go back to unprivileged user for COSA
+      USER builder
+      WORKDIR /tmp/cosa
+    to: build-image
 promotion:
   to:
   - excluded_images:
