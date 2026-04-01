@@ -9,22 +9,23 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN set -x && \
-      curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
-      curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-      PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
-      yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-      ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
-      python3 -m pip install requests  && \
-      yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-      yum -y install terraform && \
-      wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-      yum install -y ./google-chrome-stable_current_x86_64.rpm && \
-      yum clean all && rm -rf /var/cache/yum/*
-  from: src
-  to: quay-newui-test
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN set -x && \
+        curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
+        python3 -m pip install requests  && \
+        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum -y install terraform && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_x86_64.rpm && \
+        yum clean all && rm -rf /var/cache/yum/*
+    from: src
+    to: quay-newui-test
 promotion:
   to:
   - namespace: ci

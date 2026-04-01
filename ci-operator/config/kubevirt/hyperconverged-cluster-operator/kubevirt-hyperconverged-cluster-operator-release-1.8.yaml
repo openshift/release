@@ -22,47 +22,48 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.12
 images:
-- dockerfile_path: build/Dockerfile.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-operator
-  to: hyperconverged-cluster-operator
-- dockerfile_path: build/Dockerfile.wh.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-webhook
-  to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.artifacts
-  optional: true
-  to: virt-artifacts-server
-- dockerfile_path: build/Dockerfile.functest.ci
-  to: hyperconverged-cluster-functest
-- dockerfile_path: deploy/Dockerfile.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y graphviz && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image-nightly
+  items:
+  - dockerfile_path: build/Dockerfile.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-operator
+    to: hyperconverged-cluster-operator
+  - dockerfile_path: build/Dockerfile.wh.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-webhook
+    to: hyperconverged-cluster-webhook
+  - dockerfile_path: build/Dockerfile.artifacts
+    optional: true
+    to: virt-artifacts-server
+  - dockerfile_path: build/Dockerfile.functest.ci
+    to: hyperconverged-cluster-functest
+  - dockerfile_path: deploy/Dockerfile.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y graphviz && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image-nightly
 operator:
   bundles:
   - context_dir: deploy/index-image
