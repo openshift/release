@@ -84,6 +84,15 @@ if oc get imagecontentsourcepolicy &>/dev/null; then
   oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
 fi
 
+echo "$(date) Ensuring SSH key exists..."
+if [[ ! -f "${SHARED_DIR}/id_rsa.pub" ]]; then
+  echo "$(date) SSH key not found, generating new key..."
+  ssh-keygen -t rsa -b 4096 -N '' -f "${SHARED_DIR}/id_rsa"
+  echo "$(date) SSH key generated"
+else
+  echo "$(date) SSH key already exists"
+fi
+
 echo "$(date) Rendering HostedCluster YAML..."
 
 # Render the HostedCluster YAML
