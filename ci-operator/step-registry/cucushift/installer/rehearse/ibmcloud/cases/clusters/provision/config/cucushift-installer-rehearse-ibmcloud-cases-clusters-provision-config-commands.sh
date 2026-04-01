@@ -103,6 +103,8 @@ function ibmcloud_login {
   echo "Login successful."
   echo "Check the installed plugin..."
   set +e
+  ibmcloud plugin repos
+  ibmcloud plugin list -q
   timout 1m "${IBMCLOUD_CLI}" plugin list -q
   set -e
 }
