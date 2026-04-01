@@ -27,16 +27,17 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- to: hypershift-operator
-- dockerfile_path: Dockerfile.control-plane
-  to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  to: hypershift-tests
-- dockerfile_literal: |
-    FROM base
-    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
-  from: src
-  to: docs-build-src
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
+    from: src
+    to: docs-build-src
 promotion:
   to:
   - disabled: true
@@ -149,6 +150,9 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aks-4-21
@@ -192,6 +196,9 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-v2-aws
@@ -221,6 +228,9 @@ tests:
       CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
 - always_run: false
   as: e2e-aws-minimal
