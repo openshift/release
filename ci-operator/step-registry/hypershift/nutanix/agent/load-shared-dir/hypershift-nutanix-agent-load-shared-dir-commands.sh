@@ -6,13 +6,15 @@ set -o pipefail
 
 echo "Loading management cluster artifacts from S3 into SHARED_DIR..."
 
+CRED_FILE="/etc/hypershift-ci-jobs-awscreds/hypershift-debug-aws"
+
 # Configure AWS credentials
-if [[ ! -f "/etc/hypershift-ci-jobs-awscreds/hypershift-debug-info" ]]; then
-    echo "ERROR: AWS credentials not found at /etc/hypershift-ci-jobs-awscreds/hypershift-debug-info"
+if [[ ! -f $CRED_FILE ]]; then
+    echo "ERROR: AWS credentials not found at $CRED_FILE"
     exit 1
 fi
 
-export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-ci-jobs-awscreds/hypershift-debug-info
+export AWS_SHARED_CREDENTIALS_FILE=$CRED_FILE
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
