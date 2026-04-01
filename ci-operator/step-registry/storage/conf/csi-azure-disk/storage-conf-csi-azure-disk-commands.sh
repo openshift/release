@@ -6,12 +6,21 @@ set -o pipefail
 if [ -d /go/src/github.com/openshift/csi-operator/ ]; then
     echo "Using csi-operator repo"
     cd /go/src/github.com/openshift/csi-operator
-    cp test/e2e/azure-disk/manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+    if [ "${AZURE_DISK_SKU}" == "UltraSSD_LRS" ]; then
+        cp test/e2e/azure-disk/ultrassd-manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+    else
+        cp test/e2e/azure-disk/manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+    fi
 
     if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
         cp test/e2e/azure-disk/ocp-manifest.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
         echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
         cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    fi
+    if [ -f "test/e2e/azure-disk/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}" ]; then
+        echo "Copying ${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST} to ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}"
+        cp test/e2e/azure-disk/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST} ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}
+        cat ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}
     fi
 else
     echo "Using azure-disk-csi-driver-operator repo"
