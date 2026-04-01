@@ -24,6 +24,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=breaking-changes
         command:
@@ -43,6 +44,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -63,6 +67,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -230,6 +240,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e
         command:
@@ -249,6 +260,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -269,6 +283,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -313,6 +333,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-oo
         command:
@@ -332,6 +353,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -352,6 +376,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -685,6 +715,72 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: app.ci
+    context: ci/prow/secret-bootstrapper-validation
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: openshift
+      repo: release
+    name: pull-ci-openshift-ci-tools-main-secret-bootstrapper-validation
+    optional: true
+    rerun_command: /test secret-bootstrapper-validation
+    spec:
+      containers:
+      - command:
+        - ./../release/hack/validate-ci-secret-boostrap.sh
+        env:
+        - name: BOOTSTRAP_BINARY
+          value: /tmp/ci-secret-bootstrap
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: secret-bootstrap
+    trigger: (?m)^/test( | .* )secret-bootstrapper-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/secret-generator-validation
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: openshift
+      repo: release
+    name: pull-ci-openshift-ci-tools-main-secret-generator-validation
+    optional: true
+    rerun_command: /test secret-generator-validation
+    spec:
+      containers:
+      - args:
+        - --config=../release/core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=../release/core-services/ci-secret-bootstrap/_config.yaml
+        - --enable-gsm-sync=true
+        - --gsm-config=../release/core-services/ci-secret-bootstrap/gsm-config.yaml
+        - --gsm-project-config=../release/core-services/ci-secret-bootstrap/gsm-project-config.yaml
+        - --validate-only=true
+        command:
+        - go
+        - run
+        - -race
+        - ./cmd/ci-secret-generator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
     cluster: build10
     context: ci/prow/security
     decorate: true
@@ -703,6 +799,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=security
         command:
@@ -722,6 +819,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -742,6 +842,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -823,6 +929,39 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/validate-prow
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: kubernetes-sigs
+      repo: prow
+    - base_ref: main
+      org: openshift
+      repo: ci-chat-bot
+    - base_ref: main
+      org: openshift
+      repo: release-controller
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-main-validate-prow
+    rerun_command: /test validate-prow
+    spec:
+      containers:
+      - command:
+        - hack/check-prow-version.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )validate-prow,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
