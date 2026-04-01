@@ -493,7 +493,6 @@ IMPORTANT:
   Always review AI generated responses prior to use.
   Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
 - Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --title '<title>' --body '<body>'
-- After creating the PR, add a comment '/auto-cc' on the PR to assign reviewers.
 - SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
 - ${SUBAGENT_PROMPT}"
 
