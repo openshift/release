@@ -9,41 +9,42 @@ build_root:
     namespace: openshift
     tag: golang-1.22
 images:
-- build_args:
-  - name: FLAVOR
-    value: cpu
-  - name: NUM_WORKERS
-    value: "4"
-  - name: OS_VERSION
-    value: "2025.2"
-  - name: BUILD_UPSTREAM_DOCS
-    value: "true"
-  - name: BUILD_OPERATORS_DOCS
-    value: "false"
-  - name: INDEX_NAME
-    value: os-docs-2025.2
-  - name: VECTOR_DB_TYPE
-    value: faiss
-  - name: BUILD_OCP_DOCS
-    value: "false"
-  - name: BUILD_OKP_CONTENT
-    value: "false"
-  - name: HERMETIC
-    value: "false"
-  - name: RHOSO_DOCS_GIT_URL
-  - name: RHOSO_DOCS_GIT_BRANCH
-  - name: RHOSO_CA_CERT_URL
-  - name: DOCS_LINK_UNREACHABLE_ACTION
-    value: warn
-  - name: OKP_CONTENT
-    value: all
-  - name: RHOSO_IGNORE_LIST
-  - name: OPERATORS_REPO_URL
-    value: https://github.com/openstack-k8s-operators/openstack-operator.git
-  - name: OPERATORS_BRANCH
-    value: main
-  dockerfile_path: Containerfile
-  to: rag-content-openstack
+  items:
+  - build_args:
+    - name: FLAVOR
+      value: cpu
+    - name: NUM_WORKERS
+      value: "4"
+    - name: OS_VERSION
+      value: "2025.2"
+    - name: BUILD_UPSTREAM_DOCS
+      value: "true"
+    - name: BUILD_OPERATORS_DOCS
+      value: "false"
+    - name: INDEX_NAME
+      value: os-docs-2025.2
+    - name: VECTOR_DB_TYPE
+      value: faiss
+    - name: BUILD_OCP_DOCS
+      value: "false"
+    - name: BUILD_OKP_CONTENT
+      value: "false"
+    - name: HERMETIC
+      value: "false"
+    - name: RHOSO_DOCS_GIT_URL
+    - name: RHOSO_DOCS_GIT_BRANCH
+    - name: RHOSO_CA_CERT_URL
+    - name: DOCS_LINK_UNREACHABLE_ACTION
+      value: warn
+    - name: OKP_CONTENT
+      value: all
+    - name: RHOSO_IGNORE_LIST
+    - name: OPERATORS_REPO_URL
+      value: https://github.com/openstack-k8s-operators/openstack-operator.git
+    - name: OPERATORS_BRANCH
+      value: main
+    dockerfile_path: Containerfile
+    to: rag-content-openstack
 releases:
   initial:
     integration:
@@ -53,10 +54,6 @@ releases:
     integration:
       name: "4.22"
       namespace: ocp
-credentials:
-- namespace: test-credentials
-  name: rag-content-quay-push
-  mount_path: /secrets/quay
 resources:
   '*':
     limits:
@@ -66,35 +63,45 @@ resources:
       memory: 8Gi
 tests:
 - as: build-rag-content-image
-  commands: |
-    echo "====================================="
-    echo "RAG Content Vector DB Image Build"
-    echo "====================================="
-    echo "Image: rag-content-openstack"
-    echo "Index: os-docs-2025.2"
-    echo "Docs: minimal build (waiting for pre-rendered repos)"
-    echo "====================================="
+  steps:
+    test:
+    - as: build-and-push
+      commands: |
+        echo "====================================="
+        echo "RAG Content Vector DB Image Build"
+        echo "====================================="
+        echo "Image: rag-content-openstack"
+        echo "Index: os-docs-2025.2"
+        echo "Docs: minimal build (waiting for pre-rendered repos)"
+        echo "====================================="
 
-    # Login to Quay.io using credentials from Vault
-    echo "Logging into Quay.io..."
-    podman login quay.io \
-      --username $(cat /secrets/quay/quay_username) \
-      --password $(cat /secrets/quay/quay_password)
+        # Login to Quay.io using credentials from Vault
+        echo "Logging into Quay.io..."
+        podman login quay.io \
+          --username $(cat /secrets/quay/quay_username) \
+          --password $(cat /secrets/quay/quay_password)
 
-    # Tag the built image for Quay.io
-    echo "Tagging image for Quay.io..."
-    podman tag rag-content-openstack:latest \
-      quay.io/openstack-lightspeed/rag-content:latest
+        # Tag the built image for Quay.io
+        echo "Tagging image for Quay.io..."
+        podman tag rag-content-openstack:latest \
+          quay.io/openstack-lightspeed/rag-content:latest
 
-    # Push to Quay.io
-    echo "Pushing image to Quay.io..."
-    podman push quay.io/openstack-lightspeed/rag-content:latest
+        # Push to Quay.io
+        echo "Pushing image to Quay.io..."
+        podman push quay.io/openstack-lightspeed/rag-content:latest
 
-    echo "====================================="
-    echo "Build completed and pushed to Quay.io!"
-    echo "====================================="
-  container:
-    from: rag-content-openstack
+        echo "====================================="
+        echo "Build completed and pushed to Quay.io!"
+        echo "====================================="
+      credentials:
+      - mount_path: /secrets/quay
+        name: rag-content-quay-push
+        namespace: test-credentials
+      from: rag-content-openstack
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
   timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
