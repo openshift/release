@@ -605,7 +605,6 @@ tests:
       enable:
       - redhat-chaos-cerberus
     test:
-    - ref: ipi-install-nutanix-csi
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: redhat-chaos-krkn-hub-tests
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
@@ -631,10 +630,49 @@ tests:
       enable:
       - redhat-chaos-cerberus
     test:
-    - ref: ipi-install-nutanix-csi
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+- always_run: false
+  as: krkn-hub-tests-nutanix-qe
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      TELEMETRY_GROUP: prow-ocp-4.21
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+- always_run: false
+  as: krkn-hub-node-tests-nutanix-qe
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe
+    env:
+      CLOUD_TYPE: nutanix
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "11"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
+      TELEMETRY_GROUP: prow-ocp-4.21
+      WAIT_DURATION: "1000"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
