@@ -12,8 +12,10 @@ if [[ ! -f "/var/run/vault/nutanix-dns/.awscred" ]]; then
     exit 1
 fi
 
-source /var/run/vault/nutanix-dns/.awscred
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix-dns/.awscred
 export AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_MAX_ATTEMPTS=50
+export AWS_RETRY_MODE=adaptive
 echo "✓ AWS credentials configured"
 
 # Validate ARTIFACTS_SOURCE_URL
