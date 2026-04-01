@@ -7,6 +7,12 @@ set -x
 
 echo "************ baremetals agentserviceconfig config command ************"
 
+# Debug mode workaround: Skip if AgentServiceConfig already exists
+if oc get agentserviceconfig agent &>/dev/null; then
+  echo "INFO: AgentServiceConfig 'agent' already exists, skipping creation (debug mode)"
+  exit 0
+fi
+
 if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   source "${SHARED_DIR}/packet-conf.sh"
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
