@@ -39,7 +39,8 @@ KONFLUX_SNAPSHOT=$(echo ${SNAPSHOT} | jq -r '.components[].containerImage' )
 
 echo "Konflux snapshot ID: ${KONFLUX_SNAPSHOT}"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+# TODO: change me
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh /usr/local/bin/extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
 
 # APPLY MANOJ'S PATCH FOR BAREMETAL SERIAL CONSOLE
 
@@ -50,4 +51,4 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh extract_ove_i
 # Add necessary kernel arguments to support serial console communication
 # console=ttyS0,115200n8
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh patch_ove_iso.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh /usr/local/bin/patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso" $(<"${CLUSTER_PROFILE_DIR}/ssh-key")
