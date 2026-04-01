@@ -7,12 +7,12 @@ set -o pipefail
 echo "Loading management cluster artifacts from S3 into SHARED_DIR..."
 
 # Configure AWS credentials
-if [[ ! -f "/etc/hypershift-pool-aws-credentials/credentials" ]]; then
-    echo "ERROR: AWS credentials not found at /etc/hypershift-pool-aws-credentials/credentials"
+if [[ ! -f "/var/run/vault/nutanix-dns/.awscred" ]]; then
+    echo "ERROR: AWS credentials not found at /var/run/vault/nutanix-dns/.awscred"
     exit 1
 fi
 
-export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
+source /var/run/vault/nutanix-dns/.awscred
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 echo "✓ AWS credentials configured"
 
