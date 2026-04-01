@@ -2,12 +2,50 @@
 
 set -exuo pipefail
 
-trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
+trap 'FRC=$?; debug $FRC' EXIT TERM
 
 debug() {
-  oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml || true
-  oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml || true
-  oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt || true
+  local exit_code=$1
+  if [[ $exit_code != 0 ]]; then
+    echo "$(date) ERROR: Script exited with code $exit_code, collecting debug information..."
+
+    # Save HostedCluster YAML
+    if oc get hostedcluster -n local-cluster ${CLUSTER_NAME} &>/dev/null; then
+      echo "$(date) Saving HostedCluster YAML to artifacts..."
+      oc get hostedcluster -n local-cluster ${CLUSTER_NAME} -o yaml > ${ARTIFACT_DIR}/hostedcluster-${CLUSTER_NAME}.yaml || true
+
+      # Also get the status in a more readable format
+      oc get hostedcluster -n local-cluster ${CLUSTER_NAME} -o jsonpath='{.status}' | jq '.' > ${ARTIFACT_DIR}/hostedcluster-${CLUSTER_NAME}-status.json 2>/dev/null || true
+    fi
+
+    # Save NodePool YAML
+    if oc get nodepool -n local-cluster &>/dev/null; then
+      echo "$(date) Saving NodePool YAML to artifacts..."
+      oc get nodepool -n local-cluster -o yaml > ${ARTIFACT_DIR}/nodepool-all.yaml || true
+    fi
+
+    # Save control plane pods
+    if oc get namespace local-cluster-${CLUSTER_NAME} &>/dev/null; then
+      echo "$(date) Saving control plane pods to artifacts..."
+      oc get pod -n local-cluster-${CLUSTER_NAME} -o yaml > ${ARTIFACT_DIR}/controlplane-pods.yaml || true
+      oc get pod -n local-cluster-${CLUSTER_NAME} -o wide > ${ARTIFACT_DIR}/controlplane-pods-wide.txt || true
+    fi
+
+    # Save hypershift operator logs (errors only)
+    if oc get namespace hypershift &>/dev/null; then
+      echo "$(date) Saving hypershift operator logs to artifacts..."
+      oc logs -n hypershift -lapp=operator --tail=500 -c operator > ${ARTIFACT_DIR}/hypershift-operator.log || true
+      oc logs -n hypershift -lapp=operator --tail=500 -c operator | grep -i "error\|failed\|panic" > ${ARTIFACT_DIR}/hypershift-operator-errors.log || true
+    fi
+
+    # Save rendered HostedCluster YAML if it exists
+    if [[ -f ${SHARED_DIR}/hostedcluster.yaml ]]; then
+      echo "$(date) Saving rendered HostedCluster YAML to artifacts..."
+      cp ${SHARED_DIR}/hostedcluster.yaml ${ARTIFACT_DIR}/hostedcluster-rendered.yaml || true
+    fi
+
+    echo "$(date) Debug information collection complete"
+  fi
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
