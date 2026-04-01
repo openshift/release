@@ -11,8 +11,9 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: cluster-config-api
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: cluster-config-api
 promotion:
   to:
   - name: "4.22"
@@ -95,6 +96,30 @@ tests:
     go build ./...
   container:
     from: src
+- always_run: false
+  as: verify-hypershift-integration
+  commands: |
+    dir=$GOPATH/src/github.com/openshift/hypershift
+    git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
+     git clone https://github.com/openshift/client-go --branch master --single-branch $dir/openshift-client-go
+    rm -rf $dir/vendor/github.com/openshift/api/*
+    rm -rf $dir/vendor/github.com/openshift/client-go/*
+    cp -Rf ./ $dir/openshift-api/
+    rm -rf $dir/openshift-api/vendor
+    rm -rf $dir/openshift-client-go/vendor
+    cd $dir
+    echo "replace github.com/openshift/api => ./openshift-api" >> go.mod
+    echo "replace github.com/openshift/client-go => ./openshift-client-go" >> go.mod
+    echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
+    echo "# github.com/openshift/client-go => ./openshift-client-go" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
+    sed -i "/github.com\/openshift\/client-go v0.0.0/ s/$/ => \.\/openshift-client-go/" vendor/modules.txt
+    go mod tidy
+    go mod vendor
+    make api test-envtest-api-all
+  container:
+    from: src
+  optional: true
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
