@@ -131,22 +131,22 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 CREATED_DATE="$(current_date)"
 
-set +e
+
 echo "=============== openshift-install version =============="
 openshift-install version
 
 echo "=============== Create manifests =============="
+set +e
 openshift-install --dir="${INSTALL_DIR}" create manifests &
 wait "$!"
 ret="$?"
+set -e
 if test "${ret}" -ne 0 ; then
 	echo "Create manifests exit code: $ret"
 	INSTALL_RESULT="FAIL"
 else
   echo "$(date -u --rfc-3339=seconds) - Created manifests."
 fi
-
-set -e
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
