@@ -73,12 +73,18 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-token-path=/etc/oauth/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --job-config-path=/var/repo/release/ci-operator/jobs
         - --cache-file=/cache/backoff
         - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
         env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-merge-bot
+              key: appid
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -93,8 +99,8 @@ spec:
         - name: metrics
           containerPort: 9090
         volumeMounts:
-        - name: github-token
-          mountPath: /etc/oauth
+        - name: github-app-credentials
+          mountPath: /etc/github
           readOnly: true
         - name: prow-config
           mountPath: /etc/config
@@ -131,9 +137,9 @@ spec:
       - name: prow-config
         configMap:
           name: config
-      - name: github-token
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-merge-bot
       - name: release
         emptyDir: {}
       - name: config
