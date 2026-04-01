@@ -32,9 +32,6 @@ function post_actions() {
   jq -r . "${OUT_RESULT}"
 }
 
-
-export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
-
 mkdir /tmp/installer
 cp "${SHARED_DIR}"/metadata.json /tmp/installer/
 

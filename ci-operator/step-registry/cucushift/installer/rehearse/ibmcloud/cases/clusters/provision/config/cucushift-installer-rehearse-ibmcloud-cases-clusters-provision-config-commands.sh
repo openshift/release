@@ -18,8 +18,10 @@ OUT_SELECT_DICT=${SHARED_DIR}/select.dict.json
 OUT_RESULT=${SHARED_DIR}/result.json
 echo '{}' > "$OUT_RESULT"
 
+# decrease the compute node count to speed up the installation and decrease the cpu requirement for the cluster.
 IC_COMPUTE_NODE_COUNT=2
 IC_CONTROL_PLANE_NODE_COUNT=3
+# the requirement of cpu of openshift Cluster. some instace types, the minimul cpu is not the DefaultCPUNumber.
 DefaultCPUNumber=4
 
 if [ ! -f "${OUT_SELECT}" ]; then
@@ -48,7 +50,7 @@ function create_install_config() {
   local compute_type=$4
   local zones_raw formatted_zones config
 
-  zones_raw=$(ibmcloud is zones ${REGION} -q | awk '(NR>1) {print $1}')
+  zones_raw=$(ibmcloud is zones "${REGION}" -q | awk '(NR>1) {print $1}')
   formatted_zones="[$(echo "${zones_raw}" | paste -sd, - | sed 's/,/, /g')]"
   echo "zones: ${formatted_zones}"
 
@@ -85,7 +87,7 @@ pullSecret: >
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
-  return ${config}
+  echo "${config}"
 }
 
 
@@ -106,6 +108,7 @@ function getInstanceType {
   local instance_family=$1
   local cpu_number instance_type
   declare -A instance_map
+  # some instace types, the minimul cpu is not the DefaultCPUNumber
   instance_map=( 
       ["gx2"]=8 
       ["gx3"]=16 
@@ -146,7 +149,7 @@ else
   exit 1
 fi
 
-if is_empty "REGION" || is_empty "$CONTROL_PLANE_INSTANCE_TYPE_FAMILY" ; then
+if is_empty "${REGION}" || is_empty "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}" ; then
   echo "ERROR: Region and control plane instance type family are required, exiting"
   exit 1
 fi

@@ -60,7 +60,7 @@ function post_actions() {
 
   update_result "Region" "${region}"
   update_result "CPType" "${control_plane_type}"
-  update_result "CPamily" "${control_plane_type%%-*}"
+  update_result "CPFamily" "${control_plane_type%%-*}"
   update_result "CType" "${computer_type}"
   update_result "CFamily" "${computer_type%%-*}"
   update_result "Arch" "${arch}"
