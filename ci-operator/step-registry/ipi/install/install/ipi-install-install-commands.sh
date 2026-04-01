@@ -640,7 +640,7 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
@@ -756,7 +756,7 @@ azure4|azure-arm64)
       inject_boot_diagnostics ${dir}
     fi
     ;;
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"
     fi
