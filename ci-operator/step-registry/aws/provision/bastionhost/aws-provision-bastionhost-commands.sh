@@ -99,6 +99,12 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
     elif [[ "${REGION}" == "us-gov-west-1" ]]; then
       ami_id="ami-01cdd82c43022852b"
     fi
+  elif [[ "${CLUSTER_PROFILE_NAME:-}" == "aws-eusc" ]]; then
+    # Fedora CoreOS 43.20260301.3.1 x86_64 bastion host AMI for EUSC
+    # Source AMI: ami-06cac406e53158eb6 (us-east-1)
+    if [[ "${REGION}" == "eusc-de-east-1" ]]; then
+      ami_id="ami-0e43802c8b4ad242e"
+    fi
   else
     if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
         bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
@@ -140,6 +146,10 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
+# EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
+elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
+    # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types
+    BastionHostInstanceType="m6id.large"
 fi
 
 ## ----------------------------------------------------------------
