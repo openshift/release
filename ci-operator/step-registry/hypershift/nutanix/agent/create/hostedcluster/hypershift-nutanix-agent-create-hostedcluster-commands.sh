@@ -97,7 +97,8 @@ fi
 
 echo "$(date) Rendering HostedCluster YAML..."
 
-# Render the HostedCluster YAML
+# Render the HostedCluster YAML with --render-sensitive to include pull secret
+# MCE 2.7+ requires --render-sensitive to include sensitive data like pull secrets
 /tmp/${HYPERSHIFT_NAME} create cluster agent \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
@@ -108,7 +109,7 @@ echo "$(date) Rendering HostedCluster YAML..."
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} \
-  --render > ${SHARED_DIR}/hostedcluster.yaml
+  --render-sensitive --render > ${SHARED_DIR}/hostedcluster.yaml
 
 echo "$(date) Modifying service publishing strategy to use Route for all services..."
 
