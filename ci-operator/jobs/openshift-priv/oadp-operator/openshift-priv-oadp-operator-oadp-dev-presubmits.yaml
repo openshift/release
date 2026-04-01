@@ -72,7 +72,7 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build10
+    cluster: build09
     context: ci/prow/4.22-e2e-test-aws
     decorate: true
     decoration_config:
@@ -167,7 +167,7 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build10
+    cluster: build09
     context: ci/prow/4.22-e2e-test-cli-aws
     decorate: true
     decoration_config:
@@ -396,7 +396,7 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build10
+    cluster: build09
     context: ci/prow/4.23-e2e-test-aws
     decorate: true
     decoration_config:
@@ -626,7 +626,7 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build10
+    cluster: build09
     context: ci/prow/5.0-e2e-test-aws
     decorate: true
     decoration_config:
@@ -721,7 +721,7 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build10
+    cluster: build09
     context: ci/prow/5.0-e2e-test-cli-aws
     decorate: true
     decoration_config:
@@ -965,6 +965,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=unit-test
@@ -985,6 +986,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1002,6 +1006,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner

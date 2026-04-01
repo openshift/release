@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: thanos-receive-ingester-nonroot
+subjects:
+- kind: ServiceAccount
+  name: thanos-receive-ingester-ci-metrics-default
+  namespace: ci-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:nonroot-v2
+---
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosReceive
+metadata:
+  name: ci-metrics
+  namespace: ci-monitoring
+spec:
+  routerSpec:
+    replicas: 3
+    replicationFactor: 3
+    externalLabels:
+      receive: "true"
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 90
+          preference:
+            matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+              - arm64
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: thanos-receive-router
+            topologyKey: kubernetes.io/hostname
+    resourceRequirements:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+    additionalArgs:
+    - --remote-write.server-tls-cert=/etc/thanos/tls/server.crt
+    - --remote-write.server-tls-key=/etc/thanos/tls/server.key
+    - --remote-write.server-tls-client-ca=/etc/thanos/tls/ca.crt
+    additionalVolumes:
+    - name: tls-certs
+      secret:
+        secretName: thanos-receive-tls
+    additionalVolumeMounts:
+    - name: tls-certs
+      mountPath: /etc/thanos/tls
+      readOnly: true
+  ingesterSpec:
+    defaultObjectStorageConfig:
+      name: thanos-object-storage
+      key: thanos.yaml
+    additionalArgs:
+    - --tsdb.wal-compression
+    - --tsdb.min-block-duration=10m
+    - --tsdb.max-block-duration=10m
+    - --tsdb.out-of-order.time-window=30m
+    additionalEnv:
+    - name: AWS_ROLE_ARN
+      valueFrom:
+        secretKeyRef:
+          name: thanos-aws-credentials
+          key: role-arn
+    - name: AWS_WEB_IDENTITY_TOKEN_FILE
+      value: "/var/run/secrets/aws/token"
+    additionalVolumes:
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
+    additionalVolumeMounts:
+    - name: aws-token
+      mountPath: /var/run/secrets/aws
+      readOnly: true
+    hashrings:
+    - name: default
+      replicas: 13
+      externalLabels:
+        replica: "$(POD_NAME)"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 90
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - arm64
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: thanos-receive-ingester
+              topologyKey: kubernetes.io/hostname
+      tsdbConfig:
+        retention: 1d
+      storage:
+        size: 100Gi
+      resourceRequirements:
+        limits:
+          cpu: "8"
+          memory: 54Gi
+        requests:
+          cpu: "8"
+          memory: 54Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-receive-router-nlb
+  namespace: ci-monitoring
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: remote-write
+    port: 19291
+    targetPort: 19291
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: thanos-receive
+    app.kubernetes.io/component: thanos-receive-router
+    app.kubernetes.io/instance: thanos-receive-router-ci-metrics

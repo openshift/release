@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/e2e-aws-capi-techpreview
     decorate: true
     labels:
@@ -87,7 +87,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -169,7 +169,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     labels:
@@ -251,7 +251,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/e2e-aws-serial-1of2
     decorate: true
     labels:
@@ -334,7 +334,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/e2e-aws-serial-2of2
     decorate: true
     labels:
@@ -417,7 +417,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
@@ -499,7 +499,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build01
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -554,7 +554,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build03
+    cluster: build11
     context: ci/prow/regression-clusterinfra-aws-ipi-techpreview-capi
     decorate: true
     labels:
@@ -636,7 +636,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build01
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -698,7 +698,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build01
+    cluster: build03
     context: ci/prow/verify-commits
     decorate: true
     labels:
@@ -761,7 +761,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build01
+    cluster: build03
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -775,6 +775,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -795,6 +796,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -812,6 +816,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

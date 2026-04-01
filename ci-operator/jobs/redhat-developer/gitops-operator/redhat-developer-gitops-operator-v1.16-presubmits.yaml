@@ -192,6 +192,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
         command:
@@ -211,6 +212,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -225,6 +229,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -295,7 +305,7 @@ presubmits:
     branches:
     - ^v1\.16$
     - ^v1\.16-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-e2e
     decorate: true
     labels:
@@ -433,7 +443,7 @@ presubmits:
     branches:
     - ^v1\.16$
     - ^v1\.16-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-kuttl-parallel
     decorate: true
     labels:
@@ -516,7 +526,7 @@ presubmits:
     branches:
     - ^v1\.16$
     - ^v1\.16-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-kuttl-sequential
     decorate: true
     labels:
