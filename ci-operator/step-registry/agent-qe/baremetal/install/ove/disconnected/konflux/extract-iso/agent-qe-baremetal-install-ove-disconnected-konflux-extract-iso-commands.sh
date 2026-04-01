@@ -21,7 +21,8 @@ HOST_ID=$(<"${SHARED_DIR}"/host-id.txt)
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
+  -o 'TCPKeepAlive=yes'
+  -o 'ServerAliveInterval=30'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key"
   -p $((14000+"${HOST_ID}")))
