@@ -85,12 +85,14 @@ if oc get imagecontentsourcepolicy &>/dev/null; then
 fi
 
 echo "$(date) Ensuring SSH key exists..."
-if [[ ! -f "${SHARED_DIR}/id_rsa.pub" ]]; then
-  echo "$(date) SSH key not found, generating new key..."
-  ssh-keygen -t rsa -b 4096 -N '' -f "${SHARED_DIR}/id_rsa"
-  echo "$(date) SSH key generated"
+if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
+  echo "$(date) Copying SSH public key from cluster profile..."
+  cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
+  echo "$(date) SSH key copied"
+elif [ -f "${SHARED_DIR}/id_rsa.pub" ]; then
+  echo "$(date) SSH key already exists in SHARED_DIR"
 else
-  echo "$(date) SSH key already exists"
+  echo "$(date) WARNING: No SSH key found in SHARED_DIR or CLUSTER_PROFILE_DIR"
 fi
 
 echo "$(date) Rendering HostedCluster YAML..."
