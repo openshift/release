@@ -11,7 +11,7 @@ set -o pipefail
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
-trap echo "waiting..."; sleep 1h; 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "waiting..."; sleep 1h; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 OUT_SELECT=${SHARED_DIR}/select.json
 OUT_SELECT_DICT=${SHARED_DIR}/select.dict.json
