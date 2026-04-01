@@ -24,8 +24,13 @@ function get_latest_wmco_index_image() {
 # Create Konflux ImageDigestMirrorSet
 function setup_wmco_catalog() {
   local wmco_index_image
-  wmco_index_image=$(get_latest_wmco_index_image)
-  
+  if [ -n "${WMCO_INDEX_IMAGE:-}" ]; then
+    wmco_index_image="${WMCO_INDEX_IMAGE}"
+    log "Using WMCO_INDEX_IMAGE override: ${wmco_index_image}"
+  else
+    wmco_index_image=$(get_latest_wmco_index_image)
+  fi
+
   if [ -z "$wmco_index_image" ]; then
     log "Failed to fetch WMCO index image. Cannot proceed with WMCO setup."
     return 1
