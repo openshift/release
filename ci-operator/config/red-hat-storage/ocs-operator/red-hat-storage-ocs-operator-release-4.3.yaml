@@ -16,50 +16,51 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
-  to: ocs-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry-base
-  to: ocs-registry
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: _output/bin
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
-  to: ocs-operator-quay
-- dockerfile_path: deploy/Dockerfile
-  from: operator-registry
-  inputs:
-    src:
-      paths:
-      - destination_dir: deploy
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/deploy/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/deploy/olm-catalog
-  to: ocs-registry-quay
-- dockerfile_path: must-gather/Dockerfile
-  from: must-gather
-  inputs:
-    src:
-      paths:
-      - destination_dir: must-gather
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/collection-scripts
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/templates
-  to: ocs-must-gather-quay
+  items:
+  - dockerfile_path: openshift-ci/Dockerfile.deploy
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
+    to: ocs-operator
+  - dockerfile_path: openshift-ci/Dockerfile.registry.intermediate
+    from: operator-registry
+    to: operator-registry-base
+  - dockerfile_path: openshift-ci/Dockerfile.registry.build
+    from: operator-registry-base
+    to: ocs-registry
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: _output/bin
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
+    to: ocs-operator-quay
+  - dockerfile_path: deploy/Dockerfile
+    from: operator-registry
+    inputs:
+      src:
+        paths:
+        - destination_dir: deploy
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/deploy/Dockerfile
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/deploy/olm-catalog
+    to: ocs-registry-quay
+  - dockerfile_path: must-gather/Dockerfile
+    from: must-gather
+    inputs:
+      src:
+        paths:
+        - destination_dir: must-gather
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/Dockerfile
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/collection-scripts
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/must-gather/templates
+    to: ocs-must-gather-quay
 promotion:
   to:
   - disabled: true

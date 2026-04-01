@@ -11,25 +11,26 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
-  to: jira-lifecycle-plugin
-- dockerfile_literal: |-
-    FROM pipeline:govulncheck
-    COPY jira-lifecycle-plugin /workdir
-    WORKDIR /workdir
-  from: govulncheck
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
-  to: govulncheck-src
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
+    to: jira-lifecycle-plugin
+  - dockerfile_literal: |-
+      FROM pipeline:govulncheck
+      COPY jira-lifecycle-plugin /workdir
+      WORKDIR /workdir
+    from: govulncheck
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
+    to: govulncheck-src
 promotion:
   to:
   - excluded_images:

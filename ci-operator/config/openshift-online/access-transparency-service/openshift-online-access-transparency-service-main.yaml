@@ -9,20 +9,21 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.20
 images:
-- dockerfile_literal: |
-    FROM nested-podman
-    COPY src/ /opt/app-root/src
-    WORKDIR /opt/app-root/src/access-transparency-service
-    USER root
-    RUN dnf install -y git go make jq
-    RUN dnf clean all
-  from: nested-podman
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/openshift-online/access-transparency-service
-  to: golang-plus
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/access-transparency-service
+      USER root
+      RUN dnf install -y git go make jq
+      RUN dnf clean all
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/access-transparency-service
+    to: golang-plus
 resources:
   '*':
     limits:

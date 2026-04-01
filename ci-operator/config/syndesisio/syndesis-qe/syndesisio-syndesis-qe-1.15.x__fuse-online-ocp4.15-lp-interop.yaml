@@ -9,24 +9,25 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.15
 images:
-- dockerfile_literal: |-
-    FROM quay.io/fuse_qe/syndesisqe-tests:1.15.x
-    USER root
-    RUN apt install -y rsync
-    RUN chgrp -R 0 /home/seluser && \
-    chmod -R g=u /home/seluser && \
-    chgrp 0 / && \
-    chmod g=u / && \
-    chmod g=u /etc/passwd /etc/group && \
-    chgrp -R 0 /tmp && \
-    chmod -R g=u /tmp
-    USER seluser
-  to: fuse-online-test-runner
-- dockerfile_literal: |-
-    FROM cli
-    RUN dnf update -y && dnf install httpd-tools -y && dnf install rsync -y && dnf clean all
-  from: cli
-  to: htpasswd-cli
+  items:
+  - dockerfile_literal: |-
+      FROM quay.io/fuse_qe/syndesisqe-tests:1.15.x
+      USER root
+      RUN apt install -y rsync
+      RUN chgrp -R 0 /home/seluser && \
+      chmod -R g=u /home/seluser && \
+      chgrp 0 / && \
+      chmod g=u / && \
+      chmod g=u /etc/passwd /etc/group && \
+      chgrp -R 0 /tmp && \
+      chmod -R g=u /tmp
+      USER seluser
+    to: fuse-online-test-runner
+  - dockerfile_literal: |-
+      FROM cli
+      RUN dnf update -y && dnf install httpd-tools -y && dnf install rsync -y && dnf clean all
+    from: cli
+    to: htpasswd-cli
 releases:
   latest:
     prerelease:

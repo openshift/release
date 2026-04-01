@@ -40,24 +40,25 @@ build_root:
       ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/github.com/backube/volsync
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- context_dir: .
-  from: ubi_minimal
-  inputs:
-    ocp_builder_volsync:
-      as:
-      - golang:1.25
-  to: volsync
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - context_dir: .
+    from: ubi_minimal
+    inputs:
+      ocp_builder_volsync:
+        as:
+        - golang:1.25
+    to: volsync
 operator:
   bundles:
   - as: volsync-bundle
