@@ -124,18 +124,6 @@ for _ in {1..30}; do
 done
 if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
   echo "Timed out waiting for QuayRegistry CRD" >&2
-  echo "=== DEBUG: Operator subscription status ===" >&2
-  oc -n quay-enterprise get subscription quay-operator -o yaml >&2 || true
-  echo "=== DEBUG: All CSVs in quay-enterprise ===" >&2
-  oc -n quay-enterprise get csv -o wide >&2 || true
-  echo "=== DEBUG: All CRDs matching quay ===" >&2
-  oc get crd | grep -i quay >&2 || true
-  echo "=== DEBUG: InstallPlan status ===" >&2
-  oc -n quay-enterprise get installplan -o wide >&2 || true
-  echo "=== DEBUG: Operator pod status ===" >&2
-  oc -n quay-enterprise get pods -o wide >&2 || true
-  echo "=== DEBUG: Sleeping 120 minutes for cluster inspection ===" >&2
-  sleep 7200
   exit 1
 fi
 
