@@ -51,4 +51,4 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh /usr/local/bi
 # Add necessary kernel arguments to support serial console communication
 # console=ttyS0,115200n8
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh /usr/local/bin/patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso" $(<"${CLUSTER_PROFILE_DIR}/ssh-key")
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${NODE_ZERO}" sh /usr/local/bin/patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso"
