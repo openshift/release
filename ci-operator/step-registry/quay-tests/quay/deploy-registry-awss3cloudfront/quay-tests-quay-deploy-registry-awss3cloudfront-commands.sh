@@ -71,6 +71,9 @@ PULL_METRICS_REDIS:
   host: quay-quay-redis
   port: 6379
   db: 1
+FEATURE_IMMUTABLE_TAGS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_SPARSE_INDEX: true
 EOF
 
 ls utility -l
