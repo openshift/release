@@ -84,10 +84,13 @@ function post_actions() {
   rm -f "${ACCESS_TOKEN_FILE}"
   rm -f /tmp/pull-secret
 
-  echo "Copying files to ARTIFACT_DIR for debugging ..."
-  cp "${OUT_SELECT}" "${ARTIFACT_DIR}"/
-  cp "${OUT_MATCH}" "${ARTIFACT_DIR}"/
+  if -f "${OUT_SELECT}" && [ -s "${OUT_SELECT}" ]; then
+    echo "Copying select result to ARTIFACT_DIR for debugging ..."
+    cp "${OUT_SELECT}" "${ARTIFACT_DIR}"/
+    cp "${OUT_MATCH}" "${ARTIFACT_DIR}"/
+  fi
 }
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'post_actions' EXIT TERM INT
 
