@@ -2,7 +2,7 @@
 
 set -euxo pipefail; shopt -s inherit_errexit
 
-# --- 1. Environment & JUnit Setup ---
+# JUnit Setup
 typeset artifactDir="${ARTIFACT_DIR:-/tmp/artifacts}"
 typeset stepId
 stepId=$(basename "${artifactDir}")
@@ -16,7 +16,6 @@ function FinalizeJunit() {
     typeset -i duration
     duration=$(( $(date +%s) - startTime ))
 
-    # Generate JUnit report for CI aggregation
     cat <<EOF > "${junitReport}"
 <testsuite name="lp-cnv-chaos-suite" tests="1" failures="$([[ ${exitCode} -eq 0 ]] && echo 0 || echo 1)" time="${duration}">
   <testcase name="${stepId}" classname="cnv-chaos-matrix" time="${duration}">
@@ -28,21 +27,16 @@ EOF
 }
 trap FinalizeJunit EXIT
 
-# --- 2. Variable Initialization ---
-# Reading VM list into string then array to ensure multi-line compatibility
 typeset vmList
 vmList="$(cat "${SHARED_DIR}/target-vm-name.txt")"
 typeset -a vmArray
 read -r -a vmArray <<< "${vmList}"
-
-# Target the first VM from the array for chaos injection
 typeset vmName="${vmArray[0]}"
 typeset vmNamespace="${LPC_LP_CNV__VM__NS:-default}"
 typeset snapshotName="snap-${stepId}"
 typeset restoreName="restore-${snapshotName}"
 typeset targetNamespace
 
-# Auto-infer target namespace based on component
 if [[ -z "${TARGET_NAMESPACE:-}" ]]; then
     case "${TARGET_COMPONENT:-}" in
         (apiserver)           targetNamespace="openshift-kube-apiserver" ;;
@@ -54,8 +48,7 @@ else
     targetNamespace="${TARGET_NAMESPACE}"
 fi
 
-# --- 3. Core Logic Functions ---
-
+# Core Logic Functions
 function DoSnapshotCreate() {
     : "Action: Creating VMSnapshot ${snapshotName} for VM ${vmName}"
     {
@@ -83,7 +76,6 @@ spec:
     name: ""
 EOF
 
-    # Sentinel: Wait for InProgress phase in a quiet subshell to avoid log spam
     ( set +x
       timeout 60s bash -c "until [[ \$(oc get vmsnapshot '${snapshotName}' -n '${vmNamespace}' -o jsonpath='{.status.phase}' 2>/dev/null) == 'InProgress' ]]; do sleep 0.5; done"
     ) || : "Warning: Phase might have transitioned or timeout reached"
@@ -94,8 +86,6 @@ EOF
 function DoSnapshotDelete() {
     : "Action: Deleting VMSnapshot ${snapshotName}"
     oc get vmsnapshot "${snapshotName}" -n "${vmNamespace}"
-    
-    # Background deletion to allow sentinel monitoring
     oc delete vmsnapshot "${snapshotName}" -n "${vmNamespace}" &
     
     ( set +x
@@ -144,8 +134,7 @@ EOF
     true
 }
 
-# --- 4. Execution Flow ---
-
+# Execution Flow
 : "[CHAOS START] Scenario: ${stepId}"
 
 case "${OPERATION:-create}" in
