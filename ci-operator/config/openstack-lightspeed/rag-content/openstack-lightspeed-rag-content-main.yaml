@@ -53,6 +53,10 @@ releases:
     integration:
       name: "4.22"
       namespace: ocp
+credentials:
+- namespace: test-credentials
+  name: rag-content-quay-push
+  mount_path: /secrets/quay
 resources:
   '*':
     limits:
@@ -68,9 +72,27 @@ tests:
     echo "====================================="
     echo "Image: rag-content-openstack"
     echo "Index: os-docs-2025.2"
-    echo "Docs: Minimal build (waiting for pre-rendered repos)"
+    echo "Docs: minimal build (waiting for pre-rendered repos)"
     echo "====================================="
-    echo "Build completed successfully!"
+
+    # Login to Quay.io using credentials from Vault
+    echo "Logging into Quay.io..."
+    podman login quay.io \
+      --username $(cat /secrets/quay/quay_username) \
+      --password $(cat /secrets/quay/quay_password)
+
+    # Tag the built image for Quay.io
+    echo "Tagging image for Quay.io..."
+    podman tag rag-content-openstack:latest \
+      quay.io/openstack-lightspeed/rag-content:latest
+
+    # Push to Quay.io
+    echo "Pushing image to Quay.io..."
+    podman push quay.io/openstack-lightspeed/rag-content:latest
+
+    echo "====================================="
+    echo "Build completed and pushed to Quay.io!"
+    echo "====================================="
   container:
     from: rag-content-openstack
   timeout: 4h0m0s
