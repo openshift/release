@@ -35,12 +35,15 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster payload image"
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$OCP_IMAGE_LATEST}
 
+# Download yq for YAML processing
+curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 # Give IDMS priority over ICSP by appending the ICSP to the IDMS file.
 if oc get imagedigestmirrorset &>/dev/null; then
-  oc get imagedigestmirrorset -oyaml | yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
+  oc get imagedigestmirrorset -oyaml | /tmp/yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
 fi
 if oc get imagecontentsourcepolicy &>/dev/null; then
-  oc get imagecontentsourcepolicy -oyaml | yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
 fi
 
 echo "$(date) Rendering HostedCluster YAML..."
@@ -62,7 +65,7 @@ echo "$(date) Modifying service publishing strategy to use Route for all service
 
 # Modify the HostedCluster to use Route for all services
 # This is necessary for Nutanix because DNS points to management cluster INGRESS_VIP
-yq eval -i '
+/tmp/yq eval -i '
   (select(.kind == "HostedCluster") | .spec.services) = [
     {"service": "APIServer", "servicePublishingStrategy": {"type": "Route"}},
     {"service": "OAuthServer", "servicePublishingStrategy": {"type": "Route"}},
