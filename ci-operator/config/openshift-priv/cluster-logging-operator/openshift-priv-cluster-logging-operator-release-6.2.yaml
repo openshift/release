@@ -34,34 +34,35 @@ build_root:
     tag: rhel-9-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/openshift/cluster-logging-operator
 images:
-- from: ubi9-minimal
-  to: cluster-logging-operator
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: ubi9-minimal
-  to: cluster-logging-operator-registry
-- dockerfile_literal: |
-    FROM loki-operator-src AS lo-src
-    FROM registry.redhat.io/ubi9/go-toolset:latest
-    ADD . /go/src/github.com/openshift/cluster-logging-operator
-    COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
-    WORKDIR /go/src/github.com/openshift/cluster-logging-operator
-    USER 0
-    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-      && chmod 755 kubectl && mv kubectl /go/bin
-    RUN dnf install -y gettext
-    RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
-    RUN go mod download
-    RUN make tools
-    RUN chmod -R 777 /go
-    RUN make bin/functional-benchmarker
-  inputs:
-    go_builder:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
-    loki-operator-src:
-      as:
-      - loki-operator-src
-  to: cluster-logging-operator-e2e
+  items:
+  - from: ubi9-minimal
+    to: cluster-logging-operator
+  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+    from: ubi9-minimal
+    to: cluster-logging-operator-registry
+  - dockerfile_literal: |
+      FROM loki-operator-src AS lo-src
+      FROM registry.redhat.io/ubi9/go-toolset:latest
+      ADD . /go/src/github.com/openshift/cluster-logging-operator
+      COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
+      WORKDIR /go/src/github.com/openshift/cluster-logging-operator
+      USER 0
+      RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+        && chmod 755 kubectl && mv kubectl /go/bin
+      RUN dnf install -y gettext
+      RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
+      RUN go mod download
+      RUN make tools
+      RUN chmod -R 777 /go
+      RUN make bin/functional-benchmarker
+    inputs:
+      go_builder:
+        as:
+        - registry.redhat.io/ubi9/go-toolset:latest
+      loki-operator-src:
+        as:
+        - loki-operator-src
+    to: cluster-logging-operator-e2e
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
