@@ -52,8 +52,6 @@ function create_install_config() {
 
   zones_raw=$(ibmcloud is zones "${REGION}" -q | awk '(NR>1) {print $1}')
   formatted_zones="[$(echo "${zones_raw}" | paste -sd, - | sed 's/,/, /g')]"
-  echo "zones: ${formatted_zones}"
-
   config=${install_dir}/install-config.yaml
 
   cat > "${config}" << EOF
@@ -104,9 +102,15 @@ function ibmcloud_login {
   echo "Login successful."
   echo "Check the installed plugin..."
   set +e
-  ibmcloud plugin repos
-  ibmcloud plugin list -q
-  timout 1m "${IBMCLOUD_CLI}" plugin list -q
+  ibmcloud plugin list | grep -w is
+  if $? -ne 0; then
+    echo "Installing IBM Cloud CLI plugin: vpc-infrastructure[infrastructure-service..."
+    ibmcloud plugin install is -f
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Failed to install IBM Cloud CLI plugin: vpc-infrastructure[infrastructure-service."
+      exit 1
+    fi
+  fi
   set -e
 }
 
@@ -124,7 +128,6 @@ function getInstanceType {
 
   instance_type=$(ibmcloud is instance-profiles -q | grep ${ARCH} | grep "${instance_family}-${cpu_number}x" | awk '{print $1}')
   if [[ -z "$instance_type" ]]; then    
-    echo "ERROR: No instance type found for family ${instance_family} cpu $cpu_number."
     echo ""
   fi
   echo "$instance_type"
@@ -179,7 +182,7 @@ if is_empty "$COMPUTE_INSTANCE_TYPE" ; then
 fi
 
 if is_empty "${CONTROL_PLANE_INSTANCE_TYPE}" || is_empty "${COMPUTE_INSTANCE_TYPE}" ; then
-  echo "ERROR: No instance type found for control plane ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} or compute plane ${COMPUTE_INSTANCE_TYPE_FAMILY} in region ${REGION}, exiting."
+  echo "ERROR: Region ${REGION}, no instance type found for control plane ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} or compute plane ${COMPUTE_INSTANCE_TYPE_FAMILY}, need update the sheet [IBMCloud_Regions_Summary] firstly!!!, exiting"
   exit 1
 fi
 
