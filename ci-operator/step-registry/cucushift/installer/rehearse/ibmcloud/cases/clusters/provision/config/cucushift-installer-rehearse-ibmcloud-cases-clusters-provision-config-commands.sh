@@ -95,6 +95,7 @@ EOF
 # IBM Cloud CLI login
 function ibmcloud_login {
   export IBMCLOUD_CLI=ibmcloud
+  export IBMCLOUD_HOME=/output
   region="${1}"
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
