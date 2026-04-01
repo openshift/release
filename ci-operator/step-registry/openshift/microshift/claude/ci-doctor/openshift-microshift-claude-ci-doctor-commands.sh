@@ -153,11 +153,12 @@ timeout 3600 claude \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
 
 # After the analysis, run automatic approval of rebase PRs with all tests passing
-echo "Running automatic approval of rebase PRs with all tests passing..."
-.claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
-    --mode approve \
-    --author 'microshift-rebase-script[bot]'
-echo "Automatic approval of rebase PRs with all tests passing completed"
+# TODO: Reenable this once we get approval from ProdSec
+# echo "Running automatic approval of rebase PRs with all tests passing..."
+# .claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
+#     --mode approve \
+#     --author 'microshift-rebase-script[bot]'
+# echo "Automatic approval of rebase PRs with all tests passing completed"
 
 # After the analysis, attempt to restart failed rebase PRs tests. If the
 # restarted tests complete successfully, the PR will be automatically
