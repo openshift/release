@@ -16,30 +16,7 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix-dns/.awscred
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
-export HOME=/tmp
 echo "✓ AWS credentials configured"
-
-# Install AWS CLI if not available
-if ! command -v aws &> /dev/null; then
-    echo "Installing AWS CLI..."
-    export PATH="${HOME}/.local/bin:${PATH}"
-
-    if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]; then
-        easy_install --user 'pip<21'
-        pip install --user awscli
-    elif [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 3 ]; then
-        python -m ensurepip
-        if command -v pip3 &> /dev/null; then
-            pip3 install --user awscli
-        elif command -v pip &> /dev/null; then
-            pip install --user awscli
-        fi
-    else
-        echo "ERROR: No pip available"
-        exit 1
-    fi
-    echo "✓ AWS CLI installed"
-fi
 
 # Validate ARTIFACTS_SOURCE_URL
 if [[ -z "${ARTIFACTS_SOURCE_URL:-}" ]]; then
