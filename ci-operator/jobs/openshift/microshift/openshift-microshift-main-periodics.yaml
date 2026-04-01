@@ -21,14 +21,14 @@ periodics:
       - success
       - failure
       - error
-      report_template: ':ai-intensifies: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/ci-doctor/openshift-microshift-claude-ci-doctor/artifacts/microshift-ci-doctor-report.html|View
-        Report>'
+      report_template: |
+        ':ai-intensifies: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/ci-doctor/openshift-microshift-claude-ci-doctor/artifacts/microshift-ci-doctor-report.html|View Report>'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ci-doctor
@@ -49,6 +49,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -66,6 +69,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials

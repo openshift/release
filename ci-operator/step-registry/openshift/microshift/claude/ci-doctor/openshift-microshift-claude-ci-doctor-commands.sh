@@ -21,7 +21,7 @@ load_secrets() {
         export GITHUB_TOKEN
         echo "GitHub token loaded."
     else
-        echo "WARNING: GitHub token not found at ${GITHUB_TOKEN_PATH}. GutHub operations will not be available."
+        echo "WARNING: GitHub token not found at ${GITHUB_TOKEN_PATH}. GitHub operations will not be available."
     fi
 
     if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
