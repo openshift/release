@@ -4,6 +4,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [[ "${RESOURCE_WATCH_ENABLED:-false}" != "true" ]]; then
+  echo "resource watch observer is disabled, set RESOURCE_WATCH_ENABLED=true to enable"
+  exit 0
+fi
+
 export STORE_PATH="${ARTIFACT_DIR}/resource-watch-store"
 export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
 
