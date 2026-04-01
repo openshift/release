@@ -8,6 +8,7 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 declare ICSP_NAME=${ICSP_NAME}
 declare CATALOG_SOURCE=${COO_CATALOG_SOURCE}
 declare COO_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE}
+declare disconnected="false"
 
 # Check if COO_INDEX_IMAGE is not empty
 if [[ -z "$COO_INDEX_IMAGE" ]]; then
@@ -100,6 +101,25 @@ update_global_auth() {
 		fi
 	fi
 	return 0
+}
+
+
+# Add support for 'disconnected' and 'connected' env
+function check_mirror_registry () {
+    if test -s "${SHARED_DIR}/mirror_registry_url" ; then
+	    echo "This is a disconnected environment as mirror registry url is set. Setting up mirror registry related configuration..."
+        disconnected="true" 
+		MIRROR_REGISTRY_HOST=$(head -n 2 "${SHARED_DIR}/mirror_registry_url")
+		if [[ "$COO_INDEX_IMAGE" == *"quay.io"* ]]; then
+			MIRROR_REGISTRY_HOST="${MIRROR_REGISTRY_HOST%:*}:6001"
+        else
+            MIRROR_REGISTRY_HOST="${MIRROR_REGISTRY_HOST%:*}:6002"
+        fi
+		COO_INDEX_IMAGE="${MIRROR_REGISTRY_HOST}/${COO_INDEX_IMAGE#*/}"
+    else
+        echo "This is a connected environment as mirror registry url is not set. Skipping mirror registry related configuration..."
+		disconnected="false"
+    fi
 }
 
 # create ICSP for connected env.
@@ -225,10 +245,16 @@ main() {
 	}
 	echo "sleeping for 5s"
 	sleep 5
-	create_icsp_connected || {
-		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
-		return 1
-	}
+	check_mirror_registry
+	if [[ "$disconnected" == "true" ]]; then
+        echo "Skip create icsp for disconnected environment."
+	else
+	    echo "Create icsp for connected environment."
+		create_icsp_connected || {
+			echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+			return 1
+		}
+	fi
 	check_marketplace || {
 		echo "failed to check marketplace. resolve the above errors"
 		return 1

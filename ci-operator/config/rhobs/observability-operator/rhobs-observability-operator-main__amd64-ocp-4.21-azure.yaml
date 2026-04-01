@@ -7,6 +7,10 @@ base_images:
     name: observability-operator-test-harness
     namespace: ci
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
 build_root:
   image_stream_tag:
     name: builder
@@ -26,7 +30,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: coo-stage
+- as: coo-stage-dast
   cron: 30 0 * * 4
   steps:
     cluster_profile: azure-observability
@@ -42,6 +46,8 @@ tests:
             {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
             {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
         ]
+      TEST_FILTERS: Serial
+      TEST_SCENARIOS: Cluster_Observability.*DAST
     test:
     - ref: rhobs-konflux-catalogsource
     - ref: rhobs-acm-patch-node
@@ -50,6 +56,7 @@ tests:
     - ref: rhobs-acm-setup-observability
     - ref: rhobs-acm-alerting-ui-test
     - ref: distributed-tracing-tests-tracing-ui-integration
+    - ref: openshift-extended-test
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
