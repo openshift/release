@@ -53,6 +53,7 @@ listen access-auxiliary
     bind :::$((14000 + "$host"))
     mode tcp
     balance source
+    timeout tunnel 2h
       server access-auxiliary 192.168.80.2:22 check inter 1s"
   fi
   SSH="$SSH
@@ -60,6 +61,7 @@ listen $name-ssh
     bind :::$((13000 + "$host"))
     mode tcp
     balance source
+    timeout tunnel 5m
       server $name $ip:22 check inter 1s
       server $name-v6 [$ipv6]:22 check inter 1s"
 done
