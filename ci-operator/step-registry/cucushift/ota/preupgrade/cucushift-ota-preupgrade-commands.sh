@@ -275,6 +275,48 @@ function pre-OCP-24358(){
     return 0
 }
 
+function pre-OCP-42668(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local upstream="api.openshift.com"
+    local noproxy retrieved_reason retrieved_msg new_noproxy
+
+    echo "Checking ${upstream} is not in noProxy list..."
+    noproxy=$(oc get proxy.config.openshift.io/cluster -o jsonpath='{.spec.noProxy}')
+    if [[ "${noproxy}" == *"${upstream}"* ]]; then
+        echo "FAIL: ${upstream} should not be in noProxy list by default"
+        return 1
+    fi
+
+    echo "Setting candidate channel to trigger upstream check..."
+    switch_channel "candidate" || return 1
+
+    echo "Verifying CVO cannot access upstream..."
+    retrieved_reason=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="RetrievedUpdates")].reason}')
+    retrieved_msg=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="RetrievedUpdates")].message}')
+    if [[ "${retrieved_reason}" != "RemoteFailed" ]] || [[ "${retrieved_msg}" != *"Forbidden"* ]]; then
+        echo "FAIL: Expected RemoteFailed with Forbidden, got: ${retrieved_reason}, ${retrieved_msg}"
+        return 1
+    fi
+
+    echo "Adding ${upstream} to noProxy..."
+    new_noproxy="${noproxy:+${noproxy},}${upstream}"
+    oc patch proxy.config.openshift.io/cluster --type=merge -p "{\"spec\":{\"noProxy\":\"${new_noproxy}\"}}" || return 1
+
+    echo "Waiting for machineconfig rollout..."
+    oc wait mcp --all --for condition=updating --timeout=300s || return 1
+    oc wait mcp --all --for condition=updated --timeout=1800s || return 1
+
+    echo "Verifying CVO can access upstream..."
+    retrieved_reason=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="RetrievedUpdates")].reason}')
+    retrieved_msg=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="RetrievedUpdates")].message}')
+    if [[ "${retrieved_reason}" == "RemoteFailed" ]] || [[ "${retrieved_msg}" == *"Forbidden"* ]]; then
+        echo "FAIL: CVO still cannot access upstream, reason: ${retrieved_reason}, message: ${retrieved_msg}"
+        return 1
+    fi
+    echo "Test Passed: ${FUNCNAME[0]}"
+    return 0
+}
+
 function verify_no_update_with_overrides(){
     echo "Verifying upgrade is blocked due to overrides..."
     local wait=0 max_wait=300 msg history_count
