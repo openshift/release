@@ -153,7 +153,7 @@ RUN RPM_FILE=$(ls /output/resource-agents-*.rpm | head -1) && \
     echo "RPM verified: $(basename ${RPM_FILE})"
 
 # Download libqb runtime RPM for the RHCOS overlay.
-RUN dnf download -y --destdir /output libqb 2>/dev/null && \
+RUN dnf download -y --arch x86_64 --destdir /output libqb 2>/dev/null && \
     ls /output/libqb-*.rpm >/dev/null 2>&1 || \
     { echo "ERROR: Could not download libqb RPM."; exit 1; }
 
