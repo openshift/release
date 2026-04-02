@@ -23,7 +23,8 @@ git remote add upstream https://github.com/Azure/ARO-HCP.git || true
 git fetch upstream vars_for_prow_job
 git checkout upstream/vars_for_prow_job -- \
   backend/Makefile frontend/Makefile admin/Makefile \
-  sessiongate/Makefile image-sync/oc-mirror/Makefile
+  sessiongate/Makefile image-sync/oc-mirror/Makefile \
+  tooling/aro-hcp-exporter/Makefile
 
 # Authenticate to CI registry
 export XDG_RUNTIME_DIR="/tmp/run"
@@ -62,6 +63,7 @@ push_image backend              "${ARO_HCP_BACKEND}"     aro-hcp-backend
 push_image frontend             "${ARO_HCP_FRONTEND}"    aro-hcp-frontend
 push_image admin                "${ARO_HCP_ADMIN_API}"   aro-hcp-admin-api
 push_image sessiongate          "${ARO_HCP_SESSIONGATE}" aro-hcp-sessiongate
-push_image image-sync/oc-mirror "${ARO_HCP_OC_MIRROR}"   aro-hcp-oc-mirror latest
+push_image image-sync/oc-mirror       "${ARO_HCP_OC_MIRROR}"   aro-hcp-oc-mirror latest
+push_image tooling/aro-hcp-exporter   "${ARO_HCP_EXPORTER}"    aro-hcp-exporter
 
 echo "All images pushed successfully."
