@@ -11,6 +11,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  validate-release:
+    name: validate-release
+    namespace: cincinnati-ci-public
+    tag: latest
 build_root:
   image_stream_tag:
     name: rust
@@ -110,6 +114,13 @@ tests:
   container:
     from: content-checks
   run_if_changed: hack/(stabilization-changes|util).py
+- as: validate-release
+  commands: /usr/local/bin/validate-release
+  container:
+    clone: true
+    from: validate-release
+  optional: true
+  run_if_changed: internal-channels/candidate.yaml
 zz_generated_metadata:
   branch: master
   org: openshift
