@@ -135,10 +135,27 @@ EOF
         run_command "oc extract configmap/registry-config -n openshift-config --to=/tmp --confirm"
         for cert_file in /tmp/*.crt /tmp/ca-bundle.crt; do
             if [ -f "$cert_file" ]; then
-                run_command "cp $cert_file /etc/pki/ca-trust/source/anchors/mirror-registry.crt"
-                run_command "update-ca-trust extract"
+                export SSL_CERT_FILE="${HOME}/mirror-registry.crt"
+                run_command "cp $cert_file $SSL_CERT_FILE"
                 CERT_INSTALLED=true
                 echo "Certificate installed from registry-config ConfigMap"
+                break
+            fi
+        done
+    fi
+
+    # Try to extract from the user-ca-bundle ConfigMap
+    ret=0
+    run_command "oc get configmap user-ca-bundle -n openshift-config" || ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "Found user-ca-bundle ConfigMap, extracting certificate..."
+        run_command "oc extract configmap/user-ca-bundle -n openshift-config --to=/tmp --confirm"
+        for cert_file in /tmp/*.crt /tmp/ca-bundle.crt; do
+            if [ -f "$cert_file" ]; then
+                export SSL_CERT_FILE="${HOME}/user-ca-bundle.crt"
+                run_command "cp $cert_file $SSL_CERT_FILE"
+                CERT_INSTALLED=true
+                echo "Certificate installed from user-ca-bundle ConfigMap"
                 break
             fi
         done
