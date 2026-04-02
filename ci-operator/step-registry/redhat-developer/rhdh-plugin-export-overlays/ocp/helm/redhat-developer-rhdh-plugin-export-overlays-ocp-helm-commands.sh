@@ -10,15 +10,15 @@ set -euo pipefail
 #
 # Job flows:
 #
-#   Scenario                          | JOB_TYPE   | JOB_NAME         | Mode     | GIT_PR_NUMBER | Code tested | OCI images | Tests
-#   ----------------------------------|------------|------------------|----------|---------------|-------------|------------|------
-#   Overlay PR (pr-check)             | presubmit  | pull-ci-*        | pr-check | PR number     | PR branch   | PR-built   | changed workspace
-#   Overlay PR (nightly)              | presubmit  | pull-ci-*nightly | nightly  | not exported  | PR branch   | released   | all workspaces
-#   Rehearse pr-check (no override)   | presubmit  | rehearse-*       | pr-check | empty         | main        | —          | skips (no changes)
-#   Rehearse pr-check (with override) | presubmit  | rehearse-*       | pr-check | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
-#   Rehearse nightly (no override)    | presubmit  | rehearse-*night  | nightly  | not exported  | main        | released   | all workspaces
-#   Rehearse nightly (with override)  | presubmit  | rehearse-*night  | nightly  | not exported  | PR branch   | released   | all workspaces
-#   Periodic cron                     | periodic   | periodic-*       | nightly  | not exported  | main        | released   | all workspaces
+#   Scenario                                | JOB_TYPE  | JOB_NAME         | Mode     | GIT_PR_NUMBER | Code tested | OCI images | Tests
+#   ----------------------------------------|-----------|------------------|----------|---------------|-------------|------------|------
+#   Overlay PR (pr-check)                   | presubmit | pull-ci-*        | pr-check | PR number     | PR branch   | PR-built   | changed workspace
+#   Overlay PR (nightly)                    | presubmit | pull-ci-*nightly | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Rehearse pr-check                       | presubmit | rehearse-*       | pr-check | empty         | main        | —          | skips (no changes)
+#   Rehearse pr-check + REHEARSE_PR_NUMBER  | presubmit | rehearse-*       | pr-check | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
+#   Rehearse nightly                        | presubmit | rehearse-*night  | nightly  | not exported  | main        | released   | all workspaces
+#   Rehearse nightly  + REHEARSE_PR_NUMBER  | presubmit | rehearse-*night  | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Periodic cron                           | periodic  | periodic-*       | nightly  | not exported  | main        | released   | all workspaces
 #
 # =============================================================================
 
