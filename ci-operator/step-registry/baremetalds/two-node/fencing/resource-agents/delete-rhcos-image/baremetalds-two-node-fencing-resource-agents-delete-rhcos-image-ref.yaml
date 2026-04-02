@@ -1,0 +1,33 @@
+ref:
+  as: baremetalds-two-node-fencing-resource-agents-delete-rhcos-image
+  from: cli
+  best_effort: true
+  timeout: 10m0s
+  commands: baremetalds-two-node-fencing-resource-agents-delete-rhcos-image-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: RESOURCE_AGENT_SOURCE
+      default: "RHCOS"
+      documentation: |-
+        RHCOS: skip image cleanup (no custom image was pushed).
+        REPO: delete this job's image tag and stale tags from the mirror registry.
+    - name: CUSTOM_OS_MIRROR_REGISTRY
+      default: ""
+      documentation: |-
+        Registry hostname (e.g. quay.io). Only quay.io is supported for tag deletion via API.
+    - name: CUSTOM_OS_IMAGE_REPO
+      default: ""
+      documentation: |-
+        Repository path (org/repo) for the custom RHCOS image (e.g. rh-edge-enablement/tnf-custom-rhcos).
+    - name: CUSTOM_OS_EXTENSIONS_REPO
+      default: ""
+      documentation: |-
+        Repository path (org/repo) for the custom RHCOS extensions image.
+        Defaults to CUSTOM_OS_IMAGE_REPO with "-extensions" appended.
+  documentation: |-
+    TNF (Two-Node Fencing) post-step when RESOURCE_AGENT_SOURCE=REPO: deletes this job's image tag
+    (from SHARED_DIR/custom-rhcos-image-tag) and any tag in the repo older than 24h. Only supports
+    quay.io. Reads Quay auth from CLUSTER_PROFILE_DIR/quay-custom-rhcos-secret. Best-effort; does not fail the job.
