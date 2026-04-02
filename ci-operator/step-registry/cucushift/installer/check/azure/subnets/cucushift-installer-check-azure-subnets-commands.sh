@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -55,8 +62,7 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID "${SHARED_DIR}"/metadata.json)
@@ -117,7 +123,7 @@ if [[ "${OUTBOUND_TYPE}" != "Loadbalancer" ]]; then
         echo "${subnets_json_array}" | jq -c '.[]' | while IFS= read -r item; do
             subnet_name=$(echo "${item}" | jq -r '.name')
             subnet_role=$(echo "${item}" | jq -r '.role')
-            if [[ "${subnet_role}" == "control-plane" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 20 )) || (( ocp_major_version > 4 )) ); then
+            if [[ "${subnet_role}" == "control-plane" ]] && version_ge "${ocp_version}" "4.20"; then
                 echo "INFO: starting from 4.20, NAT gateways only attach on worker subnets, skip checking on master subnet!"
                 continue
             fi
