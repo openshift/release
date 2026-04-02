@@ -4,6 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# OCP 4.x libvirt-installer images may not ship yq-v4; install on demand.
+if ! command -v yq-v4 &>/dev/null; then
+  if [ ! -f /tmp/yq-v4 ]; then
+    curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      -o /tmp/yq-v4 && chmod +x /tmp/yq-v4
+  fi
+  export PATH="/tmp:${PATH}"
+fi
+
 INSTALL_DIR=/tmp
 
 trap 'prepare_next_steps' EXIT TERM
