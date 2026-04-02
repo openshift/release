@@ -15,13 +15,18 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-network-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-network-operator
 promotion:
   to:
   - name: 5.0-priv
@@ -481,6 +486,17 @@ tests:
         \[apigroup:image.openshift.io\] when installed on the cluster should provide
         named network metrics
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- as: e2e-aws-ovn-fdp-qe
+  skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      PARALLEL: "1"
+      TEST_TIMEOUT: "60"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-5.0
   org: openshift-priv

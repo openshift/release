@@ -3,8 +3,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/oauth-apiserver
 images:
-- dockerfile_path: images/Dockerfile.rhel7
-  to: oauth-apiserver
+  items:
+  - dockerfile_path: images/Dockerfile.rhel7
+    to: oauth-apiserver
 promotion:
   to:
   - name: 4.22-priv
@@ -52,6 +53,24 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-component-serial-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- as: e2e-gcp-component-serial-disruptive-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial-disruptive
+    test:
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - as: e2e-aws-upgrade
   steps:

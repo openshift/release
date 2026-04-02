@@ -1,0 +1,86 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+canonical_go_repository: github.com/stolostron/cluster-proxy-addon
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-proxy-addon
+promotion:
+  to:
+  - disabled: true
+    name: "2.8"
+    namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: 4.18-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.18-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: cluster-proxy-addon
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        KUBECTL=oc
+        export KUBECTL
+        make test-e2e
+      dependencies:
+      - env: CLUSTER_PROXY_ADDON_IMAGE
+        name: cluster-proxy-addon
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ocm-e2e-clusterpool
+zz_generated_metadata:
+  branch: backplane-2.8
+  org: openshift-priv
+  repo: cluster-proxy-addon

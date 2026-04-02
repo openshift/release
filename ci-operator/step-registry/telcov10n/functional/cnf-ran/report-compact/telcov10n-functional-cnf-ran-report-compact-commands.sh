@@ -93,23 +93,26 @@ done
 
 cd /eco-ci-cd
 
-echo "Construct Report Portal attributes"
-if [[ -n "${REPORTS_PORTAL_ATTRIBUTES_ENV}" ]]; then
-  REPORTS_PORTAL_ATTRIBUTES="${REPORTS_PORTAL_ATTRIBUTES_ENV}"
-  echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES} (from REPORTS_PORTAL_ATTRIBUTES_ENV)"
-else
-  REPORTS_PORTAL_ATTRIBUTES=""
-  if [[ -f "${SHARED_DIR}/cluster_version" ]]; then
-    CLUSTER_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
-    CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
-    REPORTS_PORTAL_ATTRIBUTES="ci-lane:${CI_LANE};spoke_ocp_build:${CLUSTER_VERSION}"
-    echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
-  fi
+SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
+CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
+METRICS_FILE="/tmp/metrics/ran-metrics.txt"
+
+echo "Collect metrics from hub and spoke clusters"
+ansible-playbook ./playbooks/ran/collect-metrics.yml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
+    ran_spoke_kubeconfig=${SPOKE_KUBECONFIG} \
+    ran_ci_lane='${CI_LANE}' \
+    ran_output_file=${METRICS_FILE} \
+    ran_metrics_list=${RAN_METRICS_LIST}" || true
+
+REPORTS_PORTAL_ATTRIBUTES=""
+if [[ -f "${METRICS_FILE}" ]]; then
+  REPORTS_PORTAL_ATTRIBUTES="$(cat "${METRICS_FILE}")"
+  echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
-
 echo "Upload reports to Polarion and Report Portal"
-ansible-playbook ./playbooks/cnf/upload-report.yaml \
+ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_3node' reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"

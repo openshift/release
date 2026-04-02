@@ -24,32 +24,33 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
+    tag: rhel-9-golang-1.25-openshift-4.23
 images:
-- dockerfile_literal: |
-    FROM src AS builder
-    FROM this-is-ignored-and-not-used
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-  from: ci_tests-private-baseui
-  inputs:
-    src:
-      as:
-      - src
-  to: tests-private-ui
-- dockerfile_literal: |
-    FROM bin AS builder
-    FROM this-is-ignored-and-not-used
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
-        rm -rf /usr/bin/oc /usr/bin/kubectl
-  from: ci_tests-private-base
-  inputs:
-    bin:
-      as:
-      - bin
-  to: tests-private-pr
+  items:
+  - dockerfile_literal: |
+      FROM src AS builder
+      FROM this-is-ignored-and-not-used
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    from: ci_tests-private-baseui
+    inputs:
+      src:
+        as:
+        - src
+    to: tests-private-ui
+  - dockerfile_literal: |
+      FROM bin AS builder
+      FROM this-is-ignored-and-not-used
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+          rm -rf /usr/bin/oc /usr/bin/kubectl
+    from: ci_tests-private-base
+    inputs:
+      bin:
+        as:
+        - bin
+    to: tests-private-pr
 promotion:
   to:
   - excluded_images:
@@ -196,7 +197,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -209,7 +210,7 @@ tests:
     cluster_profile: gcp-qe
     env:
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -223,7 +224,7 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -236,12 +237,40 @@ tests:
     cluster_profile: vsphere-connected-2
     env:
       FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: debug-winc-nutanix-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OVERRIDE_RHCOS_IMAGE: https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-9.6/builds/9.6.20260323-1/x86_64/rhcos-9.6.20260323-1-nutanix.x86_64.qcow2
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "1551"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
+- as: debug-winc-aws-upi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

@@ -23,6 +23,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e
@@ -44,6 +45,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -64,6 +68,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -81,7 +91,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )420-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
@@ -96,7 +106,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-event-release-1.16-420-images
     rerun_command: /test 420-images
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -210,7 +219,7 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build11
+    cluster: build10
     context: ci/prow/421-e2e
     decorate: true
     decoration_config:
@@ -291,7 +300,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(421-e2e|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
@@ -307,7 +316,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-kn-plugin-event-release-1.16-421-images
     rerun_command: /test 421-images
-    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:

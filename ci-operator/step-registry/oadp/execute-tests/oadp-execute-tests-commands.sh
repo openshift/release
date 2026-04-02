@@ -63,7 +63,9 @@ export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
 export TEMP_TEST_FOCUS=$OADP_TEST_FOCUS
 export ANSIBLE_REMOTE_TMP="/tmp/"
-export STORAGE_CLASS=${STORAGE_CLASS:-}
+# STORAGE_CLASS will be configured later based on cluster state
+# Initialize EXTRA_GINKGO_PARAMS - will be appended to throughout script
+export EXTRA_GINKGO_PARAMS=${EXTRA_GINKGO_PARAMS:-}
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 LOGS_FOLDER="/alabama/cspi/e2e/logs"
@@ -74,8 +76,8 @@ echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz to ${OADP_GIT_DIR}"
 tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
 echo "Extract /home/jenkins/oadp-apps-deployer.tar.gz to ${OADP_APPS_DIR}"
 tar -xf /home/jenkins/oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
-echo "Extract /home/jenkins/mtc-python-client.tar.gz to ${PYCLIENT_DIR}"
-tar -xf /home/jenkins/mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
+# echo "Extract /home/jenkins/mtc-python-client.tar.gz to ${PYCLIENT_DIR}"
+# tar -xf /home/jenkins/mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
 # Setup /tmp/test-settings
 echo "Create and populate /tmp/test-settings..."
@@ -104,30 +106,65 @@ python3 -m venv /alabama/venv
 source /alabama/venv/bin/activate
 python3 -m pip install ansible_runner
 python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
-python3 -m pip install "${PYCLIENT_DIR}"
+# python3 -m pip install "${PYCLIENT_DIR}"
 
 # Install go modules
 cd $OADP_GIT_DIR
 go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
 go mod tidy
 
-oc get storageclass -o name | xargs oc patch -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
-oc patch storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization" -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
-echo "Printing Storage Classes:"
-oc get storageclasses
-STORAGE_CLASS="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization"
+# Configure default storage class
+echo "Storage classes before configuration:"
+oc get sc
 
+if [ -n "${STORAGE_CLASS:-}" ]; then
+    # STORAGE_CLASS has a value - make it the default
+    echo "STORAGE_CLASS env var set to: ${STORAGE_CLASS}"
+    if oc get storageclass "${STORAGE_CLASS}" &>/dev/null; then
+        echo "Setting ${STORAGE_CLASS} as default storage class"
+        oc get storageclass -o name | xargs oc patch -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+        oc patch storageclass "${STORAGE_CLASS}" -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+    else
+        echo "ERROR: STORAGE_CLASS ${STORAGE_CLASS} does not exist"
+    fi
+else
+    # STORAGE_CLASS is empty - do nothing, leave storage classes as is
+    echo "STORAGE_CLASS not set, leaving storage class configuration unchanged"
+    # Get the current default storage class for later use
+    STORAGE_CLASS=$(oc get storageclass -o jsonpath="{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=='true')].metadata.name}" || echo "")
+    if [ -n "${STORAGE_CLASS}" ]; then
+        echo "Current default storage class: ${STORAGE_CLASS}"
+    else
+        echo "No default storage class found in cluster"
+    fi
+fi
+
+echo "Storage classes after configuration:"
+oc get sc
+
+# Export STORAGE_CLASS for test_runner.sh to use
+export STORAGE_CLASS
+echo "STORAGE_CLASS exported: ${STORAGE_CLASS}"
+
+# Skip VSL tests if NOT using ODF storage class
+if [ -n "${STORAGE_CLASS}" ] && [[ "${STORAGE_CLASS}" != odf* ]]; then
+    echo "Non-ODF storage class detected (${STORAGE_CLASS}), adding VSL skip parameters"
+    EXTRA_GINKGO_PARAMS="${EXTRA_GINKGO_PARAMS} --skip=vsl --skip=VSL"
+fi
 
 # Run OADP Kubevirt tests if configured
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
-  # oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class=false --overwrite &&\
-  # oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization" storageclass.kubernetes.io/is-default-class=true &&\
-  OADP_TEST_FOCUS=""
-  export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
-  export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
-  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555 --skip=tc-id:OADP-186" &&\
-  (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
-  OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
+  if [ "$STORAGE_CLASS" == "odf-operator-ceph-rbd-virtualization" ]; then
+    echo "Running Kubevirt tests with ODF storage class"
+    OADP_TEST_FOCUS=""
+    export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
+    export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
+    export EXTRA_GINKGO_PARAMS="${EXTRA_GINKGO_PARAMS} --skip=tc-id:OADP-555 --skip=tc-id:OADP-186" &&\
+    (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+    OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
+  else
+    echo "Skipping Kubevirt tests - requires odf-operator-ceph-rbd-virtualization storage class (current: ${STORAGE_CLASS})"
+  fi
 fi
 
 # Run OADP tests with the focus
@@ -136,7 +173,8 @@ if [[ "$OADP_TEST_FOCUS" == "--focus=ALL_TESTS" ]]; then
   OADP_TEST_FOCUS=""
 fi
 # export NUM_OF_OADP_INSTANCES=3
-export EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS &&\
+# Append OADP_TEST_FOCUS to EXTRA_GINKGO_PARAMS instead of overriding
+export EXTRA_GINKGO_PARAMS="${EXTRA_GINKGO_PARAMS} ${OADP_TEST_FOCUS}" &&\
 export TESTS_FOLDER="/alabama/cspi/e2e" &&\
 export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&\
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)

@@ -18,14 +18,17 @@ build_root:
     tag: rhel-9-golang-1.25-openshift-4.21
   use_build_cache: true
 images:
-- context_dir: .
-  dockerfile_path: Dockerfiles/Dockerfile
-  from: ubi
-  to: opendatahub-operator
-- context_dir: .
-  dockerfile_path: Dockerfiles/rhoai.Dockerfile
-  from: ubi
-  to: opendatahub-operator-rhoai
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfiles/Dockerfile
+    from: ubi
+    optional: true
+    to: opendatahub-operator
+  - context_dir: .
+    dockerfile_path: Dockerfiles/rhoai.Dockerfile
+    from: ubi
+    optional: true
+    to: opendatahub-operator-rhoai
 operator:
   bundles:
   - as: opendatahub-operator-bundle
@@ -35,9 +38,9 @@ operator:
     dockerfile_path: Dockerfiles/rhoai-bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: REPLACE_IMAGE:latest-rhoai
+  - pullspec: REPLACE_IMAGE:v0.0.0-rhoai-placeholder
     with: pipeline:opendatahub-operator-rhoai
-  - pullspec: REPLACE_IMAGE:latest
+  - pullspec: REPLACE_IMAGE:v0.0.0-placeholder
     with: pipeline:opendatahub-operator
 releases:
   latest:
@@ -51,49 +54,6 @@ resources:
       cpu: 400m
       memory: 200Mi
 tests:
-- as: opendatahub-operator-pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
-    env:
-      IMAGE_REPO: opendatahub-operator
-    workflow: opendatahub-io-ci-image-mirror
-- as: opendatahub-operator-image-mirror
-  postsubmit: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
-    env:
-      IMAGE_REPO: opendatahub-operator
-      RELEASE_VERSION: main
-    workflow: opendatahub-io-ci-image-mirror
-- as: opendatahub-operator-image-mirror-latest
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
-    env:
-      IMAGE_REPO: opendatahub-operator
-      IMAGE_TAG: latest
-    workflow: opendatahub-io-ci-image-mirror
-- as: opendatahub-operator-rhoai-pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
-    env:
-      IMAGE_REPO: opendatahub-operator
-    workflow: opendatahub-io-ci-image-mirror
-- as: opendatahub-operator-rhoai-image-mirror
-  postsubmit: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
-    env:
-      IMAGE_REPO: opendatahub-operator
-      RELEASE_VERSION: rhoai
-    workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
   cluster_claim:
     architecture: amd64
@@ -106,6 +66,10 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
     pre:
     - ref: ipi-install-rbac
     - as: cluster-preflight-health-check
@@ -153,6 +117,7 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 10m0s
+    - ref: opendatahub-io-ci-image-mirror-generic-claim
     - as: e2e
       cli: latest
       commands: |
@@ -177,6 +142,10 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
+    env:
+      IMAGE_REPO: opendatahub-operator
     pre:
     - ref: ipi-install-rbac
     - as: cluster-preflight-health-check
@@ -223,6 +192,7 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 10m0s
+    - ref: opendatahub-io-ci-image-mirror-generic-claim
     - as: e2e
       cli: latest
       commands: |
@@ -235,6 +205,35 @@ tests:
           memory: 3Gi
       timeout: 1h30m0s
     workflow: generic-claim
+- as: opendatahub-operator-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-image-mirror-latest
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+      IMAGE_TAG: latest
+    workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-rhoai-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
+    env:
+      IMAGE_REPO: opendatahub-operator
+      RELEASE_VERSION: rhoai
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

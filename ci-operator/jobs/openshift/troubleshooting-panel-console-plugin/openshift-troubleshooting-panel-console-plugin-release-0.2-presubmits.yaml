@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build10
+    cluster: build03
     context: ci/prow/fips-image-scan
     decorate: true
     decoration_config:
@@ -20,6 +20,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=fips-image-scan
         command:
@@ -39,6 +40,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -53,6 +57,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -68,7 +78,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build10
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -123,7 +133,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build10
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:

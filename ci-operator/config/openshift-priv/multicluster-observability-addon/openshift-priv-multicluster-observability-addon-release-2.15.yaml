@@ -1,0 +1,36 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+canonical_go_repository: github.com/stolostron/multicluster-observability-addon
+images:
+  items:
+  - dockerfile_path: Dockerfile.Konflux
+    to: multicluster-observability-addon
+promotion:
+  to:
+  - disabled: true
+    name: "2.15"
+    namespace: stolostron
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: pr-image-mirror-multicluster-observability-addon
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-observability-addon
+    env:
+      IMAGE_REPO: multicluster-observability-addon
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.15
+  org: openshift-priv
+  repo: multicluster-observability-addon

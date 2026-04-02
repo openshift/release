@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+canonical_go_repository: github.com/stolostron/addon-framework
+images:
+  items:
+  - dockerfile_path: build/Dockerfile.example
+    from: base
+    to: addon-examples
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: addon-examples
+    env:
+      IMAGE_REPO: addon-examples
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: sonar-pre-submit
+  commands: |
+    export SONAR_GO_TEST_ARGS="./..."
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: addon-framework

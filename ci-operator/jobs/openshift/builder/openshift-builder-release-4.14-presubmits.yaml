@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -86,7 +86,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-builds
     decorate: true
     labels:
@@ -167,7 +167,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-builds-techpreview
     decorate: true
     labels:
@@ -248,7 +248,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-cgroupsv2
     decorate: true
     labels:
@@ -329,7 +329,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-image-ecosystem
     decorate: true
     labels:
@@ -410,7 +410,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-proxy
     decorate: true
     labels:
@@ -487,11 +487,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-proxy,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build10
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
@@ -499,7 +499,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-builder-release-4.14-images
     rerun_command: /test images
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -546,7 +545,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build10
+    cluster: build11
     context: ci/prow/security
     decorate: true
     labels:
@@ -560,6 +559,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -580,6 +580,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -597,6 +600,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -615,7 +624,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build10
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     labels:
@@ -677,7 +686,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build10
+    cluster: build11
     context: ci/prow/verify
     decorate: true
     labels:

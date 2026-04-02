@@ -1,0 +1,64 @@
+base_images:
+  oadp-runner:
+    name: oadp-runner
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.25
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: oadp-operator
+operator:
+  bundles:
+  - dockerfile_path: build/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/konveyor/oadp-operator:oadp-1.6
+    with: oadp-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- as: oadp-qe-aws-fips
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: mig-qe-aws.devcluster.openshift.com
+      BUCKET_NAME: oadp-fips
+      EXECUTE_KUBEVIRT_TESTS: "false"
+      FIPS_ENABLED: "true"
+      OADP_TEST_FOCUS: smoke
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      RE_TRIGGER_ON_FAILURE: "false"
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
+      STORAGE_CLASS: ""
+      USER_TAGS: |
+        scenario oadp oadp-qe
+    test:
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws-oadp-qe-dev
+zz_generated_metadata:
+  branch: oadp-1.6
+  org: oadp-qe
+  repo: oadp-operator
+  variant: qe-ocp-4.22-aws-testing

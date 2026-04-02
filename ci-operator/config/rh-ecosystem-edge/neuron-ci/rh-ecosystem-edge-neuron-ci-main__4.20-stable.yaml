@@ -13,21 +13,22 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.23-openshift-4.20
 images:
-- dockerfile_path: Containerfile
-  to: neuron-ci
-- dockerfile_literal: |
-    FROM quay.io/ocp-edge-qe/eco-gotests:latest
-    USER 0
-    RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
-    RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
-    RUN dnf install -y openssh-clients && dnf clean all
-  to: eco-gotests
+  items:
+  - dockerfile_path: Containerfile
+    to: neuron-ci
+  - dockerfile_literal: |
+      FROM quay.io/ocp-edge-qe/eco-gotests:latest
+      USER 0
+      RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+      RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+      RUN dnf install -y openssh-clients && dnf clean all
+    to: eco-gotests
 releases:
   latest:
     prerelease:
       product: ocp
       version_bounds:
-        lower: 4.20.6-0
+        lower: 4.20.0-0
         stream: 4-stable
         upper: 4.21.0-0
 resources:
@@ -41,6 +42,7 @@ tests:
 - always_run: false
   as: aws-neuron-operator-e2e
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-edge-infra
     env:
       ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE: public.ecr.aws/neuron/neuron-device-plugin:2.24.23.0
@@ -57,11 +59,12 @@ tests:
       ECO_TEST_LABELS: neuron
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.20"
-      REGION: us-east-1
+      REGION: us-west-2
     workflow: aws-neuron-operator-e2e-rosa
 - as: aws-neuron-operator-e2e-weekly
   cron: 0 6 * * 1
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-edge-infra
     env:
       ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE: public.ecr.aws/neuron/neuron-device-plugin:2.24.23.0
@@ -79,7 +82,7 @@ tests:
       LAST_KNOWN_DTK_COMMIT: ""
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.20"
-      REGION: us-east-1
+      REGION: us-west-2
     workflow: aws-neuron-operator-conditional-e2e-rosa
 zz_generated_metadata:
   branch: main

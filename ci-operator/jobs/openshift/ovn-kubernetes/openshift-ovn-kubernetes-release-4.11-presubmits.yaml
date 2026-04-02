@@ -87,7 +87,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/4.11-upgrade-from-stable-4.10-images
     decorate: true
     labels:
@@ -225,7 +225,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/4.11-upgrade-from-stable-4.10-local-gateway-images
     decorate: true
     labels:
@@ -937,7 +937,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1102,7 +1102,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/e2e-hypershift
     decorate: true
     decoration_config:
@@ -1185,7 +1185,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -1268,7 +1268,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
     decoration_config:
@@ -1352,7 +1352,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -1767,7 +1767,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -1830,7 +1830,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1886,7 +1886,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1949,7 +1949,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -1965,6 +1965,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -1985,6 +1986,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -2002,6 +2006,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -2020,7 +2030,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build10
     context: ci/prow/unit
     decorate: true
     decoration_config:

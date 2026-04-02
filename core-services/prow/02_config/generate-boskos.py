@@ -224,9 +224,9 @@ CONFIG = {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
-        'northcentralus': 10,
-        'westus2': 10,
-        'centralus': 10
+        'northcentralus': 15,
+        'westus2': 15,
+        'centralus': 15
     },
     'azure-observability-quota-slice': {
         'westus': 3
@@ -655,7 +655,7 @@ CONFIG = {
         'default': 1,
     },
     'amd-gpu-quota-slice': {
-        '10.1.178.14': 1,
+        '10.8.231.19': 1,
     },
     'aws-osp-qe-quota-slice': {
         'us-east-1': 10,
@@ -776,7 +776,25 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
-    }
+    },
+    'openshift-org-gcp': {
+        'gcp': {
+            'install': 50,
+            'quota': CONFIG['gcp-quota-slice'],
+        },
+        'gcp-arm64': {
+            'install': 20,
+            'quota': CONFIG['gcp-arm64-quota-slice'],
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': CONFIG['gcp-3-quota-slice'],
+        },
+    },
 }
 
 config = {

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-agent-4control-ipv4
     decorate: true
     decoration_config:
@@ -97,7 +97,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-agent-5control-ipv4
     decorate: true
     decoration_config:
@@ -189,7 +189,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     decoration_config:
@@ -281,7 +281,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-agent-ha-dualstack
     decorate: true
     decoration_config:
@@ -373,7 +373,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-agent-sno-ipv6
     decorate: true
     decoration_config:
@@ -547,6 +547,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -568,6 +569,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -588,6 +592,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

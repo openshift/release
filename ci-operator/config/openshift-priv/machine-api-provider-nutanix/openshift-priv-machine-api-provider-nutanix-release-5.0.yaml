@@ -11,8 +11,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-api-provider-nutanix
 images:
-- dockerfile_path: Dockerfile
-  to: nutanix-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile
+    to: nutanix-machine-controllers
 promotion:
   to:
   - name: 5.0-priv
@@ -64,13 +65,14 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-nutanix
 - as: regression-clusterinfra-nutanix-ipi-mapi
+  cluster: build01
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: nutanix
     env:
       E2E_RUN_TAGS: '@mapi'
-      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!connected-only&&mapi
       TEST_SCENARIOS: Cluster_Infrastructure MAPI
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression

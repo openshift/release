@@ -126,7 +126,9 @@ spec:
           echo "Running on upstream main branch of linuxptp-daemon"
           git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git
           cd linuxptp-daemon
-          IMG=${DAEMON_IMG} make image
+          # Split DAEMON_IMG into IMAGE_TAG_BASE and VERSION because
+          # hack/build-image.sh unconditionally overwrites IMG from these two vars.
+          IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
           podman push ${DAEMON_IMG} --tls-verify=false
           cd ..
 

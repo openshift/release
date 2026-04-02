@@ -1,101 +1,55 @@
-base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.22
-  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
 build_root:
-  from_repository: true
-canonical_go_repository: github.com/openshift/console
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs20-linux
+canonical_go_repository: github.com/stolostron/console
 images:
-- dockerfile_path: Dockerfile
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
-  to: console-plugin-demo
-promotion:
-  to:
-  - additional_images:
-      console-tests: src
-    name: 4.22-priv
-    namespace: ocp-private
-releases:
-  initial:
-    integration:
-      name: 4.22-priv
-      namespace: ocp-private
-  latest:
-    integration:
-      include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+  items:
+  - dockerfile_path: Containerfile.acm
+    to: console
+  - dockerfile_path: Containerfile.mce
+    to: console-mce
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
-  analyze:
-    requests:
-      cpu: "1"
-      memory: 14Gi
-  console:
-    requests:
-      cpu: "2"
-      memory: 10Gi
-  frontend:
-    requests:
-      cpu: "2"
-      memory: 10Gi
-  test-bin:
-    requests:
-      cpu: "1"
-      memory: 10Gi
-test_binary_build_commands: |
-  ./build-frontend.sh
-  ./build-demos.sh
+      cpu: 400m
+      memory: 2Gi
 tests:
-- as: backend
+- as: check
   commands: |
-    export XDG_CACHE_HOME=/tmp/.cache
-    mkdir -p ${ARTIFACT_DIR} ${XDG_CACHE_HOME}
-    go install -mod= github.com/jstemmer/go-junit-report@latest
-    /home/prow/go/src/github.com/openshift/console/test-backend.sh
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow check
   container:
-    from: ocp_builder_rhel-9-golang-1.25-openshift-4.22
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: frontend
+    from: src
+- as: unit-tests-sonarcloud
   commands: |
-    git config --global --add safe.directory /go/src/github.com/openshift/console
-    ./test-frontend.sh
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
   container:
-    from: test-bin
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: analyze
-  commands: ./analyze.sh
-  container:
-    from: test-bin
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: e2e-gcp-console
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
   steps:
-    cluster_profile: gcp-3
-    test:
-    - as: test
-      cli: latest
-      commands: ./test-prow-e2e.sh
-      dependencies:
-      - env: CYPRESS_PLUGIN_PULL_SPEC
-        name: console-plugin-demo
-      from: src
-      resources:
-        requests:
-          cpu: "4"
-          memory: 10Gi
-      timeout: 6h0m0s
-    workflow: ipi-gcp
+    dependencies:
+      SOURCE_IMAGE_REF: console
+    env:
+      IMAGE_REPO: console
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-mce
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-mce
+    env:
+      IMAGE_REPO: console-mce
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: openshift-priv

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -88,7 +88,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -171,7 +171,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -254,7 +254,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -337,7 +337,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -420,7 +420,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -502,7 +502,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -585,94 +585,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
-    context: ci/prow/e2e-aws-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.8-e2e-aws-upi
-    optional: true
-    rerun_command: /test e2e-aws-upi
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-aws-upi
-        - --template=/usr/local/e2e-aws-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -998,92 +911,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
-    cluster: build01
-    context: ci/prow/e2e-azure-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.8-e2e-azure-upi
-    rerun_command: /test e2e-azure-upi
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-azure-upi
-        - --template=/usr/local/e2e-azure-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-azure-upi|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1670,7 +1497,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -1753,7 +1580,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -1836,7 +1663,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -1919,7 +1746,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -2003,7 +1830,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -2606,7 +2433,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
@@ -2620,7 +2447,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-images
     rerun_command: /test images
-    skip_if_only_changed: ^docs/
     spec:
       containers:
       - args:

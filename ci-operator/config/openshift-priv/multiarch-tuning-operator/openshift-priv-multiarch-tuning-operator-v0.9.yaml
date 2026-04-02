@@ -15,21 +15,22 @@ build_root:
     tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 canonical_go_repository: github.com/openshift/multiarch-tuning-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    builder:
-      as:
-      - golang:1.21
-  to: multiarch-tuning-operator
-- dockerfile_path: bundle.Dockerfile
-  to: multiarch-tuning-op-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
-    FROM src
-    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-  from: src
-  to: operator-sdk-src
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      builder:
+        as:
+        - golang:1.21
+    to: multiarch-tuning-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: multiarch-tuning-op-bundle
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-src
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle

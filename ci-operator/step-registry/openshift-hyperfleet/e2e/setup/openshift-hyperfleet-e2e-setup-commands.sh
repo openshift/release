@@ -26,12 +26,32 @@ hyperfleet-credential-provider generate-kubeconfig \
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 
+# Export chart parameters for the deployment
+export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
+export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_PATH="${API_CHART_PATH:-charts}"
+export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
+export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
+export SENTINEL_CHART_REPO="${SENTINEL_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-sentinel.git}"
+export SENTINEL_CHART_REF="${SENTINEL_CHART_REF:-main}"
+export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
+
+# Export image parameters for the deployment
+export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
+export API_IMAGE_REPO="${API_IMAGE_REPO:-ci/hyperfleet-api}"
+export API_IMAGE_TAG="${API_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
+export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
+export SENTINEL_IMAGE_TAG="${SENTINEL_IMAGE_TAG:-latest}"
+
 # copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
 cp -r /e2e/ /tmp/
 cd "/tmp/e2e/deploy-scripts/"
 cp .env.example .env
 source .env
-./deploy-clm.sh --action install --namespace $NAMESPACE_NAME
+./deploy-clm.sh --action install --namespace $NAMESPACE_NAME --debug-log-dir ${ARTIFACT_DIR}
 
 log "=== Checking all deployed resources ==="
 kubectl get all -n $NAMESPACE_NAME > "${ARTIFACT_DIR}/all-resources.txt"
