@@ -4,14 +4,22 @@ set -euo pipefail
 # =============================================================================
 # RHDH Plugin Export Overlays - E2E Test Runner (OpenShift CI)
 #
-# Job modes:
-#   - nightly (periodic / rehearse-*-nightly*): runs selected workspace tests
-#   - pr-check (presubmit / rehearse with REHEARSE_PR_NUMBER): runs changed workspace
+# Job modes (nightly / pr-check) determine:
+#   - Whether GIT_PR_NUMBER is exported (controls PR vs released OCI image resolution)
+#   - Which workspaces to test (all vs changed)
 #
-# The mode determines:
-#   - Which branch/PR to checkout
-#   - Whether GIT_PR_NUMBER is exported (controls PR OCI resolution in e2e-test-utils)
-#   - Which workspaces to test
+# Job flows:
+#
+#   Scenario                          | JOB_TYPE   | JOB_NAME         | Mode     | GIT_PR_NUMBER | Code tested | OCI images | Tests
+#   ----------------------------------|------------|------------------|----------|---------------|-------------|------------|------
+#   Overlay PR (pr-check)             | presubmit  | pull-ci-*        | pr-check | PR number     | PR branch   | PR-built   | changed workspace
+#   Overlay PR (nightly)              | presubmit  | pull-ci-*nightly | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Rehearse pr-check (no override)   | presubmit  | rehearse-*       | pr-check | empty         | main        | —          | skips (no changes)
+#   Rehearse pr-check (with override) | presubmit  | rehearse-*       | pr-check | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
+#   Rehearse nightly (no override)    | presubmit  | rehearse-*night  | nightly  | not exported  | main        | released   | all workspaces
+#   Rehearse nightly (with override)  | presubmit  | rehearse-*night  | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Periodic cron                     | periodic   | periodic-*       | nightly  | not exported  | main        | released   | all workspaces
+#
 # =============================================================================
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -41,19 +49,25 @@ done
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 
 # Determine job mode
-if [[ "$JOB_TYPE" == "periodic" ]] || { [[ "$JOB_NAME" == rehearse-* ]] && [[ "$JOB_NAME" == *nightly* ]]; }; then
+if [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
     JOB_MODE="nightly"
 else
     JOB_MODE="pr-check"
 fi
 
-# Parse PR number — only relevant for pr-check mode
+# Parse PR number for presubmit jobs (needed for checkout)
+# Rehearse jobs get PR number from release repo (not overlay), so use REHEARSE_PR_NUMBER override
 GIT_PR_NUMBER=""
-if [[ "$JOB_MODE" == "pr-check" ]]; then
-    GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number // empty')
-    if [[ "$JOB_NAME" == rehearse-* ]] && [[ -n "$REHEARSE_PR_NUMBER" ]]; then
-        GIT_PR_NUMBER="$REHEARSE_PR_NUMBER"
+if [[ "$JOB_TYPE" == "presubmit" ]]; then
+    if [[ "$JOB_NAME" == rehearse-* ]]; then
+        GIT_PR_NUMBER="${REHEARSE_PR_NUMBER:-}"
+    else
+        GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number // empty')
     fi
+fi
+
+# Only export GIT_PR_NUMBER in pr-check mode (nightly uses released OCI images)
+if [[ "$JOB_MODE" == "pr-check" ]]; then
     export GIT_PR_NUMBER
 fi
 
@@ -109,8 +123,9 @@ git checkout "${OVERLAY_BRANCH:-$RELEASE_BRANCH_NAME}"
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
-# Checkout PR branch for pr-check mode
-if [[ "$JOB_MODE" == "pr-check" ]] && [[ -n "$GIT_PR_NUMBER" ]]; then
+# Checkout PR branch for presubmit jobs
+# Rehearse jobs only checkout if REHEARSE_PR_NUMBER is explicitly set (JOB_SPEC PR is from the release repo)
+if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$GIT_PR_NUMBER" ]] && { [[ "$JOB_NAME" != rehearse-* ]] || [[ -n "${REHEARSE_PR_NUMBER:-}" ]]; }; then
     git fetch origin "pull/${GIT_PR_NUMBER}/head:PR${GIT_PR_NUMBER}"
     git checkout "PR${GIT_PR_NUMBER}"
     git merge "origin/${RELEASE_BRANCH_NAME}" --no-edit
