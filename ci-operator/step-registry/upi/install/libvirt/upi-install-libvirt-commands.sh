@@ -18,6 +18,16 @@ if ! command -v yq-v4 &>/dev/null; then
   export PATH="/tmp:${PATH}"
 fi
 
+# Older libvirt-installer images (e.g. OCP 4.8) do not ship oc; oc adm release extract requires it.
+if ! command -v oc &>/dev/null; then
+  echo "oc not found; installing openshift-client from mirror.openshift.com..."
+  mkdir -p /tmp/oc-client
+  CLIENT_ARCH="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+  curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/${CLIENT_ARCH}/openshift-client-linux.tar.gz" | tar -xz -C /tmp/oc-client oc
+  chmod +x /tmp/oc-client/oc
+  export PATH="/tmp/oc-client:${PATH}"
+fi
+
 INSTALL_DIR=/tmp
 
 trap 'prepare_next_steps' EXIT TERM
