@@ -10,7 +10,9 @@ function pr_debug_mode_waiting {
   echo "################################################################################"
 
   TZ=UTC
+  TIMEOUT="8 hours"
   END_TIME=$(date -d "${TIMEOUT}" +%s)
+ 
   debug_done=/tmp/debug.done
 
   while sleep 1m; do

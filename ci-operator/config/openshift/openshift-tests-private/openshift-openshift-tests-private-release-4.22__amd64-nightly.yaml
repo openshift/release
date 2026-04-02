@@ -463,17 +463,24 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: idp-external-oidc-entraid-aws
-- as: aws-ipi-f7-longduration-hive-remaining
+- as: aws-ipi-miyadav-2003
   cron: 35 1 7,16,23,30 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;~HiveSpec&
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build11.ci.openshift.org/ci-ln-0q6hxd2/release:latest
     test:
-    - ref: openshift-extended-test-longduration
+    - ref: wait
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-miyadav-nightly
+  cron: 35 1 7,16,23,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f7-longduration-hive-sd-rosa
   cron: 55 7 2,11,18,25 * *
@@ -546,12 +553,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
-- as: gcp-ipi-f14-stress-olm
+- as: gcp-ipi-miyadav-cco787
   cron: 34 14 14,28 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-58s8pdt/release:latest
     test:
-    - chain: openshift-e2e-test-olm-qe-stress
+    - ref: wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-tp-ocl-f7
   cron: 4 4 4,11,20,27 * *
@@ -2054,6 +2063,14 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: e2e-azure-manual-oidc-wi-cco785
+  steps:
+    cluster_profile: azure-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-j6mkmp2/release:latest
+    test:
+    - ref: wait
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: azure-aks-hypershift-arm-nodepool-guest-f7
   cron: 1 2 7,14,23,30 * *
   steps:
@@ -2233,16 +2250,15 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: idp-external-oidc-entraid-azure
-- as: azure-ipi-f7-longduration-part3-3
+- as: azure-ipi-cco785
   cron: 9 21 6,15,22,29 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "100"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-j6mkmp2/release:latest
     test:
-    - chain: openshift-e2e-test-qe-longrun
+    - ref: wait
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-marketplace-mini-perm-f7
   cron: 35 13 1,8,15,22 * *
