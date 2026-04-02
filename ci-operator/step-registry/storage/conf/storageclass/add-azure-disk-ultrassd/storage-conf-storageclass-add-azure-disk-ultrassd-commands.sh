@@ -3,7 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cat << EOF > ${SHARED_DIR}/manifest_storageclass.yaml
+oc apply -f - <<EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
