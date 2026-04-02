@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -144,9 +151,8 @@ check_resource ".*vpc/vpc-.*"
 # # check_resource ".*openshift-bootstrap-data-${INFRA_ID}"
 
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ocp_major_version == 4 && ocp_minor_version >= 16 )) || (( ocp_major_version > 4 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+if version_ge "${ocp_version}" "4.16"; then
   check_resource ".*targetgroup/additional-listener-.*"
   check_resource ".*targetgroup/apiserver-target-.*"
   check_resource ".*listener/net/${INFRA_ID}-ext/.*"
