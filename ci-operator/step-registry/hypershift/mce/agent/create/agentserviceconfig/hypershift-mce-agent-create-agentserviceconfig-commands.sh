@@ -18,7 +18,19 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
+# Try to get cluster version from release image
+# In debug mode, registry access might fail, so fallback to extracting from image name
+if ! CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json 2>/dev/null | jq -r '.metadata.version' | cut -d '.' -f 1,2); then
+  echo "WARNING: Failed to get version from registry, extracting from OCP_IMAGE_LATEST"
+  # Extract version from OCP_IMAGE_LATEST (e.g., registry.build01.ci.openshift.org/ci-op-xxx/release:4.21)
+  if [[ -n "${OCP_IMAGE_LATEST:-}" ]]; then
+    CLUSTER_VERSION=$(echo "$OCP_IMAGE_LATEST" | grep -oP ':\K[0-9]+\.[0-9]+' || echo "4.21")
+  else
+    echo "ERROR: Cannot determine cluster version"
+    exit 1
+  fi
+fi
+echo "Using cluster version: ${CLUSTER_VERSION}"
 
 function registry_config() {
   src_image=${1}
