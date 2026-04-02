@@ -32,23 +32,20 @@ set -x
 
 exit_code=0
 scripts/openshift-CI-kuttl-tests.sh
-unset CI
-make ginkgo
-./bin/ginkgo -v --trace  --junit-report=openshift-gitops-sequential-e2e.xml -r ./test/openshift/e2e/ginkgo/sequential || exit_code=1
 
-# Find report
-cat openshift-gitops-sequential-e2e.xml || cat "$(find . -name "*openshift-gitops-sequential-e2e.xml")"
+make ginkgo
+./bin/ginkgo -v --trace --timeout 210m --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel || exit_code=1
 
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
 
 # Keep a copy of all the original Junit file before modifying it
-cp "openshift-gitops-sequential-e2e.xml" "${original_results}/openshift-gitops-sequential-e2e.xml"
+cp "openshift-gitops-parallel-e2e.xml" "${original_results}/openshift-gitops-parallel-e2e.xml"
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness "${original_results}/openshift-gitops-sequential-e2e.xml"
+mapTestsForComponentReadiness "${original_results}/openshift-gitops-parallel-e2e.xml"
 
  # Send junit file to shared dir for Data Router Reporter step
-cp "openshift-gitops-sequential-e2e.xml" "${SHARED_DIR}"
+cp "openshift-gitops-parallel-e2e.xml" "${SHARED_DIR}"
 
 exit $exit_code
