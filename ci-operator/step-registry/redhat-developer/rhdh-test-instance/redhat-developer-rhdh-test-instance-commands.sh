@@ -118,25 +118,64 @@ echo "Found comment: $comment_body"
 
 if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
     read -r -a comment_parts <<< "$comment_body"
-    
-    if [ ${#comment_parts[@]} -ge 4 ] && [[ "${comment_parts[2]}" == "helm" || "${comment_parts[2]}" == "operator" ]]; then
-        # Extract install.sh arguments (skip /pj-rehearse or /test and job_name)
+
+    action="${comment_parts[1]}"
+
+    if [ ${#comment_parts[@]} -ge 4 ] && [[ "${comment_parts[2]}" == "helm" || "${comment_parts[2]}" == "operator" ]] && [[ "$action" == "deploy" || "$action" == "redeploy" ]]; then
+        # Extract deploy arguments (skip /pj-rehearse or /test and action)
         install_type="${comment_parts[2]}"
         rhdh_version="${comment_parts[3]}"
-        
-        # Check if duration is provided (5th argument), otherwise default to 3h
-        if [ ${#comment_parts[@]} -ge 5 ]; then
+
+        # Check if duration is provided (5th argument) and is not a flag, otherwise default to 3h
+        if [ ${#comment_parts[@]} -ge 5 ] && [[ "${comment_parts[4]}" != "--plugins" ]]; then
             time="${comment_parts[4]}"
         else
             time="3h"
         fi
-        
+
+        # Parse optional --plugins flag anywhere after the required arguments
+        plugins_args=()
+        for (( i=4; i<${#comment_parts[@]}; i++ )); do
+            if [[ "${comment_parts[$i]}" == "--plugins" ]] && [[ $(( i + 1 )) -lt ${#comment_parts[@]} ]]; then
+                plugins_args=("--plugins" "${comment_parts[$((i+1))]}")
+                break
+            fi
+        done
+
         echo "Parsed arguments: $install_type $rhdh_version"
         echo "Time duration: $time"
-        
-        source ./deploy.sh "$install_type" "$rhdh_version"
+        [[ ${#plugins_args[@]} -gt 0 ]] && echo "Plugins: ${plugins_args[*]}"
+
+        if [[ "$action" == "redeploy" ]]; then
+            echo "Running teardown before redeployment..."
+
+            # Teardown must use the plugins from the PREVIOUS deploy, not the current redeploy.
+            # Passing the new plugin list would leave any previously-deployed-but-now-removed
+            # plugins (e.g. lighthouse) still running in the cluster.
+            prev_deploy_comment=$(gh pr view "$GIT_PR_NUMBER" --repo "$REPO" --json comments |
+                jq -r '.comments | reverse | map(select(.body | test("^(/pj-rehearse|/test) deploy "))) | .[0].body')
+            echo "Previous deploy comment: $prev_deploy_comment"
+
+            teardown_plugins_args=()
+            if [[ -n "$prev_deploy_comment" && "$prev_deploy_comment" != "null" ]]; then
+                read -r -a prev_parts <<< "$prev_deploy_comment"
+                for (( i=4; i<${#prev_parts[@]}; i++ )); do
+                    if [[ "${prev_parts[$i]}" == "--plugins" ]] && [[ $(( i + 1 )) -lt ${#prev_parts[@]} ]]; then
+                        teardown_plugins_args=("--plugins" "${prev_parts[$((i+1))]}")
+                        break
+                    fi
+                done
+            fi
+
+            echo "Tearing down previously deployed plugins: ${teardown_plugins_args[*]:-none}"
+            source ./teardown.sh "$install_type" "${teardown_plugins_args[@]}"
+        fi
+
+        # deploy.sh mirrors the deploy.sh script from the rhdh-test-instance repo
+        source ./deploy.sh "$install_type" "$rhdh_version" "${plugins_args[@]}"
     else
-        echo "❌ Error: Unable to trigger deployment command format is incorrect. Expected: /test deploy (helm or operator) (1.7-98-CI or next or 1.7) 3h"
+        echo "❌ Error: Unable to trigger deployment - command format is incorrect."
+        echo "Expected: /test deploy|redeploy (helm or operator) (1.7-98-CI or next or 1.7) [duration] [--plugins keycloak,lighthouse]"
         echo "Example: /test deploy helm 1.7 3h"
         echo "Received comment: $comment_body"
         gh_comment "## ❌ Deployment Command Error
@@ -145,13 +184,15 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
 
 ### 📋 Expected Format:
 \`\`\`
-/test deploy [helm or operator] [Helm chart or Operator version] [duration]
+/test deploy|redeploy [helm or operator] [Helm chart or Operator version] [duration] [--plugins plugin1,plugin2]
 \`\`\`
 
 ### ✨ Examples:
 - \`/test deploy helm 1.7 3h\`
 - \`/test deploy operator 1.6 2h\`
 - \`/test deploy helm 1.7-98-CI\` (defaults to 3h)
+- \`/test deploy helm 1.7 3h --plugins keycloak,lighthouse\`
+- \`/test redeploy helm 1.7 3h --plugins keycloak\` (tears down first, then redeploys)
 
 Please correct the command format and try again! 🚀"
         exit 1
@@ -184,7 +225,13 @@ else
     echo "Sleeping for $time"
 fi
 
-comment="🚀 Deployed RHDH version: $rhdh_version using $install_type
+plugins_info=""
+if [[ ${#plugins_args[@]} -gt 0 ]]; then
+    plugins_info="
+🔌 **Plugins:** \`${plugins_args[1]}\`"
+fi
+
+comment="🚀 Deployed RHDH version: $rhdh_version using $install_type${plugins_info}
 
 🌐 **RHDH URL:** $RHDH_BASE_URL
 
