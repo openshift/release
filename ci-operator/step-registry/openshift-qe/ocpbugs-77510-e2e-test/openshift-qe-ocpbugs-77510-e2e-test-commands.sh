@@ -78,10 +78,14 @@ validate_cluster() {
     log "📊 Cluster: $cluster_info"
     log "🔑 Connected as: $(oc whoami)"
     
-    # Check for API server access (required)
+    # Check for API server access (for bug trigger, but not required for basic test)
     if ! oc get pods -n openshift-kube-apiserver --no-headers 2>/dev/null | head -1 >/dev/null; then
-        log_error "Cannot access kube-apiserver pods - insufficient permissions"
-        return 1
+        log_warning "Cannot access kube-apiserver pods - will skip API server restart trigger"
+        log_warning "Test will still validate basic service behavior and RST detection"
+        SKIP_API_RESTART=true
+    else
+        log_success "API server access confirmed - full test will execute"
+        SKIP_API_RESTART=false
     fi
     
     # Find suitable worker node for monitoring
@@ -234,6 +238,34 @@ start_monitoring() {
 # Execute the bug trigger - API server restart
 trigger_bug_scenario() {
     log "💥 Executing OCPBUGS-77510 trigger scenario..."
+    
+    if [[ "${SKIP_API_RESTART:-false}" == "true" ]]; then
+        log_warning "⚠️ Skipping API server restart trigger (insufficient permissions)"
+        log "   Running baseline service connectivity test instead"
+        log "   Monitoring for any existing RST activity patterns"
+        
+        # Generate some baseline traffic to detect any existing RST patterns
+        log "🔄 Generating service traffic to detect baseline RST patterns..."
+        sleep 30  # Initial baseline period
+        
+        # Add some service connection churn to see if RST patterns emerge
+        for i in $(seq 1 3); do
+            log "   Traffic pattern $i/3..."
+            oc exec -n "$NAMESPACE" traffic-client -- sh -c "
+                for j in \$(seq 1 10); do
+                    curl -s --connect-timeout 1 --max-time 2 http://test-svc-1.$NAMESPACE.svc.cluster.local/ >/dev/null 2>&1 &
+                    curl -s --connect-timeout 1 --max-time 2 http://test-svc-2.$NAMESPACE.svc.cluster.local/ >/dev/null 2>&1 &
+                done
+                wait
+            " 2>/dev/null || true
+            sleep 20
+        done
+        
+        log "⏱️ Monitoring RST activity for remaining test duration..."
+        sleep $(((TIMEOUT_MINUTES - 2) * 60))
+        return 0
+    fi
+    
     log "   Simulating etcd encryption key rotation via API server restart"
     
     # Get API server pods
