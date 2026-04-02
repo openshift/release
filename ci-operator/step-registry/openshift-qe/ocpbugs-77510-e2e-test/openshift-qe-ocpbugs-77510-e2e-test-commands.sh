@@ -313,6 +313,169 @@ trigger_bug() {
     sleep $((TIMEOUT_MINUTES - 5)) * 60
 }
 
+# Save comprehensive test artifacts for manual investigation
+save_test_artifacts() {
+    log " Saving comprehensive test artifacts..."
+    
+    # Create artifacts directory
+    ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+    mkdir -p "$ARTIFACT_DIR"
+    
+    # Save RST logs
+    if [[ -f "/tmp/${TEST_NAME}-rst.log" ]]; then
+        cp "/tmp/${TEST_NAME}-rst.log" "$ARTIFACT_DIR/ocpbugs-77510-rst-packets.log"
+        log "  📋 RST packet capture: $ARTIFACT_DIR/ocpbugs-77510-rst-packets.log"
+    fi
+    
+    # Save cluster state for manual investigation
+    oc get pods -n "$NAMESPACE" -o wide > "$ARTIFACT_DIR/test-pods-state.log" 2>&1 || true
+    oc get svc -n "$NAMESPACE" -o yaml > "$ARTIFACT_DIR/test-services-detailed.yaml" 2>&1 || true
+    oc get events -n "$NAMESPACE" --sort-by='.lastTimestamp' > "$ARTIFACT_DIR/test-events.log" 2>&1 || true
+    
+    # Save OVN-Kubernetes and API server state
+    oc get pods -n openshift-ovn-kubernetes -o wide > "$ARTIFACT_DIR/ovn-kubernetes-pods.log" 2>&1 || true
+    oc get pods -n openshift-kube-apiserver -o wide > "$ARTIFACT_DIR/kube-apiserver-pods.log" 2>&1 || true
+    oc logs -n openshift-ovn-kubernetes ds/ovnkube-node --tail=500 > "$ARTIFACT_DIR/ovn-kubernetes-logs.log" 2>&1 || true
+    
+    # Save node information
+    oc get nodes -o wide > "$ARTIFACT_DIR/cluster-nodes.log" 2>&1 || true
+    oc describe node "$WORKER_NODE" > "$ARTIFACT_DIR/worker-node-details.log" 2>&1 || true
+    
+    # Create manual investigation guide
+    local rst_count
+    rst_count=$(grep -c "RST:" "/tmp/${TEST_NAME}-rst.log" 2>/dev/null || echo "0")
+    
+    cat > "$ARTIFACT_DIR/MANUAL_INVESTIGATION_GUIDE.md" << EOF
+# OCPBUGS-77510 Manual Investigation Guide
+
+## Test Results Summary
+- **Date**: $(date)
+- **Cluster**: $(oc whoami --show-server 2>/dev/null || echo 'unknown')
+- **Version**: $(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || echo 'unknown')
+- **RST Packets Captured**: $rst_count (threshold: $EXPECTED_MIN_RST)
+- **Test Namespace**: $NAMESPACE
+- **Monitor Node**: $WORKER_NODE
+
+## Bug Status Analysis
+$([[ $rst_count -ge $EXPECTED_MIN_RST ]] && echo "
+🚨 **BUG REPRODUCED** - OCPBUGS-77510 is PRESENT
+- High RST count indicates serviceUpdateNotNeeded() bug is active
+- This cluster needs the reflect.DeepEqual() fix
+" || echo "
+✅ **BUG NOT REPRODUCED** - Possible fix present
+- Low RST count suggests bug may be fixed
+- Or different network configuration/timing
+")
+
+## Manual Investigation Commands
+
+### 1. Check Test Infrastructure
+\`\`\`bash
+# Test pods and services
+oc get pods -n $NAMESPACE -o wide
+oc get svc -n $NAMESPACE -o yaml
+
+# Test events
+oc get events -n $NAMESPACE --sort-by='.lastTimestamp'
+\`\`\`
+
+### 2. Monitor TCP RST Packets Manually
+\`\`\`bash
+# Live RST monitoring
+oc debug node/$WORKER_NODE --quiet -- tcpdump -i any -nnvv 'tcp[tcpflags] & tcp-rst != 0'
+
+# With packet details
+oc debug node/$WORKER_NODE --quiet -- tcpdump -i any -nnvvS 'tcp[tcpflags] & tcp-rst != 0'
+\`\`\`
+
+### 3. Trigger Manual API Server Restart
+\`\`\`bash
+# Get API server pods
+oc get pods -n openshift-kube-apiserver -l app=kube-apiserver
+
+# Restart API servers (one at a time)
+for pod in \$(oc get pods -n openshift-kube-apiserver -l app=kube-apiserver --no-headers | awk '{print \$1}' | head -3); do
+    echo "Restarting \$pod"
+    oc delete pod \$pod -n openshift-kube-apiserver --grace-period=10
+    sleep 30
+done
+\`\`\`
+
+### 4. Investigate OVN-Kubernetes
+\`\`\`bash
+# OVN pods status
+oc get pods -n openshift-ovn-kubernetes
+
+# OVN logs during restart
+oc logs -n openshift-ovn-kubernetes ds/ovnkube-node --tail=100 -f
+
+# Check for serviceUpdateNotNeeded calls
+oc logs -n openshift-ovn-kubernetes ds/ovnkube-node | grep -i "serviceUpdateNotNeeded\|DeepEqual"
+\`\`\`
+
+### 5. Generate Load for Better RST Capture
+\`\`\`bash
+# Create additional client traffic
+oc run test-client --image=curlimages/curl -n $NAMESPACE -- /bin/sh -c "
+while true; do 
+    for svc in \$(seq 1 10); do 
+        curl -s http://test-svc-\${svc}.$NAMESPACE.svc.cluster.local/ >/dev/null 2>&1 || true
+        sleep 1
+    done
+done"
+
+# Then trigger API restart while monitoring RST packets
+\`\`\`
+
+### 6. Check OVN-Kubernetes Version and Fix Status
+\`\`\`bash
+# Get OVN-K version
+oc get pods -n openshift-ovn-kubernetes -o yaml | grep image: | grep ovn-kubernetes
+
+# Check for reflect.DeepEqual fix in source (if accessible)
+# Look for PR that changed serviceUpdateNotNeeded function
+\`\`\`
+
+## Expected Behavior
+
+### With Bug (OCPBUGS-77510 present):
+- High RST packet count during API restart (>100 packets)
+- Connections drop/reset during restart
+- serviceUpdateNotNeeded() uses == comparison (incorrect)
+
+### With Fix Applied:
+- Low/zero RST packets during API restart
+- Minimal connection disruption
+- serviceUpdateNotNeeded() uses reflect.DeepEqual() (correct)
+
+## Troubleshooting
+
+### No RST Packets Captured:
+1. Check monitoring permissions: \`oc debug node/$WORKER_NODE --quiet -- whoami\`
+2. Verify tcpdump availability: \`oc debug node/$WORKER_NODE --quiet -- which tcpdump\`
+3. Check network interface: \`oc debug node/$WORKER_NODE --quiet -- ip link show\`
+
+### API Restart Not Triggering RST:
+1. Ensure OVN-K reconnection happens
+2. Check if etcd encryption is enabled (different trigger pattern)
+3. Verify services are actively receiving traffic
+
+## Test Artifacts
+- RST Capture: \`ocpbugs-77510-rst-packets.log\`
+- Pod States: \`test-pods-state.log\`
+- Service Details: \`test-services-detailed.yaml\`
+- OVN Logs: \`ovn-kubernetes-logs.log\`
+- Cluster Info: \`cluster-nodes.log\`
+
+---
+Generated by OCPBUGS-77510 test at $(date)
+EOF
+    
+    log "  📄 Investigation guide: $ARTIFACT_DIR/MANUAL_INVESTIGATION_GUIDE.md"
+    log "  📊 Cluster state saved for manual analysis"
+    log "  🔍 Use 'wait' step will preserve cluster for manual investigation"
+}
+
 # Analyze results
 analyze_results() {
     log " Analyzing test results..."
@@ -404,16 +567,26 @@ main() {
     trigger_bug || exit 1
     
     # Analyze and report results
+    local test_result=0
     if analyze_results; then
         log_success "🎉 OCPBUGS-77510 test completed successfully!"
-        exit 0
+        test_result=0
     elif [[ $? -eq 2 ]]; then
         log_warning "⚠️ OCPBUGS-77510 test completed with partial results"
-        exit 0  # Don't fail CI on partial results
+        test_result=0  # Don't fail CI on partial results
     else
         log_error "❌ OCPBUGS-77510 test failed to reproduce bug"
-        exit 1
+        test_result=1
     fi
+    
+    # Save comprehensive artifacts for manual investigation
+    save_test_artifacts
+    
+    log "📋 Test completed - cluster will be preserved for manual investigation"
+    log "    Use the wait step timeout (30 minutes) for manual analysis"
+    log "    Check MANUAL_INVESTIGATION_GUIDE.md in artifacts for commands"
+    
+    exit $test_result
 }
 
 # Execute main function
