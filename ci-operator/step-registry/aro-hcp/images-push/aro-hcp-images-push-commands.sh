@@ -33,6 +33,19 @@ oc registry login
 
 IMAGE_TAG="$(git rev-parse --short=7 HEAD)"
 
+retry() {
+  local attempt
+  for attempt in 1 2 3; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Attempt ${attempt}/3 failed, retrying in 10s..."
+    sleep 10
+  done
+  echo "Command failed after 3 attempts: $*"
+  return 1
+}
+
 # Resolve vars, authenticate to ACR, and push a single image to a temp repo
 # Pass "latest" as 4th arg to also push a :latest tag
 push_image() {
@@ -50,12 +63,12 @@ push_image() {
 
   local target="${IMAGE_REGISTRY}/test-${image_name}:${IMAGE_TAG}"
   echo "Pushing ${src_image} -> ${target}"
-  oc image mirror "${src_image}" "${target}"
+  retry oc image mirror "${src_image}" "${target}"
 
   if [[ "${push_latest}" == "latest" ]]; then
     local target_latest="${IMAGE_REGISTRY}/test-${image_name}:latest"
     echo "Pushing ${src_image} -> ${target_latest}"
-    oc image mirror "${src_image}" "${target_latest}"
+    retry oc image mirror "${src_image}" "${target_latest}"
   fi
 }
 
