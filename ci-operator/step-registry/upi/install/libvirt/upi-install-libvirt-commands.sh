@@ -66,6 +66,39 @@ function resolve_qemu_img () {
       return 0
     fi
   fi
+  # Non-root / no repos: extract qemu-img from Rocky Linux 8 AppStream RPM (el8 glibc, matches old libvirt-installer).
+  echo "qemu-img still missing; extracting from Rocky Linux 8 qemu-img RPM..."
+  local dest rpmarch rpm_url
+  dest="/tmp/qemu-img-rocky-rpm"
+  rm -rf "${dest}"
+  mkdir -p "${dest}"
+  rpmarch=$(uname -m)
+  rpm_url="https://download.rockylinux.org/pub/rocky/8/AppStream/${rpmarch}/os/Packages/q/qemu-img-6.2.0-53.module+el8.10.0+40076+c1171059.6.${rpmarch}.rpm"
+  if ! curl -fsSL "${rpm_url}" -o "${dest}/qemu-img.rpm"; then
+    echo "Could not download qemu-img RPM for ${rpmarch} from ${rpm_url}"
+    return 1
+  fi
+  (
+    cd "${dest}"
+    if command -v cpio &>/dev/null; then
+      if command -v rpm2cpio &>/dev/null; then
+        rpm2cpio qemu-img.rpm | cpio -idm 2>/dev/null || true
+      elif [[ -x /usr/bin/rpm2cpio ]]; then
+        /usr/bin/rpm2cpio qemu-img.rpm | cpio -idm 2>/dev/null || true
+      elif [[ -x /usr/lib/rpm/rpm2cpio ]]; then
+        /usr/lib/rpm/rpm2cpio qemu-img.rpm | cpio -idm 2>/dev/null || true
+      fi
+    fi
+    if [[ ! -x usr/bin/qemu-img ]] && command -v bsdtar &>/dev/null; then
+      rm -rf usr lib lib64
+      bsdtar -xf qemu-img.rpm
+    fi
+  )
+  if [[ -x "${dest}/usr/bin/qemu-img" ]]; then
+    echo "${dest}/usr/bin/qemu-img"
+    return 0
+  fi
+  echo "Could not extract qemu-img from RPM (need rpm2cpio+cpio or bsdtar)."
   return 1
 }
 
@@ -298,6 +331,10 @@ else
     if ! QEMU_IMG_BIN=$(resolve_qemu_img); then
       echo "ERROR: qemu-img is required to resize RHCOS images but was not found (and could not be installed)."
       exit 1
+    fi
+    # Unpacked Rocky RPM may ship shared libs next to the binary.
+    if [[ "${QEMU_IMG_BIN}" == /tmp/qemu-img-rocky-rpm/* ]]; then
+      export LD_LIBRARY_PATH="/tmp/qemu-img-rocky-rpm/usr/lib64:/tmp/qemu-img-rocky-rpm/lib64:${LD_LIBRARY_PATH:-}"
     fi
     "${QEMU_IMG_BIN}" resize "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
 
