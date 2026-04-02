@@ -9,18 +9,19 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-  inputs:
-    src:
-      as:
-      - src
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift
-  optional: true
-  to: microshift-test-rpm
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+    inputs:
+      src:
+        as:
+        - src
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/microshift
+    optional: true
+    to: microshift-test-rpm
 promotion:
   to:
   - excluded_images:
@@ -377,6 +378,10 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-upstream
     workflow: openshift-microshift-e2e-metal-tests
+- as: ci-doctor
+  cron: 0 10 * * *
+  steps:
+    workflow: openshift-microshift-claude-ci-doctor
 zz_generated_metadata:
   branch: main
   org: openshift

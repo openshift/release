@@ -24,32 +24,33 @@ build_root:
       # VENV by default.
       ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
 images:
-- dockerfile_path: Dockerfile
-  from: ubi_minimal
-  inputs:
-    golang:
-      as:
-      - golang:1.20
-  to: kserve-controller
-- dockerfile_path: agent.Dockerfile
-  from: ubi_minimal
-  inputs:
-    golang:
-      as:
-      - golang:1.20
-  to: kserve-agent
-- context_dir: qpext/
-  dockerfile_path: qpext.Dockerfile
-  to: kserve-queue-proxy
-- context_dir: .
-  dockerfile_path: router.Dockerfile
-  to: kserve-router
-- context_dir: python/
-  dockerfile_path: storage-initializer.Dockerfile
-  to: kserve-storage-initializer
-- context_dir: python/
-  dockerfile_path: sklearn.Dockerfile
-  to: sklearn-serving-runtime
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi_minimal
+    inputs:
+      golang:
+        as:
+        - golang:1.20
+    to: kserve-controller
+  - dockerfile_path: agent.Dockerfile
+    from: ubi_minimal
+    inputs:
+      golang:
+        as:
+        - golang:1.20
+    to: kserve-agent
+  - context_dir: qpext/
+    dockerfile_path: qpext.Dockerfile
+    to: kserve-queue-proxy
+  - context_dir: .
+    dockerfile_path: router.Dockerfile
+    to: kserve-router
+  - context_dir: python/
+    dockerfile_path: storage-initializer.Dockerfile
+    to: kserve-storage-initializer
+  - context_dir: python/
+    dockerfile_path: sklearn.Dockerfile
+    to: sklearn-serving-runtime
 promotion:
   to:
   - excluded_images:

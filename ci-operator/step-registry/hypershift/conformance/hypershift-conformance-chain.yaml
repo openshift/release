@@ -112,7 +112,18 @@ chain:
         source "${SHARED_DIR}/packet-conf.sh"
       fi
 
-      CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
+      DEADLINE=$((SECONDS + 1200))
+      while true; do
+        OUTPUT="$(oc get infrastructure cluster -ojsonpath='{.status.platform}' 2>&1)" && break
+        if [[ "${OUTPUT}" == *"no such host"* ]] && (( SECONDS < DEADLINE )); then
+          echo "Retrying oc get infrastructure (no such host)..."
+          sleep 30
+          continue
+        fi
+        echo "${OUTPUT}" >&2
+        exit 1
+      done
+      CLUSTER_TYPE="$(echo "${OUTPUT}" | tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
       gcp)
           PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"

@@ -9,22 +9,23 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN set -x && \
-      curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
-      curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-      PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
-      yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-      ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
-      python3 -m pip install requests  && \
-      yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-      yum -y install terraform && \
-      wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-      yum install -y ./google-chrome-stable_current_x86_64.rpm && \
-      yum clean all && rm -rf /var/cache/yum/*
-  from: src
-  to: quay-newui-test
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN set -x && \
+        curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
+        python3 -m pip install requests  && \
+        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum -y install terraform && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_x86_64.rpm && \
+        yum clean all && rm -rf /var/cache/yum/*
+    from: src
+    to: quay-newui-test
 promotion:
   to:
   - namespace: ci
@@ -51,8 +52,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -70,8 +71,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -89,8 +90,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -108,8 +109,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -127,8 +128,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -146,8 +147,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -165,8 +166,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-16@sha256:a1f44ed37213e3d0428aad9ec183feaf4ea3c2833e2b422ca1df8edb4605f4a8
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-16@sha256:a1f44ed37213e3d0428aad9ec183feaf4ea3c2833e2b422ca1df8edb4605f4a8
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -184,8 +185,8 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-16@sha256:a1f44ed37213e3d0428aad9ec183feaf4ea3c2833e2b422ca1df8edb4605f4a8
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-16@sha256:a1f44ed37213e3d0428aad9ec183feaf4ea3c2833e2b422ca1df8edb4605f4a8
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog

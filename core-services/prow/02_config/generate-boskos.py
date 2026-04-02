@@ -776,7 +776,25 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
-    }
+    },
+    'openshift-org-gcp': {
+        'gcp': {
+            'install': 50,
+            'quota': CONFIG['gcp-quota-slice'],
+        },
+        'gcp-arm64': {
+            'install': 20,
+            'quota': CONFIG['gcp-arm64-quota-slice'],
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': CONFIG['gcp-3-quota-slice'],
+        },
+    },
 }
 
 config = {

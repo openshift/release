@@ -311,6 +311,22 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-blocklist-arm-f28-ota
+  cron: 38 4 8 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PROXY_BLOCKLIST: api.openshift.com
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-blocklist
 - as: aws-ipi-proxy-reboot-nodes-arm-f28
   cron: 56 23 7 * *
   steps:
@@ -729,8 +745,8 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-azure-cases-multi-clusters-same-subnets
-- as: azure-ipi-oidc-managed-identity-system-f14
-  cron: 43 9 3,17 * *
+- as: azure-ipi-oidc-identity-system-f14
+  cron: 41 18 7,21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -741,12 +757,13 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-managed-identity
-- as: azure-ipi-oidc-managed-identity-user-defined-mini-perm-f14
-  cron: 16 9 2,18 * *
+- as: azure-ipi-oidc-identity-user-sharedkeyaccess-mini-perm-f14
+  cron: 13 2 7,23 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
+      AZURE_ALLOW_SHARED_KEY_ACCESS: "false"
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AZURE_MANAGED_IDENTITY_TYPE: user-defined
       BASE_DOMAIN: qe.azure.devcluster.openshift.com

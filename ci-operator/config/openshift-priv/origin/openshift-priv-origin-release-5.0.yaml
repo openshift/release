@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.64.8
+    tag: v2.10.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -24,11 +24,12 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools-openstack
-  to: tests
-- dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  to: hello-openshift
+  items:
+  - dockerfile_path: images/tests/Dockerfile.rhel
+    from: tools-openstack
+    to: tests
+  - dockerfile_path: images/hello-openshift/Dockerfile.rhel
+    to: hello-openshift
 promotion:
   to:
   - name: 5.0-priv
@@ -652,7 +653,7 @@ tests:
     OPENSHIFT_SKIP_EXTERNAL_TESTS=1 openshift-tests images \
       --to-repository=quay.io/openshift/e2e-verify-image-manifest-lists \
       --verify-manifest-lists \
-      --allow-missing-architectures=e2e-22-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
+      --allow-missing-architectures=e2e-19-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
       --allow-missing-architectures=registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
       --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
       --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
@@ -706,8 +707,6 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-certrotation
 - always_run: false
   as: e2e-gcp-ovn-techpreview
