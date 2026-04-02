@@ -1,0 +1,25 @@
+ref:
+  as: openshift-qe-ocpbugs-77510-e2e-test
+  from_image:
+    namespace: ci
+    name: ci-tools-build-root
+    tag: latest
+  commands: openshift-qe-ocpbugs-77510-e2e-test-commands.sh
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Executes an end-to-end test for OCPBUGS-77510, which validates TCP RST storm 
+    behavior during kube-apiserver rollouts. This test reproduces a critical 
+    OpenShift networking bug where API server restarts trigger massive TCP RST 
+    storms affecting application connections.
+    
+    The test creates a production-like workload with multiple services and 
+    continuously running clients, then triggers API server restarts while 
+    monitoring for TCP RST packets. Success is determined by capturing a 
+    sufficient number of RST packets, indicating the bug is present.
+    
+    This test is designed to validate both unfixed clusters (where the bug 
+    manifests) and fixed clusters (where RST storms are prevented).
