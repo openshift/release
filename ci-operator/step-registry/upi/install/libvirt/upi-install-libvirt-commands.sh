@@ -37,6 +37,38 @@ if ! command -v oc &>/dev/null; then
   fi
 fi
 
+# Older libvirt-installer images (e.g. OCP 4.8) may omit qemu-img from PATH; RHCOS qcow2 resize needs it.
+function resolve_qemu_img () {
+  local found
+  found=$(type -P qemu-img 2>/dev/null || true)
+  if [[ -n "${found}" ]]; then
+    echo "${found}"
+    return 0
+  fi
+  for d in /usr/bin /usr/local/bin; do
+    if [[ -x "${d}/qemu-img" ]]; then
+      echo "${d}/qemu-img"
+      return 0
+    fi
+  done
+  if [[ "$(id -u)" -eq 0 ]]; then
+    echo "qemu-img not found; attempting package install..."
+    if command -v microdnf &>/dev/null; then
+      microdnf --noplugins install -y qemu-img 2>/dev/null || true
+    elif command -v dnf &>/dev/null; then
+      dnf install -y qemu-img 2>/dev/null || true
+    elif command -v yum &>/dev/null; then
+      yum install -y qemu-img 2>/dev/null || true
+    fi
+    found=$(type -P qemu-img 2>/dev/null || true)
+    if [[ -n "${found}" ]]; then
+      echo "${found}"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -263,7 +295,11 @@ else
 
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
-    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    if ! QEMU_IMG_BIN=$(resolve_qemu_img); then
+      echo "ERROR: qemu-img is required to resize RHCOS images but was not found (and could not be installed)."
+      exit 1
+    fi
+    "${QEMU_IMG_BIN}" resize "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
 
     # Create the new source volume
     echo "Creating source volume..."
