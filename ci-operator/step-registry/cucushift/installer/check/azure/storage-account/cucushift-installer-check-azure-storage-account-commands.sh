@@ -66,7 +66,7 @@ no_critical_check_result=0
 echo "Checking if storage account is publicly accessible in ${RESOURCE_GROUP}"
 
 sa_access_output=$(mktemp)
-az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess,allowCrossTenantReplication]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
+az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess,allowCrossTenantReplication,allowSharedKeyAccess]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
 if [[ ${no_critical_check_result=} == 1 ]]; then
     echo "ERROR: fail to list storage account on cluster ${INFRA_ID}!"
     [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
@@ -92,6 +92,21 @@ do
         else
             echo "ERROR: property allowCrossTenantReplication is ${cross_tenant_replication}, expected value should be False!"
             no_critical_check_result=1
+        fi
+    fi
+
+    # check property allowSharedKeyAccess on the storage account created by installer
+    if [[ "${name}" == *"sa" ]]; then
+        ALLOW_SHARED_KEY_ACCESS=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.allowSharedKeyAccess')
+        if [[ -n "${ALLOW_SHARED_KEY_ACCESS}" ]]; then
+            allowsharedkeyaccess_value=$(echo $line | awk -F' ' '{print $4}')
+            if [[ "${allowsharedkeyaccess_value}" == "${ALLOW_SHARED_KEY_ACCESS}" ]]; then
+                echo "INFO: property allowSharedKeyAccess has expected value ${ALLOW_SHARED_KEY_ACCESS}!"
+            else
+                echo "ERROR: property allowSharedKeyAccess has unexpected value ${allowsharedkeyaccess_value}, expected value is ${ALLOW_SHARED_KEY_ACCESS}!"
+                no_critical_check_result=1
+            fi
+
         fi
     fi
 done
