@@ -122,7 +122,34 @@ EOF
 
     run_command "cd /tmp"
     run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
-    run_command "./oc-mirror --config=/tmp/image-set.yaml --workspace file://oc-mirror-workspace docker://${MIRROR_REGISTRY_HOST} --image-timeout 60m0s --src-tls-verify false --dest-tls-verify false --retry-times 3 --v2 || true"
+
+    # Setup TLS certificate for mirror registry by extracting from cluster
+    echo "Extracting mirror registry CA certificate from cluster..."
+    CERT_INSTALLED=false
+
+    # Try to extract from the registry-config ConfigMap
+    ret=0
+    run_command "oc get configmap registry-config -n openshift-config" || ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "Found registry-config ConfigMap, extracting certificate..."
+        run_command "oc extract configmap/registry-config -n openshift-config --to=/tmp --confirm"
+        for cert_file in /tmp/*.crt /tmp/ca-bundle.crt; do
+            if [ -f "$cert_file" ]; then
+                run_command "cp $cert_file /etc/pki/ca-trust/source/anchors/mirror-registry.crt"
+                run_command "update-ca-trust extract"
+                CERT_INSTALLED=true
+                echo "Certificate installed from registry-config ConfigMap"
+                break
+            fi
+        done
+    fi
+
+    if [ "$CERT_INSTALLED" = false ]; then
+        echo "WARNING: Could not extract mirror registry CA certificate from cluster"
+        echo "oc-mirror may fail due to internal TLS validation"
+    fi
+
+    run_command "./oc-mirror --config=/tmp/image-set.yaml --workspace file://oc-mirror-workspace docker://${MIRROR_REGISTRY_HOST} --authfile /tmp/.dockerconfigjson --image-timeout 60m0s --src-tls-verify false --dest-tls-verify false --retry-times 3 --v2 || true"
     # run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
     #run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/jaeger|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
     # run_command "oc image mirror -a ${REG_CREDS} -f mapping.txt --insecure --filter-by-os='.*'"
