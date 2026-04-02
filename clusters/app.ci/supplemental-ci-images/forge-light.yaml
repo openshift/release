@@ -2,7 +2,7 @@ kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
   namespace: ci
-  name: topsail-ng-light
+  name: forge-light
 spec:
   successfulBuildsHistoryLimit: 1
   failedBuildsHistoryLimit: 2
@@ -32,15 +32,18 @@ spec:
 
       COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+      ARG APP_NAME=forge
+      ARG APP_HOME=/app/forge
+
       # Set up the runner user
-      ENV USER_NAME=psap-ci-runner \
-          USER=psap-ci-runner \
-          HOME=/app/forge \
-          TOPSAIL_LIGHT_IMAGE="true"
+      ENV USER_NAME=${APP_NAME} \
+          USER=${APP_NAME} \
+          HOME=${APP_HOME} \
+          FORGE_LIGHT_IMAGE="true"
 
       ENV PYTHONPATH=$HOME
 
-      WORKDIR /app/forge
+      WORKDIR ${APP_HOME}
 
       RUN git clone https://github.com/openshift-psap/forge/ $HOME
 
@@ -53,9 +56,9 @@ spec:
       ENV UV_SYSTEM_PYTHON=1
 
       # Set environment variables
-      ENV PYTHONPATH=/app/forge \
+      ENV PYTHONPATH=${APP_HOME} \
           PYTHONUNBUFFERED=1 \
-          FORGE_HOME=/app/forge
+          FORGE_HOME=${APP_HOME}
 
       RUN cp projects/core/image/pyproject-lightweight.toml pyproject.toml
       RUN uv lock
