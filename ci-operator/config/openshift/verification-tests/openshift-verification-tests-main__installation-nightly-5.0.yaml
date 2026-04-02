@@ -1072,19 +1072,67 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
-- as: gcp-ipi-all-regions-f1
-  cron: 44 17 * * *
+- as: gcp-ipi-all-regions-f3
+  cron: 32 7 2,5,8,11,14,17,20,23,26,29 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "OverallResult", "value": "", "operator": "equals"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ],
+          [
+              {"column": "OverallResult", "value": "FAIL", "operator": "equals"},
+              {"column": "CreatedDate", "value": "7", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ],
+          [
+              {"column": "CreatedDate", "value": "30", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ]
+        ]
       TEST_FILTERS: "57148"
       TEST_OBJECT: Regions
     test:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
+- as: gcp-ipi-all-regions-without-storage-test-f3
+  cron: 50 10 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "OverallResult", "value": "", "operator": "equals"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ],
+          [
+              {"column": "OverallResult", "value": "FAIL", "operator": "equals"},
+              {"column": "CreatedDate", "value": "7", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ],
+          [
+              {"column": "CreatedDate", "value": "30", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ]
+        ]
+      TEST_OBJECT: Regions
     workflow: cucushift-installer-rehearse-gcp-cases-clusters
 - as: gcp-ipi-confidential-mini-perm-f14
   cron: 5 16 9,23 * *
