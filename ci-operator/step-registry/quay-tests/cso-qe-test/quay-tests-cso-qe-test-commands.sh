@@ -35,6 +35,7 @@ for _ in {1..60}; do
 done
 echo "Container Security Operator is deployed successfully"
 
+sleep 8h
 
 #execute sanity test
 ##create ns
