@@ -30,11 +30,6 @@ echo $SPREADSHEET_NAME > "$SHARED_DIR"/spreadsheet_name
 
 if [ "${SHEET_NAME_PREFIX}" == "" ]; then
 
-  if is_empty "$TEST_OBJECT"; then
-    echo "TEST_OBJECT is empty, using default value 'Regions'"
-    TEST_OBJECT="Regions"
-  fi
-
   case "${CLUSTER_TYPE}" in
   aws|aws-arm64)
     SHEET_NAME_PREFIX="AWS_${TEST_OBJECT}"
@@ -46,7 +41,8 @@ if [ "${SHEET_NAME_PREFIX}" == "" ]; then
     SHEET_NAME_PREFIX="GCP_${TEST_OBJECT}"
     ;;
   ibmcloud)
-    SHEET_NAME_PREFIX="IBMCloud_${TEST_OBJECT}"
+    echo "IBMCloud just support TEST_OBJECT 'Regions'"
+    SHEET_NAME_PREFIX="IBMCloud_Regions"
     ;;
   *)
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"

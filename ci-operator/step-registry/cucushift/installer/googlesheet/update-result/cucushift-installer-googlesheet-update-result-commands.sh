@@ -31,6 +31,10 @@ if [ "${SHEET_NAME_PREFIX}" == "" ]; then
   gcp)
     SHEET_NAME_PREFIX="GCP_${TEST_OBJECT}"
     ;;
+  ibmcloud)
+    echo "IBMCloud just support TEST_OBJECT 'Regions'"
+    SHEET_NAME_PREFIX="IBMCloud_Regions"
+    ;;    
   *)
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1
