@@ -18,17 +18,14 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-# Try to get cluster version from release image
-# In debug mode, registry access might fail, so fallback to extracting from image name
-if ! CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json 2>/dev/null | jq -r '.metadata.version' | cut -d '.' -f 1,2); then
-  echo "WARNING: Failed to get version from registry, extracting from OCP_IMAGE_LATEST"
-  # Extract version from OCP_IMAGE_LATEST (e.g., registry.build01.ci.openshift.org/ci-op-xxx/release:4.21)
-  if [[ -n "${OCP_IMAGE_LATEST:-}" ]]; then
-    CLUSTER_VERSION=$(echo "$OCP_IMAGE_LATEST" | grep -oP ':\K[0-9]+\.[0-9]+' || echo "4.21")
-  else
-    echo "ERROR: Cannot determine cluster version"
-    exit 1
-  fi
+# Get cluster version
+# Priority: 1. Environment variable, 2. Registry query, 3. Error
+if [[ -n "${CLUSTER_VERSION:-}" ]]; then
+  echo "Using cluster version from environment: ${CLUSTER_VERSION}"
+elif ! CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json 2>/dev/null | jq -r '.metadata.version' | cut -d '.' -f 1,2); then
+  echo "ERROR: Failed to get version from registry and CLUSTER_VERSION not set"
+  echo "In debug mode, set CLUSTER_VERSION environment variable explicitly"
+  exit 1
 fi
 echo "Using cluster version: ${CLUSTER_VERSION}"
 
