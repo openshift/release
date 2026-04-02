@@ -10,7 +10,7 @@ set -o pipefail
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
-trap 'post_actions; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+trap 'post_actions; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "waiting..."; sleep 2h; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
