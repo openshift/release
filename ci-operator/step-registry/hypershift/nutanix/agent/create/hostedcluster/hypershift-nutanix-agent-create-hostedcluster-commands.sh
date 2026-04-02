@@ -29,6 +29,10 @@ debug() {
       echo "$(date) Saving control plane pods to artifacts..."
       oc get pod -n local-cluster-${CLUSTER_NAME} -o yaml > ${ARTIFACT_DIR}/controlplane-pods.yaml || true
       oc get pod -n local-cluster-${CLUSTER_NAME} -o wide > ${ARTIFACT_DIR}/controlplane-pods-wide.txt || true
+
+      # Describe CAPI provider pods
+      echo "$(date) Describing CAPI provider pods..."
+      oc describe pod -n local-cluster-${CLUSTER_NAME} -lapp=capi-provider-controller-manager > ${ARTIFACT_DIR}/capi-provider-pods-describe.txt || true
     fi
 
     # Save hypershift operator logs (errors only)
