@@ -4,7 +4,7 @@ set -o nounset
 export REPORT_HANDLE_PATH="/usr/bin"
 
 pwd
-echo "Quay upgrade test..."
+echo "Quay upgrade test ....."
 
 #export env variabels for Go test cases
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
