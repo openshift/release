@@ -1,0 +1,43 @@
+base_images:
+  tools:
+    name: "4.21"
+    namespace: ocp
+    tag: tools
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: partitionable-devices
+  interval: 168h
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: a3-highgpu-1g
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      COMPUTE_ZONES: '[us-central1-a]'
+      DRA_TEST_FOCUS: \[FeatureGate:DRAPartitionableDevices\]
+      FEATURE_GATES: '[''DRAPartitionableDevices=true'']'
+      FEATURE_SET: CustomNoUpgrade
+      NVIDIA_DRA_DRIVER_VERSION: 25.12.0
+      NVIDIA_DRA_FEATURE_GATES: DynamicMIG=true
+    workflow: openshift-kubernetes-e2e-nvidia-dra-partitionable
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kubernetes
+  variant: gcp-nvidia-dra
