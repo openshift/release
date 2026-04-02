@@ -10,32 +10,33 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM this-is-ignored
-    RUN dnf install -y git
-    WORKDIR /go/src/github.com/openshift-kni/commatrix
-    RUN mkdir -p /go/src/github.com/openshift-kni/commatrix/vendor && \
-        chmod -R a+w /go/src/github.com/openshift-kni/commatrix
+  items:
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y git
+      WORKDIR /go/src/github.com/openshift-kni/commatrix
+      RUN mkdir -p /go/src/github.com/openshift-kni/commatrix/vendor && \
+          chmod -R a+w /go/src/github.com/openshift-kni/commatrix
 
-    RUN mkdir -p /tmp/bin && \
-        chgrp root /tmp/bin && \
-        chmod -R a+w /tmp/bin
+      RUN mkdir -p /tmp/bin && \
+          chgrp root /tmp/bin && \
+          chmod -R a+w /tmp/bin
 
-    COPY oc /usr/bin/oc
-    COPY oc /tmp/bin/
-    COPY app/ .
-  from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    src:
-      paths:
-      - destination_dir: app
-        source_path: /go/src/github.com/openshift-kni/commatrix/.
-  optional: true
-  to: cli-with-git
+      COPY oc /usr/bin/oc
+      COPY oc /tmp/bin/
+      COPY app/ .
+    from: ocp_builder_rhel-9-golang-1.23-openshift-4.19
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      src:
+        paths:
+        - destination_dir: app
+          source_path: /go/src/github.com/openshift-kni/commatrix/.
+    optional: true
+    to: cli-with-git
 releases:
   initial:
     integration:

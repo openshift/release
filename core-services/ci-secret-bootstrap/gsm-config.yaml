@@ -1760,3 +1760,66 @@ bundles:
       - cluster: vsphere02
         namespace: test-credentials
         type: kubernetes.io/dockerconfigjson
+
+  - name: cluster-secrets-aws-5-psalajova-test # todo: remove suffix after testing
+    dockerconfig:
+      as: pull-secret
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          collection: test-platform-infra
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          email_field: email
+          collection: test-platform-infra
+          group: cloud--dot--openshift--dot--com-pull-secret
+          registry_url: cloud.openshift.com
+        - auth_field: auth
+          email_field: email
+          collection: test-platform-infra
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+        - auth_field: auth
+          collection: test-platform-infra
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          collection: test-platform-infra
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          email_field: email
+          collection: test-platform-infra
+          group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+          registry_url: registry.connect.redhat.com
+        - auth_field: auth
+          email_field: email
+          collection: test-platform-infra
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-5-aws-credentials
+        fields:
+          - name: --dot--awscred
+            as: .awscred
+          - name: public_hosted_zone
+            as: baseDomain
+          - name: id_rsa
+            as: ssh-privatekey
+          - name: id_rsa--dot--pub
+            as: ssh-publickey
+      - collection: test-platform-infra
+        group: insights-ci-account
+        fields:
+          - name: insights-live--dot--yaml
+            as: insights-live.yaml
+      - collection: test-platform-infra
+        group: mirror--dot--openshift--dot--com
+        fields:
+          - name: cert-key--dot--pem
+            as: ops-mirror.pem
+    sync_to_cluster: true
+    targets:
+      - cluster: build01  # todo: change to cluster_groups: [non_app_ci]
+        namespace: ci

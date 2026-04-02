@@ -18,57 +18,58 @@ build_root:
     namespace: cincinnati-ci-public
     tag: boot-root-1.84.1
 images:
-- dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi9/ubi:latest
-    WORKDIR /root
-    ENV HOME=/root PATH="/root/.cargo/bin:${PATH}"
-    RUN dnf update -y \
-        && dnf install -y git gcc openssl-devel \
-        && dnf clean all \
-        && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-        && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /root/.cargo/bin
-    COPY . /root/cincinnati/
-    WORKDIR /root/cincinnati
-    RUN just build --release
-  from: ubi
-  to: rustup-build
-- dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi9/ubi:latest
-    ENV RUST_LOG=actix_web=error,dkregistry=error
-    COPY --from=pipeline:bin /go/bin/graph-builder /go/bin/policy-engine /go/bin/metadata-helper /usr/bin/
-    ENTRYPOINT ["/usr/bin/graph-builder"]
-  from: ubi
-  inputs:
-    bin:
-      as:
-      - pipeline:bin
-  to: deploy
-- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  to: downstream-deploy
-- dockerfile_literal: |
-    FROM replaced
-    ENV HOME="/root"
-    WORKDIR "${HOME}/cincinnati"
-    COPY --from=pipeline:test-bin /opt/cincinnati/bin/e2e /usr/bin/cincinnati-e2e-test
-    COPY --from=pipeline:test-bin /opt/cincinnati/bin/prometheus_query /usr/bin/cincinnati-prometheus_query-test
-    COPY --from=pipeline:test-bin /opt/cincinnati/bin/slo /usr/bin/cincinnati-e2e-slo
-    COPY Justfile Justfile
-    COPY hack/e2e.sh hack/vegeta.targets hack/
-    COPY dist/openshift/cincinnati-deployment.yaml \
-         dist/openshift/cincinnati-e2e.yaml \
-         dist/openshift/observability.yaml \
-         dist/openshift/load-testing.yaml \
-         dist/openshift/
-    COPY e2e/tests/testdata e2e/tests/testdata
-    COPY dist/prepare_ci_credentials.sh dist/cargo_test.sh dist/
-    ENV E2E_TESTDATA_DIR "e2e/tests/testdata"
-    ENTRYPOINT ["hack/e2e.sh"]
-  from: e2e
-  inputs:
-    test-bin:
-      as:
-      - pipeline:test-bin
-  to: e2e-test
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+      WORKDIR /root
+      ENV HOME=/root PATH="/root/.cargo/bin:${PATH}"
+      RUN dnf update -y \
+          && dnf install -y git gcc openssl-devel \
+          && dnf clean all \
+          && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+          && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /root/.cargo/bin
+      COPY . /root/cincinnati/
+      WORKDIR /root/cincinnati
+      RUN just build --release
+    from: ubi
+    to: rustup-build
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+      ENV RUST_LOG=actix_web=error,dkregistry=error
+      COPY --from=pipeline:bin /go/bin/graph-builder /go/bin/policy-engine /go/bin/metadata-helper /usr/bin/
+      ENTRYPOINT ["/usr/bin/graph-builder"]
+    from: ubi
+    inputs:
+      bin:
+        as:
+        - pipeline:bin
+    to: deploy
+  - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+    to: downstream-deploy
+  - dockerfile_literal: |
+      FROM replaced
+      ENV HOME="/root"
+      WORKDIR "${HOME}/cincinnati"
+      COPY --from=pipeline:test-bin /opt/cincinnati/bin/e2e /usr/bin/cincinnati-e2e-test
+      COPY --from=pipeline:test-bin /opt/cincinnati/bin/prometheus_query /usr/bin/cincinnati-prometheus_query-test
+      COPY --from=pipeline:test-bin /opt/cincinnati/bin/slo /usr/bin/cincinnati-e2e-slo
+      COPY Justfile Justfile
+      COPY hack/e2e.sh hack/vegeta.targets hack/
+      COPY dist/openshift/cincinnati-deployment.yaml \
+           dist/openshift/cincinnati-e2e.yaml \
+           dist/openshift/observability.yaml \
+           dist/openshift/load-testing.yaml \
+           dist/openshift/
+      COPY e2e/tests/testdata e2e/tests/testdata
+      COPY dist/prepare_ci_credentials.sh dist/cargo_test.sh dist/
+      ENV E2E_TESTDATA_DIR "e2e/tests/testdata"
+      ENTRYPOINT ["hack/e2e.sh"]
+    from: e2e
+    inputs:
+      test-bin:
+        as:
+        - pipeline:test-bin
+    to: e2e-test
 promotion:
   to:
   - excluded_images:
