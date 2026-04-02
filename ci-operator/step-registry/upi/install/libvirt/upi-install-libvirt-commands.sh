@@ -18,17 +18,24 @@ if ! command -v yq-v4 &>/dev/null; then
   export PATH="/tmp:${PATH}"
 fi
 
-# Older libvirt-installer images (e.g. OCP 4.8) do not ship oc; oc adm release extract requires it.
-if ! command -v oc &>/dev/null; then
-  echo "oc not found; installing openshift-client from mirror.openshift.com..."
-  mkdir -p /tmp/oc-client
-  CLIENT_ARCH="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
-  curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/${CLIENT_ARCH}/openshift-client-linux.tar.gz" | tar -xz -C /tmp/oc-client oc
-  chmod +x /tmp/oc-client/oc
-  export PATH="/tmp/oc-client:${PATH}"
-fi
-
 INSTALL_DIR=/tmp
+
+# Newer libvirt-installer images ship oc and we extract openshift-install from OPENSHIFT_INSTALL_TARGET.
+# Older images (e.g. OCP 4.8) have no oc; downloading a modern oc from mirror fails on old glibc in the image.
+# Fall back to openshift-install already in the image (same libc as the container).
+EXTRACT_OPENSHIFT_INSTALL=1
+if ! command -v oc &>/dev/null; then
+  echo "oc not found in image."
+  if command -v openshift-install &>/dev/null; then
+    echo "Using openshift-install bundled in libvirt-installer (skips oc adm release extract)."
+    cp "$(command -v openshift-install)" "${INSTALL_DIR}/openshift-install"
+    chmod +x "${INSTALL_DIR}/openshift-install"
+    EXTRACT_OPENSHIFT_INSTALL=0
+  else
+    echo "Neither oc nor openshift-install found in PATH; cannot proceed."
+    exit 1
+  fi
+fi
 
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -81,10 +88,11 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-# download openshift-install from the payload
-echo "Extracting openshift-install from the payload..."
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
-  --command=openshift-install --to="${INSTALL_DIR}"
+if [[ "${EXTRACT_OPENSHIFT_INSTALL}" -eq 1 ]]; then
+  echo "Extracting openshift-install from the payload..."
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
+    --command=openshift-install --to="${INSTALL_DIR}"
+fi
 
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   CLUSTER_NAME="${LEASED_RESOURCE}"
