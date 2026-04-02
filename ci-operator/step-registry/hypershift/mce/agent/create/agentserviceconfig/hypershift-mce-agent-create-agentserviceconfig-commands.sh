@@ -19,12 +19,15 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
 fi
 
 # Get cluster version
-# Priority: 1. Environment variable, 2. Registry query, 3. Error
-if [[ -n "${CLUSTER_VERSION:-}" ]]; then
-  echo "Using cluster version from environment: ${CLUSTER_VERSION}"
+# Priority: 1. Extract from HYPERSHIFT_HC_RELEASE_IMAGE if it's a public image
+#           2. Query registry
+#           3. Error
+if [[ -n "${HYPERSHIFT_HC_RELEASE_IMAGE:-}" && "${HYPERSHIFT_HC_RELEASE_IMAGE}" =~ quay\.io.*(4\.[0-9]+) ]]; then
+  CLUSTER_VERSION="${BASH_REMATCH[1]}"
+  echo "Extracted cluster version from HYPERSHIFT_HC_RELEASE_IMAGE: ${CLUSTER_VERSION}"
 elif ! CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json 2>/dev/null | jq -r '.metadata.version' | cut -d '.' -f 1,2); then
-  echo "ERROR: Failed to get version from registry and CLUSTER_VERSION not set"
-  echo "In debug mode, set CLUSTER_VERSION environment variable explicitly"
+  echo "ERROR: Failed to get version from registry"
+  echo "In debug mode, set HYPERSHIFT_HC_RELEASE_IMAGE to a public image like quay.io/openshift-release-dev/ocp-release:4.21.8-x86_64"
   exit 1
 fi
 echo "Using cluster version: ${CLUSTER_VERSION}"
