@@ -1,0 +1,166 @@
+clusterName: build08
+provision:
+  gcp: {}
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  multiarchBuilderController:
+    skip: true
+  certificate:
+    patches:
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apps-tls
+      inline: [{"op": "add", "path": "/spec/issuerRef/name", "value": "cert-issuer-ci-build-farm"}]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apps-tls
+      inline: [
+        {"op": "remove", "path": "/metadata/labels/aws-project"},
+        {"op": "add", "path": "/metadata/labels/gcp-project", "value": "openshift-ci-build-farm"}
+      ]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apiserver-tls
+      inline: [{"op": "add", "path": "/spec/issuerRef/name", "value": "cert-issuer-ci-build-farm"}]
+    - type: json-patch
+      matches:
+      - kind: Certificate
+        name: apiserver-tls
+      inline: [
+        {"op": "remove", "path": "/metadata/labels/aws-project"},
+        {"op": "add", "path": "/metadata/labels/gcp-project", "value": "openshift-ci-build-farm"}
+      ]
+  ciSchedulingWebhook:
+    skip: true
+  machineSet:
+    skip: true
+  passthrough:
+    exclude:
+    - "**/supplemental-ci-images/**"
+  openshiftMonitoring:
+    patches:
+    - matches:
+      - kind: ConfigMap
+        name: cluster-monitoring-config
+        namespace: openshift-monitoring
+      inline:
+        data:
+          config.yaml: |
+            alertmanagerMain:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp2
+                  resources:
+                    requests:
+                      storage: 10Gi
+            prometheusK8s:
+              externalLabels:
+                clusterName: build08
+              remoteWrite:
+                - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+                  queueConfig:
+                    sampleAgeLimit: 10m
+                  tlsConfig:
+                    ca:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: ca.crt
+                    cert:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: client.crt
+                    keySecret:
+                      name: thanos-remote-write-tls
+                      key: client.key
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp2
+                  resources:
+                    requests:
+                      storage: 400Gi
+            prometheusOperator:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            metricsServer:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            kubeStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            telemeterClient:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            openshiftStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            thanosQuerier:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+  multiarchTuningOperator:
+    skip: true

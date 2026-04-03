@@ -11,6 +11,8 @@ function run_command() {
     eval "${CMD}"
 }
 
+
+
 # az should already be there
 command -v az
 az --version
@@ -23,9 +25,11 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
-if [[ "${CLUSTER_TYPE}" == "azuremag" ]] || [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-    echo "The installation with minimal permissions is only supported on Azure Public Cloud, no SP or custom role to be destroyed on ${CLUSTER_TYPE}"
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    echo "No SP or custom role to be destroyed on ${CLUSTER_TYPE}"
     exit 0
+elif [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
+    az cloud set --name AzureUSGovernment
 else
     az cloud set --name AzureCloud
 fi

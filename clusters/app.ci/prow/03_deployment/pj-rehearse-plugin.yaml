@@ -35,7 +35,7 @@ metadata:
     keel.sh/pollSchedule: "@every 5m"
   namespace: ci
 spec:
-  replicas: 3
+  replicas: 2
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -94,7 +94,7 @@ spec:
             memory: "32Gi"
             cpu: "6"
           limits:
-            memory: "32Gi"
+            memory: "64Gi"
             cpu: "6"
         livenessProbe:
           httpGet:
@@ -124,3 +124,12 @@ spec:
           secretName: github-credentials-openshift-ci-robot
       - name: cache
         emptyDir: {}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "node.kubernetes.io/instance-type"
+                operator: In
+                values:
+                - r5.4xlarge

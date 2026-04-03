@@ -1,0 +1,32 @@
+workflow:
+  as: openshift-e2e-azure-csi-ultrassd
+  steps:
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-ultrassd
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - ref: storage-conf-storageclass-add-azure-disk-ultrassd
+    - ref: storage-conf-csi-azure-disk
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    env:
+      AZURE_DISK_SKU: UltraSSD_LRS
+      CLUSTERCSIDRIVER: disk.csi.azure.com
+      TRUECONDITIONS: AzureDiskDriverControllerServiceControllerAvailable AzureDiskDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-azure-disk.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E Azure CSI UltraSSD workflow executes the openshift/csi end-to-end test
+    suite on Azure Disk CSI driver with UltraSSD capability enabled and an UltraSSD_LRS
+    StorageClass. This is required for VolumeAttributesClass tests which only
+    work with UltraSSD_LRS or PremiumV2_LRS disk types.
