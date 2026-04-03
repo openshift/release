@@ -52,11 +52,10 @@ function post_actions() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${INSTALL_DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
-  set -x
+
   region=$(yq-v4 -r '.platform.ibmcloud.region' "${CONFIG}")
   control_plane_type=$(yq-v4 -r '.controlPlane.platform.ibmcloud.type' "${CONFIG}")
   computer_type=$(yq-v4 -r '.compute[0].platform.ibmcloud.type' "${CONFIG}")
-  set +x
 
   update_result "CPType" "${control_plane_type}"
   update_result "CType" "${computer_type}"
@@ -96,8 +95,12 @@ ret=0
 INSTALL_DIR=/tmp/install_dir
 mkdir -p ${INSTALL_DIR}
 
-CONFIG="${INSTALL_DIR}"/install-config.yaml
-if [ ! -f "${SHARED_DIR}/install-config.yaml" ]; then
+CONFIG="${SHARED_DIR}"/install-config.yaml
+
+if [ -f "${SHARED_DIR}/install-config.yaml" ]; then
+  echo "Copying install-config.yaml from ${SHARED_DIR} to ${INSTALL_DIR}"
+  cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}"
+else
   echo "ERROR: Not found install-config.yaml in ${SHARED_DIR}."
   exit 1
 fi
@@ -114,7 +117,6 @@ export IC_API_KEY
 # copy the install-config from the shared dir to install dir
 # ---------------------------------------
 
-cp "${SHARED_DIR}"/install-config.yaml "${CONFIG}"
 
 echo "install-config.yaml"
 echo "-------------------"
