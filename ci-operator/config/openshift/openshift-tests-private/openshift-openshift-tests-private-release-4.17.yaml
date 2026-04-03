@@ -328,6 +328,31 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+- as: debug-winc-vsphere-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "180"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: debug-winc-vsphere-ipi-disruptive
+  optional: true
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FORCE_SUCCESS_EXIT: "yes"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&;Disruptive;Serial
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "180"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 - as: debug-winc-vsphere-ipi-proxy
   optional: true
   steps:
