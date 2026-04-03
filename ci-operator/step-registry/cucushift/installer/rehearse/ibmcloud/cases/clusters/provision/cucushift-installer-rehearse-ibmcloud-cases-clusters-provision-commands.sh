@@ -10,7 +10,7 @@ set -o pipefail
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
-trap 'post_actions; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "waiting..."; sleep 2h; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+trap 'post_actions; if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "waiting..."; sleep 1h; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -52,18 +52,15 @@ function post_actions() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${INSTALL_DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-${current_time}.log"
-
+  set -x
   region=$(yq-v4 -r '.platform.ibmcloud.region' "${CONFIG}")
-  control_plane_type=$(yq-v4 '.controlPlane.platform.ibmcloud.type' "${CONFIG}")
-  computer_type=$(yq-v4 '.compute[0].platform.ibmcloud.type' "${CONFIG}")
-  arch=$(yq-v4 -r '.controlPlane.architecture' "${CONFIG}")
+  control_plane_type=$(yq-v4 -r '.controlPlane.platform.ibmcloud.type' "${CONFIG}")
+  computer_type=$(yq-v4 -r '.compute[0].platform.ibmcloud.type' "${CONFIG}")
+  set +x
 
-  update_result "Region" "${region}"
   update_result "CPType" "${control_plane_type}"
-  update_result "CPFamily" "${control_plane_type%%-*}"
   update_result "CType" "${computer_type}"
   update_result "CFamily" "${computer_type%%-*}"
-  update_result "Arch" "${arch}"
   update_result "Install" "${INSTALL_RESULT}"
   update_result "CreatedDate" "${CREATED_DATE}"
   update_result "Job" "$(echo "${JOB_SPEC}" | jq -r '.job')"
