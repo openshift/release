@@ -171,6 +171,7 @@ EOF
 
     # Need to allow some time before checking if the operator is installed.
     sleep 60
+    sleep 6h
 
     RETRIES=30
     CSV=
