@@ -28,7 +28,7 @@ if [ "${CDI_ENABLED}" != "true" ]; then
   exit 1
 fi
 
-echo "✓ GPU Operator is installed with CDI enabled"
+echo "GPU Operator is installed with CDI enabled"
 echo ""
 
 # Check if DRA driver is already installed
@@ -49,12 +49,14 @@ if ! command -v helm &> /dev/null; then
   HELM_VERSION="3.14.0"
   curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz
   tar -xzf /tmp/helm.tar.gz -C /tmp
-  mv /tmp/linux-amd64/helm /usr/local/bin/helm
-  chmod +x /usr/local/bin/helm
+  mkdir -p /tmp/bin
+  mv /tmp/linux-amd64/helm /tmp/bin/helm
+  chmod +x /tmp/bin/helm
+  export PATH="/tmp/bin:$PATH"
   rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
-  echo "✓ Helm installed: $(helm version --short)"
+  echo "Helm installed: $(helm version --short)"
 else
-  echo "✓ Helm already installed: $(helm version --short)"
+  echo "Helm already installed: $(helm version --short)"
 fi
 
 echo ""
@@ -64,9 +66,15 @@ echo "Creating namespace ${NVIDIA_DRA_DRIVER_NAMESPACE}..."
 oc create namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" || true
 oc label namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
 
+# Add privileged SCC for DRA driver service accounts (required for OpenShift)
+echo "Adding privileged SCC for DRA driver service accounts..."
+oc adm policy add-scc-to-user privileged -z nvidia-dra-driver-gpu-service-account-controller -n "${NVIDIA_DRA_DRIVER_NAMESPACE}"
+oc adm policy add-scc-to-user privileged -z nvidia-dra-driver-gpu-service-account-kubeletplugin -n "${NVIDIA_DRA_DRIVER_NAMESPACE}"
+oc adm policy add-scc-to-user privileged -z compute-domain-daemon-service-account -n "${NVIDIA_DRA_DRIVER_NAMESPACE}"
+
 # Add NVIDIA Helm repository
 echo "Adding NVIDIA Helm repository..."
-helm repo add nvidia https://nvidia.github.io/k8s-dra-driver || true
+helm repo add nvidia https://helm.ngc.nvidia.com/nvidia || true
 helm repo update
 
 echo ""
@@ -90,17 +98,25 @@ echo ""
 
 # Install NVIDIA DRA driver
 echo "Installing NVIDIA DRA driver v${NVIDIA_DRA_DRIVER_VERSION}..."
-helm install nvidia-dra-driver nvidia/k8s-dra-driver \
+helm install nvidia-dra-driver nvidia/nvidia-dra-driver-gpu \
   --namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" \
   --version "${NVIDIA_DRA_DRIVER_VERSION}" \
+  --set nvidiaDriverRoot=/run/nvidia/driver \
+  --set gpuResourcesEnabledOverride=true \
   --set nfd.enabled=false \
   --set gfd.enabled=false \
+  --set 'controller.tolerations[0].key=node-role.kubernetes.io/control-plane' \
+  --set 'controller.tolerations[0].operator=Exists' \
+  --set 'controller.tolerations[0].effect=NoSchedule' \
+  --set 'controller.tolerations[1].key=node-role.kubernetes.io/master' \
+  --set 'controller.tolerations[1].operator=Exists' \
+  --set 'controller.tolerations[1].effect=NoSchedule' \
   ${FEATURE_GATE_ARGS} \
   --wait \
   --timeout 10m
 
 echo ""
-echo "✓ NVIDIA DRA driver installed successfully"
+echo "NVIDIA DRA driver installed successfully"
 
 # Wait for DRA driver pods to be ready
 echo ""
@@ -110,7 +126,7 @@ oc wait --for=condition=Ready pods \
   -n "${NVIDIA_DRA_DRIVER_NAMESPACE}" \
   --timeout=10m
 
-echo "✓ All DRA driver pods are ready"
+echo "All DRA driver pods are ready"
 
 # List pods
 echo ""
@@ -122,8 +138,8 @@ echo ""
 echo "Waiting for DeviceClass to be created..."
 timeout 5m bash -c '
 while true; do
-  if oc get deviceclass nvidia.com/gpu &>/dev/null; then
-    echo "✓ DeviceClass created: nvidia.com/gpu"
+  if oc get deviceclass gpu.nvidia.com &>/dev/null; then
+    echo "DeviceClass created: gpu.nvidia.com"
     break
   fi
   echo "Waiting for DeviceClass..."
@@ -134,19 +150,26 @@ done
 # Show DeviceClass
 echo ""
 echo "DeviceClass details:"
-oc get deviceclass nvidia.com/gpu -o yaml
+oc get deviceclass gpu.nvidia.com -o yaml
 
-# Verify ResourceSlices are created for GPU nodes
+# Wait for ResourceSlices to be published
 echo ""
-echo "Checking ResourceSlices..."
-RESOURCE_SLICES=$(oc get resourceslice -o name 2>/dev/null | wc -l)
-echo "Found ${RESOURCE_SLICES} ResourceSlice(s)"
+echo "Waiting for ResourceSlices to be published..."
+timeout 5m bash -c '
+while true; do
+  RESOURCE_SLICES=$(oc get resourceslice -o name 2>/dev/null | wc -l)
+  if [ "${RESOURCE_SLICES}" -gt 0 ]; then
+    echo "Found ${RESOURCE_SLICES} ResourceSlice(s)"
+    break
+  fi
+  echo "Waiting for ResourceSlices..."
+  sleep 10
+done
+'
 
-if [ "${RESOURCE_SLICES}" -gt 0 ]; then
-  echo ""
-  echo "ResourceSlices:"
-  oc get resourceslice
-fi
+echo ""
+echo "ResourceSlices:"
+oc get resourceslice
 
 echo ""
 echo "========================================="
@@ -156,6 +179,5 @@ echo ""
 echo "Summary:"
 echo "  - Namespace: ${NVIDIA_DRA_DRIVER_NAMESPACE}"
 echo "  - Version: ${NVIDIA_DRA_DRIVER_VERSION}"
-echo "  - DeviceClass: nvidia.com/gpu"
-echo "  - ResourceSlices: ${RESOURCE_SLICES}"
+echo "  - DeviceClass: gpu.nvidia.com"
 echo ""
