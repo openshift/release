@@ -149,36 +149,55 @@ echo "Terraform and byoh.sh found in image"
 cd /usr/local/share/byoh-provisioner
 
 echo "Provisioning ${BYOH_NUM_WORKERS} Windows ${BYOH_WINDOWS_VERSION} nodes..."
+# Enable node pool mode if requested (reuses pre-provisioned nodes across tests)
+if [[ "${USE_NODE_POOL:-false}" == "true" ]]; then
+    export USE_NODE_POOL=true
+    echo "Node pool mode enabled: nodes will be registered in windows-node-pool ConfigMap"
+fi
 ./byoh.sh apply "${BYOH_INSTANCE_NAME}" "${BYOH_NUM_WORKERS}" "" "${BYOH_WINDOWS_VERSION}"
 
-# Wait for BYOH nodes specifically to be Ready (identified by WMCO label)
-# Default timeout: 45 minutes (vSphere provisioning takes longer than cloud platforms)
-READY_TIMEOUT="${BYOH_READY_TIMEOUT:-45m}"
-echo "Waiting for ${BYOH_NUM_WORKERS} BYOH Windows nodes to become Ready (timeout: ${READY_TIMEOUT})..."
-# Export BYOH_NUM_WORKERS so it's available in the subshell
-export BYOH_NUM_WORKERS
-timeout "${READY_TIMEOUT}" bash -c '
-    loops=0
-    max_loops=30
-    sleep_seconds=60
-    while (( loops < max_loops )); do
-        # Count nodes where STATUS field (column 2) starts with "Ready" (not "NotReady")
-        READY=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | awk '\''$2 == "Ready" || $2 ~ /^Ready,/ {print}'\'' | wc -l)
-        TOTAL=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | wc -l)
-        echo "[$loops/$max_loops] BYOH nodes ready: ${READY}/${TOTAL} (waiting for ${BYOH_NUM_WORKERS})"
-        if [[ "${READY}" -ge "${BYOH_NUM_WORKERS}" ]]; then
-            echo "All ${READY} BYOH Windows nodes are Ready"
-            break
-        fi
-        ((loops++))
-        sleep "$sleep_seconds"
-    done
-    if (( loops >= max_loops )); then
-        echo "Timeout: Only ${READY}/${BYOH_NUM_WORKERS} BYOH nodes became Ready after ${max_loops} attempts"
-        oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true -o wide || true
+# In node pool mode, nodes are not configured by WMCO at provision time.
+# Tests allocate nodes from the pool individually and create temporary windows-instances.
+# Just verify the node pool ConfigMap was created with the correct number of nodes.
+if [[ "${USE_NODE_POOL:-false}" == "true" ]]; then
+    echo "Node pool mode: verifying windows-node-pool ConfigMap exists with ${BYOH_NUM_WORKERS} nodes..."
+    POOL_NODES=$(oc get configmap windows-node-pool -n openshift-windows-machine-config-operator -o jsonpath='{.data}' 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "0")
+    echo "Node pool has ${POOL_NODES} nodes registered"
+    if [[ "${POOL_NODES}" -lt "${BYOH_NUM_WORKERS}" ]]; then
+        echo "ERROR: Expected ${BYOH_NUM_WORKERS} nodes in pool, found ${POOL_NODES}"
         exit 1
     fi
-'
+    echo "Node pool provisioning complete. Nodes will be configured by WMCO when tests allocate them."
+else
+    # Wait for BYOH nodes specifically to be Ready (identified by WMCO label)
+    # Default timeout: 45 minutes (vSphere provisioning takes longer than cloud platforms)
+    READY_TIMEOUT="${BYOH_READY_TIMEOUT:-45m}"
+    echo "Waiting for ${BYOH_NUM_WORKERS} BYOH Windows nodes to become Ready (timeout: ${READY_TIMEOUT})..."
+    # Export BYOH_NUM_WORKERS so it's available in the subshell
+    export BYOH_NUM_WORKERS
+    timeout "${READY_TIMEOUT}" bash -c '
+        loops=0
+        max_loops=30
+        sleep_seconds=60
+        while (( loops < max_loops )); do
+            # Count nodes where STATUS field (column 2) starts with "Ready" (not "NotReady")
+            READY=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | awk '\''$2 == "Ready" || $2 ~ /^Ready,/ {print}'\'' | wc -l)
+            TOTAL=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | wc -l)
+            echo "[$loops/$max_loops] BYOH nodes ready: ${READY}/${TOTAL} (waiting for ${BYOH_NUM_WORKERS})"
+            if [[ "${READY}" -ge "${BYOH_NUM_WORKERS}" ]]; then
+                echo "All ${READY} BYOH Windows nodes are Ready"
+                break
+            fi
+            ((loops++))
+            sleep "$sleep_seconds"
+        done
+        if (( loops >= max_loops )); then
+            echo "Timeout: Only ${READY}/${BYOH_NUM_WORKERS} BYOH nodes became Ready after ${max_loops} attempts"
+            oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true -o wide || true
+            exit 1
+        fi
+    '
+fi
 
 echo "Windows BYOH nodes provisioned successfully"
 echo "All Windows nodes in cluster:"
