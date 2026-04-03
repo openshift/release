@@ -32,7 +32,7 @@ vmList="$(cat "${SHARED_DIR}/target-vm-name.txt")"
 typeset -a vmArray
 read -r -a vmArray <<< "${vmList}"
 typeset vmName="${vmArray[0]}"
-typeset vmNamespace="${LPC_LP_CNV__VM__NS:-default}"
+typeset vmNamespace="${LPC_LP_CNV__VM__NS}"
 typeset snapshotName="snap-${stepId}"
 typeset restoreName="restore-${snapshotName}"
 typeset targetNamespace
@@ -50,7 +50,6 @@ fi
 
 # Core Logic Functions
 function DoSnapshotCreate() {
-    : "Action: Creating VMSnapshot ${snapshotName} for VM ${vmName}"
     {
         oc create -f - --dry-run=client -o json --save-config |
         jq -c \
@@ -84,19 +83,17 @@ EOF
 }
 
 function DoSnapshotDelete() {
-    : "Action: Deleting VMSnapshot ${snapshotName}"
     oc get vmsnapshot "${snapshotName}" -n "${vmNamespace}"
-    oc delete vmsnapshot "${snapshotName}" -n "${vmNamespace}" &
-    
-    ( set +x
-      timeout 30s bash -c "until oc get vmsnapshot '${snapshotName}' -n '${vmNamespace}' -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null | grep -q 'T'; do sleep 0.2; done"
-    )
+    oc delete vmsnapshot "${snapshotName}" -n "${vmNamespace}" --wait=false    
+ 
+    # ( set +x
+    #   timeout 30s bash -c "until oc get vmsnapshot '${snapshotName}' -n '${vmNamespace}' -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null | grep -q 'T'; do sleep 0.2; done"
+    # )
     
     true
 }
 
 function DoSnapshotRestore() {
-    : "Action: Restoring VM ${vmName} from ${snapshotName}"
     virtctl stop "${vmName}" -n "${vmNamespace}" || true
     
     {
@@ -137,14 +134,13 @@ EOF
 # Execution Flow
 : "[CHAOS START] Scenario: ${stepId}"
 
-case "${OPERATION:-create}" in
+case "${OPERATION}" in
     (create)  DoSnapshotCreate ;;
     (delete)  DoSnapshotDelete ;;
     (restore) DoSnapshotRestore ;;
     (*)       echo "ERROR: Unsupported operation: ${OPERATION}" >&2; exit 1 ;;
 esac
 
-: "Action: Killing ${TARGET_COMPONENT} pods (Label: ${TARGET_LABEL})"
 oc delete pod -n "${targetNamespace}" -l "${TARGET_LABEL}" --force --grace-period=0 --ignore-not-found=true || : "Info: Pod deletion call handled"
 
 if [[ "${TARGET_COMPONENT:-}" == "apiserver" ]]; then
@@ -153,7 +149,7 @@ if [[ "${TARGET_COMPONENT:-}" == "apiserver" ]]; then
     )
 fi
 
-case "${OPERATION:-create}" in
+case "${OPERATION}" in
     (create)
         oc wait vmsnapshot "${snapshotName}" -n "${vmNamespace}" --for=jsonpath='{.status.readyToUse}'=true --timeout="${waitTimeout}"
         ;;
