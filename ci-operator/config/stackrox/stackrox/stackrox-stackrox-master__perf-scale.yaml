@@ -34,13 +34,24 @@ tests:
       ROX_SCANNER_V4_ENABLED: "true"
       SCANNER_V4_MATCHER_READINESS: vulnerability
       SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
+      TEST_SUITE: ocp-perf-scale-tests
       USER_TAGS: |
         TicketId 382
         RoxProject PerfScale
       ZONES_COUNT: "3"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    - ref: stackrox-stackrox-end
+    pre:
+    - ref: stackrox-stackrox-begin
+    - ref: stackrox-stackrox-e2e-test
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: stackrox-install-helm
     test:
     - chain: stackrox-perfscale
-    workflow: stackrox-install-helm
   timeout: 14h0m0s
 zz_generated_metadata:
   branch: master
