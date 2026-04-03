@@ -15,6 +15,9 @@ ref:
     - name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
       default: ""
       documentation: "DNS domain for HyperShift CI hosted clusters"
+    - name: GKE_REGION
+      default: "us-central1"
+      documentation: "GCP region for the GKE cluster (used as fallback when SHARED_DIR is unavailable)"
   resources:
     requests:
       cpu: 100m
@@ -34,8 +37,13 @@ ref:
     deleting the cluster first and waiting for completion, we ensure the Control Plane
     project can be deleted cleanly.
 
-    Reads from ${SHARED_DIR}:
+    Reads from ${SHARED_DIR} (when available):
     - control-plane-project-id: Control Plane project ID
     - hosted-cluster-project-id: Hosted Cluster project ID (optional)
-    - cluster-name: GKE cluster name
+    - control-plane-cluster-name: GKE cluster name
     - gcp-region: GCP region
+
+    If SHARED_DIR files are missing (e.g. provision step was aborted before
+    the Kubernetes Secret backing SHARED_DIR was synced), resource names are
+    reconstructed from NAMESPACE and UNIQUE_HASH env vars using the same
+    naming logic as hypershift-gcp-gke-provision.
