@@ -135,6 +135,11 @@ done
 
 PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
+# Workaround: --continue + -p is broken (anthropics/claude-code#42376).
+# Sessions created by -p get sessionKind tagged and are filtered from --continue lookup.
+# Setting CLAUDE_CODE_ENTRYPOINT=cli prevents the sessionKind tag from being set.
+export CLAUDE_CODE_ENTRYPOINT=cli
+
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
