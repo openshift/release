@@ -21,13 +21,19 @@ tests:
     test:
     - as: fournos
       commands: |
-        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-fournos-ci
+        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
+        export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
-        exec /app/bin/run_ci forge ci submit
+
+        exec ./bin/run_ci fournos ci submit
       credentials:
-      - mount_path: /var/run/psap-forge-fournos-ci
+      - mount_path: /var/run/psap-forge-ci
         name: psap-forge-ci
+        namespace: test-credentials
+      - mount_path: /var/run/psap-forge-notifications
+        name: psap-forge-notifications
         namespace: test-credentials
       from_image:
         name: forge-light
