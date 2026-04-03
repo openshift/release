@@ -111,6 +111,7 @@ if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V 
     export CYPRESS_QUAY_ENDPOINT_PROTOCOL="https"
     export CYPRESS_QUAY_PROJECT="quay-enterprise"
     export CYPRESS_OLD_UI_DISABLED=true
+    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 else
     export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
     export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
