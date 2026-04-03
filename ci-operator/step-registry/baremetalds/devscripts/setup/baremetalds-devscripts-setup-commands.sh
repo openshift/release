@@ -477,3 +477,7 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+
+# Copy SSH key to SHARED_DIR for later test steps (e.g., Cypress tests that need to SSH to hypervisor)
+cp /run/secrets/ci.openshift.io/cluster-profile/packet-ssh-key "${SHARED_DIR}/hypervisor-ssh-key"
+chmod 600 "${SHARED_DIR}/hypervisor-ssh-key"

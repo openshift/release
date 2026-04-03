@@ -23,5 +23,13 @@ workflow:
         NUM_EXTRA_WORKERS=5
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
+        MODIFY_VM_XML='if [[ "$VM_NAME" == *"extra"* ]]; then
+          TARGET_ISO="/var/lib/libvirt/images/mce-discovery.iso";
+          sed -i "/<boot dev=/d" $VM_XML;
+          sed -i "s|<boot order=.*/>||g" $VM_XML;
+          sed -i "/device='\''cdrom'\''/ s|/>|>\n      <source file='\''$TARGET_ISO'\''/>\n      <boot order='\''1'\''/>|g" $VM_XML;
+          sed -i "s|<bootmenu enable=.*/>|<bootmenu enable='\''yes'\'' timeout='\''10000'\''/>|g" $VM_XML;
+          (sleep 5; virsh destroy $VM_NAME) &
+        fi'
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
