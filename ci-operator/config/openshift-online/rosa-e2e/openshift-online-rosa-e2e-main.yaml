@@ -1,3 +1,8 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -19,6 +24,33 @@ tests:
   commands: make unit-test
   container:
     from: src
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+  capabilities:
+  - nested-podman
+  commands: |
+    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file /tmp/podman.env \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
 - as: lint
   commands: |
     unset GOFLAGS
