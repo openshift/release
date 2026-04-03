@@ -58,7 +58,7 @@ if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
 fi
 
 # Run tests
-GINKGO_FLAGS="--junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml -v"
+GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
 if [[ -n "${LABEL_FILTER}" ]]; then
   GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${LABEL_FILTER}"
 fi
