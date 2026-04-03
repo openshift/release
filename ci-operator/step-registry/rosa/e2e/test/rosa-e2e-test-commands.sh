@@ -57,11 +57,6 @@ if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
   fi
 fi
 
-# Copy prebuilt test binary from rosa-e2e image
-log "Extracting rosa-e2e test binary..."
-oc image extract "${ROSA_E2E_IMAGE}" --path /usr/local/bin/e2e.test:/tmp/ --confirm
-chmod +x /tmp/e2e.test
-
 # Run tests
 GINKGO_FLAGS="--junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml -v"
 if [[ -n "${LABEL_FILTER}" ]]; then
@@ -73,6 +68,6 @@ if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
 fi
 
 log "Running rosa-e2e tests..."
-/tmp/e2e.test ${GINKGO_FLAGS}
+/usr/local/bin/e2e.test ${GINKGO_FLAGS}
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"
