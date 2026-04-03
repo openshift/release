@@ -147,16 +147,19 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-default
-- as: installer-rehearse-ibmcloud-mirror
+- as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe-2
     env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.22.0-ec.3-x86_64
+      FEATURE_SET: TechPreviewNoUpgrade
       MIRROR_BIN: oc-mirror
+      OS_IMAGE_STREAM: rhel-10
       SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
       SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
+    post:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
