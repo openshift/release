@@ -3,7 +3,7 @@
 # OCPBUGS-77510 Generic End-to-End Test for Prow CI
 # Tests TCP RST behavior during API server restarts (etcd encryption simulation)
 set -euo pipefail
-
+sleep 5
 # Test configuration - Generic and adaptable
 TEST_NAME="ocpbugs-77510-e2e"
 NAMESPACE="${TEST_NAME}-$(date +%s)"
