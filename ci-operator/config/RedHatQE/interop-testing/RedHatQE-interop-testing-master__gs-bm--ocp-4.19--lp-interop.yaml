@@ -1,0 +1,83 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: cnv-4.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: localnet
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: metal-redhat-gs
+    env:
+      OCP__ABI__BM__BASE_DOM: sys.eng.rdu2.dc.redhat.com
+      OCP__ABI__BM__CLS_NAME: integrity
+      OCP__ABI__DAY0_SCRIPTS_YAML: |
+        Scripts:
+          - |
+            cp -f "${CLUSTER_PROFILE_DIR}/agent-config.yaml" "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
+      OCP__ABI__DAY1_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__DAY2_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__TEAM_NAME: lp-interop
+      OCP__ABI__TUN_SVC__CP_URL: https://chisel.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/cp
+      OCP__ABI__TUN_SVC__DP_BASE_URL: https://50.18.200.61/dp
+      OCP__ABI__TUN_SVC__DP_PORT: "20000"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: gs-baremetal-agent-install
+  timeout: 4h0m0s
+- as: pr-test
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: metal-redhat-gs
+    env:
+      OCP__ABI__BM__BASE_DOM: sys.eng.rdu2.dc.redhat.com
+      OCP__ABI__BM__CLS_NAME: integrity
+      OCP__ABI__DAY0_SCRIPTS_YAML: |
+        Scripts:
+          - |
+            cp -f "${CLUSTER_PROFILE_DIR}/agent-config.yaml" "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
+      OCP__ABI__DAY1_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__DAY2_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__TEAM_NAME: lp-interop
+      OCP__ABI__TUN_SVC__CP_URL: https://chisel.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/cp
+      OCP__ABI__TUN_SVC__DP_BASE_URL: https://50.18.200.61/dp
+      OCP__ABI__TUN_SVC__DP_PORT: "20000"
+    workflow: gs-baremetal-agent-install
+  timeout: 4h0m0s
+- as: gs-baremetal-localnet-ocp419
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: metal-redhat-gs
+    test:
+    - ref: gs-baremetal-localnet-test
+    workflow: external-cluster
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: gs-bm--ocp-4.19--lp-interop
