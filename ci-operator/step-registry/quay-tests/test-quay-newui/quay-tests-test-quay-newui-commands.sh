@@ -82,7 +82,7 @@ npm install || true
 npm install --save-dev typescript@^5.0.0 || true
 npm install --save-dev cypress-failed-log || true
 npm install --save-dev @cypress/grep@5.0.0 || true
-npm install -g regctl || true
+npm install --save-dev regctl || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
@@ -127,14 +127,10 @@ else
   export CYPRESS_OLD_UI_DISABLED=false 
 fi
 
-YARN_PATH=$(yarn global bin)
-NEW_PATH="$PATH:${YARN_PATH}"
-export PATH=${NEW_PATH}
 
-#NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
-NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags="${NEW_UI_TESTING_COVERAGE}",grepFilterSpecs=true || true 
+NO_COLOR=1 npx cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags="${NEW_UI_TESTING_COVERAGE}",grepFilterSpecs=true || true 
 
-yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
+npx jrm ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 
 reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
 
