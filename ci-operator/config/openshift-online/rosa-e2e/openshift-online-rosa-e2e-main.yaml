@@ -3,6 +3,10 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -12,6 +16,12 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: rosa-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -57,6 +67,17 @@ tests:
     make lint
   container:
     from: src
+- as: rosa-hcp-e2e-nightly
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      REPLICAS: "3"
+    workflow: rosa-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-online
