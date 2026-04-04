@@ -9,6 +9,31 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
+generate_github_token() {
+    local -r app_ver="2.0.8"
+    local -r app_sha="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
+    local -r app_exe="/tmp/gh-token-${app_ver}"
+
+    # Install a GitHub CLI extension to generate tokens for GitHub Apps
+    curl -sSL https://github.com/Link-/gh-token/releases/download/v${app_ver}/linux-amd64 -o "${app_exe}"
+    if ! echo "${app_sha}  ${app_exe}" | sha256sum -c -; then
+        echo "ERROR: Failed to verify GitHub CLI extension checksum"
+        exit 1
+    fi
+    chmod +x "${app_exe}"
+
+    # Generate a GitHub token for the GitHub App
+    GITHUB_TOKEN="$("${app_exe}" generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
+    if [ -z "${GITHUB_TOKEN}" ]; then
+        echo "ERROR: Failed to generate GitHub token"
+        exit 1
+    fi
+    rm -f "${app_exe}"
+
+    export GITHUB_TOKEN
+    echo "GitHub token generated."
+}
+
 load_secrets() {
     # Disable command tracing to prevent leaking credentials in logs
     # and restore it after the secrets are loaded
@@ -16,12 +41,11 @@ load_secrets() {
     set +x
 
     echo "Loading secrets..."
-    if [ -f "${GITHUB_TOKEN_PATH}" ]; then
-        GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
-        export GITHUB_TOKEN
-        echo "GitHub token loaded."
+    if [ -f "${GITHUB_APP_ID_PATH}" ] && [ -f "${GITHUB_KEY_PATH}" ]; then
+        generate_github_token
+        echo "GitHub token configured from GitHub App credentials."
     else
-        echo "WARNING: GitHub token not found at ${GITHUB_TOKEN_PATH}. GitHub operations will not be available."
+        echo "WARNING: GitHub App credentials not found at ${GITHUB_APP_ID_PATH} and ${GITHUB_KEY_PATH}. GitHub operations will not be available."
     fi
 
     if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
