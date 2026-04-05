@@ -18,6 +18,7 @@ python3 -V ||true
 terraform version ||true
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
+
 #Create Artifact Directory:
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p $ARTIFACT_DIR
@@ -82,7 +83,7 @@ npm install || true
 npm install --save-dev typescript@^5.0.0 || true
 npm install --save-dev cypress-failed-log || true
 npm install --save-dev @cypress/grep@5.0.0 || true
-npm install -g regctl || true
+npm install --save-dev regctl || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
@@ -112,6 +113,8 @@ echo "The OCP cluster endpoint is ${ocp_endpoint}"
 ocp_kubeadmin_password=$(cat $SHARED_DIR/kubeadmin-password |tr -d '\n')
 #echo "The OCP cluster kubeadmin password is ${ocp_kubeadmin_password}"
 
+sleep 28800
+
 export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
 export CYPRESS_QUAY_ENDPOINT_PROTOCOL=https
 export CYPRESS_QUAY_SUPER_USER_NAME=${QUAY_USERNAME}
@@ -127,14 +130,9 @@ else
   export CYPRESS_OLD_UI_DISABLED=false 
 fi
 
-YARN_PATH=$(yarn global bin)
-NEW_PATH="$PATH:${YARN_PATH}"
-export PATH=${NEW_PATH}
 
-#NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
-NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags="${NEW_UI_TESTING_COVERAGE}",grepFilterSpecs=true || true 
-
-yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
+NO_COLOR=1 npx cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags="${NEW_UI_TESTING_COVERAGE}",grepFilterSpecs=true || true 
+npx jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 
 reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
 
