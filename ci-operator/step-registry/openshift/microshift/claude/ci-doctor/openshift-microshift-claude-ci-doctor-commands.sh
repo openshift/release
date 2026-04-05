@@ -135,7 +135,7 @@ trap copy_reports EXIT TERM INT
 # Clone the MicroShift repository from the main branch to get the latest
 # analyze-ci skills and run analysis on all releases and open pull requests
 SRC_DIR="/tmp/microshift"
-git clone -b main https://github.com/openshift/microshift.git "${SRC_DIR}"
+git clone -b analyze-ci-more-deterministic https://github.com/ggiguash/microshift.git "${SRC_DIR}"
 cd "${SRC_DIR}"
 
 load_secrets
