@@ -39,7 +39,7 @@ eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-)"; EnsureReqs jq
+)"; EnsureReqs jq yq
 
 #=====================
 # Parse leased resources into array
@@ -119,6 +119,7 @@ Need() {
 # Returns: JSON representation of the resource
 JsonGet() {
     oc -n "${1}" get "${2}" "${3}" -o json
+    true
 }
 
 # ResolveSpokeCidrs — derive non-overlapping install-config CIDRs per spoke index.
@@ -139,35 +140,10 @@ ResolveSpokeCidrs() {
     true
 }
 
-#=====================
-# InstallYq — install yq to /tmp/bin if not already in PATH
-#=====================
-# The cli image ships oc but not yq; this function downloads a pinned
-# release on demand and prepends /tmp/bin to PATH.
-InstallYq() {
-    if command -v yq 1>/dev/null; then
-        : "yq already in PATH: $(yq --version 2>&1)"
-        return
-    fi
-    typeset -r yqVersion="v4.44.2"
-    typeset yqArch
-    yqArch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
-    : "Installing yq ${yqVersion} (${yqArch}) to /tmp/bin"
-    mkdir -p /tmp/bin
-    curl -fsSL \
-        "https://github.com/mikefarah/yq/releases/download/${yqVersion}/yq_linux_${yqArch}" \
-        -o /tmp/bin/yq
-    chmod +x /tmp/bin/yq
-    export PATH="/tmp/bin:${PATH}"
-    : "yq installed: $(yq --version 2>&1)"
-    true
-}
-
 # Verify required CLI tools are available
 Need oc
 Need curl
 Need base64
-InstallYq
 
 #=====================
 # Get hub cluster name for suffix generation
@@ -410,8 +386,7 @@ ocEOF
     oc label secret acm-aws-secret \
         cluster.open-cluster-management.io/type=aws \
         cluster.open-cluster-management.io/credentials="" \
-        -n "${clusterName}" --overwrite \
-        --dry-run=client -o yaml | oc apply -f -
+        -n "${clusterName}" --overwrite
 
     # Create pull-secret for accessing container registries
     : "Creating pull-secret"
@@ -433,65 +408,61 @@ ocEOF
         --from-file=ssh-privatekey="${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
         --dry-run=client -o yaml --save-config | oc apply -f -
 
-    # Generate OpenShift install-config.yaml
+    # Generate OpenShift install-config.yaml and store it as a secret for Hive.
     # install-config is an OpenShift Installer config, NOT a Kubernetes resource,
     # so oc create --dry-run cannot process it (it would fail with "Kind is missing").
     # Build the JSON document directly with jq -cn; all shell values are injected
-    # via --arg / --argjson so no shell expansion occurs inside the jq filter.
+    # via --arg / --argjson / --rawfile so no shell expansion occurs in the filter.
     # JSON is a valid YAML superset: Hive reads install-config as YAML and accepts
     # the JSON form without any conversion step.
-    : "Creating install-config for region '${clusterRegion}'"
-    typeset installConfigFile="/tmp/install-config-${clusterName}.yaml"
-
-    jq -cn \
-        --arg name     "${clusterName}" \
-        --arg domain   "${BASE_DOMAIN}" \
-        --arg arch     "${ACM_SPOKE_ARCH_TYPE}" \
-        --arg cpType   "${ACM_SPOKE_CP_TYPE}" \
-        --argjson cpR  "${ACM_SPOKE_CP_REPLICAS}" \
-        --arg wkType   "${ACM_SPOKE_WORKER_TYPE}" \
-        --argjson wkR  "${ACM_SPOKE_WORKER_REPLICAS}" \
-        --arg netType  "${ACM_SPOKE_NETWORK_TYPE}" \
-        --arg region   "${clusterRegion}" \
-        --arg clusterNetCidr "${clusterNetworkCidr}" \
-        --arg machineNetCidr "${machineNetworkCidr}" \
-        --arg serviceNetCidr "${serviceNetworkCidr}" \
-        --arg sshKey   "$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")" \
-        '{
-            "apiVersion": "v1",
-            "metadata": {"name": $name},
-            "baseDomain": $domain,
-            "controlPlane": {
-                "architecture": $arch,
-                "hyperthreading": "Enabled",
-                "name": "master",
-                "replicas": $cpR,
-                "platform": {"aws": {"type": $cpType}}
-            },
-            "compute": [
-                {
-                    "hyperthreading": "Enabled",
-                    "architecture": $arch,
-                    "name": "worker",
-                    "replicas": $wkR,
-                    "platform": {"aws": {"type": $wkType}}
-                }
-            ],
-            "networking": {
-                "networkType": $netType,
-                "clusterNetwork": [{"cidr": $clusterNetCidr, "hostPrefix": 23}],
-                "machineNetwork": [{"cidr": $machineNetCidr}],
-                "serviceNetwork": [$serviceNetCidr]
-            },
-            "platform": {"aws": {"region": $region}},
-            "sshKey": $sshKey
-        }' > "${installConfigFile}"
-
-    # Store install-config as a secret for Hive to consume
-    : "Creating install-config secret"
+    # Process substitution <(...) feeds the generated config directly to oc create
+    # without writing to /tmp; --rawfile keeps the SSH public key out of xtrace.
+    : "Creating install-config secret for region '${clusterRegion}'"
     oc -n "${clusterName}" create secret generic install-config \
         --type Opaque \
-        --from-file install-config.yaml="${installConfigFile}" \
+        --from-file install-config.yaml=<(
+            jq -cn \
+                --arg name     "${clusterName}" \
+                --arg domain   "${BASE_DOMAIN}" \
+                --arg arch     "${ACM_SPOKE_ARCH_TYPE}" \
+                --arg cpType   "${ACM_SPOKE_CP_TYPE}" \
+                --argjson cpR  "${ACM_SPOKE_CP_REPLICAS}" \
+                --arg wkType   "${ACM_SPOKE_WORKER_TYPE}" \
+                --argjson wkR  "${ACM_SPOKE_WORKER_REPLICAS}" \
+                --arg netType  "${ACM_SPOKE_NETWORK_TYPE}" \
+                --arg region   "${clusterRegion}" \
+                --arg clusterNetCidr "${clusterNetworkCidr}" \
+                --arg machineNetCidr "${machineNetworkCidr}" \
+                --arg serviceNetCidr "${serviceNetworkCidr}" \
+                --rawfile sshKey "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+                '{
+                    "apiVersion": "v1",
+                    "metadata": {"name": $name},
+                    "baseDomain": $domain,
+                    "controlPlane": {
+                        "architecture": $arch,
+                        "hyperthreading": "Enabled",
+                        "name": "master",
+                        "replicas": $cpR,
+                        "platform": {"aws": {"type": $cpType}}
+                    },
+                    "compute": [{
+                        "hyperthreading": "Enabled",
+                        "architecture": $arch,
+                        "name": "worker",
+                        "replicas": $wkR,
+                        "platform": {"aws": {"type": $wkType}}
+                    }],
+                    "networking": {
+                        "networkType": $netType,
+                        "clusterNetwork": [{"cidr": $clusterNetCidr, "hostPrefix": 23}],
+                        "machineNetwork": [{"cidr": $machineNetCidr}],
+                        "serviceNetwork": [$serviceNetCidr]
+                    },
+                    "platform": {"aws": {"region": $region}},
+                    "sshKey": ($sshKey | rtrimstr("\n"))
+                }'
+        ) \
         --dry-run=client -o yaml --save-config | oc apply -f -
 
     # Create ClusterDeployment - this is the main Hive resource
