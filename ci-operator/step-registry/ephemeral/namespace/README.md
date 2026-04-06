@@ -80,8 +80,8 @@ tests:
 
 ## Required Secret
 
-The workflow requires the `ephemeral-bot-svc-account` secret in the
-`openshift-online-platform-eng` namespace. This secret must contain:
+The workflow requires the `bonfire-ephemeral-osci-svc-account` secret in the
+`test-credentials` namespace. This secret must contain:
 
 | Key | Description |
 |---|---|
