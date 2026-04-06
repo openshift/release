@@ -20,6 +20,7 @@ az bicep install
 export DEPLOY_ENV="${DEPLOY_ENV:-cspr}"
 export SKIP_CONFIRM=true
 export PERSIST=true
+export AZURE_TOKEN_CREDENTIALS="${AZURE_TOKEN_CREDENTIALS:-dev}"
 
 cd dev-infrastructure && make mgmt.aks.kubeconfig && cd ..
 make mgmt.deployall
