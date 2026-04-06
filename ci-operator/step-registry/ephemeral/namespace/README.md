@@ -81,7 +81,7 @@ tests:
 ## Required Secret
 
 The workflow requires the `ephemeral-bot-svc-account` secret in the
-`test-credentials` namespace. This secret must contain:
+`openshift-online-platform-eng` namespace. This secret must contain:
 
 | Key | Description |
 |---|---|
