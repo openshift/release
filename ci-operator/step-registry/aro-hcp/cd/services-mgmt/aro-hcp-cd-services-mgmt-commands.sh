@@ -15,6 +15,7 @@ az login --service-principal \
   --output none
 
 az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+az bicep install
 
 export DEPLOY_ENV="${DEPLOY_ENV:-cspr}"
 export SKIP_CONFIRM=true
