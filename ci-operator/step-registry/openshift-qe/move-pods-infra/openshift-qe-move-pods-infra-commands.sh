@@ -629,3 +629,4 @@ IF_MOVE_MONITORING=${IF_MOVE_MONITORING:=true}
 if [[ ${IF_MOVE_MONITORING} == "true" ]];then
    move_monitoring
 fi
+sleep 14400
