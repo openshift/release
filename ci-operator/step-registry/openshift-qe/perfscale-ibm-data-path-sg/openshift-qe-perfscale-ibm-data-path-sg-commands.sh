@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Configure ibmcloud
 export IBMCLOUD_CLI=ibmcloud
 REGION=$(jq -r .ibmcloud.region ${SHARED_DIR}/metadata.json)
-expore REGION
+export REGION
 "${IBMCLOUD_CLI}" config --check-version=false
 
 echo "Logging in..."
@@ -50,3 +50,4 @@ echo "Adding rule to Security Group ${SG} for TCP and UDP traffic on ports 10000
 "${IBMCLOUD_CLI}" is security-group-rule-add ${SG} inbound udp --port-min=10000 --port-max=61000
 
 echo "Security group rules are updated successfully."
+sleep 14400
