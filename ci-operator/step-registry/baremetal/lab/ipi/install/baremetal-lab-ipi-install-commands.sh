@@ -97,6 +97,9 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
 export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build10.ci.openshift.org/ci-ln-lb33cik/release:latest"
+export MULTI_RELEASE_IMAGE="registry.build10.ci.openshift.org/ci-ln-lb33cik/release:latest"
+
 # The extraction may be done from the release-multi-latest image, so that we can extract the openshift-baremetal-install
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
