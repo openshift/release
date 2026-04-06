@@ -291,6 +291,9 @@ CONFIG = {
     'aro-hcp-dev-global-pipeline-quota-slice': {
         'default': 1,
     },
+    'aro-hcp-dev-cd-quota-slice': {
+        'default': 1,
+    },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
