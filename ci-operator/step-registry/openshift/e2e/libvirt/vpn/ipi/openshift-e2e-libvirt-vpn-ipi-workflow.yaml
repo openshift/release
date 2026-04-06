@@ -1,0 +1,18 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-ipi
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: ipi-libvirt-pre
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - chain: ipi-libvirt-post
+  documentation: |-
+    IBM Z VPN (phc-cicd) CI with IPI libvirt provisioning. Run upi-libvirt-cleanup-pre first
+    (shared pools / httpd cleanup like openshift-e2e-libvirt-vpn), then the standard IPI chain.
+    Set USE_EXTERNAL_DNS=true and cluster_profile libvirt-s390x-vpn so ipi-conf-libvirt matches
+    UPI VPN install-config naming (baseDomain phc-cicd.cis.ibm.net, cluster name = lease).
+    Like openshift-e2e-libvirt-vpn and openshift-e2e-libvirt-vpn-fips, there is no workflow-level
+    dnsConfig; individual step refs define DNS where needed.

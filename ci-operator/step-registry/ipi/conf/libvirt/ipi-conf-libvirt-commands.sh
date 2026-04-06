@@ -36,15 +36,24 @@ echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
 openshift-install version
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-BASE_DOMAIN="${LEASED_RESOURCE}.ci"
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
-  CLUSTER_NAME="${LEASED_RESOURCE}"
-fi
 CLUSTER_SUBNET="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${CLUSTER_SUBNET}" ]]; then
   echo "Failed to lookup subnet"
   exit 1
+fi
+
+# Match upi-conf-libvirt / upi-conf-libvirt-network when using IBM Z VPN (phc-cicd) CI.
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  BASE_DOMAIN="phc-cicd.cis.ibm.net"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+  LIBVIRT_NETWORK_IF="ocp${CLUSTER_SUBNET}"
+else
+  BASE_DOMAIN="${LEASED_RESOURCE}.ci"
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+  if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
+    CLUSTER_NAME="${LEASED_RESOURCE}"
+  fi
+  LIBVIRT_NETWORK_IF="br$(printf ${LEASED_RESOURCE} | tail -c 3)"
 fi
 
 cat >> "${CONFIG}" << EOF
@@ -77,7 +86,7 @@ platform:
       dnsmasqOptions:
       - name: "address"
         value: "/.apps.${CLUSTER_NAME}.${BASE_DOMAIN}/192.168.${CLUSTER_SUBNET}.1"
-      if: "br$(printf ${LEASED_RESOURCE} | tail -c 3)"
+      if: "${LIBVIRT_NETWORK_IF}"
 EOF
 cat "${CONFIG}"
 
