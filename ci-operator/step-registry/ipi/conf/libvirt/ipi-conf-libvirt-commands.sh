@@ -4,6 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# mikefarah/yq v4 is installed as yq-v4 in current libvirt-installer images; older images (e.g. OCP 4.8) ship only "yq".
+if command -v yq-v4 >/dev/null 2>&1; then
+  YQ=yq-v4
+elif command -v yq >/dev/null 2>&1; then
+  YQ=yq
+else
+  echo "Neither yq-v4 nor yq found in PATH"
+  exit 1
+fi
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -17,7 +27,7 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 # ensure hostname can be found
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+HOSTNAME="$("${YQ}" -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
@@ -36,7 +46,7 @@ echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
 openshift-install version
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-CLUSTER_SUBNET="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
+CLUSTER_SUBNET="$("${YQ}" -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${CLUSTER_SUBNET}" ]]; then
   echo "Failed to lookup subnet"
   exit 1
