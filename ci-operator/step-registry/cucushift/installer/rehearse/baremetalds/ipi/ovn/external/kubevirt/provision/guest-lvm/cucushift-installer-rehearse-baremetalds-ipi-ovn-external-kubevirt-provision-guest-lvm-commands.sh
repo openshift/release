@@ -23,27 +23,7 @@ CATALOG_SOURCE="${LVM_OPERATOR_SUB_SOURCE}"
 INSTALL_NAMESPACE="${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 DEVICE="/dev/vdb"
 
-# Step 1: Create IDMS for LVM images
-echo "Creating ImageDigestMirrorSet for LVM images"
-oc apply -f - <<EOF
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: guest-lvm-operator-idms
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
-  - mirrors:
-    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
-    source: registry.redhat.io/lvms4/lvms-operator-bundle
-  - mirrors:
-    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
-EOF
-
-# Step 2: Ensure openshift-marketplace namespace exists
+# Step 1: Ensure openshift-marketplace namespace exists
 oc get ns openshift-marketplace || oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
@@ -56,7 +36,7 @@ metadata:
   name: openshift-marketplace
 EOF
 
-# Step 3: Create LVM CatalogSource
+# Step 2: Create LVM CatalogSource
 echo "Creating LVM CatalogSource: ${CATALOG_SOURCE}"
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -90,7 +70,7 @@ if [[ "$status" != "READY" ]]; then
   exit 1
 fi
 
-# Step 4: Create namespace and subscribe to LVM operator
+# Step 3: Create namespace and subscribe to LVM operator
 echo "Creating namespace ${INSTALL_NAMESPACE}"
 oc create ns "${INSTALL_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
@@ -135,7 +115,7 @@ for i in $(seq 1 60); do
   sleep 10
 done
 
-# Step 5: Create LVMCluster on /dev/vdb
+# Step 4: Create LVMCluster on /dev/vdb
 echo "Creating LVMCluster using device ${DEVICE}"
 oc apply -f - <<EOF
 apiVersion: lvm.topolvm.io/v1alpha1
