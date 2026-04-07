@@ -2,7 +2,11 @@ workflow:
   as: openshift-e2e-azure-csi-ultrassd
   steps:
     pre:
-    - chain: ipi-conf-azure
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - ref: ipi-conf-azure-custom-az
     - ref: ipi-conf-azure-ultrassd
     - chain: azure-provision-service-principal-minimal-permission
     - ref: rhcos-conf-osstream
@@ -21,6 +25,9 @@ workflow:
     env:
       AZURE_DISK_SKU: UltraSSD_LRS
       CLUSTERCSIDRIVER: disk.csi.azure.com
+      COMPUTE_CUSTOM_AZURE_AZ: "['3']"
+      CP_CUSTOM_AZURE_AZ: "['3']"
+      CUSTOM_AZURE_REGION: westus2
       TRUECONDITIONS: AzureDiskDriverControllerServiceControllerAvailable AzureDiskDriverNodeServiceControllerAvailable
       TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
       TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-azure-disk.yaml
