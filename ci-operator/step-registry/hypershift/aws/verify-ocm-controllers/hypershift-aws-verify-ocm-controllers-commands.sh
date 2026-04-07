@@ -49,11 +49,11 @@ echo "Using base domain: ${DOMAIN}"
 AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 
-# Detect multi-arch release image
+# Detect multi-arch release image (use build-farm credentials for CI-internal images)
 MULTI_ARCH_ARG=""
-NUM_IMAGES="$(oc image info ${RELEASE_IMAGE} -a /tmp/pull-secret.json --show-multiarch true -o json 2>/dev/null | jq '.[].config.architecture' | wc -l || true)"
+NUM_IMAGES="$(oc image info ${RELEASE_IMAGE} -a /tmp/pull-secret-build-farm.json --show-multiarch true -o json 2>/dev/null | jq '.[].config.architecture' 2>/dev/null | wc -l || echo 0)"
 if [[ ${NUM_IMAGES} -gt 1 ]]; then
-  echo "Multi-arch release image detected"
+  echo "Multi-arch release image detected (${NUM_IMAGES} architectures)"
   MULTI_ARCH_ARG="--multi-arch"
 fi
 
