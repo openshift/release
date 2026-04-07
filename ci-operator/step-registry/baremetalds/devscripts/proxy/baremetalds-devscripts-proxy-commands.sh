@@ -13,7 +13,6 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-set -x
 # CENTOS STREAM 8 IS END OF LIFE
 # FIXME:Update to CentOS Stream 9
 # Temporary workaround here https://forums.centos.org/viewtopic.php?t=78708&start=30
@@ -24,7 +23,6 @@ if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
     sudo sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
     sudo dnf clean all
 fi
-set +x
 
 sudo dnf install -y container-tools crun podman firewalld
 
@@ -74,8 +72,8 @@ EOF
 
 CIRFILE=$SHARED_DIR/cir
 PROXYPORT=8213
-if [ -f $CIRFILE ] ; then
-    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
+if [ -f "$CIRFILE" ] ; then
+    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" | jq ".ofcir_port_proxy // 8213" -r)
 fi
 
 
