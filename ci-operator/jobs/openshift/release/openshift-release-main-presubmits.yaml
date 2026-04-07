@@ -883,16 +883,17 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir
-        - ./ci-operator/config/
-        - --registry
-        - ./ci-operator/step-registry/
-        - --cluster-profiles-config
-        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
-        - --cluster-claim-owners-config
-        - ./core-services/cluster-pools/_config.yaml
+        - -c
+        - |
+          core-services/prow/02_config/generate-boskos.py --print-cluster-profile-sets >/tmp/cps.json
+          ci-operator-checkconfig \
+            --config-dir=./ci-operator/config/ \
+            --registry=./ci-operator/step-registry/ \
+            --cluster-profiles-config=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml \
+            --cluster-claim-owners-config=./core-services/cluster-pools/_config.yaml \
+            --cluster-profile-set-details=/tmp/cps.json
         command:
-        - ci-operator-checkconfig
+        - /bin/sh
         image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
         name: ""
