@@ -517,6 +517,9 @@ if [ "${Z_VERSION}" -lt 20 ]; then
     compute_cpu=4
 fi
 
+# Short pool name for PowerCLI (matches GOVC_RESOURCE_POOL / vsphere_resource_pool path suffix).
+vsphere_install_resource_pool_name="${vsphere_resource_pool##*/}"
+
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
 cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$clustername = "${cluster_name}"
@@ -535,6 +538,7 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
+\$vsphere_install_resource_pool_name = "${vsphere_install_resource_pool_name}"
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 

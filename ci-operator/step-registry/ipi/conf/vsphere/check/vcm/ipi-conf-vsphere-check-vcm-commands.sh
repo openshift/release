@@ -215,10 +215,8 @@ function getDVSInfo() {
 SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 
 if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
-   IPI=0
    log "determined this is a UPI job"
 else
-   IPI=1
    log "determined this is an IPI job"
 fi
 
@@ -514,11 +512,8 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
 
   # Populate network from our map.  Add quotes around the comma for json creation below
   network="${vcenter_portgroups[$RESOURCE_POOL]/,/\",\"}"
-  if [ $IPI -eq 0 ]; then
-    resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
-  else
-    resource_pool=${cluster}/Resources/ipi-ci-clusters
-  fi
+  # UPI and IPI share the pre-provisioned CI pool (PowerCLI must not create per-job pools).
+  resource_pool=${cluster}/Resources/ipi-ci-clusters
 
   # prevent duplicate failure domains if in the event we have a network-only lease in addition to the primary lease
   add_failure_domain=0
@@ -623,12 +618,8 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
     # shellcheck source=/dev/null
     source /tmp/envvars_pool
 
-    # Build resource pool path
-    if [ $IPI -eq 0 ]; then
-      vcenter_resource_pool=${vcenter_cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
-    else
-      vcenter_resource_pool=${vcenter_cluster}/Resources/ipi-ci-clusters
-    fi
+    # Build resource pool path (same shared pool for UPI and IPI)
+    vcenter_resource_pool=${vcenter_cluster}/Resources/ipi-ci-clusters
 
     # Create a sanitized filename from the pool name
     # Pool names look like: vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
