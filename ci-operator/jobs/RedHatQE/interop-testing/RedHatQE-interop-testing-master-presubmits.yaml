@@ -527,6 +527,93 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build10
+    context: ci/prow/gs-bm--ocp-4.19--lp-interop-pr-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 4h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-redhat-gs
+      ci-operator.openshift.io/cloud-cluster-profile: metal-redhat-gs
+      ci-operator.openshift.io/variant: gs-bm--ocp-4.19--lp-interop
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-RedHatQE-interop-testing-master-gs-bm--ocp-4.19--lp-interop-pr-test
+    rerun_command: /test gs-bm--ocp-4.19--lp-interop-pr-test
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=pr-test
+        - --variant=gs-bm--ocp-4.19--lp-interop
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gs-bm--ocp-4.19--lp-interop-pr-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build04
     context: ci/prow/ibm-fusion-access-operator-ocp-4.21-lp-interop-cr-images
     decorate: true
