@@ -1,11 +1,13 @@
-# Internal use only: download jq if it is not already available.
-#
-# Result:
-#   Return 0, export a new PATH env variable having the jq download directory as first entry.
-#   Return 1 and print an error message otherwise.
-function _lease__ensure_jq() {
+# Internal use only: Return the path to the jq binary. Download it if it's not available on the system.
+function _lease__jq_bin() {
     if command -v jq &>/dev/null; then
-        return 0
+        printf 'jq'
+        return
+    fi
+
+    if [[ -f '/tmp/jq' ]]; then
+        printf '/tmp/jq'
+        return
     fi
 
     local response_body="$(mktemp --tmpdir=/tmp ensure-jq-XXXXX)" || {
@@ -62,11 +64,7 @@ function _lease__ensure_jq() {
         return 1
     fi
 
-    local download_dir="$(mktemp --tmpdir=/tmp -d jq-XXXXX)" || {
-        printf 'Failed to create the jq download directory: %s\n' "$download_dir"
-        rm -f "$response_body" &>/dev/null
-        return 1
-    }
+    local download_dir='/tmp'
 
     local jq_bin="${download_dir}/jq"
     response=$(curl --connect-timeout 300 --max-time 600 --no-progress-meter \
@@ -95,11 +93,10 @@ function _lease__ensure_jq() {
         return 1
     fi
 
-    export PATH="$download_dir:$PATH"
     rm -f "$response_body" &>/dev/null
-    return 0
+    printf '/tmp/jq'
 }
-export -f _lease__ensure_jq
+export -f _lease__jq_bin
 
 # Acquire `--count` leases of type `--type`, store them in a file a return it.
 # If `--scope=test` is passed, the leases are also saved into `${SHARED_DIR}/leases` so 
@@ -197,8 +194,6 @@ function lease__acquire() {
         return 0
     fi
 
-    _lease__ensure_jq || return 1
-
     local response_body="$(mktemp --tmpdir=/tmp lease-acquire-XXXXX)" || {
         printf 'Failed to create temp file\n'
         return 1
@@ -229,7 +224,8 @@ function lease__acquire() {
                 ;;
             2*)
                 local names=''
-                if ! names=$(jq -r '.names[]' "$response_body"); then
+                local jq_bin="$(_lease__jq_bin)"
+                if ! names=$("$jq_bin" -r '.names[]' "$response_body"); then
                     printf 'Failed to parse the response\n'
                     rm -f "$response_body" &>/dev/null
                     return 1
@@ -397,7 +393,8 @@ function lease__release() {
         return 1
     }
 
-    local request_body=$(jq -cR '{names: split(",")}' <<<"$names") || {
+    local jq_bin="$(_lease__jq_bin)"
+    local request_body=$("$jq_bin" -cR '{names: split(",")}' <<<"$names") || {
         printf 'Failed to compose the request body: %s' "$request_body"
         return 1
     }

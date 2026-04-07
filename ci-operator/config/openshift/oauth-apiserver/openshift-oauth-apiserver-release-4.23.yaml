@@ -2,8 +2,9 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile.rhel7
-  to: oauth-apiserver
+  items:
+  - dockerfile_path: images/Dockerfile.rhel7
+    to: oauth-apiserver
 promotion:
   to:
   - name: "4.23"
@@ -51,6 +52,24 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-component-serial-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- as: e2e-gcp-component-serial-disruptive-ote
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/oauth-apiserver/component/serial-disruptive
+    test:
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - as: e2e-aws-upgrade
   steps:

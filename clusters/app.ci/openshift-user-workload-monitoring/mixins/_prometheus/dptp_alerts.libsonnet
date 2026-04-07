@@ -98,14 +98,24 @@
           {
             alert: 'high-ci-operator-infra-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+              (
+                sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+              )
+              and on (reason)
+              (
+                count by (reason) (
+                  sum by (reason, job_name) (
+                    rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
+                  ) > 0
+                ) >= 3
+              )
             |||,
-            'for': '1m',
+            'for': '5m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -116,14 +126,14 @@
           {
             alert: 'high-ci-operator-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.',
             },
           }
         ],
@@ -264,7 +274,7 @@
             expr: |||
               sum by (job_name) (
                 rate(
-                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
+                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[6h]
                 )
               )
               * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="image-mirroring",label_ci_openshift_io_area="openshift"}) == 0
@@ -275,7 +285,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.',
+              message: 'OpenShift image mirroring jobs have had no successful run in the last 6 hours. The primary recovery target is to restore at least one successful run after repeated failures. Check <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/openshift-mirroring-failures.md|SOP>.',
             },
           }
         ],

@@ -406,7 +406,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-hypershift-conformance
     decorate: true
     labels:
@@ -486,7 +486,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/generate
     decorate: true
     labels:
@@ -556,7 +556,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-monitoring-operator-release-4.23-ginkgo-tests
-    optional: true
     rerun_command: /test ginkgo-tests
     spec:
       containers:
@@ -628,7 +627,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/go-fmt
     decorate: true
     labels:
@@ -689,7 +688,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/golangci-lint
     decorate: true
     labels:
@@ -750,7 +749,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -804,7 +803,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/jsonnet-fmt
     decorate: true
     labels:
@@ -865,7 +864,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/misspell
     decorate: true
     labels:
@@ -926,7 +925,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/rules
     decorate: true
     labels:
@@ -987,7 +986,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -1048,7 +1047,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1109,7 +1108,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -1170,7 +1169,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/verify
     decorate: true
     labels:
@@ -1231,7 +1230,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -1244,6 +1243,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -1264,6 +1264,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1281,6 +1284,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1299,7 +1308,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build05
     context: ci/prow/versions
     decorate: true
     labels:

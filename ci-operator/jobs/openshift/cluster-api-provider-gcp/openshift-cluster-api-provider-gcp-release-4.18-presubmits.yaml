@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -87,7 +87,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-capi-techpreview
     decorate: true
     labels:
@@ -169,7 +169,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -251,7 +251,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-serial
     decorate: true
     labels:
@@ -333,7 +333,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/images
     decorate: true
     labels:
@@ -388,7 +388,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/regression-clusterinfra-gcp-ipi-techpreview-capi
     decorate: true
     labels:
@@ -470,7 +470,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/security
     decorate: true
     labels:
@@ -484,6 +484,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -504,6 +505,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -521,6 +525,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -539,7 +549,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/unit
     decorate: true
     labels:
@@ -601,7 +611,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build08
     context: ci/prow/verify-commits
     decorate: true
     labels:

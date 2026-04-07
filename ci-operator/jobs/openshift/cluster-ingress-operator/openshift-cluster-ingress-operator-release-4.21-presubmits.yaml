@@ -329,7 +329,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-hypershift-conformance
     decorate: true
     labels:
@@ -899,7 +899,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     labels:
@@ -980,7 +980,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-operator
     decorate: true
     labels:
@@ -1061,7 +1061,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -1142,7 +1142,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build09
+    cluster: build03
     context: ci/prow/e2e-baremetalds-metallb-gatewayapi-conformance
     decorate: true
     labels:
@@ -1224,7 +1224,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
@@ -1305,7 +1305,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -1386,7 +1386,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
@@ -1467,7 +1467,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-operator
     decorate: true
     labels:
@@ -1710,7 +1710,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/hypershift-e2e-aks
     decorate: true
     labels:
@@ -1791,7 +1791,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -1930,7 +1930,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1988,7 +1988,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -2049,7 +2049,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     labels:
@@ -2110,7 +2110,7 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
-    cluster: build06
+    cluster: build03
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -2123,6 +2123,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -2143,6 +2144,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -2160,6 +2164,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

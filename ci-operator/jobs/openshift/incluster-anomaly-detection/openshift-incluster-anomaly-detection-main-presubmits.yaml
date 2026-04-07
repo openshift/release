@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/code-style
     decorate: true
     decoration_config:
@@ -69,7 +69,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/doc-style
     decorate: true
     decoration_config:
@@ -133,7 +133,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -189,7 +189,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -253,7 +253,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -270,6 +270,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -290,6 +291,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -307,6 +311,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -325,7 +335,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build11
     context: ci/prow/unittest
     decorate: true
     decoration_config:

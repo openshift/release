@@ -4,6 +4,7 @@ ref:
     namespace: ocp
     name: "4.18"
     tag: upi-installer
+  grace_period: 10m
   commands: ipi-conf-aws-commands.sh
   resources:
     requests:
@@ -127,5 +128,19 @@ ref:
       IP family configuration for dual-stack. Valid values: DualStackIPv4Primary, DualStackIPv6Primary.
       When set, configures both IPv4 and IPv6 network stacks for AWS clusters using the ipFamily field.
       When "" (default), dual-stack is not configured.
+  - name: CONTROL_PLANE_AMI
+    default: ""
+    documentation: |-
+      Custom RHCOS AMI ID for control plane nodes.
+
+      Required for AWS partitions without public AMIs (e.g., EUSC, China).
+      For C2S/SC2S, auto-detected from GitHub if not provided.
+      When "" (default), uses installer's built-in AMI for the region.
+  - name: COMPUTE_AMI
+    default: ""
+    documentation: |-
+      Custom RHCOS AMI ID for compute nodes.
+
+      When "" (default), uses installer's built-in AMI for the region.
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.

@@ -41,27 +41,28 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.14-openshift-4.7
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: installer
-- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
-  to: installer-artifacts
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
-  to: baremetal-installer
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: ovirt-installer
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: installer
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    from: base
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: rhel-7
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: base
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    from: base
+    to: baremetal-installer
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: ovirt-installer
 promotion:
   to:
   - name: "4.7"
@@ -196,12 +197,6 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-latestinstaller
 - always_run: false
-  as: e2e-aws-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
-    cluster_profile: openshift-org-aws
-  optional: true
-- always_run: false
   as: e2e-gcp-upi
   optional: true
   steps:
@@ -213,11 +208,6 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
-- always_run: false
-  as: e2e-azure-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
-    cluster_profile: openshift-org-azure
 - always_run: false
   as: e2e-aws-workers-rhel7
   optional: true

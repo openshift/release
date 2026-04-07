@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/check-cluster-profiles-config
     decorate: true
     labels:
@@ -34,7 +34,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation
     decorate: true
     labels:
@@ -101,7 +101,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation-tide
     decorate: true
     labels:
@@ -163,7 +163,35 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
+    context: ci/prow/check-trigger-trusted-apps
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-trigger-trusted-apps
+    rerun_command: /test check-trigger-trusted-apps
+    run_if_changed: ^core-services/prow/.*
+    spec:
+      containers:
+      - args:
+        - ./hack/validate-trigger-trusted-apps.py
+        - --config-dir=./core-services/prow/02_config
+        - --required-trusted-app=openshift-merge-bot
+        command:
+        - python3
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )check-trigger-trusted-apps,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
     context: ci/prow/image-mirroring-config-validation
     decorate: true
     labels:
@@ -207,7 +235,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-ci-secret-bootstrap-config-validation
     rerun_command: /test ci-secret-bootstrap-config-validation
-    run_if_changed: ^(core-services/ci-secret-bootstrap/_config.yaml|core-services/ci-secret-generator/_config.yaml)
+    run_if_changed: ^(core-services/ci-secret-bootstrap/_config.yaml|core-services/ci-secret-bootstrap/gsm-config.yaml|core-services/ci-secret-generator/_config.yaml)
     spec:
       containers:
       - command:
@@ -225,7 +253,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/clusterimageset-validate
     decorate: true
     labels:
@@ -254,7 +282,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/app-ci-config-dry
     decorate: true
     labels:
@@ -265,9 +293,10 @@ presubmits:
     spec:
       containers:
       - args:
+        - --as=
         - --config-dir=clusters/app.ci
         - --confirm=false
-        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         env:
@@ -290,10 +319,18 @@ presubmits:
           requests:
             cpu: 500m
         volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.app.ci.config
+            path: kubeconfig
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )app-ci-config-dry,?($|\s.*)
@@ -302,7 +339,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/boskos-config
     decorate: true
     labels:
@@ -329,7 +366,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/boskos-config-generation
     decorate: true
     labels:
@@ -353,125 +390,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
-    context: ci/build-farm/build01-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: build01
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-main-build01-dry
-    rerun_command: /test build01-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build01
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        - name: build01_id
-          valueFrom:
-            secretKeyRef:
-              key: build01-id
-              name: build01-dex-oidc
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: quay.io/openshift/ci-public:ci_applyconfig_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build01.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: app.ci
-    context: ci/build-farm/build02-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: build02
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-main-build02-dry
-    rerun_command: /test build02-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build02
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        - name: build02_id
-          valueFrom:
-            secretKeyRef:
-              key: build02-id
-              name: build02-dex-oidc
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: quay.io/openshift/ci-public:ci_applyconfig_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build02.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build03-dry
     decorate: true
     labels:
@@ -484,8 +403,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build03
         - --as=
+        - --config-dir=clusters/build-clusters/build03
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -509,7 +428,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -525,7 +443,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build04-dry
     decorate: true
     labels:
@@ -538,8 +456,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build04
         - --as=
+        - --config-dir=clusters/build-clusters/build04
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -568,7 +486,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -584,7 +501,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build05-dry
     decorate: true
     labels:
@@ -597,8 +514,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build05
         - --as=
+        - --config-dir=clusters/build-clusters/build05
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -622,7 +539,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -638,7 +554,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build06-dry
     decorate: true
     labels:
@@ -651,8 +567,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build06
         - --as=
+        - --config-dir=clusters/build-clusters/build06
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -676,7 +592,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -692,7 +607,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build07-dry
     decorate: true
     labels:
@@ -705,8 +620,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build07
         - --as=
+        - --config-dir=clusters/build-clusters/build07
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -730,7 +645,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -746,7 +660,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build08-dry
     decorate: true
     labels:
@@ -759,8 +673,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build08
         - --as=
+        - --config-dir=clusters/build-clusters/build08
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -784,7 +698,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -800,7 +713,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build09-dry
     decorate: true
     labels:
@@ -813,8 +726,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build09
         - --as=
+        - --config-dir=clusters/build-clusters/build09
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -838,7 +751,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -854,7 +766,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build10-dry
     decorate: true
     labels:
@@ -867,8 +779,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build10
         - --as=
+        - --config-dir=clusters/build-clusters/build10
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -892,7 +804,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -908,7 +819,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/build11-dry
     decorate: true
     labels:
@@ -921,8 +832,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build11
         - --as=
+        - --config-dir=clusters/build-clusters/build11
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -946,7 +857,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -962,7 +872,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -995,7 +905,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -1021,7 +931,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -1052,7 +962,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ci-testgrid-allow-list
     decorate: true
     labels:
@@ -1082,7 +992,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -1121,7 +1031,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260316-25576911a
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260328-dc2bbc9fc
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1141,7 +1051,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/core-ci-config-dry
     decorate: true
     labels:
@@ -1152,9 +1062,10 @@ presubmits:
     spec:
       containers:
       - args:
+        - --as=
         - --config-dir=clusters/core-ci
         - --confirm=false
-        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         env:
@@ -1177,10 +1088,18 @@ presubmits:
           requests:
             cpu: 500m
         volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.core-ci.config
+            path: kubeconfig
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )core-ci-config-dry,?($|\s.*)
@@ -1189,7 +1108,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -1252,7 +1171,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -1278,7 +1197,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -1304,7 +1223,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/hosted-mgmt-dry
     decorate: true
     labels:
@@ -1315,11 +1234,9 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir
-        - clusters/hosted-mgmt
-        - --kubeconfig
-        - /etc/build-farm-credentials/kubeconfig
         - --as=
+        - --config-dir=clusters/hosted-mgmt
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         env:
@@ -1342,7 +1259,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -1358,7 +1274,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/jira-lifecycle-config
     decorate: true
     labels:
@@ -1384,7 +1300,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/labels
     decorate: true
     labels:
@@ -1408,7 +1324,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -1434,7 +1350,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/owners
     decorate: true
     labels:
@@ -1460,7 +1376,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -1486,7 +1402,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -1513,7 +1429,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -1540,7 +1456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/release-config
     decorate: true
     labels:
@@ -1567,7 +1483,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -1592,7 +1508,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/secret-generator-config-valid
     decorate: true
     labels:
@@ -1623,7 +1539,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -1687,7 +1603,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/stackrox-stackrox-stackrox-stackrox-check
     decorate: true
     decoration_config:
@@ -1753,7 +1669,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -1779,7 +1695,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -1805,7 +1721,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/verified-config
     decorate: true
     labels:
@@ -1831,7 +1747,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/build-farm/vsphere02-dry
     decorate: true
     labels:
@@ -1844,8 +1760,8 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/vsphere02
         - --as=
+        - --config-dir=clusters/build-clusters/vsphere02
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
@@ -1864,7 +1780,6 @@ presubmits:
           readOnly: true
         - mountPath: /tmp
           name: tmp
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:
@@ -1880,7 +1795,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/openshift-image-mirror-mappings
     decorate: true
     labels:
@@ -1962,7 +1877,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -1991,7 +1906,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/rover-groups-config-validation
     decorate: true
     labels:
@@ -2015,7 +1930,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/sync-rover-groups
     decorate: true
     labels:
@@ -2047,7 +1962,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build07
     context: ci/prow/yamllint
     decorate: true
     labels:

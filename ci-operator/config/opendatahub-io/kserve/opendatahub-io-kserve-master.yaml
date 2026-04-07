@@ -20,54 +20,55 @@ build_root:
       # VENV by default.
       ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
 images:
-- dockerfile_path: Dockerfile
-  from: ubi_minimal
-  to: kserve-controller
-- build_args:
-  - name: GOTAGS
-    value: distro
-  dockerfile_path: llmisvc-controller.Dockerfile
-  from: ubi_minimal
-  to: llmisvc-controller
-- dockerfile_path: agent.Dockerfile
-  from: ubi_minimal
-  to: kserve-agent
-- context_dir: .
-  dockerfile_path: router.Dockerfile
-  to: kserve-router
-- context_dir: python/
-  dockerfile_path: storage-initializer.Dockerfile
-  to: kserve-storage-initializer
-- context_dir: python/
-  dockerfile_path: sklearn.Dockerfile
-  to: sklearn-serving-runtime
-- context_dir: python/
-  dockerfile_path: custom_transformer.Dockerfile
-  to: custom-transformer
-- context_dir: python/
-  dockerfile_path: custom_model_grpc.Dockerfile
-  to: custom-model-grpc
-- context_dir: python/
-  dockerfile_path: success_200_isvc.Dockerfile
-  to: success-200-isvc
-- context_dir: python/
-  dockerfile_path: error_404_isvc.Dockerfile
-  to: error-404-isvc
-- dockerfile_literal: |-
-    FROM registry.access.redhat.com/ubi9/python-311:1
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi_minimal
+    to: kserve-controller
+  - build_args:
+    - name: GOTAGS
+      value: distro
+    dockerfile_path: llmisvc-controller.Dockerfile
+    from: ubi_minimal
+    to: llmisvc-controller
+  - dockerfile_path: agent.Dockerfile
+    from: ubi_minimal
+    to: kserve-agent
+  - context_dir: .
+    dockerfile_path: router.Dockerfile
+    to: kserve-router
+  - context_dir: python/
+    dockerfile_path: storage-initializer.Dockerfile
+    to: kserve-storage-initializer
+  - context_dir: python/
+    dockerfile_path: sklearn.Dockerfile
+    to: sklearn-serving-runtime
+  - context_dir: python/
+    dockerfile_path: custom_transformer.Dockerfile
+    to: custom-transformer
+  - context_dir: python/
+    dockerfile_path: custom_model_grpc.Dockerfile
+    to: custom-model-grpc
+  - context_dir: python/
+    dockerfile_path: success_200_isvc.Dockerfile
+    to: success-200-isvc
+  - context_dir: python/
+    dockerfile_path: error_404_isvc.Dockerfile
+    to: error-404-isvc
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/python-311:1
 
-    # Prow expects to be able to check out a repo under /go
-    USER 0:0
-    WORKDIR /go
-    RUN chown 1001:0 .
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:0 .
 
-    USER 1001:0
+      USER 1001:0
 
-    # The VENV that is activated by default conflicts with KServe
-    # scripts. These variables are set to empty to not activate any
-    # VENV by default.
-    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
-  to: kserve-tests
+      # The VENV that is activated by default conflicts with KServe
+      # scripts. These variables are set to empty to not activate any
+      # VENV by default.
+      ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+    to: kserve-tests
 promotion:
   to:
   - excluded_images:
@@ -98,7 +99,7 @@ resources:
 tests:
 - always_run: false
   as: e2e-graph
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -166,7 +167,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-raw
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -237,7 +238,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-predictor
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub

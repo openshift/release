@@ -1465,6 +1465,87 @@ presubmits:
     - ^release-4\.23$
     - ^release-4\.23-
     cluster: build01
+    context: ci/prow/e2e-aws-eusc-techpreview
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws-eusc
+      ci-operator.openshift.io/cloud-cluster-profile: aws-eusc
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.23-e2e-aws-eusc-techpreview
+    optional: true
+    rerun_command: /test e2e-aws-eusc-techpreview
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-eusc-techpreview
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-eusc-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build01
     context: ci/prow/e2e-aws-overlay-mtu-ovn-1200
     decorate: true
     labels:
@@ -2685,16 +2766,16 @@ presubmits:
     - ^release-4\.23$
     - ^release-4\.23-
     cluster: build01
-    context: ci/prow/e2e-aws-ovn-rhel10-devpreview
+    context: ci/prow/e2e-aws-ovn-rhcos10-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.23-e2e-aws-ovn-rhel10-devpreview
+    name: pull-ci-openshift-installer-release-4.23-e2e-aws-ovn-rhcos10-techpreview
     optional: true
-    rerun_command: /test e2e-aws-ovn-rhel10-devpreview
+    rerun_command: /test e2e-aws-ovn-rhcos10-techpreview
     spec:
       containers:
       - args:
@@ -2703,7 +2784,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-rhel10-devpreview
+        - --target=e2e-aws-ovn-rhcos10-techpreview
         command:
         - ci-operator
         env:
@@ -2759,7 +2840,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-rhel10-devpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-rhcos10-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4556,7 +4637,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-crc
     decorate: true
     labels:
@@ -4799,7 +4880,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-custom-dns
     decorate: true
     labels:
@@ -4881,7 +4962,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-custom-endpoints
     decorate: true
     labels:
@@ -4963,7 +5044,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-default-config
     decorate: true
     labels:
@@ -5045,7 +5126,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -5126,7 +5207,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-byo-vpc
     decorate: true
     labels:
@@ -5208,7 +5289,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-devpreview
     decorate: true
     labels:
@@ -5289,7 +5370,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-heterogeneous
     decorate: true
     labels:
@@ -5370,7 +5451,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -5451,7 +5532,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-upi
     decorate: true
     labels:
@@ -5532,7 +5613,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-xpn
     decorate: true
     labels:
@@ -5614,7 +5695,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-secureboot
     decorate: true
     labels:
@@ -5696,7 +5777,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     labels:
@@ -5777,7 +5858,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     labels:
@@ -5859,7 +5940,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-xpn-custom-dns
     decorate: true
     labels:
@@ -5941,7 +6022,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-xpn-dedicated-dns-project
     decorate: true
     labels:
@@ -8985,7 +9066,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/gcp-custom-endpoints-proxy-wif
     decorate: true
     decoration_config:
@@ -9069,7 +9150,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/gcp-private
     decorate: true
     labels:
@@ -9405,6 +9486,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=integration-tests
@@ -9425,6 +9507,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -9442,6 +9527,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -9474,6 +9565,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=integration-tests-nodejoiner
@@ -9494,6 +9586,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -9511,6 +9606,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -9867,6 +9968,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -9887,6 +9989,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -9904,6 +10009,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

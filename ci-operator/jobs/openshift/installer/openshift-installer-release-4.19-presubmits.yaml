@@ -63,7 +63,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )aro-unit,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -76,7 +76,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.19-artifacts-images
     rerun_command: /test artifacts-images
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3482,7 +3481,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-crc
     decorate: true
     labels:
@@ -3726,7 +3725,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-custom-dns-techpreview
     decorate: true
     labels:
@@ -3808,7 +3807,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-default-config
     decorate: true
     labels:
@@ -3890,7 +3889,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -3971,7 +3970,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-byo-vpc
     decorate: true
     labels:
@@ -4053,7 +4052,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-heterogeneous
     decorate: true
     labels:
@@ -4134,7 +4133,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -4215,7 +4214,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-upi
     decorate: true
     labels:
@@ -4296,7 +4295,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-xpn
     decorate: true
     labels:
@@ -4378,7 +4377,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-secureboot
     decorate: true
     labels:
@@ -4460,7 +4459,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     labels:
@@ -4541,7 +4540,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     labels:
@@ -7177,7 +7176,7 @@ presubmits:
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
-    cluster: build02
+    cluster: build04
     context: ci/prow/gcp-private
     decorate: true
     labels:
@@ -7441,7 +7440,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.19$
     - ^release-4\.19-
@@ -7453,7 +7452,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.19-images
     rerun_command: /test images
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -7514,6 +7512,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=integration-tests
@@ -7534,6 +7533,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -7551,6 +7553,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -7583,6 +7591,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=integration-tests-nodejoiner
@@ -7603,6 +7612,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -7620,6 +7632,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -7884,6 +7902,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -7904,6 +7923,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -7921,6 +7943,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -56,43 +52,44 @@ build_root:
   from_repository: true
 canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  to: hyperkube
-- dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
-  to: kube-proxy
-- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  to: kubernetes-tests
-- dockerfile_literal: |
-    # We want to test the PR using the code from it. Now, this repo ships RPMs
-    # which are normally part of RHCOS. We need to make sure that RHCOS itself
-    # is updated with the freshly built RPMs from the PR run. To do this, we do a
-    # multi-stage build: the first stage downloads the RPMs that were just built
-    # (the `base-machine-with-rpms` contains the RPMs), and the second stage
-    # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
-    # bootable container).
-    # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
-    FROM quay.io/centos/centos:stream9 as build
-    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
-    # in a container https://github.com/coreos/rpm-ostree/issues/4034
-    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
-    # See also https://issues.redhat.com/browse/ART-4352
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
-    COPY --from=build /*.rpm /
-    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
-    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - quay.io/centos/centos:stream9
-    rhel-coreos-base:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
-  to: rhel-coreos
-- context_dir: build/pause
-  dockerfile_path: Dockerfile.Rhel
-  to: pod
-- dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
-  to: installer-kube-apiserver-artifacts
+  items:
+  - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+    to: hyperkube
+  - dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
+    to: kube-proxy
+  - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+    to: kubernetes-tests
+  - dockerfile_literal: |
+      # We want to test the PR using the code from it. Now, this repo ships RPMs
+      # which are normally part of RHCOS. We need to make sure that RHCOS itself
+      # is updated with the freshly built RPMs from the PR run. To do this, we do a
+      # multi-stage build: the first stage downloads the RPMs that were just built
+      # (the `base-machine-with-rpms` contains the RPMs), and the second stage
+      # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
+      # bootable container).
+      # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+      FROM quay.io/centos/centos:stream9 as build
+      # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+      # in a container https://github.com/coreos/rpm-ostree/issues/4034
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+      # See also https://issues.redhat.com/browse/ART-4352
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      COPY --from=build /*.rpm /
+      # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+  - context_dir: build/pause
+    dockerfile_path: Dockerfile.Rhel
+    to: pod
+  - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+    to: installer-kube-apiserver-artifacts
 promotion:
   to:
   - additional_images:
@@ -529,10 +526,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
-- as: e2e-aws-hpa
-  cron: 0 5 * * 1
+- always_run: false
+  as: e2e-aws-hpa
+  optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-2
     env:
       TEST_SUITE: kubernetes/autoscaling/hpa
     workflow: openshift-e2e-aws

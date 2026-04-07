@@ -82,7 +82,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "5.0"
   upi-installer:
     name: "5.0"
     namespace: ocp
@@ -202,8 +202,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
+      OS_IMAGE_STREAM: rhel-10
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -687,7 +688,8 @@ tests:
         NUM_WORKERS=0
       SKIP_READINESS_CHECKS: "true"
       TEST_ARGS: |
-        --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals --cluster-stability=Disruptive
+        --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals,termination-message-policy --cluster-stability=Disruptive
+      TEST_SKIPS: ""
       TEST_SUITE: openshift/two-node
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
@@ -745,6 +747,7 @@ tests:
   capabilities:
   - intranet
   cron: 7 2,12 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -836,9 +839,6 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-rhcos10-techpreview
   cron: 1 18 * * 0
@@ -846,12 +846,9 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
+      OS_IMAGE_STREAM: rhel-10
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-multi-network
   cron: 11 7 * * 2
@@ -861,17 +858,11 @@ tests:
       FEATURE_GATES: '["VSphereMultiNetworks=true"]'
       FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-external-vsphere-ccm
   cron: 5 0 * * 3
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: upi-vsphere-platform-external-ccm
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
@@ -890,9 +881,6 @@ tests:
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-vcf9
   cron: 23,53 12,19 * * *
@@ -902,17 +890,11 @@ tests:
       POOL_SELECTOR: vsphere-type=vcf9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
   cron: 21 10 * * 0
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-staticip
 - as: e2e-vsphere-static-ovn-techpreview
   cron: 55 14 * * 5
@@ -920,17 +902,11 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-staticip
 - as: e2e-vsphere-externallb-ovn
   cron: 44 14 * * 3
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
   cron: 9 4 * * 3
@@ -939,9 +915,6 @@ tests:
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 40,55 2,9,10 * * *
@@ -949,9 +922,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-rhcos10-techpreview-serial
   cron: 3 4 * * 4
@@ -959,10 +929,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
-    observers:
-      enable:
-      - observers-resource-watch
+      OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
   cron: 44 22 * * 0
@@ -971,9 +938,6 @@ tests:
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-vcf9
   cron: 27,57 5,21 * * *
@@ -983,9 +947,6 @@ tests:
       POOL_SELECTOR: vsphere-type=vcf9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
   cron: 12 20 * * 2
@@ -994,9 +955,6 @@ tests:
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi-operator-test
   cron: 18 3 * * *
@@ -1024,9 +982,6 @@ tests:
         access the single volume from pods on different node\|Testpattern: Dynamic
         PV (block volmode).*multiVolume.*should concurrently access the single volume
         from pods on different node'
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-ovn-csi-vcf9
   cron: 2,32 8,23 * * *
@@ -1040,9 +995,6 @@ tests:
         access the single volume from pods on different node\|Testpattern: Dynamic
         PV (block volmode).*multiVolume.*should concurrently access the single volume
         from pods on different node'
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-ovn-host-groups-csi-techpreview
   cron: 42 0 * * 5
@@ -1050,9 +1002,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups-csi
 - as: e2e-vsphere-ovn-zones
   cron: 44 16 * * 5
@@ -1070,9 +1019,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter
   cron: 32 12 * * *
@@ -1126,12 +1072,14 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
-- as: e2e-aws-ovn-dedicated
-  cron: '@yearly'
+- as: e2e-aws-ovn-dedicated-serial-techpreview
+  cron: '@daily'
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
       DEDICATED_HOST: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
     leases:
     - env: LEASED_RESOURCE
       resource_type: aws-edge-zones-quota-slice
@@ -1143,7 +1091,7 @@ tests:
     - chain: gather-core-dump
     - chain: ipi-deprovision
     - ref: ipi-deprovision-aws-dedicated-hosts
-    workflow: openshift-e2e-aws-ovn
+    workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -1642,6 +1590,48 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-custom-dns
+- as: e2e-aws-custom-dns-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
+        \| egressfirewall
+      USER_PROVISIONED_DNS: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-custom-dns
+- as: e2e-azure-custom-dns-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      COMPUTE_NODE_TYPE: Standard_D16s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
+        \| egressfirewall
+      USER_PROVISIONED_DNS: "yes"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1654,9 +1644,6 @@ tests:
   cron: 26 0 * * 6
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-cpu-partitioning
   interval: 168h
@@ -2165,9 +2152,6 @@ tests:
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-azure-ovn-kube-apiserver-rollout
   interval: 168h
@@ -2181,9 +2165,6 @@ tests:
   cron: 49 23 * * *
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-runc
 - as: e2e-azure-ovn-runc
   cron: '@daily'
@@ -2216,9 +2197,6 @@ tests:
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial-runc
 - as: e2e-azure-ovn-serial-runc
   cron: '@daily'
@@ -2250,9 +2228,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-runc
 - as: e2e-azure-ovn-runc-techpreview
   cron: '@daily'
@@ -2310,7 +2285,7 @@ tests:
 - as: e2e-rosa-sts-ovn
   cron: '@daily'
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: rosa-e2e-03
     observers:
       enable:
       - observers-resource-watch
@@ -2354,7 +2329,7 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
+      OS_IMAGE_STREAM: rhel-10
     observers:
       enable:
       - observers-resource-watch
@@ -2364,12 +2339,28 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
+      OS_IMAGE_STREAM: rhel-10
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp-serial
 - as: e2e-metal-ipi-ovn-ipv4-rhcos10-techpreview
   capabilities:
   - intranet
@@ -2392,7 +2383,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       FEATURE_SET: TechPreviewNoUpgrade
-      OSSTREAM: rhel-10
+      OS_IMAGE_STREAM: rhel-10
       RT_ENABLED: "true"
     observers:
       enable:

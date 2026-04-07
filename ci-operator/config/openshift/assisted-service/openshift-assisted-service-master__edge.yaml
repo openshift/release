@@ -35,10 +35,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  postgresql-13-c9s:
+  postgresql-15-c9s:
     name: postgresql
     namespace: ci
-    tag: postgresql-13-c9s
+    tag: postgresql-15-c9s
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -50,50 +50,51 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ci-images/Dockerfile.base
-  to: assisted-service-base
-- dockerfile_path: ci-images/Dockerfile.unit-tests
-  from: assisted-service-base
-  to: assisted-service-unit-test
-- dockerfile_path: ci-images/Dockerfile.lint
-  from: assisted-service-base
-  to: assisted-service-lint
-- dockerfile_path: ci-images/Dockerfile.subsystem
-  from: assisted-service-base
-  to: assisted-service-subsystem
-- dockerfile_path: ci-images/Dockerfile.code-generation
-  from: assisted-service-base
-  to: assisted-service-generate
-- dockerfile_path: Dockerfile.assisted-service-build
-  to: assisted-service-build-base
-- dockerfile_literal: |
-    FROM base-build
-    COPY . .
-  inputs:
-    assisted-service-build-base:
-      as:
-      - base-build
-    src:
-      paths:
-      - destination_dir: ./
-        source_path: /go/src/github.com/openshift/assisted-service/.
-  to: assisted-service-build
-- dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service
-- dockerfile_path: Dockerfile.assisted-service-debug
-  to: assisted-service-debug
-- dockerfile_literal: |
-    FROM quay.io/multi-arch/yq:4.30.5 as yq4
-    FROM coreos/stream9:9
-    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
-    COPY . .
-  from: src
-  to: assisted-service-scripts
-- dockerfile_literal: |
-    FROM coreos/stream9:9
-    RUN dnf install -y --skip-broken skopeo pip
-  from: src
-  to: assisted-service-publish-index
+  items:
+  - dockerfile_path: ci-images/Dockerfile.base
+    to: assisted-service-base
+  - dockerfile_path: ci-images/Dockerfile.unit-tests
+    from: assisted-service-base
+    to: assisted-service-unit-test
+  - dockerfile_path: ci-images/Dockerfile.lint
+    from: assisted-service-base
+    to: assisted-service-lint
+  - dockerfile_path: ci-images/Dockerfile.subsystem
+    from: assisted-service-base
+    to: assisted-service-subsystem
+  - dockerfile_path: ci-images/Dockerfile.code-generation
+    from: assisted-service-base
+    to: assisted-service-generate
+  - dockerfile_path: Dockerfile.assisted-service-build
+    to: assisted-service-build-base
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      assisted-service-build-base:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./
+          source_path: /go/src/github.com/openshift/assisted-service/.
+    to: assisted-service-build
+  - dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service
+  - dockerfile_path: Dockerfile.assisted-service-debug
+    to: assisted-service-debug
+  - dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM coreos/stream9:9
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY . .
+    from: src
+    to: assisted-service-scripts
+  - dockerfile_literal: |
+      FROM coreos/stream9:9
+      RUN dnf install -y --skip-broken skopeo pip
+    from: src
+    to: assisted-service-publish-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -108,8 +109,8 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
     with: assisted-image-service
-  - pullspec: quay.io/sclorg/postgresql-13-c9s:latest
-    with: postgresql-13-c9s
+  - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
+    with: postgresql-15-c9s
 promotion:
   to:
   - name: ocm-2.17
@@ -1155,6 +1156,19 @@ tests:
         OPENSHIFT_VERSION=4.22
         OCI_COMPUTE_SHAPE="BM.Standard2.52"
         OCI_CONTROL_PLANE_SHAPE="BM.Standard2.52"
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-bm-4cp-4-22
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.22
+        OCI_COMPUTE_SHAPE="BM.Standard2.52"
+        OCI_CONTROL_PLANE_SHAPE="BM.Standard2.52"
+        NUM_MASTERS=4
+        NUM_WORKERS=0
     workflow: assisted-oci
 - as: e2e-metal-assisted-external-4-22
   capabilities:

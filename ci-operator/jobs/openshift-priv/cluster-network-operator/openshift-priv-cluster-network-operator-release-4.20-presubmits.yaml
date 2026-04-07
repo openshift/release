@@ -96,7 +96,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-aws-ovn-hypershift-conformance
     decorate: true
     decoration_config:
@@ -1093,7 +1093,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1184,7 +1184,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-azure-ovn-dualstack
     decorate: true
     decoration_config:
@@ -1275,7 +1275,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-azure-ovn-manual-oidc
     decorate: true
     decoration_config:
@@ -1366,7 +1366,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -1456,7 +1456,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build08
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -1546,7 +1546,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build08
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
@@ -1636,7 +1636,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build08
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
@@ -2090,7 +2090,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build08
+    cluster: build04
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv4
     decorate: true
     decoration_config:
@@ -3093,7 +3093,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/hypershift-e2e-aks
     decorate: true
     decoration_config:
@@ -3183,7 +3183,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3246,7 +3246,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -3681,7 +3681,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -3701,6 +3701,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -3722,6 +3723,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -3742,6 +3746,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -3760,7 +3770,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3831,7 +3841,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -3902,7 +3912,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build09
+    cluster: build07
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
@@ -3921,6 +3931,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -3942,6 +3953,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -3962,6 +3976,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build08
   cron: 50 16 7,15 * *
   decorate: true
   extra_refs:
@@ -16,6 +16,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=fips-image-scan-operator
@@ -36,6 +37,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -53,6 +57,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -144,7 +154,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   cron: 25 22 20 2 *
   decorate: true
   extra_refs:
@@ -222,7 +232,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   cron: 54 14 21 10 *
   decorate: true
   extra_refs:

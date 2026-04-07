@@ -43,23 +43,24 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: machine-config-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
-    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
-        chmod +x /usr/bin/rg && \
-        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
-        chmod +x /usr/bin/yq && \
-        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
-        rpm-ostree install tailscale && \
-        systemctl enable tailscaled && \
-        ostree container commit
-  from: ocp_os
-  to: custom-os-image
-- dockerfile_literal: |
-    FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
-  to: zacks-toolbox
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: machine-config-operator
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+      RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
+          chmod +x /usr/bin/rg && \
+          curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
+          chmod +x /usr/bin/yq && \
+          cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
+          rpm-ostree install tailscale && \
+          systemctl enable tailscaled && \
+          ostree container commit
+    from: ocp_os
+    to: custom-os-image
+  - dockerfile_literal: |
+      FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
+    to: zacks-toolbox
 promotion:
   to:
   - excluded_images:
@@ -103,6 +104,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     test:
+    - ref: agent-e2e-compact-ipv4-iso-no-registry-validation
     - as: iri-e2e-step
       cli: latest
       commands: make test-e2e-iri
@@ -155,8 +157,9 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -235,8 +238,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-part1
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-part1
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
     test:
@@ -252,8 +256,9 @@ tests:
           cpu: 100m
       timeout: 1h40m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-part2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-part2
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
     test:
@@ -332,8 +337,9 @@ tests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -500,8 +506,9 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-single-node
-- as: e2e-gcp-op-single-node
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-single-node
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -548,8 +555,9 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-external-lb
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -560,7 +568,7 @@ tests:
     cluster_profile: hypershift-aws
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-openstack-dualstack
   optional: true
@@ -586,7 +594,7 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: security
   optional: true
   steps:

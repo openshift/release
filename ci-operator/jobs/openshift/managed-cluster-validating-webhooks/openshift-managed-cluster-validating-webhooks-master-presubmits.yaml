@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build08
     context: ci/prow/e2e-binary-build-success
     decorate: true
     decoration_config:
@@ -69,28 +69,36 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
-    context: ci/prow/images
+    cluster: build08
+    context: ci/prow/pr-check
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-managed-cluster-validating-webhooks-master-images
-    rerun_command: /test images
+    name: pull-ci-openshift-managed-cluster-validating-webhooks-master-pr-check
+    rerun_command: /test pr-check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=pr-check
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -118,4 +126,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-check,?($|\s.*)

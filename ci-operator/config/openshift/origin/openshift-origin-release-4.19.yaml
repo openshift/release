@@ -23,15 +23,22 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools
-  to: tests
-- dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  to: hello-openshift
+  items:
+  - dockerfile_path: images/tests/Dockerfile.rhel
+    from: tools-openstack
+    to: tests
+  - dockerfile_path: images/hello-openshift/Dockerfile.rhel
+    to: hello-openshift
 promotion:
   to:
   - name: "4.19"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-19.ocp.svc > /etc/yum.repos.art/ci/base-openstack-4-19.repo
+    from: tools
+    to: tools-openstack
 releases:
   initial:
     integration:
@@ -632,8 +639,6 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-certrotation
 - always_run: false
   as: e2e-gcp-ovn-techpreview

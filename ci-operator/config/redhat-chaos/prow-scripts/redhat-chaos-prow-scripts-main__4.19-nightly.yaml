@@ -22,18 +22,19 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-419
-- dockerfile_path: Dockerfile
-  from: krkn.prow
-  to: prow-scripts-419
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-419
+  - dockerfile_path: Dockerfile
+    from: krkn.prow
+    to: prow-scripts-419
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -110,8 +111,8 @@ tests:
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
     workflow: ipi-gcp
-- as: krkn-hub-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn
   steps:
     cluster_profile: aws-chaos
     env:
@@ -136,8 +137,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn
   steps:
     cluster_profile: aws-chaos
     env:
@@ -161,8 +162,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-tests-aws-ipsec
-  cron: 0 4 5 * *
+- always_run: false
+  as: krkn-hub-tests-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
@@ -179,8 +180,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-aws-ipsec
-  cron: 0 4 29 * *
+- always_run: false
+  as: krkn-hub-node-tests-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
@@ -197,8 +198,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
@@ -223,8 +224,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
@@ -248,8 +249,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: gcp-fipsetcd-krkn-hub-tests
-  cron: 0 4 28 * *
+- always_run: false
+  as: gcp-fipsetcd-krkn-hub-tests
   steps:
     cluster_profile: gcp-chaos
     env:
@@ -319,8 +320,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-vsphere-ipi-ovn
-- as: krkn-hub-tests-13nodes
-  cron: 0 4 1,15 * 1
+- always_run: false
+  as: krkn-hub-tests-13nodes
   steps:
     cluster_profile: aws-chaos
     env:
@@ -338,8 +339,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-13nodes
-  cron: 0 4 3,17 * 1
+- always_run: false
+  as: krkn-hub-node-tests-13nodes
   steps:
     cluster_profile: aws-chaos
     env:
@@ -411,8 +412,8 @@ tests:
     - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-syn-flood
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-azure-multiarch
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-node-tests-azure-multiarch
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -448,8 +449,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-multiarch
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure-multiarch
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -481,8 +482,8 @@ tests:
     - chain: workers-scale
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-node
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-tests-azure-node
   steps:
     cluster_profile: azure-qe
     env:
@@ -500,8 +501,8 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-azure
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure
   steps:
     cluster_profile: azure-qe
     env:
@@ -518,8 +519,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-compact
-  cron: 0 4 2 * *
+- always_run: false
+  as: krkn-hub-tests-compact
   steps:
     cluster_profile: aws-chaos
     env:
@@ -534,8 +535,8 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-compact
-  cron: 0 4 1 * *
+- always_run: false
+  as: krkn-hub-node-tests-compact
   steps:
     cluster_profile: aws-chaos
     env:

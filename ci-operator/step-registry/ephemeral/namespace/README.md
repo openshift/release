@@ -80,7 +80,7 @@ tests:
 
 ## Required Secret
 
-The workflow requires the `ephemeral-bot-svc-account` secret in the
+The workflow requires the `bonfire-ephemeral-osci-svc-account` secret in the
 `test-credentials` namespace. This secret must contain:
 
 | Key | Description |
