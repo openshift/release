@@ -195,7 +195,8 @@ function gather_resources {
         } > "${RESOURCE_DUMP_DIR}/${resource}s.txt"
         
         if [ "$hasSetTarget" = true ];  then
-            ${IBMCLOUD_CLI} target --unset-resource-group
+            ${IBMCLOUD_CLI} target --unset-resource-group -q
+            hasSetTarget=false
         fi
     done
 
@@ -306,6 +307,15 @@ ibmcloud_login
 if [ -f ${SHARED_DIR}/metadata.json ]; then
     RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
     echo "Resource group: $RESOURCE_GROUP"
+    set -x
+    region1=$(jq -r .ibmcloud.region ${SHARED_DIR}/metadata.json)
+    echo "Region from metadata.json: $region1"
+    if [[ -n "$region1" ]] && [[ "$region" != "$region1" ]]; then
+        region="$region1"
+        echo "Overwrite the LEASED_RESOURCE Region: $region"
+        ibmcloud target -r $region -q
+    fi
+    set +x
 elif [ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]; then
     RESOURCE_GROUP=$(cat "${SHARED_DIR}/ibmcloud_cluster_resource_group")
     echo "Resource group: $RESOURCE_GROUP"    
