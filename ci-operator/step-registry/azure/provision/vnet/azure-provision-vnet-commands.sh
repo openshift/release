@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -39,7 +46,7 @@ function create_disconnected_network() {
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
         if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
-            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 17 )) || (( ocp_major_version > 4 )) ); then
+            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && version_ge "${ocp_version}" "4.17"; then
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
 	        else
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
@@ -106,8 +113,6 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
