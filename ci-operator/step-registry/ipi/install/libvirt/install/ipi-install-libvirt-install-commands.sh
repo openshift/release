@@ -45,8 +45,20 @@ function init_bootstrap() {
 	done
 	CLUSTER_DOMAIN=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
 	BOOTSTRAP_HOSTNAME="bootstrap.${CLUSTER_DOMAIN}"
-	RESOURCE_ID=$(echo "${CLUSTER_DOMAIN}" | cut -d- -f4)
 	BASTION_SSH_PORTS=( 1033 1043 1053 1063 1073 1083 )
+	# Pick bastion tunnel port by lease slice index. *.ci domains use hyphen-separated
+	# segments (field 4 is the slice id). *.phc-cicd.cis.ibm.net merges "3.phc-..." into
+	# field 4; use the last segment of LEASED_RESOURCE (e.g. libvirt-s390x-2-3 -> 3).
+	RESOURCE_ID=$(echo "${CLUSTER_DOMAIN}" | cut -d- -f4)
+	if ! [[ "${RESOURCE_ID}" =~ ^[0-9]+$ ]]; then
+		RESOURCE_ID=$(echo "${LEASED_RESOURCE}" | rev | cut -d- -f1 | rev)
+	fi
+	if ! [[ "${RESOURCE_ID}" =~ ^[0-9]+$ ]]; then
+		RESOURCE_ID=0
+	fi
+	if [ "${RESOURCE_ID}" -ge "${#BASTION_SSH_PORTS[@]}" ]; then
+		RESOURCE_ID=0
+	fi
 }
 
 function init_worker() {
