@@ -153,18 +153,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-https-proxy-sts-dualstack-ipv4-tp-f28-destructive
+- as: aws-ipi-https-proxy-sts-dualstack-ipv4-tp-f28-test1
   cron: 40 14 7 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-vtnkxj2/release:latest
       ENABLE_HTTPS_PROXY: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe-destructive
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-disc-priv-sts-fips-dualstack-ipv6-mini-perm-tp-f7
   cron: 9 18 2,9,16,25 * *
@@ -799,6 +801,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone
+- as: azure-ipi-oidc-f7-test1
+  cron: 33 14 1,10,17,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-vtnkxj2/release:latest
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      SLEEP_DURATION: 24h
+    test:
+    - ref: cucushift-installer-wait
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: aws-ipi-localzone-sts-fips-mini-perm-f14
   cron: 31 21 15,29 * *
   steps:
@@ -1999,10 +2016,13 @@ tests:
   steps:
     cluster_profile: aws-usgov-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-vtnkxj2/release:latest
       EXTRACT_MANIFEST_INCLUDED: "true"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
 - as: aws-usgov-ipi-private-sts-f28-destructive
   cron: 12 16 9 * *
@@ -3258,19 +3278,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-disc-priv-oidc-oc-mirror-fips-f28-destructive
+- as: gcp-ipi-oidc
   cron: 54 10 6 * *
   steps:
     cluster_profile: gcp-qe
     env:
-      E2E_RUN_TAGS: '@disconnected'
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-vtnkxj2/release:latest
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FIPS_ENABLED: "true"
-      MIRROR_BIN: oc-mirror
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      FEATURE_SET: TechPreviewNoUpgrade
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+    - ref: cucushift-installer-wait
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-ipi-disc-priv-fips-mini-perm-f28-disasterrecovery
   cron: 1 4 1 * *
   steps:
