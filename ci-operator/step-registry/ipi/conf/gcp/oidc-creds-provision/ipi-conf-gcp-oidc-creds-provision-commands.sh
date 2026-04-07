@@ -56,11 +56,16 @@ fi
 # For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
 # RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
 # higher priority than RELEASE_IMAGE_LATEST
+# When CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is set (e.g. build-farm rehearsal payload),
+# use it for --credentials-requests so extracted CRs match the cluster install image.
 TESTING_RELEASE_IMAGE=""
-if [[ -n ${tmp_release_image_initial:-} ]]; then
-    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  TESTING_RELEASE_IMAGE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  echo "Using CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE for credentials-requests extract"
+elif [[ -n ${tmp_release_image_initial:-} ]]; then
+  TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
 else
-    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}
+  TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
@@ -97,20 +102,35 @@ if [[ -z "${FEATURE_SET:-}" ]]; then
   fi
 fi
 
+if [[ -n "${CCOCTL_RELEASE_IMAGE:-}" ]]; then
+  echo "> Extract ccoctl from release image: ${CCOCTL_RELEASE_IMAGE}"
+  CCOCTL_EXTRACT_DIR="/tmp/ccoctl-extract"
+  rm -rf "${CCOCTL_EXTRACT_DIR}"
+  mkdir -p "${CCOCTL_EXTRACT_DIR}"
+  oc adm release extract \
+    -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
+    --command=ccoctl \
+    --to="${CCOCTL_EXTRACT_DIR}" \
+    "${CCOCTL_RELEASE_IMAGE}"
+  export PATH="${CCOCTL_EXTRACT_DIR}:${PATH}"
+  command -v ccoctl >/dev/null 2>&1 || { echo "ERROR: ccoctl not found after oc adm release extract" >&2; exit 1; }
+  echo "Using ccoctl: $(command -v ccoctl)"
+fi
+
 ADDITIONAL_CCOCTL_ARGS=""
 if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 
-ccoctl_ouptut="/tmp/ccoctl_output"
+ccoctl_output="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
-CMD="ccoctl gcp create-all --name=${infra_name} --project=${PROJECT} --region=${LEASED_RESOURCE} --credentials-requests-dir='/tmp/credrequests' --output-dir='/tmp' ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee ${ccoctl_ouptut}"
+CMD="ccoctl gcp create-all --name=${infra_name} --project=${PROJECT} --region=${LEASED_RESOURCE} --credentials-requests-dir='/tmp/credrequests' --key-storage-method=pool-jwk-file --output-dir='/tmp' ${ADDITIONAL_CCOCTL_ARGS} 2>&1 | tee ${ccoctl_output}"
 backoff "${CMD}"
 
 # oidc_pool and oidc_provider is using the same name as infra_name, so not have to enable the follwoing lines yet
 # save oidc_provider info for upgrade
-#oidc_pool=$(grep "Workload identity pool created" "${ccoctl_ouptut}" | awk -F"name " '{print $NF}')
-#oidc_provider=$(grep "workload identity provider created" "${ccoctl_ouptut}" | awk -F"name " '{print $NF}')
+#oidc_pool=$(grep "Workload identity pool created" "${ccoctl_output}" | awk -F"name " '{print $NF}')
+#oidc_provider=$(grep "workload identity provider created" "${ccoctl_output}" | awk -F"name " '{print $NF}')
 #if [[ -n "${oidc_oidc_pool}" ]] && [[ -n "${oidc_provider}" ]]; then
 #  echo "Saving oidc_pool: ${oidc_pool}"
 #  echo "Saving oidc_provider: ${oidc_provider}"
