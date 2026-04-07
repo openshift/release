@@ -1,0 +1,79 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+canonical_go_repository: github.com/stolostron/observatorium-operator
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: observatorium-operator
+promotion:
+  to:
+  - disabled: true
+    name: "2.8"
+    namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: 4.8-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.8-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium-operator
+    env:
+      IMAGE_REPO: observatorium-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: |
+        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
+        ./tests/e2e.sh test-kind-prow
+      dependencies:
+      - env: OPERATOR_IMAGE_NAME
+        name: observatorium-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-2.8
+  org: openshift-priv
+  repo: stolostron-observatorium-operator
