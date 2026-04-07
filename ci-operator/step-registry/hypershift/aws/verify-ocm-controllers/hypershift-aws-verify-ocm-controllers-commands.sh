@@ -34,17 +34,17 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Cluster name: ${CLUSTER_NAME}, Infra ID: ${INFRA_ID}"
 
-# Base domain
+# Base domain — default matches the shared root management cluster DNS zone
+DEFAULT_BASE_DOMAIN="ci.hypershift.devcluster.openshift.com"
 DOMAIN=""
 if [[ -n "${HYPERSHIFT_BASE_DOMAIN:-}" ]]; then
   DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
 elif [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+else
+  DOMAIN="${DEFAULT_BASE_DOMAIN}"
 fi
-if [[ -z "${DOMAIN}" ]]; then
-  echo "ERROR: Failed to determine the base domain."
-  exit 1
-fi
+echo "Using base domain: ${DOMAIN}"
 
 AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
@@ -129,9 +129,9 @@ echo "============================================================"
 echo "Patching imageregistry config to managementState: Removed..."
 KUBECONFIG="${GUEST_KUBECONFIG}" oc patch configs.imageregistry.operator.openshift.io cluster \
   --type merge -p '{"spec":{"managementState":"Removed"}}' || {
-  fail "Failed to patch imageregistry config"
-  echo "Dumping imageregistry config..."
+  echo "ERROR: Failed to patch imageregistry config — cannot proceed"
   KUBECONFIG="${GUEST_KUBECONFIG}" oc get configs.imageregistry.operator.openshift.io cluster -o yaml 2>/dev/null || true
+  exit 1
 }
 
 echo "Waiting 30s for HCCO to process the managementState change..."
@@ -262,21 +262,6 @@ elif [[ "${OCM_RESTARTS}" -le 2 ]]; then
 else
   fail "OCM pod has ${OCM_RESTARTS} restarts — possible reconciliation loop"
 fi
-
-echo ""
-echo "============================================================"
-echo "=== Cleanup: Destroy HostedCluster ==="
-echo "============================================================"
-
-echo "Destroying HostedCluster ${CLUSTER_NAME}..."
-KUBECONFIG="${MGMT_KUBECONFIG}" /usr/bin/hypershift destroy cluster aws \
-  --name "${CLUSTER_NAME}" \
-  --infra-id "${INFRA_ID}" \
-  --region "${HYPERSHIFT_AWS_REGION}" \
-  --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
-  --destroy-cloud-resources || {
-  echo "WARNING: Failed to destroy cluster, manual cleanup may be needed"
-}
 
 echo ""
 echo "============================================================"
