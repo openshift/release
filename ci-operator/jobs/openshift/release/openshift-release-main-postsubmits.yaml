@@ -70,12 +70,15 @@ postsubmits:
             cpu: 100m
         volumeMounts:
         - mountPath: /tmp/gcp-credentials
-          name: gcp-sa-key
+          name: gsm-secrets-reconciler-sa-key
           readOnly: true
       volumes:
-      - name: gcp-sa-key
-        secret:
-          secretName: gsm-secrets-reconciler-sa-credentials
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: gsm-secrets-reconciler
+        name: gsm-secrets-reconciler-sa-key
   - agent: kubernetes
     branches:
     - ^main$
