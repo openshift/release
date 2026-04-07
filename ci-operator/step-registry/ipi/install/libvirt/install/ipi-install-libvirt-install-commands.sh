@@ -156,6 +156,12 @@ echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
+# s390x + newer QEMU (e.g. default machine s390-ccw-virtio-rhel9.6.0): libvirt rejects domains that
+# request ACPI, but openshift-install's terraform-provider-libvirt always enables ACPI in the
+# default domain XML. Symptom: terraform fails at libvirt_domain.master with "does not support ACPI";
+# subsequent API EOF/timeouts are because VMs never started. Not fixable from this script; see
+# openshift/terraform-provider-libvirt (newDomainDef / newDomainDefForConnection) or hypervisor alignment.
+
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
 ls ${dir}/openshift

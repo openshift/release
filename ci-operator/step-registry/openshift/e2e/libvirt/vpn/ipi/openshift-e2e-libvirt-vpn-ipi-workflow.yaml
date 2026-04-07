@@ -16,3 +16,10 @@ workflow:
     UPI VPN install-config naming (baseDomain phc-cicd.cis.ibm.net, cluster name = lease).
     Like openshift-e2e-libvirt-vpn and openshift-e2e-libvirt-vpn-fips, there is no workflow-level
     dnsConfig; individual step refs define DNS where needed.
+
+    s390x note: If terraform apply fails with "machine type 's390-ccw-virtio-rhel9.*' does not support
+    ACPI", that is from openshift-install's bundled terraform-provider-libvirt (it always requests
+    ACPI) combined with newer QEMU defaults on the hypervisor. It is not specific to VPN naming.
+    Resolve by aligning VPN host QEMU/libvirt defaults with pools where IPI still works, by a
+    libvirt/qemu hook that drops ACPI for s390x domains, or by fixing openshift/terraform-provider-libvirt
+    to omit ACPI for s390x and shipping a new openshift-install.
