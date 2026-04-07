@@ -11,12 +11,13 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # a cluster due to failing to parse an empty boolean field.
 
 HOSTED_CP=${HOSTED_CP:-true}
-COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"inf2.xlarge"}
+COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"inf2.8xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 REPLICAS=${REPLICAS:-"2"}
 CHANNEL_GROUP=${CHANNEL_GROUP:-"candidate,stable"}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-true}
 CLUSTER_TAGS=${CLUSTER_TAGS:-""}
+OPENSHIFT_VERSION_OFFSET=${OPENSHIFT_VERSION_OFFSET:-2}
 
 CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 CLUSTER_NAME=${CLUSTER_NAME:-$CLUSTER_PREFIX}
@@ -68,17 +69,20 @@ AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Get OpenShift version
+# When offset > 0, skips that many z-stream releases from the latest to avoid
+# picking versions whose kernel module images may not yet be published upstream.
 get_version() {
   local channel="$1"
   local target="$2"
+  local offset="${3:-0}"
 
   local versions
   versions=$(rosa list versions --channel-group "${channel}" --hosted-cp -o json | jq -r '.[].raw_id')
 
   if [[ -n "$target" ]]; then
-    echo "$versions" | grep -E "^${target}" | head -1
+    echo "$versions" | grep -E "^${target}" | tail -n +$((offset + 1)) | head -1
   else
-    echo "$versions" | head -1
+    echo "$versions" | tail -n +$((offset + 1)) | head -1
   fi
 }
 
@@ -87,9 +91,13 @@ IFS=',' read -r -a CHANNELS <<< "${CHANNEL_GROUP// /}"
 SELECTED_VERSION=""
 SELECTED_CHANNEL=""
 
+if [[ "${OPENSHIFT_VERSION_OFFSET}" -gt 0 ]]; then
+  log "Version offset: ${OPENSHIFT_VERSION_OFFSET} (will skip ${OPENSHIFT_VERSION_OFFSET} latest z-stream releases)"
+fi
+
 for channel in "${CHANNELS[@]}"; do
   log "Checking ${channel} channel for version ${OPENSHIFT_VERSION:-latest}..."
-  SELECTED_VERSION=$(get_version "${channel}" "${OPENSHIFT_VERSION}")
+  SELECTED_VERSION=$(get_version "${channel}" "${OPENSHIFT_VERSION}" "${OPENSHIFT_VERSION_OFFSET}")
   if [[ -n "$SELECTED_VERSION" ]]; then
     SELECTED_CHANNEL="${channel}"
     log "Found version ${SELECTED_VERSION} in ${channel} channel"
@@ -103,6 +111,7 @@ if [[ -z "$SELECTED_VERSION" ]]; then
 fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+echo "${SELECTED_VERSION}" > "${SHARED_DIR}/ocp-version"
 
 # Build tags
 TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)

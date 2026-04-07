@@ -5,12 +5,12 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-e2e-aws
@@ -86,12 +86,12 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-builds
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-e2e-aws-builds
@@ -167,12 +167,12 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-proxy
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-e2e-aws-proxy
@@ -248,12 +248,12 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build06
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-e2e-aws-upgrade
@@ -329,7 +329,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -410,7 +410,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-builds
     decorate: true
     labels:
@@ -487,11 +487,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-builds,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -499,7 +499,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-images
     rerun_command: /test images
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -546,12 +545,12 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build09
+    cluster: build06
     context: ci/prow/openshift-e2e-aws-builds-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-controller-manager-release-4.11-openshift-e2e-aws-builds-techpreview
@@ -627,7 +626,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/security
     decorate: true
     labels:
@@ -641,6 +640,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -661,6 +661,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -678,6 +681,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -696,7 +705,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -758,7 +767,7 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:

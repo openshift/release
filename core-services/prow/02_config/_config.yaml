@@ -302,6 +302,7 @@ moonraker:
 owners_dir_denylist:
   default:
   - vendor/.*
+pipeline: {}
 plank:
   default_decoration_config_entries:
   - config:
@@ -351,10 +352,15 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260217-999e46ca7
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260217-999e46ca7
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260217-999e46ca7
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260217-999e46ca7
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260328-dc2bbc9fc
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260328-dc2bbc9fc
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260328-dc2bbc9fc
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260328-dc2bbc9fc
+  - config:
+      censoring_options:
+        exclude_directories:
+        - '**/aro-hcp-gather-custom-link-tools/**/*.html'
+    repo: Azure/ARO-HCP
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -402,6 +408,9 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
       timeout: 23h0m0s
     repo: openshift/open-telemetry-opentelemetry-operator
+  - config:
+      timeout: 4h0m0s
+    repo: opendatahub-io/opendatahub-operator
   - config:
       gcs_configuration:
         bucket: qe-private-deck
@@ -513,7 +522,7 @@ plank:
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1750
+  max_concurrency: 2000
   max_goroutines: 20
   max_revivals: 3
   pod_pending_timeout: 30m0s
@@ -678,6 +687,9 @@ tide:
             required-if-present-contexts:
             - Tests
             skip-unknown-contexts: true
+          opendatahub-operator:
+            optional-regex-contexts:
+            - Red\ Hat\ Konflux.*
       openshift:
         repos:
           assisted-installer:
@@ -702,6 +714,18 @@ tide:
           jenkins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
+          operator-lifecycle-manager:
+            branches:
+              master:
+                skip-unknown-contexts: true
+          operator-marketplace:
+            branches:
+              master:
+                skip-unknown-contexts: true
+          operator-registry:
+            branches:
+              master:
+                skip-unknown-contexts: true
       operator-framework:
         repos:
           api:

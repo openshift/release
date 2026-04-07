@@ -4,10 +4,11 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: Dockerfile
-  to: oadp-operator-1.0
-- dockerfile_path: build/ci-Dockerfile
-  to: test-oadp-operator-1.0
+  items:
+  - dockerfile_path: Dockerfile
+    to: oadp-operator-1.0
+  - dockerfile_path: build/ci-Dockerfile
+    to: test-oadp-operator-1.0
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
@@ -31,7 +32,7 @@ tests:
   as: e2e-test-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -56,7 +57,7 @@ tests:
 - as: e2e-test-aws-periodic
   cron: 13 19 14,28 * *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:

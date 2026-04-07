@@ -13,21 +13,22 @@ build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
 images:
-- dockerfile_literal: |
-    FROM bin
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN dnf install -y --nobest gettext jq azure-cli
-  from: bin
-  to: with-deps
-- dockerfile_literal: |
-    FROM tests-base
-    RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
-    ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
-    RUN cat /wrapped-openshift-tests.sh | tr -d '\r' > /usr/bin/openshift-tests
-    RUN chmod +x /usr/bin/openshift-tests
-  from: tests-base
-  to: tests
+  items:
+  - dockerfile_literal: |
+      FROM bin
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
+      RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
+      RUN dnf install -y --nobest gettext jq azure-cli
+    from: bin
+    to: with-deps
+  - dockerfile_literal: |
+      FROM tests-base
+      RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
+      ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
+      RUN cat /wrapped-openshift-tests.sh | tr -d '\r' > /usr/bin/openshift-tests
+      RUN chmod +x /usr/bin/openshift-tests
+    from: tests-base
+    to: tests
 releases:
   initial:
     integration:
@@ -49,7 +50,7 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_ARGS: ' --max-parallel-tests 10 --cluster-stability Disruptive --run ^\[sig-node\].*'
       TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]

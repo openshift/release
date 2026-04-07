@@ -1,0 +1,54 @@
+ref:
+  as: rosa-regional-platform-provision
+  from_image:
+    namespace: ci
+    name: rosa-regional-platform-ci
+    tag: latest
+  commands: rosa-regional-platform-provision-commands.sh
+  timeout: 7200s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-regional-platform-ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: ROSA_REGIONAL_PLATFORM_REF
+    default: "main"
+    documentation: |-
+      Git ref of openshift-online/rosa-regional-platform to clone for provisioning.
+      The resolved commit SHA is written to SHARED_DIR for e2e and teardown steps.
+  - name: ROSA_REGIONAL_COMPONENT_NAME
+    default: ""
+    documentation: |-
+      Component name for logging purposes (e.g., platform-api).
+  - name: ROSA_REGIONAL_HELM_VALUES_FILE
+    default: ""
+    documentation: |-
+      Path to the file within the rosa-regional-platform repo where the
+      override should be applied
+      (e.g., argocd/config/regional-cluster/platform-api/values.yaml).
+  - name: ROSA_REGIONAL_HELM_OVERRIDE_YAML
+    default: ""
+    documentation: |-
+      Inline YAML fragment to deep-merge into ROSA_REGIONAL_HELM_VALUES_FILE.
+      Use IMAGE_REPO and IMAGE_TAG as placeholders — they are replaced with
+      the actual values from the CI-built image (written by the image-push step).
+      Example for platform-api image override:
+        platformApi:
+          app:
+            image:
+              repository: IMAGE_REPO
+              tag: IMAGE_TAG
+      Example for chart version override (no placeholders needed):
+        dependencies:
+          - name: cert-manager
+            version: v1.20.0
+  documentation: |-
+    Provisions an ephemeral rosa-regional-platform environment. If
+    ROSA_REGIONAL_HELM_OVERRIDE_YAML is set, it is written to a file with
+    IMAGE_REPO/IMAGE_TAG placeholders replaced (if an image override exists),
+    then passed to the ephemeral provider via --provision-override-file for
+    deep merge into the target file.

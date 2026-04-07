@@ -9,12 +9,13 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.25-openshift-4.22
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ci_hyperfleet-credential-provider_latest:
-      as:
-      - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
-  to: hyperfleet-e2e
+  items:
+  - dockerfile_path: Dockerfile
+    inputs:
+      ci_hyperfleet-credential-provider_latest:
+        as:
+        - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
+    to: hyperfleet-e2e
 resources:
   '*':
     limits:
@@ -23,13 +24,22 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: hyperfleet-e2e-test-workflow-nightly
+- as: tier0-nightly
   cron: 30 9 * * *
   steps:
     env:
       CLUSTER_NAME: hyperfleet-dev-prow
       LABEL_FILTER: tier0
-      NAMESPACE_PREFIX: e2e-test
+      NAMESPACE_PREFIX: e2e
+      REGION: us-central1-a
+    workflow: openshift-hyperfleet-e2e
+- as: tier1-nightly
+  cron: 30 11 * * *
+  steps:
+    env:
+      CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier1
+      NAMESPACE_PREFIX: e2e
       REGION: us-central1-a
     workflow: openshift-hyperfleet-e2e
 zz_generated_metadata:

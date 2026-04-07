@@ -9,6 +9,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 
@@ -312,12 +319,10 @@ fi
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
 rm /tmp/pull-secret
 tmp_file=$(mktemp)
 
-if ((ocp_major_version == 4 && ocp_minor_version <= 18)); then
+if version_le "${ocp_version}" "4.18"; then
   for s in $(echo "${SUBNETS_CONFIG}" | yq-go r - '[*]');
   do
     # platform.aws.subnets

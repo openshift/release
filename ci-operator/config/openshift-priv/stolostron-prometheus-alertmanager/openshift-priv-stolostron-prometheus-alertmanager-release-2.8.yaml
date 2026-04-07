@@ -1,0 +1,70 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+canonical_go_repository: github.com/stolostron/prometheus-alertmanager
+images:
+  items:
+  - dockerfile_path: Dockerfile.prow
+    from: base
+    to: prometheus-alertmanager
+promotion:
+  to:
+  - disabled: true
+    name: "2.8"
+    namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: 4.7-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.7-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: test
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile build
+    make -f Makefile common-test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile build
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: prometheus-alertmanager
+    env:
+      IMAGE_REPO: prometheus-alertmanager
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.8
+  org: openshift-priv
+  repo: stolostron-prometheus-alertmanager

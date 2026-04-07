@@ -32,7 +32,6 @@ function cerberus_cleanup() {
   jobs -l
   
   oc cluster-info
-  ls ./cerberus/history
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json

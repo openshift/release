@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -155,8 +161,8 @@ else
 fi
 
 if ! is_empty "$ic_platform_key"; then
-  ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-  if (( ocp_minor_version < 13 )); then
+  ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+  if version_lt "${ocp_version}" "4.13"; then
     echo "Skip: KMS key: PVC: default storage class is only available on 4.13+, skip checking."
   else
     if [[ "${pvc_kms_key}" != "${ic_platform_key}" ]]; then

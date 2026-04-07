@@ -39,20 +39,34 @@ if [ -f "${SHARED_DIR}/decrypted_config.json" ]; then
     export PFLT_DOCKERCONFIG="${SHARED_DIR}/decrypted_config.json"
 fi
 
-echo "Running Preflight."
-preflight check "${ASSET_TYPE}" "${TEST_ASSET}" > "${preflight_stdout_file}" 2> "${preflight_stderr_file}"
+# Ensure artifacts directory exists before running preflight
+mkdir -p "${PFLT_ARTIFACTS}"
 
-if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then 
+echo "Running Preflight."
+echo "DEBUG: TEST_ASSET=${TEST_ASSET}"
+echo "DEBUG: PFLT_INDEXIMAGE=${PFLT_INDEXIMAGE}"
+
+# Run preflight and capture exit status
+set +e  # Temporarily disable exit-on-error to capture preflight output even on failure
+preflight check "${ASSET_TYPE}" "${TEST_ASSET}" > "${preflight_stdout_file}" 2> "${preflight_stderr_file}"
+preflight_exit_code=$?
+set -e
+
+echo "Preflight exit code: ${preflight_exit_code}"
+
+# Always save logs to ensure we can capture logs where preflight exits on error
+cp -a preflight.log "${ARTIFACT_DIR}"/
+cp -a "${preflight_stdout_file}" "${ARTIFACT_DIR}"/
+cp -a "${preflight_stderr_file}" "${ARTIFACT_DIR}"/
+
+if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then
     echo "PUBLIC_ARTIFACTS is set to true. Publishing all artifacts."
     cp -a "${PFLT_ARTIFACTS}" "${ARTIFACT_DIR}"/
-    cp -a preflight.log "${ARTIFACT_DIR}"/    
-    cp -a "${preflight_stdout_file}" "${ARTIFACT_DIR}"/
-    cp -a "${preflight_stderr_file}" "${ARTIFACT_DIR}"/
 fi
 
 echo "Placing assets into ${preflight_targz_file} for any future CI tasks."
 # assumes we're in WORKDIR and strips full paths where appropriate.
 tar czvf "${preflight_targz_file}" "$PFLT_ARTIFACTS" preflight.log "$(basename "${preflight_stdout_file}")"  "$(basename "${preflight_stderr_file}")"
 
-echo "Preflight execution completed."
-exit 0
+echo "Preflight execution completed with exit code: ${preflight_exit_code}"
+exit ${preflight_exit_code}

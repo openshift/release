@@ -1,15 +1,16 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  to: operator-registry
-- dockerfile_path: operator-framework-tools.Dockerfile
-  to: operator-framework-tools
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    to: operator-registry
+  - dockerfile_path: operator-framework-tools.Dockerfile
+    to: operator-framework-tools
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
   to:
   - excluded_images:
@@ -122,7 +123,7 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: verify-deps
   steps:

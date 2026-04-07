@@ -9,12 +9,13 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
-- dockerfile_path: Containerfile.prom-operator
-  inputs:
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.25
-  to: obo-prometheus-operator
+  items:
+  - dockerfile_path: Containerfile.prom-operator
+    inputs:
+      ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.25
+    to: obo-prometheus-operator
 promotion:
   to:
   - name: "2.17"
@@ -47,10 +48,10 @@ tests:
     test:
     - as: publish
       commands: |-
-        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export SELF="make"
         export OSCI_PUBLISH_DELAY="0"
         export OSCI_COMPONENT_NAME="obo-prometheus-operator"
-        make -f /opt/build-harness/Makefile.prow osci/publish
+        make -f osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github

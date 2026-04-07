@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build10
-  cron: 0 */6 * * 1-5
+  cluster: build09
+  cron: 0 6,14,22 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -16,7 +16,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-image-updater-image-updater-tooling
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-misc'
+      channel: '#aro-hcp-failures-dev'
       job_states_to_report:
       - failure
       - error
@@ -27,6 +27,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=image-updater-tooling
       - --variant=image-updater
@@ -47,6 +48,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -61,6 +65,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -71,7 +81,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 7,37 * * * *
   decorate: true
   decoration_config:
@@ -153,7 +163,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 7,37 * * * *
   decorate: true
   decoration_config:
@@ -171,7 +181,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-integration-resource-groups
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-int'
+      channel: '#aro-hcp-failures-int'
       job_states_to_report:
       - failure
       - error
@@ -243,7 +253,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 0 4 * * *
   decorate: true
   decoration_config:
@@ -325,7 +335,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 7,37 * * * *
   decorate: true
   decoration_config:
@@ -343,7 +353,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-prod-resource-groups
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-prod'
+      channel: '#aro-hcp-failures-prod'
       job_states_to_report:
       - failure
       - error
@@ -415,7 +425,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 7,37 * * * *
   decorate: true
   decoration_config:
@@ -433,7 +443,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-stage-resource-groups
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-stg'
+      channel: '#aro-hcp-failures-stg'
       job_states_to_report:
       - failure
       - error
@@ -505,7 +515,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -523,7 +533,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-integration-e2e-parallel
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-int'
+      channel: '#aro-hcp-failures-int'
       job_states_to_report:
       - failure
       - error
@@ -595,7 +605,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 0 2 * * *
   decorate: true
   decoration_config:
@@ -613,7 +623,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-prod-e2e-parallel
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-prod'
+      channel: '#aro-hcp-failures-prod'
       job_states_to_report:
       - failure
       - error
@@ -685,7 +695,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 0 2 * * *
   decorate: true
   decoration_config:
@@ -703,7 +713,7 @@ periodics:
   name: periodic-ci-Azure-ARO-HCP-main-periodic-stage-e2e-parallel
   reporter_config:
     slack:
-      channel: '#aro-hcp-prow-failures-stg'
+      channel: '#aro-hcp-failures-stg'
       job_states_to_report:
       - failure
       - error

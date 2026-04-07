@@ -17,37 +17,38 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: origin_scos-4.22_base-stream9
-  to: upi-installer
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/baremetal/Dockerfile.ci
-  from: origin_scos-4.22_base-stream9
-  inputs:
-    origin_scos-4.22_etcd:
-      as:
-      - etcd
-    origin_scos-4.22_hyperkube:
-      as:
-      - kas
-  to: baremetal-installer
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: origin_scos-4.22_base-stream9
-  to: installer-artifacts
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer/Dockerfile.ci
-  from: origin_scos-4.22_base-stream9
-  to: installer
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: origin_scos-4.22_base-stream9
+    to: upi-installer
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/baremetal/Dockerfile.ci
+    from: origin_scos-4.22_base-stream9
+    inputs:
+      origin_scos-4.22_etcd:
+        as:
+        - etcd
+      origin_scos-4.22_hyperkube:
+        as:
+        - kas
+    to: baremetal-installer
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: origin_scos-4.22_base-stream9
+    to: installer-artifacts
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/installer/Dockerfile.ci
+    from: origin_scos-4.22_base-stream9
+    to: installer
 promotion:
   to:
   - name: scos-4.22
@@ -88,7 +89,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main

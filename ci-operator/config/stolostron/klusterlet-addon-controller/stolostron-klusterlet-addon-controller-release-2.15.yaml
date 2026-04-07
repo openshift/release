@@ -14,9 +14,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: klusterlet-addon-controller
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: klusterlet-addon-controller
 promotion:
   to:
   - name: "2.15"
@@ -24,12 +25,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -48,18 +49,6 @@ tests:
   commands: make test
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: sonarcloud
-  commands: |
-    export HOME="/tmp"
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: pr-image-mirror
   steps:

@@ -7,11 +7,12 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
-- dockerfile_path: images/router/base/Dockerfile.ocp
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.ocp
-  from: haproxy-router-base
-  to: haproxy-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.ocp
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.ocp
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
   - name: 4.21-priv
@@ -91,7 +92,7 @@ tests:
   shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router
@@ -157,7 +158,7 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     post:
     - chain: gather-core-dump
     - chain: ipi-azure-post

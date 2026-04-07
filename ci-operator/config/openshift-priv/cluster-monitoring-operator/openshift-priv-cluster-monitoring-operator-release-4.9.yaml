@@ -7,13 +7,14 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-monitoring-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-monitoring-operator
-- dockerfile_literal: |
-    FROM src
-  from: src
-  to: cluster-monitoring-operator-src
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-monitoring-operator
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: cluster-monitoring-operator-src
 promotion:
   to:
   - name: 4.9-priv
@@ -65,17 +66,17 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-agnostic-operator
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -87,7 +88,7 @@ tests:
     workflow: ipi-azure
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: release-4.9

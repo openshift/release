@@ -10,17 +10,18 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
-- dockerfile_literal: |
-    FROM ubi9-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
-  to: ubi9-minimal-entitled
-- build_args:
-  - name: DNF
-    value: microdnf
-  dockerfile_path: Dockerfile
-  from: ubi9-minimal-entitled
-  to: hive
+  items:
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
+    to: ubi9-minimal-entitled
+  - build_args:
+    - name: DNF
+      value: microdnf
+    dockerfile_path: Dockerfile
+    from: ubi9-minimal-entitled
+    to: hive
 releases:
   latest:
     candidate:
@@ -150,11 +151,13 @@ tests:
 - as: e2e-azure-weekly
   cron: 5 4 * * 4
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
-      commands: CLOUD=azure make test-e2e
+      commands: |
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        CLOUD=azure make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive

@@ -87,6 +87,13 @@ fips: true
 EOF
 fi
 
+if [ ! -z "${OS_IMAGE_STREAM}" ]; then
+	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
+	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+osImageStream: "${OS_IMAGE_STREAM}"
+EOF
+fi
+
 if [ -n "${FEATURE_SET}" ]; then
         echo "Adding 'featureSet: ...' to install-config.yaml"
         cat >> "${SHARED_DIR}/install-config.yaml" << EOF

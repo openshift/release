@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Waiting for NooBaa CRD to be available..." >&2
+for i in $(seq 1 60); do
+    if oc get crd noobaas.noobaa.io &>/dev/null; then
+        echo "NooBaa CRD available" >&2
+        break
+    fi
+    if (( i == 60 )); then
+        echo "Timed out waiting for NooBaa CRD" >&2
+        exit 1
+    fi
+    sleep 5
+done
+
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
@@ -24,7 +37,7 @@ EOF
 echo "Waiting for NooBaa storage..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=120s
 
-echo "Creating Quay registry..." >&2
+echo "Creating Quay namespace and config bundle..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
@@ -33,12 +46,27 @@ metadata:
 EOF
 
 cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: config-bundle-secret
+  namespace: quay
+stringData:
+  config.yaml: |
+    FEATURE_USER_INITIALIZE: true
+    SUPER_USERS:
+    - admin
+EOF
+
+echo "Creating Quay registry with config bundle..." >&2
+cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
   name: quay
   namespace: quay
 spec:
+  configBundleSecret: config-bundle-secret
   components:
   - kind: clair
     managed: true

@@ -39,7 +39,7 @@ function copyArtifacts {
 }
 
 # Install Dependcies defined in packages.json
-yarn install || true
+npm install || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
@@ -68,10 +68,11 @@ if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V 
     export CYPRESS_QUAY_ENDPOINT=${registry}
     export CYPRESS_QUAY_PROJECT=${quay_ns}
     export CYPRESS_OLD_UI_DISABLED=true
+    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 else
     export CYPRESS_QUAY_ENDPOINT=${registry}
     export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 fi
 
-NO_COLOR=1 yarn run smoke || true
+NO_COLOR=1 npm run smoke || true
 

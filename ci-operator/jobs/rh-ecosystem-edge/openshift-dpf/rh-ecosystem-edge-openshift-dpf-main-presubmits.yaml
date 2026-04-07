@@ -1,7 +1,7 @@
 presubmits:
   rh-ecosystem-edge/openshift-dpf:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -10,19 +10,36 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-deploy-cluster
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
     rerun_command: /test deploy-cluster
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=deploy-cluster
         command:
@@ -42,6 +59,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -56,6 +76,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -65,13 +91,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )deploy-cluster,?($|\s.*)
+    trigger: (?m)^/test( | .* )(deploy-cluster|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -122,7 +148,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -138,12 +164,29 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-sanity
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
     rerun_command: /test sanity
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=sanity
         command:
@@ -163,6 +206,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -177,6 +223,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -186,4 +238,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sanity,?($|\s.*)
+    trigger: (?m)^/test( | .* )(sanity|remaining-required),?($|\s.*)

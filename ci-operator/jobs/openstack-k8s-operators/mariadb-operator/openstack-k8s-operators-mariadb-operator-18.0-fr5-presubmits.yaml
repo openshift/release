@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^18\.0-fr5$
     - ^18\.0-fr5-
-    cluster: build02
+    cluster: build03
     context: ci/prow/functional
     decorate: true
     labels:
@@ -62,11 +62,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )functional,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^18\.0-fr5$
     - ^18\.0-fr5-
-    cluster: build02
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -74,7 +74,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-mariadb-operator-18.0-fr5-images
     rerun_command: /test images
-    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -120,7 +119,7 @@ presubmits:
     branches:
     - ^18\.0-fr5$
     - ^18\.0-fr5-
-    cluster: build02
+    cluster: build03
     context: ci/prow/mariadb-operator-build-deploy
     decorate: true
     labels:
@@ -135,6 +134,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=mariadb-operator-build-deploy
@@ -155,6 +155,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -175,6 +178,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -196,7 +205,7 @@ presubmits:
     branches:
     - ^18\.0-fr5$
     - ^18\.0-fr5-
-    cluster: build02
+    cluster: build03
     context: ci/prow/mariadb-operator-build-deploy-kuttl
     decorate: true
     labels:
@@ -211,6 +220,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=mariadb-operator-build-deploy-kuttl
@@ -231,6 +241,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -251,6 +264,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -272,7 +291,7 @@ presubmits:
     branches:
     - ^18\.0-fr5$
     - ^18\.0-fr5-
-    cluster: build02
+    cluster: build03
     context: ci/prow/precommit-check
     decorate: true
     labels:

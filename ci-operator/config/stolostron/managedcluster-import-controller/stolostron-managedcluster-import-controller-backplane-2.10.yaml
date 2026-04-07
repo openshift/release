@@ -10,9 +10,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: managedcluster-import-controller
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: managedcluster-import-controller
 promotion:
   to:
   - name: "2.10"
@@ -20,12 +21,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -35,16 +36,6 @@ resources:
       cpu: 80m
       memory: 200Mi
 tests:
-- as: sonarcloud
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: check
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache

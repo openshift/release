@@ -5,4 +5,4 @@ set -o pipefail
 set -o xtrace
 
 unset GOFLAGS
-make verify-generate verify-yamlfmt
+make verify-generate verify-yamlfmt verify

@@ -1,0 +1,48 @@
+workflow:
+  as: ephemeral-namespace
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ephemeral-namespace-reserve
+    post:
+    - ref: ephemeral-namespace-release
+  documentation: |-
+    The ephemeral-namespace workflow provisions and deprovisions an
+    ephemeral namespace on the consoledot ephemeral cluster using
+    the bonfire CLI.
+
+    The pre phase reserves a namespace from the configured pool and
+    writes connection details (namespace name, kubeconfig, server
+    URL) to SHARED_DIR. The test phase is left empty so that
+    consumers can inject their own test steps. The post phase
+    unconditionally releases the namespace back to the pool.
+
+    To use this workflow, reference it from a ci-operator config
+    test definition and add your test steps:
+
+      tests:
+      - as: my-ephemeral-test
+        steps:
+          workflow: ephemeral-namespace
+          test:
+          - ref: my-test-step
+
+    Your test step should read the namespace and kubeconfig from
+    SHARED_DIR:
+
+      export KUBECONFIG="${SHARED_DIR}/ephemeral-kubeconfig"
+      NAMESPACE=$(cat "${SHARED_DIR}/ephemeral-namespace")
+
+    Environment variables controlling reservation behavior can be
+    overridden at the workflow, chain, or test level:
+
+      BONFIRE_NAMESPACE_POOL      Namespace pool (default: "default")
+      BONFIRE_NAMESPACE_DURATION   Reservation duration (default: "1h")
+      BONFIRE_NAMESPACE_TIMEOUT    Wait timeout in seconds (default: "600")
+      BONFIRE_NAMESPACE_REQUESTER  Requester identity (default: job name)
+      BONFIRE_VERSION              bonfire version spec (default: ">=4.18.0")
+
+    Required secret:
+      ephemeral-bot-svc-account in the test-credentials namespace,
+      containing keys "oc-login-token" and "oc-login-server" for
+      authentication to the ephemeral cluster.

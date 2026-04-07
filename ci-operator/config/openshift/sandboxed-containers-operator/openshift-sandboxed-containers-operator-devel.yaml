@@ -1,33 +1,39 @@
 base_images:
   base:
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: go mod download && go mod vendor && GOFLAGS="" make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
-- from: base
-  to: openshift-sandboxed-containers-operator
+  items:
+  - from: base
+    to: openshift-sandboxed-containers-operator
 operator:
   bundles:
   - as: openshift-sandboxed-containers-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: registry.redhat.io/openshift-sandboxed-containers/osc-rhel9-operator@sha256:.*
     with: pipeline:openshift-sandboxed-containers-operator
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -53,15 +59,23 @@ tests:
 - as: sandboxed-containers-operator-e2e
   optional: true
   steps:
-    cluster_profile: azure-2
-    dependencies:
-      OO_INDEX: ci-index-openshift-sandboxed-containers-operator-bundle
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-sandboxed-containers-operator
-      OO_PACKAGE: sandboxed-containers-operator
-      OO_TARGET_NAMESPACES: openshift-sandboxed-containers-operator
-    workflow: optional-operators-ci-azure
+    cluster_profile: openshift-org-azure
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create ns openshift-sandboxed-containers-operator
+        operator-sdk run bundle -n openshift-sandboxed-containers-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-sandboxed-containers-operator deployment controller-manager --timeout=5m
+      dependencies:
+      - env: OO_BUNDLE
+        name: openshift-sandboxed-containers-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: devel
   org: openshift

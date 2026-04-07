@@ -211,6 +211,7 @@ else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+  EXPECTED_CHECKSUM=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.uncompressed-sha256")
   DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume
@@ -228,7 +229,22 @@ else
     # Download the new rhcos image
     echo "Downloading new rhcos image..."
     curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
+    actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
+    if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+      echo "Checksum verified for ${VOLUME_NAME}"
+    else
+      echo "Checksum mismatch, retrying ..."
+      rm -f ${INSTALL_DIR}/${VOLUME_NAME}
+      curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME}
+      actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
 
+      if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+        echo "Checksum verified for ${VOLUME_NAME}"
+      else
+        echo "Checksum of downloaded image didn't match expected checksum. download incomplete."
+        exit 1
+      fi
+    fi
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
     qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
@@ -275,6 +291,19 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Check for the master mcp yaml config, and save it in the installation directory
+MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
+if [[ -f "${MCP_MASTER_YAML}" ]]; then
+  echo "Saving ${MCP_MASTER_YAML} to the install manifests directory..."
+  cp ${MCP_MASTER_YAML} "${INSTALL_DIR}/manifests/"
+fi
+
+# Check for the worker mcp yaml config, and save it in the installation directory
+MCP_WORKER_YAML="${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
+if [[ -f "${MCP_WORKER_YAML}" ]]; then
+  echo "Saving ${MCP_WORKER_YAML} to the install manifests directory..."
+  cp ${MCP_WORKER_YAML} "${INSTALL_DIR}/manifests/"
+fi
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then
@@ -464,6 +493,19 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
+  # openshift-install agent wait-for bootstrap-complete completes when the bootstrap Kube API is
+  # live and the bootstrap-complete ConfigMap is present (openshift/installer pkg/agent/cluster.go).
+  # A TCP check to rendezvous :22 is only for diagnostic logs when APIs are not up yet—not the
+  # success condition. s390x still requires ssh-privatekey in the cluster profile for the agent workflow.
+  if [ "$ARCH" == "s390x" ]; then
+    if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
+      echo "ERROR: ${CLUSTER_PROFILE_DIR}/ssh-privatekey is required for agent install but not found in cluster profile"
+      exit 1
+    fi
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/id_rsa
+    chmod 600 ~/.ssh/id_rsa
+  fi
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else

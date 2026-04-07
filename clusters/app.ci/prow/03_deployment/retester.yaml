@@ -61,6 +61,59 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
+        name: retester
+        imagePullPolicy: Always
+        command:
+        - retester
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --dry-run=false
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --cache-file=/cache/backoff
+        - --cache-file-on-s3=true
+        - --config-file=/etc/retester/_config.yaml
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-merge-bot
+              key: appid
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: retester-aws-credentials
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_ACCESS_KEY
+              name: retester-aws-credentials
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: prow-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
+        - name: config
+          mountPath: /etc/retester
+          readOnly: true
+        resources:
+          requests:
+            memory: "5Gi"
+            cpu: "250m"
       - name: git-sync
         command:
         - /git-sync
@@ -80,60 +133,13 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
-        name: retester
-        imagePullPolicy: Always
-        command:
-        - retester
-        args:
-        - --config-path=/etc/config/config.yaml
-        - --supplemental-prow-config-dir=/etc/config
-        - --dry-run=false
-        - --github-endpoint=http://ghproxy
-        - --github-endpoint=https://api.github.com
-        - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-token-path=/etc/oauth/oauth
-        - --job-config-path=/var/repo/release/ci-operator/jobs
-        - --cache-file=/cache/backoff
-        - --cache-file-on-s3=true
-        - --config-file=/etc/retester/_config.yaml
-        env:
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              key: AWS_ACCESS_KEY_ID
-              name: retester-aws-credentials
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: AWS_SECRET_ACCESS_KEY
-              name: retester-aws-credentials
-        ports:
-        - name: metrics
-          containerPort: 9090
-        volumeMounts:
-        - name: github-token
-          mountPath: /etc/oauth
-          readOnly: true
-        - name: prow-config
-          mountPath: /etc/config
-          readOnly: true
-        - name: release
-          mountPath: /var/repo
-        - name: config
-          mountPath: /etc/retester
-          readOnly: true
-        resources:
-          requests:
-            memory: "5Gi"
-            cpu: "250m"
       volumes:
       - name: prow-config
         configMap:
           name: config
-      - name: github-token
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-merge-bot
       - name: release
         emptyDir: {}
       - name: config

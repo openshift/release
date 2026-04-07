@@ -1,11 +1,11 @@
 presubmits:
   openshift-knative/client:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
-    cluster: build01
+    cluster: build03
     context: ci/prow/420-images
     decorate: true
     decoration_config:
@@ -17,7 +17,6 @@ presubmits:
     name: pull-ci-openshift-knative-client-release-v1.21-420-images
     path_alias: github.com/knative/client
     rerun_command: /test 420-images
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -65,7 +64,7 @@ presubmits:
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
-    cluster: build01
+    cluster: build03
     context: ci/prow/420-test-e2e
     decorate: true
     decoration_config:
@@ -84,6 +83,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-e2e
@@ -105,6 +105,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -125,6 +128,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -142,11 +151,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )420-test-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
-    cluster: build01
+    cluster: build03
     context: ci/prow/421-images
     decorate: true
     decoration_config:
@@ -159,7 +168,6 @@ presubmits:
     name: pull-ci-openshift-knative-client-release-v1.21-421-images
     path_alias: github.com/knative/client
     rerun_command: /test 421-images
-    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:

@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -174,10 +180,10 @@ done
 
 # gen2 image definition check
 echo -e "\nGen2 image definition check..."
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 expected_image_security_type="${master_security_type:-$worker_security_type}"
 expected_image_security_type="${expected_image_security_type/VM/Vm}"
-if (( ${ocp_minor_version} > 16 )); then
+if version_gt "${ocp_version}" "4.16"; then
     expected_image_security_type="${expected_image_security_type}Supported"
 fi
 image_def_security_type=$(az sig image-definition show --gallery-image-definition ${INFRA_ID}-gen2 --gallery-name gallery_${INFRA_ID//-/_} -g ${RESOURCE_GROUP} --query "features[?name=='SecurityType'].value" -otsv)
