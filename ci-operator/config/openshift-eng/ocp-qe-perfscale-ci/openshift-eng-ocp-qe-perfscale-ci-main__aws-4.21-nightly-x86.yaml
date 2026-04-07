@@ -207,6 +207,35 @@ tests:
     - chain: openshift-qe-egress-ip-bastion
     workflow: openshift-qe-installer-aws-bastion
   timeout: 6h0m0s
+- as: ocpbugs-77510-rst-validation
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-niy7v42/release:latest
+      TEST_SCALE: progressive
+      TIMEOUT: +5 hours
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    - ref: wait
+    workflow: openshift-qe-installer-aws
+  timeout: 7h0m0s
+- as: ocpbugs-77510-rst-etcd-encryption
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-niy7v42/release:latest
+      TIMEOUT: +5 hours
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    - ref: wait
+    workflow: openshift-qe-installer-aws-etcd-encryption
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
