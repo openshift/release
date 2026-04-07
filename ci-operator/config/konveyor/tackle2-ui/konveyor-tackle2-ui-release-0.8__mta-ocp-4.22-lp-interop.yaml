@@ -35,6 +35,7 @@ tests:
         {
           "failure_rules":
             [
+              {"step": "mta-prepare-operator-catalog", "failure_type": "all", "classification": "Infrastructure Provisioning - OLM catalog", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
               {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
               {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
@@ -59,13 +60,15 @@ tests:
       commands: |
         set -euo pipefail
         shopt -s inherit_errexit
-        # MTA depends on RHBK (Red Hat Build of Keycloak), which is not available on the
-        # OCP 4.22 redhat-operators catalog. Operator channel guidance: point OLM at
-        # redhat-operator-index:v4.21 for those dependencies on OCP 4.22 clusters.
-        cat <<'EOF' | oc apply -f -
+        # RHBK / MTA deps may be missing from default catalog for this OCP minor; RHOI v4.21 is used per channel guidance.
+        CS_NAME=mta-421-test-catalog
+        CS_NS=openshift-marketplace
+        cat <<'APPLY' | oc apply -f -
         apiVersion: operators.coreos.com/v1alpha1
         kind: CatalogSource
         metadata:
+          annotations:
+            target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
           name: mta-421-test-catalog
           namespace: openshift-marketplace
         spec:
@@ -73,20 +76,59 @@ tests:
           image: registry.redhat.io/redhat/redhat-operator-index:v4.21
           displayName: "RHOI v4.21 for MTA deps (e.g. RHBK) on OCP 4.22"
           publisher: Red Hat
+          updateStrategy:
+            registryPoll:
+              interval: 10m
           grpcPodConfig:
+            # Do not require node-role.kubernetes.io/master; some builds label control plane only
+            # as control-plane. Tolerations still allow scheduling onto tainted control-plane nodes.
+            nodeSelector:
+              kubernetes.io/os: linux
+            priorityClassName: system-cluster-critical
+            securityContextConfig: restricted
+            tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/master
+              operator: Exists
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/control-plane
+              operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/unreachable
+              operator: Exists
+              tolerationSeconds: 120
+            - effect: NoExecute
+              key: node.kubernetes.io/not-ready
+              operator: Exists
+              tolerationSeconds: 120
             resources:
               requests:
-                cpu: 100m
-                memory: 512Mi
+                cpu: 200m
+                memory: 1Gi
               limits:
-                memory: 2Gi
-        EOF
-        oc wait catalogsource/mta-421-test-catalog -n openshift-marketplace --for=condition=Ready --timeout=1200s
+                memory: 4Gi
+        APPLY
+        # Do not use oc wait --for=condition=Ready; it often never becomes True (rehearsal ~20m timeouts).
+        echo "mta-prepare-operator-catalog: polling connectionState + catalog pod (step timeout 45m; loop up to ~30m)"
+        for i in $(seq 1 180); do
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || true)
+          echo "attempt ${i}: connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
+            echo "catalog usable"
+            exit 0
+          fi
+          sleep 10
+        done
+        oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o yaml || true
+        oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o wide || true
+        exit 1
       from: cli
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
+      timeout: 45m0s
     - ref: install-operators
     - ref: mta-deploy-tackle
     - ref: mta-tests-ui
@@ -102,6 +144,7 @@ tests:
         {
           "failure_rules":
             [
+              {"step": "mta-prepare-operator-catalog", "failure_type": "all", "classification": "Infrastructure Provisioning - OLM catalog", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
               {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
               {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
@@ -123,13 +166,14 @@ tests:
       commands: |
         set -euo pipefail
         shopt -s inherit_errexit
-        # MTA depends on RHBK (Red Hat Build of Keycloak), which is not available on the
-        # OCP 4.22 redhat-operators catalog. Operator channel guidance: point OLM at
-        # redhat-operator-index:v4.21 for those dependencies on OCP 4.22 clusters.
-        cat <<'EOF' | oc apply -f -
+        CS_NAME=mta-421-test-catalog
+        CS_NS=openshift-marketplace
+        cat <<'APPLY' | oc apply -f -
         apiVersion: operators.coreos.com/v1alpha1
         kind: CatalogSource
         metadata:
+          annotations:
+            target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
           name: mta-421-test-catalog
           namespace: openshift-marketplace
         spec:
@@ -137,20 +181,56 @@ tests:
           image: registry.redhat.io/redhat/redhat-operator-index:v4.21
           displayName: "RHOI v4.21 for MTA deps (e.g. RHBK) on OCP 4.22"
           publisher: Red Hat
+          updateStrategy:
+            registryPoll:
+              interval: 10m
           grpcPodConfig:
+            nodeSelector:
+              kubernetes.io/os: linux
+            priorityClassName: system-cluster-critical
+            securityContextConfig: restricted
+            tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/master
+              operator: Exists
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/control-plane
+              operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/unreachable
+              operator: Exists
+              tolerationSeconds: 120
+            - effect: NoExecute
+              key: node.kubernetes.io/not-ready
+              operator: Exists
+              tolerationSeconds: 120
             resources:
               requests:
-                cpu: 100m
-                memory: 512Mi
+                cpu: 200m
+                memory: 1Gi
               limits:
-                memory: 2Gi
-        EOF
-        oc wait catalogsource/mta-421-test-catalog -n openshift-marketplace --for=condition=Ready --timeout=1200s
+                memory: 4Gi
+        APPLY
+        echo "mta-prepare-operator-catalog: polling connectionState + catalog pod (step timeout 45m; loop up to ~30m)"
+        for i in $(seq 1 180); do
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || true)
+          echo "attempt ${i}: connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
+            echo "catalog usable"
+            exit 0
+          fi
+          sleep 10
+        done
+        oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o yaml || true
+        oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o wide || true
+        exit 1
       from: cli
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
+      timeout: 45m0s
     - ref: install-operators
     - ref: mta-deploy-tackle
     - ref: mta-tests-ui
