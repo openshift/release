@@ -52,7 +52,7 @@ function resolve_qemu_img () {
     fi
   done
   if [[ "$(id -u)" -eq 0 ]]; then
-    echo "qemu-img not found; attempting package install..."
+    echo "qemu-img not found; attempting package install..." >&2
     if command -v microdnf &>/dev/null; then
       microdnf --noplugins install -y qemu-img 2>/dev/null || true
     elif command -v dnf &>/dev/null; then
@@ -66,16 +66,17 @@ function resolve_qemu_img () {
       return 0
     fi
   fi
-  # Non-root / no repos: extract qemu-img from Rocky Linux 8 AppStream RPM (el8 glibc, matches old libvirt-installer).
-  echo "qemu-img still missing; extracting from Rocky Linux 8 qemu-img RPM..."
+  # Non-root / no repos: extract qemu-img from AlmaLinux 8 AppStream RPM (el8 glibc, matches old libvirt-installer).
+  # Rocky 8 does not publish AppStream for s390x; Alma mirrors el8 for x86_64, aarch64, ppc64le, and s390x.
+  echo "qemu-img still missing; extracting from AlmaLinux 8 qemu-img RPM..." >&2
   local dest rpmarch rpm_url
-  dest="/tmp/qemu-img-rocky-rpm"
+  dest="/tmp/qemu-img-el8-rpm"
   rm -rf "${dest}"
   mkdir -p "${dest}"
   rpmarch=$(uname -m)
-  rpm_url="https://download.rockylinux.org/pub/rocky/8/AppStream/${rpmarch}/os/Packages/q/qemu-img-6.2.0-53.module+el8.10.0+40076+c1171059.6.${rpmarch}.rpm"
+  rpm_url="https://repo.almalinux.org/almalinux/8/AppStream/${rpmarch}/os/Packages/qemu-img-6.2.0-53.module_el8.10.0%2B4110%2B4a319788.6.${rpmarch}.rpm"
   if ! curl -fsSL "${rpm_url}" -o "${dest}/qemu-img.rpm"; then
-    echo "Could not download qemu-img RPM for ${rpmarch} from ${rpm_url}"
+    echo "Could not download qemu-img RPM for ${rpmarch} from ${rpm_url}" >&2
     return 1
   fi
   (
@@ -98,7 +99,7 @@ function resolve_qemu_img () {
     echo "${dest}/usr/bin/qemu-img"
     return 0
   fi
-  echo "Could not extract qemu-img from RPM (need rpm2cpio+cpio or bsdtar)."
+  echo "Could not extract qemu-img from RPM (need rpm2cpio+cpio or bsdtar)." >&2
   return 1
 }
 
@@ -333,8 +334,8 @@ else
       exit 1
     fi
     # Unpacked Rocky RPM may ship shared libs next to the binary.
-    if [[ "${QEMU_IMG_BIN}" == /tmp/qemu-img-rocky-rpm/* ]]; then
-      export LD_LIBRARY_PATH="/tmp/qemu-img-rocky-rpm/usr/lib64:/tmp/qemu-img-rocky-rpm/lib64:${LD_LIBRARY_PATH:-}"
+    if [[ "${QEMU_IMG_BIN}" == /tmp/qemu-img-el8-rpm/* ]]; then
+      export LD_LIBRARY_PATH="/tmp/qemu-img-el8-rpm/usr/lib64:/tmp/qemu-img-el8-rpm/lib64:${LD_LIBRARY_PATH:-}"
     fi
     "${QEMU_IMG_BIN}" resize "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
 
