@@ -96,6 +96,83 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-ipv6-fips-f999-logging-debug
+  capabilities:
+  - intranet
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - as: sleep-xhours
+      commands: sleep 6h
+      from: cli
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 6h5m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetal-ipi-ovn-dualstack-arm-vmedia-f999-logging-debug
+  capabilities:
+  - intranet
+  cron: 53 16 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      PRIMARY_NET: ipv4
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      ipv6_enabled: "true"
+      masters: "3"
+      workers: "2"
+    test:
+    - as: sleep-xhours
+      commands: sleep 6h
+      from: cli
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 6h5m0s
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999-logging-debug
+  capabilities:
+  - intranet
+  cron: 21 14 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - ref: olmv1-disable-default-clustercatalogs
+    - as: sleep-xhours
+      cli: latest
+      commands: sleep 6h
+      from: tests-private
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 2h5m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
