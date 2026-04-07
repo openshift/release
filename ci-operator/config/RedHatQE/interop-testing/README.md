@@ -81,8 +81,7 @@ The tests use modular chains for different testing scenarios:
 For detailed documentation on individual steps and configuration options, see the [ibm-fusion-access step registry](../../../step-registry/ibm-fusion-access/).
 
 ### GS Bare-Metal Configurations
-   
-- **OCP 4.19**: `RedHatQE-interop-testing-master__gs-baremetal-localnet-ocp4.19-lp-gs.yaml`
-    - Runs on existing Goldman Sachs bare-metal cluster
-    - Uses `external-cluster` workflow
-    - Tests OpenShift Virtualization localnet networking with single NIC configuration
+
+- **OCP 4.19**: `RedHatQE-interop-testing-master__gs-bm--ocp-4.19--lp-interop.yaml`
+    - Variant `gs-bm--ocp-4.19--lp-interop`: **`localnet`** (ABI `gs-baremetal-agent-install` + health), **`gs-baremetal-localnet-ocp419`** (`external-cluster` + `gs-baremetal-localnet-test`)
+    - ABI jobs must set **`OCP__ABI__BM__CLS_NAME`** and **`OCP__ABI__BM__BASE_DOM`** in **`steps.env`** (no step default; see [`CI-ABI-JOB-CONFIG.md`](../../../step-registry/gs-baremetal/CI-ABI-JOB-CONFIG.md)).
