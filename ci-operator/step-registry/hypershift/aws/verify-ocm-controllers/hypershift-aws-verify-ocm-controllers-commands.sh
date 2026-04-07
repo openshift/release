@@ -49,6 +49,14 @@ echo "Using base domain: ${DOMAIN}"
 AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 
+# Detect multi-arch release image
+MULTI_ARCH_ARG=""
+NUM_IMAGES="$(oc image info ${RELEASE_IMAGE} -a /tmp/pull-secret.json --show-multiarch true -o json 2>/dev/null | jq '.[].config.architecture' | wc -l || true)"
+if [[ ${NUM_IMAGES} -gt 1 ]]; then
+  echo "Multi-arch release image detected"
+  MULTI_ARCH_ARG="--multi-arch"
+fi
+
 # Build CPO override args if image is specified
 CPO_ARGS=""
 if [[ -n "${CPO_IMAGE:-}" ]]; then
@@ -77,6 +85,7 @@ KUBECONFIG="${MGMT_KUBECONFIG}" /usr/bin/hypershift create cluster aws \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
   --annotations "hypershift.openshift.io/cleanup-cloud-resources=false" \
+  ${MULTI_ARCH_ARG} \
   ${CPO_ARGS} \
   --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
   --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
