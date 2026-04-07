@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -24,10 +30,9 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
-if (( ocp_major_version == 4 && ocp_minor_version > 12 )) || (( ocp_major_version > 4 )); then
+if version_gt "${ocp_version}" "4.12"; then
     echo "No need to grant permissions to cluster identity on scope of disk encryption set on 4.13+, skip this step!"
     exit 0
 fi

@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 declare vcenter_username_minimal_permission
 declare vcenter_password_minimal_permission
 
@@ -22,10 +29,9 @@ fi
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret "${RELEASE_IMAGE_INSTALL}" -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
 rm /tmp/pull-secret
 
-if [ "${ocp_minor_version}" -lt 13 ]; then
+if version_lt "${ocp_version}" "4.13"; then
 cat > "${PATCH}" << EOF
 platform:
   vsphere:

@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -118,11 +125,9 @@ fi
 # cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 # oc registry login --to /tmp/pull-secret
 # ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 # rm /tmp/pull-secret
 
-# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+# if version_ge "${ocp_version}" "4.11"; then
 #   SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
 #   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
 #   cat > "${PATCH}" << EOF

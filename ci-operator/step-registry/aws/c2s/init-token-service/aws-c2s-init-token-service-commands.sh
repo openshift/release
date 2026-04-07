@@ -2,6 +2,13 @@
 
 set -o nounset
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -381,11 +388,9 @@ EOF
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_major_version == 4 && ocp_minor_version >= 12 )) || (( ocp_major_version > 4 )); then
+if version_ge "${ocp_version}" "4.12"; then
   echo "For 4.12+, using batch API version: batch/v1"
   cat <<EOF > /tmp/cap-token-cronjob_412plus-patch.yaml
 apiVersion: batch/v1

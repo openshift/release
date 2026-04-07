@@ -4,14 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
-# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST, 
-# but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with 
-# user specified image pullspec, to avoid auth error when accessing it, always use build farm 
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
+# but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with
+# user specified image pullspec, to avoid auth error when accessing it, always use build farm
 # registry pullspec.
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
 # release:initial image, once that, use 'oc get istag release:inital' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
@@ -21,8 +28,8 @@ elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
     tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
     echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
-# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -45,8 +52,6 @@ rm pull-secret
 popd
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -117,7 +122,7 @@ yq-go m -x -i "${CONFIG}" "${PATCH}"
 #save worker image urn to ${SHARED_DIR}
 echo "${image}" > "${SHARED_DIR}"/azure_marketplace_image_urn_worker
 
-if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
+if version_ge "${ocp_version}" "4.14"; then
   # create/apply a patch to set osImage for control plane instances
   PATCH_MASTER="${SHARED_DIR}/install-config-master-marketimage.yaml.patch"
   cat > "${PATCH_MASTER}" << EOF

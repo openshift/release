@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
 
 if [[ "$NETWORK_MTU" == "" ]]; then
   echo "error: NETWORK_MTU is empty, exit now"
@@ -17,10 +23,8 @@ if [[ "${network_type}" == "" ]]; then
   cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
   oc registry login --to /tmp/pull-secret
   ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-  ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-  ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   rm /tmp/pull-secret
-  if (( ocp_major_version == 4 && ocp_minor_version >= 12 )) || (( ocp_major_version > 4 )); then
+  if version_ge "${ocp_version}" "4.12"; then
     network_type="OVNKubernetes"
   else
     network_type="OpenShiftSDN"

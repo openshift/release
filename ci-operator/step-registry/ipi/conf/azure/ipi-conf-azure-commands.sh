@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -45,8 +52,6 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
-minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 echo "get ocp version: ${version}"
 rm pull-secret
 popd
@@ -137,7 +142,7 @@ EOF
 fi
 
 # User tags went GA in 4.14. In 4.14+, tag resources with an expiration date to facilitate cleanup.
-if (( minor_version > 13 && major_version == 4 )); then
+if version_gt "${version}" "4.13"; then
   expiration_date=$(date -d '8 hours' --iso=minutes --utc)
   printf 'Setting user tag expirationDate: %s\n' "${expiration_date}"
   yq-go write -i "${CONFIG}" "platform.azure.userTags.expiration_date" "${expiration_date}"
