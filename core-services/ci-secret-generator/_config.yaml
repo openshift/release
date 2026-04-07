@@ -65,6 +65,20 @@
   - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
       ci
     name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - core-ci
+    service_account:
+    - pj-rehearse
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
   item_name: release-controller
   params:
     cluster:

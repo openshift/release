@@ -543,12 +543,12 @@ function check_case_selected {
 
 function set_gloki_credentials() {
     # Check if the glokiuser and glokipwd files exist
-    if [ -f "/var/run/ext-loki/glokiuser" ] && \
-       [ -f "/var/run/ext-loki/glokipwd" ]; then
+    if [ -f "/var/run/ocp-logging-team-secrets/glokiuser" ] && \
+       [ -f "/var/run/ocp-logging-team-secrets/glokipwd" ]; then
 
         # Read the values of glokiuser and glokipwd from their respective files
-        glokiuser=$(cat /var/run/ext-loki/glokiuser)
-        glokipwd=$(cat /var/run/ext-loki/glokipwd)
+        glokiuser=$(cat /var/run/ocp-logging-team-secrets/glokiuser)
+        glokipwd=$(cat /var/run/ocp-logging-team-secrets/glokipwd)
 
         # Set the values as environment variables
         export GLOKIUSER="$glokiuser"
