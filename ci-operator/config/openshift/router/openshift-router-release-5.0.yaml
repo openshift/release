@@ -6,11 +6,12 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/router/base/Dockerfile.ocp
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.ocp
-  from: haproxy-router-base
-  to: haproxy-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.ocp
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.ocp
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
   - name: "5.0"
@@ -39,6 +40,24 @@ tests:
   commands: go test -race ./...
   container:
     from: src
+- as: fips-image-scan-haproxy-router
+  steps:
+    dependencies:
+      SCAN_IMAGE: haproxy-router
+    test:
+    - ref: fips-check-image-scan
+- as: e2e-aws-fips
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 - as: e2e-agnostic
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:

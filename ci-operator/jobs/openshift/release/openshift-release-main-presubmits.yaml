@@ -34,7 +34,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation
     decorate: true
     labels:
@@ -101,7 +101,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation-tide
     decorate: true
     labels:
@@ -158,6 +158,34 @@ presubmits:
         secret:
           secretName: openshift-merge-bot
     trigger: (?m)^/test( | .* )check-gh-automation-tide,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/check-trigger-trusted-apps
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-trigger-trusted-apps
+    rerun_command: /test check-trigger-trusted-apps
+    run_if_changed: ^core-services/prow/.*
+    spec:
+      containers:
+      - args:
+        - ./hack/validate-trigger-trusted-apps.py
+        - --config-dir=./core-services/prow/02_config
+        - --required-trusted-app=openshift-merge-bot
+        command:
+        - python3
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )check-trigger-trusted-apps,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -964,7 +992,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -1003,7 +1031,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260325-947fd1958
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260328-dc2bbc9fc
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1878,7 +1906,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/rover-groups-config-validation
     decorate: true
     labels:

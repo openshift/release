@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -76,8 +82,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 critical_check_result=0
 
@@ -141,7 +146,7 @@ fi
 
 #check des setting in default sc
 echo -e "\n--- check des setting in default sc ---"
-if (( ocp_major_version == 4 && ocp_minor_version < 13 )) || [[ "${ENABLE_DES_DEFAULT_MACHINE}" != "true" ]]; then
+if version_lt "${ocp_version}" "4.13" || [[ "${ENABLE_DES_DEFAULT_MACHINE}" != "true" ]]; then
     echo "DES setting in default sc is only available on 4.13+ and requires ENABLE_DES_DEFAULT_MACHINE set to true, no need to check on current cluster, skip."
 else
     echo "Expected des in default sc: ${DES_DEFAULT}"

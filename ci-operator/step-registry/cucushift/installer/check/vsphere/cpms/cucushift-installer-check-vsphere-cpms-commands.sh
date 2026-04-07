@@ -4,6 +4,22 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+function version_eq() {
+  # Returns 0 (true) if $1 == $2
+  [[ "$1" == "$2" ]]
+}
+
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 
@@ -51,19 +67,19 @@ function checkTemplate() {
 
 }
 
-ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
-if (( ${ocp_minor_version} < 15 )); then
+if version_lt "${ocp_version}" "4.15"; then
 	echo "CPMS failureDomain check is only available on 4.15+ cluster, skip the check!"
         exit 0
 fi
-if (( ${ocp_minor_version} == 15 )) && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]]; then
+if version_eq "${ocp_version}" "4.15" && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]]; then
 	echo "CPMS failureDomain check is only available when TechPreviewNoUpgrade enabled on 4.15 cluster, skip the check!"
         exit 0
 fi
 echo "cpms spec:"
 oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io'
 checkTemplate
-if (( ${ocp_minor_version} > 15 )); then          
+if version_gt "${ocp_version}" "4.15"; then
       checkCpms
 fi

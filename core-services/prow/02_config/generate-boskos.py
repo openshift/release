@@ -275,7 +275,7 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 5,
+        'default': 1,
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
@@ -464,6 +464,7 @@ CONFIG = {
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
+    'powervs-9-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -734,6 +735,9 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
+for i in range(2):
+    CONFIG['powervs-9-quota-slice']['sao04-powervs-9-quota-slice-{}'.format(i)] = 1
+
 for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
 for i in range(150):
@@ -776,7 +780,25 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
-    }
+    },
+    'openshift-org-gcp': {
+        'gcp': {
+            'install': 50,
+            'quota': CONFIG['gcp-quota-slice'],
+        },
+        'gcp-arm64': {
+            'install': 20,
+            'quota': CONFIG['gcp-arm64-quota-slice'],
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': CONFIG['gcp-3-quota-slice'],
+        },
+    },
 }
 
 config = {

@@ -19,12 +19,13 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/ci/Dockerfile
-  from: base-rhel9
-  to: cert-manager-operator
-- dockerfile_path: images/ci/operand.Dockerfile
-  from: base-rhel9
-  to: cert-manager
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    from: base-rhel9
+    to: cert-manager-operator
+  - dockerfile_path: images/ci/operand.Dockerfile
+    from: base-rhel9
+    to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -123,7 +124,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Generic} || TechPreview"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"(Platform: isSubsetOf {Generic} || TechPreview) && !TechPreview:Inverted"' make test-e2e
       from: src
       resources:
         requests:

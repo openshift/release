@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -55,8 +62,7 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
@@ -80,7 +86,7 @@ else
 fi
 
 #public lb should not be created on 4.11+
-if (( ocp_major_version == 4 && ocp_minor_version >= 11 )) || (( ocp_major_version > 4 )); then
+if version_ge "${ocp_version}" "4.11"; then
     echo "Check that no public load balancer created on fully private cluster..."
     [[ -n "${public_lb}" ]] && echo "ERROR: Found public load balancer ${public_lb} on fully private cluster!" && no_critical_check_result=1
 fi
