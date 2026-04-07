@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     ;;
 gcp)
@@ -79,7 +79,7 @@ ret=0
 # ------------------------------------------------------------------------------
 echo "Checking if private zone were created."
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     # records in public zone
     if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
         echo "Checking records in public zone."
