@@ -35,6 +35,13 @@ function post_actions() {
 mkdir /tmp/installer
 cp "${SHARED_DIR}"/metadata.json /tmp/installer/
 
+IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+if [ -z "${IC_API_KEY}" ]; then
+  echo "ERROR: IBM Cloud API key is empty."
+  exit 1
+fi
+export IC_API_KEY
+
 set +e
 openshift-install destroy cluster --dir /tmp/installer/ &
 wait "$!"
