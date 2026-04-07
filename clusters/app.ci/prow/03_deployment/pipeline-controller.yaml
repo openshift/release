@@ -67,8 +67,7 @@ spec:
             - --config-path=/etc/config/config.yaml
             - --supplemental-prow-config-dir=/etc/config
             - --job-config-path=/var/repo/release/ci-operator/jobs
-            - --github-app-id=$(GITHUB_APP_ID)
-            - --github-app-private-key-path=/etc/github/cert
+            - --github-token-path=/etc/oauth/oauth
             - --github-endpoint=http://ghproxy
             - --github-endpoint=https://api.github.com
             - --github-graphql-endpoint=http://ghproxy/graphql
@@ -76,12 +75,6 @@ spec:
             - --lgtm-config-file=/var/repo/release/core-services/pipeline-controller/lgtm-config.yaml
             - --hmac-secret-file=/etc/webhook/hmac.yaml
             - --endpoint=/
-          env:
-            - name: GITHUB_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: openshift-prow-github-app
-                  key: appid
           resources:
             requests:
               memory: "7.5Gi"
@@ -90,8 +83,8 @@ spec:
             - name: http
               containerPort: 8888
           volumeMounts:
-            - name: github-app-credentials
-              mountPath: /etc/github
+            - name: github-token
+              mountPath: /etc/oauth
               readOnly: true
             - name: config
               mountPath: /etc/config
@@ -123,9 +116,9 @@ spec:
         - name: hmac
           secret:
             secretName: github-webhook-credentials
-        - name: github-app-credentials
+        - name: github-token
           secret:
-            secretName: openshift-prow-github-app
+            secretName: github-credentials-openshift-ci-robot
         - name: config
           configMap:
             name: config
