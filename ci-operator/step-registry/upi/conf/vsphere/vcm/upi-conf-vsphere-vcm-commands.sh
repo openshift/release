@@ -291,6 +291,8 @@ vm_template=${vm_template}-hw${target_hw_version}
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >> "${SHARED_DIR}"/vsphere_context.sh
 
+# Populated by the generated vsphere_context.sh (see ipi-conf-vsphere-check-vcm); default satisfies shellcheck before source.
+vsphere_resource_pool=""
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
