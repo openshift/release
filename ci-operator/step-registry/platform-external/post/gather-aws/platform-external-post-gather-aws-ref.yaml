@@ -1,0 +1,50 @@
+ref:
+  as: platform-external-post-gather-aws
+  from: cli
+  commands: platform-external-post-gather-aws-commands.sh
+  grace_period: 10m
+  timeout: 20m
+  best_effort: true
+  optional_on_success: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Gather AWS-specific diagnostics for platform-external installations on failure.
+
+    This step collects comprehensive diagnostic information from AWS to help debug
+    installation failures in platform-external workflows:
+
+    1. **Bootstrap Logs**: Uses openshift-install gather bootstrap to collect logs
+       from the bootstrap node via SSH. Creates log-bundle-*.tar.gz in artifacts.
+
+    2. **EC2 Console Logs**: Extracts instance IDs from CloudFormation stacks and
+       collects console output for all instances (bootstrap, masters, workers).
+       Useful for diagnosing boot failures, kernel panics, ignition issues.
+
+    3. **Load Balancer Diagnostics**: Collects target group health status for all
+       cluster load balancers. Shows which targets are healthy/unhealthy and why.
+       Critical for diagnosing API connectivity issues.
+
+    4. **CloudFormation Events**: Gathers stack events showing resource creation
+       timeline and any failures. Helps identify infrastructure provisioning issues.
+
+    5. **Instance Metadata**: Collects EC2 instance details including state, type,
+       security groups, network interfaces for all cluster instances.
+
+    All diagnostics are collected to ARTIFACT_DIR with organized subdirectories:
+    - ec2-console-logs/: Console output for each instance
+    - load-balancer-diagnostics/: Target group health and LB details
+    - cloudformation-events/: Stack events for all cluster stacks
+    - aws-diagnostics-summary.txt: Human-readable summary of collected data
+
+    This step is best-effort and will collect as much data as possible even if
+    some operations fail. It only runs on failure (optional_on_success: true) to
+    avoid collecting sensitive data from successful runs.
+
+    **Prerequisites**:
+    - AWS credentials in CLUSTER_PROFILE_DIR
+    - metadata.json or LEASED_RESOURCE for region detection
+    - BOOTSTRAP_IP in SHARED_DIR (if bootstrap logs needed)
+    - SSH private key in CLUSTER_PROFILE_DIR (if bootstrap logs needed)

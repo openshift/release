@@ -7,5 +7,27 @@ ref:
     requests:
       cpu: 300m
       memory: 300Mi
+  env:
+  - name: CONTROL_PLANE_WAIT_MAX_ITERATIONS
+    default: "60"
+    documentation: |-
+      Maximum number of 30-second iterations to wait for control plane nodes.
+      Default: 60 iterations = 30 minutes total wait time.
+      Each iteration checks if all master nodes are Ready.
   documentation: |-
-    Platform agnostic check waiting for control plane nodes stayed in Ready phase.
+    Platform agnostic check waiting for control plane nodes to become Ready.
+
+    This step waits for all master nodes (typically 3) to reach Ready state with:
+    - 30-minute total timeout (60 iterations * 30 seconds, configurable)
+    - Periodic diagnostic collection every 2.5 minutes (5 iterations)
+    - Progress markers every 5 minutes showing pod and node status
+    - Comprehensive final diagnostics on timeout
+
+    Diagnostic Collection:
+    - Periodic snapshots: Node status, pod status, events, machines (every 2.5min)
+    - Final state on failure: Complete cluster state, all namespaces, events
+    - Artifacts saved to: control-plane-diagnostics/ and control-plane-final-state/
+
+    Success Criteria:
+    - All master nodes have "Ready" condition
+    - 3 master nodes discovered (for standard HA deployments)
