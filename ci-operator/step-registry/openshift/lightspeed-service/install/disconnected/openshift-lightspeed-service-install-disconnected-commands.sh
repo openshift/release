@@ -166,7 +166,7 @@ EOF
         echo "oc-mirror may fail due to internal TLS validation"
     fi
 
-    run_command "./oc-mirror --config=/tmp/image-set.yaml --workspace file://oc-mirror-workspace docker://${MIRROR_REGISTRY_HOST} --authfile /tmp/.dockerconfigjson --image-timeout 60m0s --src-tls-verify false --dest-tls-verify false --retry-times 3 --v2 || true"
+    run_command "./oc-mirror --config=/tmp/image-set.yaml --workspace file://oc-mirror-workspace docker://${MIRROR_REGISTRY_HOST} --image-timeout 60m0s --src-tls-verify false --dest-tls-verify false --retry-times 3 --v2 || true"
     # run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
     #run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/jaeger|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
     # run_command "oc image mirror -a ${REG_CREDS} -f mapping.txt --insecure --filter-by-os='.*'"
