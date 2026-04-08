@@ -307,7 +307,6 @@ ibmcloud_login
 if [ -f ${SHARED_DIR}/metadata.json ]; then
     RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
     echo "Resource group: $RESOURCE_GROUP"
-    set -x
     region1=$(jq -r .ibmcloud.region ${SHARED_DIR}/metadata.json)
     echo "Region from metadata.json: $region1"
     if [[ -n "$region1" ]] && [[ "$region" != "$region1" ]]; then
@@ -315,7 +314,6 @@ if [ -f ${SHARED_DIR}/metadata.json ]; then
         echo "Overwrite the LEASED_RESOURCE Region: $region"
         ibmcloud target -r $region -q
     fi
-    set +x
 elif [ -s "${SHARED_DIR}/ibmcloud_cluster_resource_group" ]; then
     RESOURCE_GROUP=$(cat "${SHARED_DIR}/ibmcloud_cluster_resource_group")
     echo "Resource group: $RESOURCE_GROUP"    
@@ -337,10 +335,11 @@ gather_resources
 instances=$(ibmcloud is instances -q)
 bootstrapInfo=$(echo "${instances}" | grep "bootstrap" | grep "${CLUSTER_FILTER}" || echo "")
 echo "Bootstrap info of ${CLUSTER_FILTER}: $bootstrapInfo"
-if [[ -f "${SHARED_DIR}/console.url" ]] && [[ -z ${bootstrapInfo} ]]; then
+set -x
+if [[ -f "${SHARED_DIR}/console.url" ]] && [[ -z "${bootstrapInfo}" ]]; then
     echo "install succeed, and no bootstrap vm, skipping SSH connectivity check."
 else
     ssh_instances "$(echo "${bootstrapInfo}"| awk '{print $2}')"
 fi
-
+set +x
 echo "==== IBM Cloud resource gathering completed. ========="
