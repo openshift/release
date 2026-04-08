@@ -157,13 +157,13 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser" || echo "NA")
-BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass" || echo "NA")
 
 if [ -e "$CIRFILE" ] ; then
     # Get Extra data from CIR
     jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" > "$EXTRAFILE"
     if [[ "$(cat "$CIRFILE" | jq -r .type)" =~ cluster.* ]] ; then
+        BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser")
+        BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass")
         prepare_bmcluster
     fi
 fi
