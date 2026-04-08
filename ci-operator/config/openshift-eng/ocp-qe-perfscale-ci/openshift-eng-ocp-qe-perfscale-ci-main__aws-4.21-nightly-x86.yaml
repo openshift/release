@@ -207,6 +207,50 @@ tests:
     - chain: openshift-qe-egress-ip-bastion
     workflow: openshift-qe-installer-aws-bastion
   timeout: 6h0m0s
+- always_run: false
+  as: ocpbugs-77510-rst-validation
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-4zh40jk/release:latest
+      TEST_SCALE: progressive
+      TIMEOUT: +5 hours
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    - ref: wait
+  timeout: 7h0m0s
+- always_run: false
+  as: ocpbugs-77510-rst-etcd-encryption
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-4zh40jk/release:latest
+      TIMEOUT: +5 hours
+      ZONES_COUNT: "3"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: etcd-encryption
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    - ref: wait
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
