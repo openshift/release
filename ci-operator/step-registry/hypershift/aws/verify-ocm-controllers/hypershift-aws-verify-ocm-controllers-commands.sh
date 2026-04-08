@@ -26,7 +26,7 @@ echo "Using release image: ${RELEASE_IMAGE}"
 oc registry login --to=/tmp/pull-secret-build-farm.json
 jq -s '.[0] * .[1]' /tmp/pull-secret-build-farm.json /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret.json
 
-# Management cluster kubeconfig
+# Management cluster kubeconfig (workload creds for HC creation)
 export MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 # Cluster naming
@@ -91,6 +91,18 @@ KUBECONFIG="${MGMT_KUBECONFIG}" oc wait --timeout=30m --for=condition=Available 
   exit 1
 }
 echo "HostedCluster is available"
+
+# Compare kubeconfigs
+echo ""
+echo "=== Debug: comparing kubeconfigs ==="
+echo "Workload credentials user:"
+KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc whoami 2>/dev/null || echo "(whoami failed)"
+echo "Admin kubeconfig user:"
+KUBECONFIG="${SHARED_DIR}/kubeconfig" oc whoami 2>/dev/null || echo "(whoami failed)"
+
+# Switch to admin kubeconfig for inspecting resources in HC namespace
+export MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+echo "Switched to admin kubeconfig for HC namespace access"
 
 # Get HC namespace (where control plane pods run)
 HC_NAMESPACE="clusters-${CLUSTER_NAME}"
