@@ -462,7 +462,8 @@ analyze_results() {
     local rst_count=0
     if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
         # Debug: Show log file size and sample content
-        local log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+        local log_size
+        log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
         log "🔍 RST log file size: $log_size lines"
         
         # Show last few lines for debugging
