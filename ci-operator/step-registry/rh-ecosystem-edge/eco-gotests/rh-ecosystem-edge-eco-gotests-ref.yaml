@@ -5,12 +5,54 @@ ref:
   timeout: 3h0m0s
   commands: rh-ecosystem-edge-eco-gotests-commands.sh
   env:
+    - name: ECO_TEST_FEATURES
+      default: ""
+      documentation: >-
+        Space-separated list of test feature directories to run (required).
+        Passed to ginkgo as the set of ./tests/<feature> paths.
+        Example: "rdscore" or "cnf network".
+    - name: ECO_TEST_LABELS
+      default: ""
+      documentation: >-
+        Ginkgo label-filter expression for including/excluding tests (optional).
+        Example: "clean-cluster && mount-ns" or "sriov || ptp".
+    - name: REPORT_CASE_TAG
+      default: "polarion-testcase-id"
+      documentation: >-
+        XML attribute name used by eco-gotests to tag Polarion test case IDs
+        in the generated report XML. Matches the standalone podman run convention.
+    - name: REPORT_PARAMETER_TAG
+      default: "polarion-parameter"
+      documentation: >-
+        XML attribute name used by eco-gotests to tag Polarion test parameters
+        in the generated report XML.
+    - name: ECO_TC_PREFIX
+      default: "OCP-"
+      documentation: >-
+        Prefix prepended to test case IDs in the Polarion XML report.
+        Example: "OCP-" produces IDs like "OCP-12345".
+    - name: ECO_TEST_VERBOSE
+      default: "false"
+      documentation: >-
+        Set to "true" to enable verbose ginkgo test output (-v flag).
+    - name: ECO_VERBOSE_LEVEL
+      default: ""
+      documentation: >-
+        glog verbose level for eco-gotests internal logging. Must be >= 100
+        to produce output. Leave empty to suppress glog output.
     - name: ECO_GOTESTS_ENV_VARS
       default: ""
-      documentation: Required env variables for eco-gotests container
+      documentation: >-
+        Newline-separated KEY=VALUE pairs for test-suite-specific eco-gotests
+        environment variables not exposed as dedicated ref env entries above.
+        Example:
+          ECO_RDS_CORE_CONFIG_FILE_PATH=/configs/default.yaml
+          ECO_DUMP_FAILED_TESTS=true
   resources:
     requests:
       cpu: 1000m
       memory: 500Mi
   documentation: |-
-    Run eco-gotests on the cluster
+    Run eco-gotests (https://github.com/rh-ecosystem-edge/eco-gotests) against
+    a pre-installed OCP cluster. Produces JUnit XML (picked up by Prow) and
+    Polarion XML (mirrored to SHARED_DIR with polarion_ prefix) on exit.
