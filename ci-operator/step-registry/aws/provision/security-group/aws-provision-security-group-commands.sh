@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -31,10 +38,8 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_major_version == 4 && ocp_minor_version <= 13 )); then
+if version_le "${ocp_version}" "4.13"; then
   echo "Custom SG in 4.13- is not applicable, skip now."
   exit 0
 fi

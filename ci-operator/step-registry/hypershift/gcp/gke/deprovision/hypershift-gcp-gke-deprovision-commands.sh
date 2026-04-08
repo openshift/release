@@ -6,17 +6,27 @@ set -euo pipefail
 GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
 gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
 
-# Check if provision completed - if not, nothing to clean up
-if [[ ! -f "${SHARED_DIR}/control-plane-project-id" ]]; then
-    echo "No control-plane-project-id file found - provision may not have completed"
-    echo "Nothing to deprovision, exiting successfully"
-    exit 0
+# Load cluster info from SHARED_DIR (written by provision step).
+# If SHARED_DIR files are missing (provision was aborted before the Secret was synced),
+# reconstruct resource names from env vars since they are deterministic.
+if [[ -f "${SHARED_DIR}/control-plane-project-id" ]]; then
+    CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
+    CP_CLUSTER_NAME="$(<"${SHARED_DIR}/control-plane-cluster-name")"
+    GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+else
+    # SHARED_DIR is backed by a Kubernetes Secret that is updated after the step exits.
+    # If the provision step is aborted (SIGTERM), the Secret update may not complete,
+    # leaving SHARED_DIR empty for post steps. Reconstruct from env vars.
+    RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
+    INFRA_ID="${RESOURCE_NAME_PREFIX}"
+    CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
+    CP_CLUSTER_NAME="${RESOURCE_NAME_PREFIX}-gke"
+    GCP_REGION="${GKE_REGION}"
+    echo "WARNING: SHARED_DIR files missing - reconstructed resource names from env vars"
+    echo "  CP_PROJECT_ID=${CP_PROJECT_ID}"
+    echo "  CP_CLUSTER_NAME=${CP_CLUSTER_NAME}"
+    echo "  GCP_REGION=${GCP_REGION}"
 fi
-
-# Load cluster info from provision and hosted-cluster-setup steps
-CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
-CP_CLUSTER_NAME="$(<"${SHARED_DIR}/control-plane-cluster-name")"
-GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
 
 # hosted-cluster-name may not exist if job was aborted before hosted-cluster-setup ran
 if [[ -f "${SHARED_DIR}/hosted-cluster-name" ]]; then
@@ -27,12 +37,13 @@ else
     echo "Will skip DNS cleanup but still deprovision GKE cluster and projects"
 fi
 
-# Hosted Cluster project file path (may not exist if provision failed early)
-HC_PROJECT_FILE="${SHARED_DIR}/hosted-cluster-project-id"
-if [[ -f "${HC_PROJECT_FILE}" ]]; then
-    HC_PROJECT_ID="$(<"${HC_PROJECT_FILE}")"
+# Hosted Cluster project - read from SHARED_DIR or reconstruct
+if [[ -f "${SHARED_DIR}/hosted-cluster-project-id" ]]; then
+    HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
 else
-    HC_PROJECT_ID=""
+    INFRA_ID="${INFRA_ID:-${NAMESPACE}-${UNIQUE_HASH}}"
+    HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
+    echo "WARNING: Reconstructed HC_PROJECT_ID=${HC_PROJECT_ID}"
 fi
 
 set -x
