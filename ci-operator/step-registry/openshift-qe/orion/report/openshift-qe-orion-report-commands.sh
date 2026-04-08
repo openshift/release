@@ -9,7 +9,7 @@ fi
 
 # Check for deferred JSON results
 shopt -s nullglob
-json_files=("${SHARED_DIR}"/orion-*.json)
+json_files=("${SHARED_DIR}"/junit*.json)
 shopt -u nullglob
 
 if [ ${#json_files[@]} -eq 0 ]; then
@@ -47,7 +47,7 @@ done
 # Run orion report on all deferred JSONs
 # orion --report exits 2 if regressions found, 0 otherwise
 set +e
-orion --report "$json_file_list"
+orion --report "$json_file_list" | tee "${ARTIFACT_DIR}/orion-report-summary.txt"
 report_exit=$?
 set -e
 

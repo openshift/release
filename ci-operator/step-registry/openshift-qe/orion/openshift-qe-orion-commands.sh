@@ -302,7 +302,8 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 # Write deferred JSON results to SHARED_DIR for report step aggregation
 if [ "${RUN_ORION}" == "deferred" ]; then
     for f in junit*.json; do
-        [ -e "$f" ] && cp "$f" "${SHARED_DIR}/orion-${FILENAME}-$(basename "$f")" 2>/dev/null || true
+        [ -e "$f" ] || continue
+        cp "$f" "${SHARED_DIR}/" 2>/dev/null || true
     done
 fi
 
