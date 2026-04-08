@@ -62,61 +62,69 @@ generate_nmstate_machineconfigs() {
   # Master node nmstate config (plain text, will be base64 encoded)
   if [ -z "${NMS_BREX_ASSET_CONF_MASTER:-}" ]; then
     local master_nmstate_config="interfaces:
-- name: br-ex
-  type: ovs-bridge
-  state: up
-  ipv4:
-    enabled: false
-    dhcp: false
-  ipv6:
-    enabled: false
-    dhcp: false
-  bridge:
-    allow-extra-patch-ports: true
-    options:
-      mcast-snooping-enable: true
-    port:
     - name: ${master_bond_port1}
+      type: ethernet
+      state: up
+      ipv4:
+        enabled: false
+      ipv6:
+        enabled: false
     - name: br-ex
-- name: br-ex
-  type: ovs-interface
-  copy-mac-from: ${master_bond_port1}
-  state: up
-  ipv4:
-    enabled: ${ipv4_enabled}
-    dhcp: ${ipv4_enabled}
-  ipv6:
-    enabled: ${ipv6_enabled}
-    dhcp: ${ipv6_enabled}"
+      type: ovs-bridge
+      state: up
+      ipv4:
+        enabled: false
+        dhcp: false
+      ipv6:
+        enabled: false
+        dhcp: false
+      bridge:
+        port:
+        - name: ${master_bond_port1}
+        - name: br-ex
+    - name: br-ex
+      type: ovs-interface
+      state: up
+      copy-mac-from: ${master_bond_port1}
+      ipv4:
+        enabled: ${ipv4_enabled}
+        dhcp: ${ipv4_enabled}
+      ipv6:
+        enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}"
 
     # Worker node nmstate config (plain text, will be base64 encoded)
     local worker_nmstate_config="interfaces:
-- name: br-ex
-  type: ovs-bridge
-  state: up
-  ipv4:
-    enabled: false
-    dhcp: false
-  ipv6:
-    enabled: false
-    dhcp: false
-  bridge:
-    allow-extra-patch-ports: true
-    options:
-      mcast-snooping-enable: true
-    port:
     - name: ${master_bond_port1}
+      type: ethernet
+      state: up
+      ipv4:
+        enabled: false
+      ipv6:
+        enabled: false
     - name: br-ex
-- name: br-ex
-  type: ovs-interface
-  copy-mac-from: ${master_bond_port1}
-  state: up
-  ipv4:
-    enabled: ${ipv4_enabled}
-    dhcp: ${ipv4_enabled}
-  ipv6:
-    enabled: ${ipv6_enabled}
-    dhcp: ${ipv6_enabled}"
+      type: ovs-bridge
+      state: up
+      ipv4:
+        enabled: false
+        dhcp: false
+      ipv6:
+        enabled: false
+        dhcp: false
+      bridge:
+        port:
+        - name: ${master_bond_port1}
+        - name: br-ex
+    - name: br-ex
+      type: ovs-interface
+      state: up
+      copy-mac-from: ${master_bond_port1}
+      ipv4:
+        enabled: ${ipv4_enabled}
+        dhcp: ${ipv4_enabled}
+      ipv6:
+        enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}"
   fi
 
   local master_b64
@@ -165,54 +173,54 @@ spec:
 EOF
 
   # Check if custom network config is provided
-  if [ -n "${NMS_BREX_NETWORK_CONF_MASTER:-}" ]; then
-    echo "Using custom NMS_BREX_NETWORK_CONF_MASTER for network configuration"
-    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
-${NMS_BREX_NETWORK_CONF_MASTER}
-EOF
-  else
-    echo "Generating default network configuration"
-    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
-networkConfig: &BOND
-  interfaces:
-  - name: bond0
-    type: bond
-    state: up
-    ipv4:
-      dhcp: true
-      enabled: true
-      auto-dns: true
-      auto-gateway: true
-      auto-routes: true
-    link-aggregation:
-      mode: active-backup
-      options:
-        miimon: '100'
-      port:
-      - ${master_bond_port1}
-      - ${master_bond_port2}
-EOF
-  fi
-
-  for ((i=1; i<masters; i++)); do
-    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-${i}.yaml" <<EOF
-networkConfig: *BOND
-EOF
-  done
-
-  for ((i=0; i<workers; i++)); do
-    cat > "${SHARED_DIR}/nmstate-network-config/ostest-worker-${i}.yaml" <<EOF
-networkConfig: *BOND
-EOF
-  done
+#  if [ -n "${NMS_BREX_NETWORK_CONF_MASTER:-}" ]; then
+#    echo "Using custom NMS_BREX_NETWORK_CONF_MASTER for network configuration"
+#    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
+#${NMS_BREX_NETWORK_CONF_MASTER}
+#EOF
+#  else
+#    echo "Generating default network configuration"
+#    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
+#networkConfig: &BOND
+#  interfaces:
+#  - name: bond0
+#    type: bond
+#    state: up
+#    ipv4:
+#      dhcp: true
+#      enabled: true
+#      auto-dns: true
+#      auto-gateway: true
+#      auto-routes: true
+#    link-aggregation:
+#      mode: active-backup
+#      options:
+#        miimon: '100'
+#      port:
+#      - ${master_bond_port1}
+#      - ${master_bond_port2}
+#EOF
+#  fi
+#
+#  for ((i=1; i<masters; i++)); do
+#    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-${i}.yaml" <<EOF
+#networkConfig: *BOND
+#EOF
+#  done
+#
+#  for ((i=0; i<workers; i++)); do
+#    cat > "${SHARED_DIR}/nmstate-network-config/ostest-worker-${i}.yaml" <<EOF
+#networkConfig: *BOND
+#EOF
+#  done
 
   echo "--- Generated MachineConfigs as manifests in ${SHARED_DIR}: ---"
   echo "  - manifest_00-generated-nmstate-brex-bond-master.yaml"
   echo "  - manifest_00-generated-nmstate-brex-bond-worker.yaml"
 
-  echo "---------- Generated network configs in ${SHARED_DIR}/nmstate-network-config: ---------"
-  echo "  - ostest-master-{0...$((masters-1))}.yaml"
-  echo "  - ostest-worker-{0...$((workers-1))}.yaml"
+#  echo "---------- Generated network configs in ${SHARED_DIR}/nmstate-network-config: ---------"
+#  echo "  - ostest-master-{0...$((masters-1))}.yaml"
+#  echo "  - ostest-worker-{0...$((workers-1))}.yaml"
 
   echo "------- Generated config in: manifest_00-generated-nmstate-brex-bond-master.yaml -------"
   cat "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-master.yaml"
@@ -220,8 +228,8 @@ EOF
   echo "------- Generated config in: manifest_00-generated-nmstate-brex-bond-worker.yaml -------"
   cat "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-worker.yaml"
 
-  echo "-------------------------- Generated network config: ---------------------------"
-  cat "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml"
+#  echo "-------------------------- Generated network config: ---------------------------"
+#  cat "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml"
 
   echo "------------------ Setting network-config path --------------------"
 #  echo "NETWORK_CONFIG_FOLDER=${SHARED_DIR}/nmstate-network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
