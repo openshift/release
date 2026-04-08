@@ -27,28 +27,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-etcd-operator
 images:
-- dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cluster-etcd-operator
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: cluster-etcd-operator
 promotion:
   to:
   - name: 4.17-priv
@@ -88,7 +74,7 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -99,13 +85,13 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-aws-disruptive-ovn
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption-ovn
 - always_run: false
   as: e2e-gcp-disruptive
@@ -122,7 +108,7 @@ tests:
 - as: e2e-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -135,10 +121,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-operator-fips
+- always_run: false
+  as: e2e-operator-fips
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -156,13 +143,13 @@ tests:
   as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-gcp
@@ -172,7 +159,8 @@ tests:
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -182,14 +170,16 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-assisted
-  cluster: build05
+  capabilities:
+  - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-metal-single-node-live-iso
@@ -201,15 +191,17 @@ tests:
   as: configmap-scale
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-ovn-etcd-scaling
+- always_run: false
+  as: e2e-aws-ovn-etcd-scaling
+  optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-etcd-scaling
 - always_run: false
   as: e2e-gcp-ovn-etcd-scaling
@@ -221,7 +213,7 @@ tests:
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling
@@ -229,17 +221,20 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
-- as: e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-etcd-recovery
-- as: e2e-aws-etcd-certrotation
+- always_run: false
+  as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-etcd-certrotation
-- as: e2e-metal-ovn-sno-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown
   optional: true
   steps:
     cluster_profile: gcp
@@ -247,7 +242,8 @@ tests:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
     workflow: openshift-e2e-cert-rotation-suspend-sno
-- as: e2e-metal-ovn-ha-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown
   optional: true
   steps:
     cluster_profile: gcp
@@ -255,58 +251,6 @@ tests:
       CLUSTER_AGE_DAYS: "1800"
       CLUSTER_AGE_STEP: "300"
     workflow: openshift-e2e-cert-rotation-shutdown
-- as: e2e-metal-assisted-four-node-serial
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-        NUM_DAY2_MASTERS=1
-        WORKERS_COUNT=1
-        TEST_FUNC=test_ctlplane_scaleup
-      TEST_SUITE: openshift/conformance/serial
-      TEST_TYPE: suite
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-four-node-parallel
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-        NUM_DAY2_MASTERS=1
-        WORKERS_COUNT=1
-        TEST_FUNC=test_ctlplane_scaleup
-      TEST_SUITE: openshift/conformance/parallel
-      TEST_TYPE: suite
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-four-node-recovery
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-        NUM_DAY2_MASTERS=1
-        WORKERS_COUNT=1
-        TEST_FUNC=test_ctlplane_scaleup
-      TEST_SUITE: openshift/etcd/recovery
-      TEST_TYPE: suite
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-four-node-scaling
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.17
-        NUM_DAY2_MASTERS=1
-        WORKERS_COUNT=1
-        TEST_FUNC=test_ctlplane_scaleup
-      TEST_SUITE: openshift/etcd/scaling
-      TEST_TYPE: suite
-    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

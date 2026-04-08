@@ -1,0 +1,37 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static-provision
+  steps: 
+  - ref: gcp-provision-minimal-permission
+  - ref: gcp-provision-vpc
+  - ref: gcp-provision-custom-endpoints
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: proxy-whitelist-gcp
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-gcp-custom-endpoints
+  - ref: ipi-conf-gcp-service-account
+  - ref: ipi-conf-manual-creds
+  - ref: gcp-provision-cco-manual-users-static
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-in-bastion
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-credentials-mode
+  env:
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: COMPUTE_SERVICE_ACCOUNT
+    default: ""
+    documentation: It defines the GCP service account for compute nodes.
+  - name: CONTROL_PLANE_SERVICE_ACCOUNT
+    default: ""
+    documentation: It defines the GCP service account for control-plane nodes.
+  documentation: |-
+    Launch an IPI disconnected cluster (behind proxy), using GCP custom 
+    endpoints, with a specified URL allowlist in the proxy server, and 
+    using GCP static IAM service accounts for QE e2e tests.
+    

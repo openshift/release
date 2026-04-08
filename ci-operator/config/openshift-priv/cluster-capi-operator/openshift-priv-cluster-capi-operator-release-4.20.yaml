@@ -2,19 +2,11 @@ base_images:
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
-    tag: latest
+    tag: "4.20"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -24,19 +16,12 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-capi-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cluster-capi-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-capi-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -87,32 +72,32 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-upgrade
 - as: e2e-aws-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -126,7 +111,7 @@ tests:
 - as: e2e-aws-capi-customnoupgrade-migration
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["MachineAPIMigration=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -182,25 +167,25 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-azure-ovn-techpreview
+- always_run: false
+  as: e2e-azure-ovn-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
 - as: e2e-azure-ovn-techpreview-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure-upgrade
 - as: e2e-azure-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -225,10 +210,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: e2e-metal3-capi-techpreview
-  cluster: build05
+- always_run: false
+  as: e2e-metal3-capi-techpreview
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -250,7 +236,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
@@ -259,13 +245,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 7h0m0s
-- as: security
-  optional: true
-  steps:
-    env:
-      PROJECT_NAME: cluster-capi-operator
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

@@ -4,6 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST, 
@@ -37,11 +52,18 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
-minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 echo "get ocp version: ${version}"
 rm pull-secret
 popd
+
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AZURE_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
+echo "${AZURE_BASE_DOMAIN}" > "${SHARED_DIR}/basedomain.txt"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -80,7 +102,7 @@ echo "Using compute node replicas: ${workers}"
 echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AZURE_BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
@@ -103,7 +125,9 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NATGatewaySingleZone" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+  OUTBOUND_TYPE_VALUE="UserDefinedRouting NATGatewaySingleZone NATGatewayMultiZone NatGateway"
+  #shellcheck disable=SC2076
+  if [[ " ${OUTBOUND_TYPE_VALUE} " =~ " ${OUTBOUND_TYPE} " ]]; then
     echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
@@ -113,12 +137,12 @@ platform:
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
   else
-    echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
+    echo "${OUTBOUND_TYPE} is not supported yet" && exit 1
   fi
 fi
 
 # User tags went GA in 4.14. In 4.14+, tag resources with an expiration date to facilitate cleanup.
-if (( minor_version > 13 && major_version == 4 )); then
+if version_gt "${version}" "4.13"; then
   expiration_date=$(date -d '8 hours' --iso=minutes --utc)
   printf 'Setting user tag expirationDate: %s\n' "${expiration_date}"
   yq-go write -i "${CONFIG}" "platform.azure.userTags.expiration_date" "${expiration_date}"
@@ -150,6 +174,44 @@ EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
   echo "Omit baseDomainResourceGroupName for private cluster"
+fi
+
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  azure:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# Configure dual-stack networking if IP_FAMILY is set
+if [[ -n "${IP_FAMILY:-}" ]]; then
+  echo "Configuring Azure dual-stack networking with IP_FAMILY: ${IP_FAMILY}"
+  patch_dualstack="${SHARED_DIR}/install-config-dualstack.yaml.patch"
+  
+  cat > "${patch_dualstack}" << EOF
+platform:
+  azure:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  - cidr: fd00::/64
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  - cidr: fd01::/64
+    hostPrefix: 64
+  serviceNetwork:
+  - 172.30.0.0/16
+  - fd02::/112
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
+  cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
+  echo "Dual-stack networking configuration added to install-config.yaml"
 fi
 
 # starting from 4.19, cluster sp only needs Contributor role

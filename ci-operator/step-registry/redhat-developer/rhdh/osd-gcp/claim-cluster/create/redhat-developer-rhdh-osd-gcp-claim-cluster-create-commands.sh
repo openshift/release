@@ -41,7 +41,7 @@ fi
 echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 
-bash ./.ibm/pipelines/cluster/osd-gcp/create-osd.sh
+bash ./.ci/pipelines/cluster/osd-gcp/create-osd.sh
 
 cp -v /tmp/rhdh/osdcluster/cluster-info.name "${SHARED_DIR}/"
 cp -v /tmp/rhdh/osdcluster/cluster-info.id "${SHARED_DIR}/"

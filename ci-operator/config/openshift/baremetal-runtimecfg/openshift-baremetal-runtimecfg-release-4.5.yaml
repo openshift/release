@@ -7,23 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
-  to: baremetal-runtimecfg
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: baremetal-runtimecfg
 promotion:
   to:
   - name: "4.5"
@@ -57,7 +50,8 @@ tests:
   container:
     from: src
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e

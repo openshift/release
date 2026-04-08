@@ -4,6 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if a custom redhat-operators CatalogSource was created and use it
+if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
+  CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
+  echo "Found custom CatalogSource name: ${CUSTOM_CATALOG_SOURCE}"
+  LOCAL_STORAGE_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
+  
+  # Local Storage uses "stable" channel, not version-specific, so we keep it as is
+  echo "Local Storage uses 'stable' channel, keeping it unchanged"
+fi
+
 if [[ -z "${LOCAL_STORAGE_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
@@ -22,7 +32,7 @@ fi
 if [[ "${LOCAL_STORAGE_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   LOCAL_STORAGE_SUB_TARGET_NAMESPACES="${LOCAL_STORAGE_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
-echo "Installing ${LOCAL_STORAGE_OPERATOR_SUB_PACKAGE} from ${LOCAL_STORAGE_OPERATOR_SUB_CHANNEL} into ${LOCAL_STORAGE_OPERATOR_SUB_INSTALL_NAMESPACE}, targeting ${LOCAL_STORAGE_SUB_TARGET_NAMESPACES}"
+echo "Installing ${LOCAL_STORAGE_OPERATOR_SUB_PACKAGE} from channel: ${LOCAL_STORAGE_OPERATOR_SUB_CHANNEL} in source: ${LOCAL_STORAGE_OPERATOR_SUB_SOURCE} into ${LOCAL_STORAGE_OPERATOR_SUB_INSTALL_NAMESPACE}, targeting ${LOCAL_STORAGE_SUB_TARGET_NAMESPACES}"
 
 # create the install namespace
 oc apply -f - <<EOF

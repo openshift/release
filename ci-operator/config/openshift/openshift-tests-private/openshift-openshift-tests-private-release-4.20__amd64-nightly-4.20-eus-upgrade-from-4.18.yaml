@@ -1,0 +1,213 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.13
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.18"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.20"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-ovn-hypershift-replace-f28
+  cron: 24 17 24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-mce-inplace-f28
+  cron: 5 21 14 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      MCE_VERSION: "2.10"
+      TEST_FILTERS: ~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-eus
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-replace-f28
+  cron: 34 7 22 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.10"
+      TEST_FILTERS: ~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-eus
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mceupgrade-replace-f28
+  cron: 50 12 14 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_TARGET_VERSION: "2.10"
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mceupgrade-full-replace-f28
+  cron: 10 19 20 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_TARGET_VERSION: "2.10"
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-full
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: baremetalds-agent-hypershift-mce-inplace-f28
+  capabilities:
+  - intranet
+  cron: 30 1 7 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.10"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-agent-hypershift-mce-mceupgrade-inplace-f28
+  capabilities:
+  - intranet
+  cron: 25 15 20 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_TARGET_VERSION: "2.10"
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-agent-hypershift-mce-compact-full-inplace-f28
+  capabilities:
+  - intranet
+  cron: 29 10 14 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=32768
+        MASTER_DISK=256
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=256G
+        NUM_EXTRA_WORKERS=2
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_TARGET_VERSION: "2.10"
+      MCE_VERSION: "2.8"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-full
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-kubevirt-hypershift-mce-replace-f28
+  capabilities:
+  - intranet
+  cron: 45 14 15 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.10"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: baremetalds-kubevirt-hypershift-mce-mceupgrade-replace-f28
+  capabilities:
+  - intranet
+  cron: 52 23 23 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_TARGET_VERSION: "2.10"
+      MCE_VERSION: "2.8"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.20-eus-upgrade-from-4.18

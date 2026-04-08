@@ -29,6 +29,33 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+
+
+if [ "$READ_EDGE_NODE_CONFIG_FROM_INSTALL_CONFIG_FILE" == "yes" ]; then
+  echo "Reading edge node configuration from install-config.yaml ..."
+  CONFIG=${SHARED_DIR}/install-config.yaml
+  if [ ! -f "$CONFIG" ] ; then
+    echo "ERROR: READ_EDGE_NODE_CONFIG_FROM_INSTALL_CONFIG_FILE is enabled, but install-config.yaml not found, please check."
+    exit 1
+  fi
+
+  REGION=$(yq-v4 e '.platform.aws.region' $CONFIG)
+
+  EXPECTED_MTU_OVN=$(yq-v4 e '.networking.clusterNetworkMTU // 1200' $CONFIG)
+  EDGE_NODE_WORKER_NUMBER=$(yq-v4 e '.compute[1].replicas' $CONFIG)
+  VALID_AVAILABILITY_ZONES=$(yq-v4 e '.compute[1].platform.aws.zones[]' $CONFIG | tr '\n' ' ')
+
+  if echo $VALID_AVAILABILITY_ZONES | grep -qE ".*-wlz-.*"; then
+    EDGE_ZONE_TYPES="wavelength-zone"
+  else
+    EDGE_ZONE_TYPES="local-zone"
+  fi
+else
+  # get availability zones of configuration
+  VALID_AVAILABILITY_ZONES=$(tr '\n' ' ' < ${SHARED_DIR}/edge-zone-names.txt )
+fi
+
+
 echo "====== MachineSet"
 oc get machineset.machine.openshift.io -n openshift-machine-api -owide
 echo "====== Machines"
@@ -44,9 +71,6 @@ NODES=$(oc get node --no-headers | grep edge | awk '{print$1}')
 echo "EDGE_ZONE_TYPES: ${EDGE_ZONE_TYPES}"
 echo "EDGE_NODE_WORKER_SCHEDULABLE: ${EDGE_NODE_WORKER_SCHEDULABLE}"
 echo "EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP: ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP}"
-
-# get availability zones of configuration
-VALID_AVAILABILITY_ZONES=$(tr '\n' ' ' < ${SHARED_DIR}/edge-zone-names.txt )
 echo "Valid availability zones: ${VALID_AVAILABILITY_ZONES}"
 
 ret=0

@@ -30,10 +30,11 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.image-service
-  to: assisted-image-service
-- dockerfile_path: Dockerfile.image-service-build
-  to: assisted-image-service-build
+  items:
+  - dockerfile_path: Dockerfile.image-service
+    to: assisted-image-service
+  - dockerfile_path: Dockerfile.image-service-build
+    to: assisted-image-service-build
 promotion:
   to:
   - name: assisted-version-placeholder
@@ -88,10 +89,10 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-- always_run: false
-  as: e2e-metal-assisted
-  cluster: build05
-  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
+- as: e2e-metal-assisted
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -101,7 +102,8 @@ tests:
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-deploy-nodes
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -120,9 +122,9 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=assisted-version-placeholder
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-agent-ds-main:latest
+        CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
+        INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=ocp-version-placeholder-multi
     workflow: assisted-ofcir-baremetal-heterogeneous
@@ -138,7 +140,8 @@ tests:
     workflow: assisted-oci
 - always_run: false
   as: e2e-metal-assisted-external
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted

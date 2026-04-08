@@ -86,6 +86,63 @@ if ! git merge "upstream/${DEFAULT_BRANCH}"; then
   CONFLICT=true
 fi
 
+echo "🔧 Syncing openshift/go.mod with upstream dependencies…"
+pushd openshift > /dev/null
+if go mod tidy; then
+  popd > /dev/null
+  # Check if there are any changes to commit
+  if ! git diff --quiet openshift/go.mod openshift/go.sum; then
+    echo "   📝 Changes detected in openshift/go.mod, committing…"
+    git add openshift/go.mod openshift/go.sum
+    git commit -m "sync openshift/go.mod with upstream dependencies
+
+- go mod tidy
+
+Automated sync after downstream merge to keep openshift/go.mod
+in sync with transitive dependencies from go-controller and test/e2e."
+    echo "   ✅ openshift/go.mod synced successfully"
+    GO_MOD_SYNCED=true
+  else
+    echo "   ℹ️  No changes needed in openshift/go.mod"
+  fi
+else
+  popd > /dev/null
+  echo "   ⚠️  go mod tidy failed in openshift/"
+  GO_MOD_FAILED=true
+fi
+
+if [[ "${GO_MOD_FAILED:-false}" != "true" ]]; then
+  echo "🧪 Syncing test annotations with upstream changes…"
+  pushd openshift > /dev/null
+  if go mod vendor; then
+    popd > /dev/null
+    if ./openshift/hack/update-tests-annotation.sh; then
+      if ! git diff --quiet openshift/test/generated/zz_generated.annotations.go; then
+        echo "   📝 Changes detected in test annotations, committing…"
+        git add openshift/test/generated/zz_generated.annotations.go
+        git commit -m "sync test annotations with upstream changes
+
+- go mod vendor
+- ./openshift/hack/update-tests-annotation.sh
+
+Automated sync after downstream merge to keep test annotations
+in sync with upstream test modifications and rules.go changes."
+        echo "   ✅ Test annotations synced successfully"
+        TEST_ANNOTATIONS_SYNCED=true
+      else
+        echo "   ℹ️  No changes needed in test annotations"
+      fi
+    else
+      echo "   ⚠️  Test annotation sync failed"
+      TEST_ANNOTATIONS_FAILED=true
+    fi
+  else
+    popd > /dev/null
+    echo "   ⚠️  Test annotation sync failed"
+    TEST_ANNOTATIONS_FAILED=true
+  fi
+fi
+
 echo "📤 Pushing branch to origin…"
 git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${DOWNSTREAM_REPO}"
 git push origin "$BRANCH"
@@ -93,15 +150,25 @@ git push origin "$BRANCH"
 echo "✏️  Opening Pull Request…"
 PR_TITLE="NO-JIRA: DownStream Merge [$(date +%m-%d-%Y)]"
 PR_BODY="Automated merge of upstream/${DEFAULT_BRANCH} → ${DEFAULT_BRANCH}."
+if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
+  PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of \`openshift/go.mod\` with upstream dependencies (\`go mod tidy\`)."
+fi
+if [[ "${TEST_ANNOTATIONS_SYNCED:-false}" == "true" ]]; then
+  PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of test annotations with upstream test changes (\`go mod vendor\` + \`update-tests-annotation.sh\`)."
+fi
+# Make it a draft if we detected conflicts or go mod failures (keeps Prow from auto-running presubmits).
+DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]] && echo true || echo false )
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
-    --arg title "$PR_TITLE" \
-    --arg head  "$BRANCH" \
-    --arg base  "$DEFAULT_BRANCH" \
-    --arg body  "$PR_BODY" \
-    '{title: $title, head: $head, base: $base, body: $body}'
+    --arg title     "$PR_TITLE" \
+    --arg head      "$BRANCH" \
+    --arg base      "$DEFAULT_BRANCH" \
+    --arg body      "$PR_BODY" \
+    --argjson draft "$DRAFT" \
+    '{title: $title, head: $head, base: $base, body: $body, draft: $draft}'
 )
+
 PR_NUM=$(
   curl -sS \
     -H "Authorization: token ${GITHUB_TOKEN}" \
@@ -117,21 +184,33 @@ if [[ -z "$PR_NUM" || "$PR_NUM" == "null" ]]; then
 fi
 echo "🔖 Opened PR #${PR_NUM}"
 
-echo "💬 Posting /ok-to-test and payload commands…"
-# mark it /ok-to-test and start payload jobs
-curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-     -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
-     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
+if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]]; then
+  FAILURES=()
+  STEPS=()
 
-if [[ "${CONFLICT:-false}" == "true" ]]; then
-  echo "🚨 Prepending MERGE CONFLICT! and holding PR #${PR_NUM}"
-  NEW_TITLE="MERGE CONFLICT! ${PR_TITLE}"
+  [[ "${CONFLICT:-false}" == "true" ]] && FAILURES+=("CONFLICT") && STEPS+=("Resolve merge conflicts")
+  [[ "${GO_MOD_FAILED:-false}" == "true" ]] && FAILURES+=("GO MOD FAILED") && STEPS+=("Run: cd openshift && go mod tidy")
+  [[ "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]] && FAILURES+=("TEST ANNOTATIONS FAILED") && STEPS+=("Run: go mod vendor && ./openshift/hack/update-tests-annotation.sh")
+
+  TITLE_PREFIX=$(IFS=" + "; echo "${FAILURES[*]}")
+  HOLD_REASON="/hold"
+  for step in "${STEPS[@]}"; do
+    HOLD_REASON="${HOLD_REASON}\n${step}"
+  done
+
+  echo "🚨 ${TITLE_PREFIX}, holding PR #${PR_NUM}"
+  NEW_TITLE="${TITLE_PREFIX}! ${PR_TITLE}"
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X PATCH -d "{\"title\":\"${NEW_TITLE}\"}" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/pulls/${PR_NUM}"
-  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d '{"body":"/hold\nneeds conflict resolution"}' \
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d "{\"body\":\"${HOLD_REASON}\"}" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
+else
+  echo "💬 Posting /ok-to-test and payload commands…"
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
+       -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
+       "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
 fi
 
 echo "✅ Merge succeeded; PR #${PR_NUM} created."

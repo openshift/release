@@ -1,127 +1,124 @@
 base_images:
-  ocp_4.14_cli-artifacts:
-    name: "4.14"
+  ocp_4.16_cli-artifacts:
+    name: "4.16"
     namespace: ocp
     tag: cli-artifacts
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   ocp_ubi-minimal_9:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  openshift_eventing-istio-src_knative-v1.17:
+  openshift_eventing-istio-src_knative-v1.21:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.17
-  openshift_eventing-kafka-broker-src_knative-v1.17:
+    tag: knative-v1.21
+  openshift_eventing-kafka-broker-src_knative-v1.21:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.17
-  openshift_knative-eventing-src_knative-v1.17:
+    tag: knative-v1.21
+  openshift_knative-eventing-src_knative-v1.21:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.17
-  openshift_knative-serving-src_knative-v1.17:
+    tag: knative-v1.21
+  openshift_knative-serving-src_knative-v1.21:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.17
-  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    tag: knative-v1.21
+  openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.19
-  origin_scos-4.20_cli-artifacts:
-    name: scos-4.20
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+  origin_scos-4.22_cli-artifacts:
+    name: scos-4.22
     namespace: origin
     tag: cli-artifacts
-  origin_scos-4.20_operator-registry:
-    name: scos-4.20
+  origin_scos-4.22_operator-registry:
+    name: scos-4.22
     namespace: origin
     tag: operator-registry
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: knative-operator/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
-      as:
-      - $GO_BUILDER
-  to: serverless-knative-operator
-- dockerfile_path: must-gather/Dockerfile
-  inputs:
-    ocp_4.14_cli-artifacts:
-      as:
-      - $CLI_ARTIFACTS
-    ocp_ubi-minimal_8:
-      as:
-      - $RUNTIME
-  to: serverless-must-gather
-- dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - registry.access.redhat.com/ubi9/ubi-minimal
-    origin_scos-4.20_operator-registry:
-      as:
-      - registry.ci.openshift.org/origin/scos-4.20:operator-registry
-  to: serverless-index
-- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-  to: serverless-bundle
-- dockerfile_path: openshift-knative-operator/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
-      as:
-      - $GO_BUILDER
-  to: serverless-openshift-knative-operator
-- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
-  from: src
-  inputs:
-    openshift_eventing-istio-src_knative-v1.17:
-      as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.17
-    openshift_eventing-kafka-broker-src_knative-v1.17:
-      as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.17
-    openshift_knative-eventing-src_knative-v1.17:
-      as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.17
-    openshift_knative-serving-src_knative-v1.17:
-      as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.17
-    origin_scos-4.20_cli-artifacts:
-      as:
-      - registry.ci.openshift.org/origin/scos-4.20:cli-artifacts
-  to: serverless-source-image
-- dockerfile_path: serving/ingress/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
-      as:
-      - $GO_BUILDER
-  to: serverless-ingress
-- dockerfile_path: serving/metadata-webhook/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
-      as:
-      - $GO_BUILDER
-  to: serverless-metadata-webhook
+  items:
+  - dockerfile_path: knative-operator/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: serverless-knative-operator
+  - dockerfile_path: must-gather/Dockerfile
+    inputs:
+      ocp_4.16_cli-artifacts:
+        as:
+        - $CLI_ARTIFACTS
+      ocp_ubi-minimal_9:
+        as:
+        - $RUNTIME
+    to: serverless-must-gather
+  - dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - registry.access.redhat.com/ubi9/ubi-minimal
+      origin_scos-4.22_operator-registry:
+        as:
+        - registry.ci.openshift.org/origin/scos-4.22:operator-registry
+    to: serverless-index
+  - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+    to: serverless-bundle
+  - dockerfile_path: openshift-knative-operator/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: serverless-openshift-knative-operator
+  - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+    from: src
+    inputs:
+      openshift_eventing-istio-src_knative-v1.21:
+        as:
+        - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.21
+      openshift_eventing-kafka-broker-src_knative-v1.21:
+        as:
+        - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.21
+      openshift_knative-eventing-src_knative-v1.21:
+        as:
+        - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.21
+      openshift_knative-serving-src_knative-v1.21:
+        as:
+        - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.21
+      origin_scos-4.22_cli-artifacts:
+        as:
+        - registry.ci.openshift.org/origin/scos-4.22:cli-artifacts
+    to: serverless-source-image
+  - dockerfile_path: serving/ingress/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: serverless-ingress
+  - dockerfile_path: serving/metadata-webhook/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: serverless-metadata-webhook
 promotion:
   to:
   - additional_images:
@@ -188,7 +185,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -227,10 +224,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: kitchensink-e2e-c
-  cron: 16 1 27 7 *
+  cron: 23 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -275,7 +271,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -314,7 +310,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: kitchensink-upgrade
   optional: true
@@ -362,7 +357,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -401,10 +396,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: kitchensink-upgrade-c
-  cron: 17 9 11 6 *
+  cron: 43 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -449,7 +443,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -488,7 +482,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: mesh-e2e
   optional: true
@@ -536,7 +529,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -575,10 +568,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: mesh-e2e-c
-  cron: 21 16 21 5 *
+  cron: 4 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -623,7 +615,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -662,7 +654,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: mesh-upgrade
   optional: true
@@ -710,7 +701,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -749,7 +740,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: operator-e2e
   steps:
@@ -796,7 +786,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -835,10 +825,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: operator-e2e-c
-  cron: 2 17 3 11 *
+  cron: 16 5 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -883,7 +872,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -922,7 +911,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: test-soak
   optional: true
@@ -971,7 +959,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1010,7 +998,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: test-soak-c
   cron: 41 0 * * 1,5
@@ -1058,7 +1045,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1097,7 +1084,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: test-upgrade
   steps:
@@ -1144,7 +1130,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1183,10 +1169,9 @@ tests:
           cpu: 100m
       timeout: 1h30m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: test-upgrade-c
-  cron: 13 15 14 7 *
+  cron: 35 4 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1231,7 +1216,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1270,7 +1255,6 @@ tests:
           cpu: 100m
       timeout: 1h30m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: ui-e2e
   optional: true
@@ -1319,7 +1303,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1358,10 +1342,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: ui-e2e-c
-  cron: 55 20 22 11 *
+  cron: 42 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1406,7 +1389,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1445,7 +1428,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: upstream-e2e
   optional: true
@@ -1493,7 +1475,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1532,7 +1514,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: upstream-e2e-kafka
   optional: true
@@ -1580,7 +1561,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1619,10 +1600,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 - always_run: false
   as: upstream-e2e-kafka-c
-  cron: 8 16 26 12 *
+  cron: 6 5 * * 1,5
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1667,7 +1647,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: serverless-source-image
       grace_period: 1m0s
@@ -1706,7 +1686,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative

@@ -7,11 +7,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: images/installer/Dockerfile
-  from: base
-  to: ansible
+  items:
+  - dockerfile_path: images/installer/Dockerfile
+    from: base
+    to: ansible
 promotion:
   to:
   - name: origin-v3.11
@@ -45,17 +46,6 @@ tests:
     tox
   container:
     from: test-bin
-- as: e2e-gcp
-  commands: TEST_FOCUS=Suite:openshift/conformance/parallel/minimal TEST_SKIP='(\[local\]|\[templates\]|\[Feature:Router\]|Kubectl
-    logs)' run-tests
-  openshift_ansible:
-    cluster_profile: gcp
-- as: e2e-gcp-nightly
-  commands: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
-    run-tests
-  cron: 15 1 6 1 *
-  openshift_ansible:
-    cluster_profile: gcp
 zz_generated_metadata:
   branch: release-3.11
   org: openshift

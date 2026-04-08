@@ -27,27 +27,13 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: cluster-kube-apiserver-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: cluster-kube-apiserver-operator
 promotion:
   to:
   - name: "4.19"
@@ -88,18 +74,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-kubernetes-e2e-gcp
-- as: k8s-e2e-gcp-serial
+- always_run: false
+  as: k8s-e2e-gcp-serial
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -111,7 +98,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-aescbc
+- always_run: false
+  as: e2e-gcp-operator-encryption-aescbc
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
@@ -127,7 +115,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-aesgcm
+- always_run: false
+  as: e2e-gcp-operator-encryption-aesgcm
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
@@ -147,9 +136,10 @@ tests:
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-gcp-operator-encryption-rotation-aescbc
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aescbc
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
@@ -165,7 +155,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-rotation-aesgcm
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aesgcm
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
@@ -183,7 +174,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf-aescbc
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf-aescbc
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
@@ -198,7 +190,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf-aesgcm
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf-aesgcm
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
@@ -217,22 +210,25 @@ tests:
     workflow: ipi-gcp
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-metal-single-node-live-iso
+- always_run: false
+  as: e2e-metal-single-node-live-iso
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-operator-disruptive-single-node
+- always_run: false
+  as: e2e-aws-operator-disruptive-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -244,7 +240,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-aws-single-node
-- as: e2e-gcp-operator-single-node
+- always_run: false
+  as: e2e-gcp-operator-single-node
   optional: true
   steps:
     cluster_profile: gcp
@@ -259,7 +256,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-gcp-single-node
-- as: e2e-gcp-operator-encryption-single-node
+- always_run: false
+  as: e2e-gcp-operator-encryption-single-node
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
@@ -275,11 +273,12 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-gcp-single-node
-- as: e2e-gcp-operator-encryption-rotation-single-node
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-single-node
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -291,7 +290,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-gcp-single-node
-- as: e2e-gcp-operator-encryption-perf-single-node
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf-single-node
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
@@ -310,7 +310,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-metal-ovn-sno-cert-rotation-suspend-90d

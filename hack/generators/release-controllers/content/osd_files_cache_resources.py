@@ -35,7 +35,7 @@ used by a release controller. Create a service and a route to this public instan
                 'host': context.fc_app_url,
                 'tls': {
                     'insecureEdgeTerminationPolicy': 'Redirect',
-                    'termination': 'Edge'
+                    'termination': 'edge'
                 },
                 'to': {
                     'kind': 'Service',
@@ -102,7 +102,7 @@ used by a release controller. Create a service and a route to this public instan
                 'host': context.fc_app_url,
                 'tls': {
                     'insecureEdgeTerminationPolicy': 'Redirect',
-                    'termination': 'Reencrypt'
+                    'termination': 'reencrypt'
                 },
                 'to': {
                     'kind': 'Service',

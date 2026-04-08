@@ -1,0 +1,28 @@
+ref:
+    as: openshift-microshift-manage-versions-releases
+    cli: latest
+    from_image:
+        name: release
+        namespace: openshift
+        tag: rhel-9-release-golang-1.24-openshift-4.20
+    grace_period: 30m
+    commands: openshift-microshift-manage-versions-releases-commands.sh
+    resources:
+        requests:
+            cpu: 800m
+            memory: 1800Mi
+    env:
+    - name: HOME
+      default: /tmp/secret
+    credentials:
+        - name: ci-pull-credentials
+          namespace: test-credentials
+          mount_path: /secrets/ci-pull-secret
+        - name: pr-creds
+          namespace: test-credentials
+          mount_path: /secrets/pr-creds
+        - name: microshift-rhsm-creds
+          namespace: test-credentials
+          mount_path: /var/run/rhsm/
+    documentation: |-
+        Checks the released MicroShift RPMs in the RHOCP repositories and creates GH releases in the MicroShift repository.

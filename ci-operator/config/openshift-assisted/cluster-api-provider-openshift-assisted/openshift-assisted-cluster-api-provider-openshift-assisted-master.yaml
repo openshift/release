@@ -19,10 +19,10 @@ build_root:
       ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
       pip install ansible ansible-lint && \
       curl -Ls https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 | install -m 755 /dev/stdin /usr/local/bin/yq && \
-      wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz && \
+      wget -q https://go.dev/dl/go1.25.5.linux-amd64.tar.gz && \
       rm -rf /usr/local/go && \
-      tar -C /usr/local -xzf go1.23.6.linux-amd64.tar.gz && \
-      rm -f go1.23.6.linux-amd64.tar.gz && \
+      tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz && \
+      rm -f go1.25.5.linux-amd64.tar.gz && \
       mkdir /tmp/kubectl && \
       curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
       install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
@@ -67,13 +67,15 @@ tests:
   run_if_changed: ^(test/playbooks/.*|test/e2e/.*)$
 - always_run: false
   as: e2e-capi-multinode
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal-capi
 - as: e2e-capi-multinode-postsubmit
-  cluster: build05
+  capabilities:
+  - intranet
   postsubmit: true
   steps:
     cluster_profile: packet-assisted

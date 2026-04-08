@@ -11,106 +11,93 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.18:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.11
 images:
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as toolchain
+  items:
+  - build_args:
+    - name: ARCH
+      value: amd64
+    - name: ldflags
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/openshift/release:golang-1.18 as toolchain
 
-    # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
-    ARG goproxy=https://proxy.golang.org
-    ENV GOPROXY=$goproxy
-    ENV GOFLAGS="-mod=readonly"
+      # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+      ARG goproxy=https://proxy.golang.org
+      ENV GOPROXY=$goproxy
+      ENV GOFLAGS="-mod=readonly"
 
-    FROM toolchain as builder
-    WORKDIR /workspace
+      FROM toolchain as builder
+      WORKDIR /workspace
 
-    # Copy the sources
-    COPY ./ ./
-    RUN go mod download
+      # Copy the sources
+      COPY ./ ./
+      RUN go mod download
 
-    # Build
-    ARG package=.
-    ARG ARCH
-    ARG LDFLAGS
-    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags "${LDFLAGS} -extldflags '-static'"  -o manager ${package}
-    ENTRYPOINT [ "/start.sh", "/workspace/manager" ]
+      # Build
+      ARG package=.
+      ARG ARCH
+      ARG LDFLAGS
+      RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags "${LDFLAGS} -extldflags '-static'"  -o manager ${package}
+      ENTRYPOINT [ "/start.sh", "/workspace/manager" ]
 
-    # Copy the controller-manager into a thin image
-    FROM gcr.io/distroless/static:nonroot
-    WORKDIR /
-    COPY --from=builder /workspace/manager .
-    # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
-    USER 65532
-    ENTRYPOINT ["/manager"]
-  from: base
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: kubevirt-cluster-api-controllers
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM src
+      # Copy the controller-manager into a thin image
+      FROM gcr.io/distroless/static:nonroot
+      WORKDIR /
+      COPY --from=builder /workspace/manager .
+      # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
+      USER 65532
+      ENTRYPOINT ["/manager"]
+    from: base
+    to: kubevirt-cluster-api-controllers
+  - build_args:
+    - name: ARCH
+      value: amd64
+    - name: ldflags
+    dockerfile_literal: |-
+      FROM src
 
-    RUN yum install -y expect
-    COPY oc /usr/bin/oc
+      RUN yum install -y expect
+      COPY oc /usr/bin/oc
 
-    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.2/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
-        chmod +x /usr/bin/clusterctl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: capk-oc-bin-image
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM src
-    COPY oc hypershift /usr/bin/
-    RUN mkdir -p /go/src/github.com/openshift && \
-        cd /go/src/github.com/openshift && \
-        git clone https://github.com/openshift/hypershift.git && \
-        cd hypershift/ && \
-        go mod tidy && go mod vendor && \
-        make e2e
-    WORKDIR /go/src/github.com/openshift/hypershift
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    hypershift-operator-4.11:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/hypershift
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: hypershift-cli-e2e
+      RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.2/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
+          chmod +x /usr/bin/clusterctl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: capk-oc-bin-image
+  - build_args:
+    - name: ARCH
+      value: amd64
+    - name: ldflags
+    dockerfile_literal: |-
+      FROM src
+      COPY oc hypershift /usr/bin/
+      RUN mkdir -p /go/src/github.com/openshift && \
+          cd /go/src/github.com/openshift && \
+          git clone https://github.com/openshift/hypershift.git && \
+          cd hypershift/ && \
+          go mod tidy && go mod vendor && \
+          make e2e
+      WORKDIR /go/src/github.com/openshift/hypershift
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      hypershift-operator-4.11:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/hypershift
+    to: hypershift-cli-e2e
 promotion:
   to:
   - excluded_images:
@@ -155,7 +142,7 @@ tests:
     from: src
 - as: cluster-api-provider-kubevirt-e2e
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       SUB_CHANNEL: stable
       SUB_INSTALL_NAMESPACE: openshift-cnv
@@ -306,8 +293,7 @@ tests:
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.platform=KubeVirt
       credentials:
-      - collection: ""
-        mount_path: /etc/ci-pull-credentials
+      - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:

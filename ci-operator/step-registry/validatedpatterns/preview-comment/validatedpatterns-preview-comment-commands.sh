@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GITHUB_AUTH_TOKEN=$(cat /tmp/vault/validatedpatterns-github-secret/GITHUB_AUTH_TOKEN)
+GITHUB_AUTH_TOKEN=$(cat /tmp/vault/validatedpatterns-docs-github/GITHUB_AUTH_TOKEN_VP)
 
 export GITHUB_AUTH_TOKEN
 

@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: boskos
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -17,6 +20,11 @@ objects:
     labels:
       app: prow
       component: boskos
+    annotations:
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 3
     selector:
@@ -45,6 +53,34 @@ objects:
         serviceAccountName: boskos
         terminationGracePeriodSeconds: 30
         containers:
+        - name: boskos
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_boskos_latest
+          imagePullPolicy: Always
+          args:
+          - --config=/etc/config/boskos.yaml
+          - --namespace=${namespace}
+          - --projected-token-file=/var/sa-token/token
+          - --log-level=debug
+          - --pod-name=$(POD_NAME)
+          - --boskos-label-selector=app=prow,component=boskos
+          - --enable-leader-election=true
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+          - name: boskos-config
+            mountPath: /etc/config
+            readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
         - args:
           - -provider=openshift
           - -https-address=:8082
@@ -77,33 +113,6 @@ objects:
             name: secret-boskos-tls
           - mountPath: /etc/proxy/secrets
             name: secret-boskos-proxy
-        - name: boskos
-          image: image-registry.openshift-image-registry.svc:5000/ci/boskos
-          args:
-          - --config=/etc/config/boskos.yaml
-          - --namespace=${namespace}
-          - --projected-token-file=/var/sa-token/token
-          - --log-level=debug
-          - --pod-name=$(POD_NAME)
-          - --boskos-label-selector=app=prow,component=boskos
-          - --enable-leader-election=true
-          env:
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          ports:
-            - containerPort: 8080
-              protocol: TCP
-            - name: metrics
-              containerPort: 9090
-              protocol: TCP
-          volumeMounts:
-          - name: boskos-config
-            mountPath: /etc/config
-            readOnly: true
-          - name: service-account-token
-            mountPath: /var/sa-token
         volumes:
           - name: boskos-config
             configMap:
@@ -181,4 +190,4 @@ objects:
     wildcardPolicy: None
     tls:
       insecureEdgeTerminationPolicy: Redirect
-      termination: Reencrypt
+      termination: reencrypt

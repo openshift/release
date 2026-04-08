@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/cargo-deny-check-bans
     decorate: true
     decoration_config:
@@ -25,9 +25,17 @@ presubmits:
         - --target=cargo-deny-check-bans
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -61,7 +69,7 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/clo-functional
     decorate: true
     decoration_config:
@@ -78,18 +86,30 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=clo-functional
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -110,6 +130,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -131,12 +157,11 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/cluster-logging-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.14"
@@ -149,18 +174,30 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=cluster-logging-operator-e2e
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -181,6 +218,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -202,7 +245,7 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -222,7 +265,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -258,7 +301,7 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/ldd-openssl
     decorate: true
     decoration_config:
@@ -278,9 +321,17 @@ presubmits:
         - --target=ldd-openssl
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -314,7 +365,7 @@ presubmits:
     branches:
     - ^release-5\.9$
     - ^release-5\.9-
-    cluster: build09
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -334,9 +385,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

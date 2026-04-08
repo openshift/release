@@ -23,8 +23,8 @@ fi
 
 # Discovering the AWS CCM image from OpenShift release payload.
 log "Discovering controller image 'aws-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
-
 CCM_IMAGE="$(oc adm release info -a "${REGISTRY_AUTH_FILE}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='aws-cloud-controller-manager')"
+
 CCM_MANIFEST=ccm-00-deployment.yaml
 
 log "Using CCM image=${CCM_IMAGE}"

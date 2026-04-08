@@ -2,43 +2,44 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.registration-operator
-  from: base
-  to: registration-operator
-- dockerfile_path: build/Dockerfile.registration
-  from: base
-  to: registration
-- dockerfile_path: build/Dockerfile.work
-  from: base
-  to: work
-- dockerfile_path: build/Dockerfile.placement
-  from: base
-  to: placement
-- dockerfile_path: build/Dockerfile.addon
-  from: base
-  to: addon-manager
+  items:
+  - dockerfile_path: build/Dockerfile.registration-operator
+    from: base
+    to: registration-operator
+  - dockerfile_path: build/Dockerfile.registration
+    from: base
+    to: registration
+  - dockerfile_path: build/Dockerfile.work
+    from: base
+    to: work
+  - dockerfile_path: build/Dockerfile.placement
+    from: base
+    to: placement
+  - dockerfile_path: build/Dockerfile.addon
+    from: base
+    to: addon-manager
 promotion:
   to:
   - disabled: true
-    name: "2.10"
+    name: "2.17"
     namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -103,7 +104,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.10
+      DESTINATION_BRANCH: backplane-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

@@ -3,41 +3,24 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.22-linux:
+  stolostron_builder_go1.24-linux:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
-  stolostron_builder_go1.23-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.24-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.22-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  inputs:
-    stolostron_builder_go1.23-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
-  to: grafana
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: grafana
 promotion:
   to:
   - name: "2.13"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.7"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.16"
-      namespace: ocp
 resources:
   '*':
     requests:
@@ -71,8 +54,7 @@ tests:
         export OSCI_COMPONENT_NAME="grafana"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Test-step executing."
+echo "Print test step executing."
 
 SECRETS_DIR="/var/my-secrets"
 for file in "$SECRETS_DIR"/*; do

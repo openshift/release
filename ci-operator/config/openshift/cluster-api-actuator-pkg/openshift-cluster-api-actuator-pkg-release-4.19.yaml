@@ -1,17 +1,9 @@
-base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: cluster-api-actuator-pkg-test
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
@@ -53,7 +45,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -63,11 +55,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-capi-techpreview
+- always_run: false
+  as: e2e-aws-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/aws\.go
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -95,7 +88,7 @@ tests:
 - as: e2e-azure-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -105,11 +98,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-capi-techpreview
+- always_run: false
+  as: e2e-azure-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/azure\.go
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -121,9 +115,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -136,7 +130,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-capi-techpreview
+- always_run: false
+  as: e2e-gcp-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/gcp\.go
   steps:
@@ -153,9 +148,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-openstack-operator
+- always_run: false
+  as: e2e-openstack-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -174,7 +169,7 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -187,7 +182,7 @@ tests:
 - as: e2e-aws-operator-periodic
   cron: 4 16 * * 6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -212,7 +207,7 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator-periodic
-  cron: 49 23 * * 0
+  cron: 50 21 * * 5
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -228,7 +223,7 @@ tests:
   as: e2e-azure-operator-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -241,7 +236,7 @@ tests:
 - as: e2e-azure-operator-periodic
   cron: 52 22 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -330,12 +325,6 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-- as: security
-  optional: true
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-actuator-pkg
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

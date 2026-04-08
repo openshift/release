@@ -1,11 +1,10 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build08
   cron: 00 05 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 20m0s
   extra_refs:
   - base_ref: master
     org: openshift-service-mesh
@@ -32,9 +31,17 @@ periodics:
       - --target=sync-upstream-istio-master
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

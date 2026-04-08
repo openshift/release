@@ -3,23 +3,16 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  to: sriov-dp-admission-controller
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: sriov-dp-admission-controller
 promotion:
   to:
   - name: "4.8"
@@ -42,7 +35,7 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.8

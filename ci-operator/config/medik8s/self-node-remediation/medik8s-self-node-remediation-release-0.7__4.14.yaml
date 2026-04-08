@@ -11,19 +11,20 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: operator-base
-  to: self-node-remediation-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - dockerfile_path: Dockerfile
+    from: operator-base
+    to: self-node-remediation-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
 operator:
   bundles:
   - as: self-node-remediation-bundle
@@ -56,7 +57,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-self-node-remediation-bundle
     env:
-      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: self-node-remediation
       OO_PACKAGE: self-node-remediation

@@ -69,17 +69,18 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.19-openshift-4.13
 images:
-- dockerfile_path: Dockerfile.unit
-  from: ubi9-ruby31
-  to: test-unit-fluentd
-- context_dir: fluentd
-  dockerfile_path: Dockerfile
-  from: ubi9-minimal
-  inputs:
-    ubi9-ruby31:
-      as:
-      - registry.access.redhat.com/ubi9/ruby-31
-  to: logging-fluentd
+  items:
+  - dockerfile_path: Dockerfile.unit
+    from: ubi9-ruby31
+    to: test-unit-fluentd
+  - context_dir: fluentd
+    dockerfile_path: Dockerfile
+    from: ubi9-minimal
+    inputs:
+      ubi9-ruby31:
+        as:
+        - registry.access.redhat.com/ubi9/ruby-31
+    to: logging-fluentd
 promotion:
   to:
   - name: v1.16.x
@@ -150,7 +151,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: clo-functional
   cluster_claim:
     architecture: amd64
@@ -239,7 +239,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: clo-functional-5-8
   cluster_claim:
     architecture: amd64

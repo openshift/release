@@ -10,34 +10,35 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.20
 images:
-- dockerfile_path: Dockerfile
-  from: ubi_minimal
-  to: topolvm
-- dockerfile_literal: |-
-    FROM ubi_minimal
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi_minimal
+    to: topolvm
+  - dockerfile_literal: |-
+      FROM ubi_minimal
 
-    COPY --from=root:current /usr/lib/golang /usr/local/go
-    ENV PATH=$PATH:/usr/local/go/bin
+      COPY --from=root:current /usr/lib/golang /usr/local/go
+      ENV PATH=$PATH:/usr/local/go/bin
 
-    ENV GOPATH=/tmp/go
-    ENV GOTOOLCHAIN=auto
-    ENV GOTOOLDIR=/tmp/gotools
+      ENV GOPATH=/tmp/go
+      ENV GOTOOLCHAIN=auto
+      ENV GOTOOLDIR=/tmp/gotools
 
-    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
-    RUN mkdir /.local && chmod 777 /.local
-    RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
+      RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+      RUN mkdir /.local && chmod 777 /.local
+      RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
 
-    ENV SNYK_DIR=/tmp/snyk
-    RUN mkdir -p ${SNYK_DIR}
-    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-    RUN chmod +x ${SNYK_DIR}/snyk
-    ENV PATH=$PATH:${SNYK_DIR}
-  from: ubi_minimal
-  inputs:
-    root:
-      as:
-      - root:current
-  to: topolvm-snyk
+      ENV SNYK_DIR=/tmp/snyk
+      RUN mkdir -p ${SNYK_DIR}
+      RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
+      RUN chmod +x ${SNYK_DIR}/snyk
+      ENV PATH=$PATH:${SNYK_DIR}
+    from: ubi_minimal
+    inputs:
+      root:
+        as:
+        - root:current
+    to: topolvm-snyk
 promotion:
   to:
   - namespace: lvms
@@ -58,7 +59,7 @@ resources:
 tests:
 - as: csi-conformance
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: lvms-topolvm-conformance
 - as: snyk-code
   commands: |

@@ -7,9 +7,10 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: node-maintenance-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: node-maintenance-operator
 operator:
   bundles:
   - as: my-bundle
@@ -40,11 +41,11 @@ tests:
   steps:
     cluster_profile: medik8s-aws
     env:
-      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: nmo-install
-      OPERATOR_RELEASED_VERSION: 0.17.0
+      OPERATOR_RELEASED_VERSION: 0.19.0
     test:
-    - as: e2e-install-operator-last-version
+    - as: install-last-operator-version
       cli: latest
       commands: |
         oc create namespace "$OPERATOR_NAMESPACE"
@@ -63,7 +64,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-upgrade-operator-latest
+    - as: upgrade-operator-latest
       cli: latest
       commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
       dependencies:
@@ -76,7 +77,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-test
+    - as: test-command
       cli: latest
       commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make cluster-functest
       env:

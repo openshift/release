@@ -4,17 +4,18 @@ build_root:
       FROM registry.access.redhat.com/ubi9/ubi
       RUN yum install -y openssl git
 images:
-- dockerfile_literal: |-
-    FROM src
-    SHELL ["/bin/bash", "-c"]
-    ENV BACKSTAGE_PERFORMANCE_BASE_BRANCH=rhdh-v1.2.x
-    RUN yum install -y python3 python3-pip make gettext bc skopeo
-    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
-    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 && chmod +x /usr/local/bin/yq
-    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
-    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
-  from: src
-  to: backstage-performance-runner
+  items:
+  - dockerfile_literal: |-
+      FROM src
+      SHELL ["/bin/bash", "-c"]
+      ENV BACKSTAGE_PERFORMANCE_BASE_BRANCH=rhdh-v1.2.x
+      RUN yum install -y python3 python3-pip make gettext bc skopeo
+      RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
+      RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
+    from: src
+    to: backstage-performance-runner
 releases:
   latest:
     release:
@@ -41,7 +42,6 @@ tests:
       USERS: "10000"
       WORKERS: "100"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: list-catalog
   steps:
@@ -54,7 +54,6 @@ tests:
       USERS: "10000"
       WORKERS: "100"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: list-catalog-empty
   steps:
@@ -68,7 +67,6 @@ tests:
       USERS: "10000"
       WORKERS: "100"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: mvp
   steps:
@@ -90,7 +88,6 @@ tests:
       USERS: "200"
       WORKERS: "40"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-helm
   steps:
@@ -113,7 +110,6 @@ tests:
       USERS: "200"
       WORKERS: "40"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-profile
   steps:
@@ -138,7 +134,6 @@ tests:
       USERS: "200"
       WORKERS: "40"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-olm
   steps:
@@ -161,7 +156,6 @@ tests:
       USERS: "200"
       WORKERS: "40"
     workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-scalability
   steps:
@@ -181,7 +175,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-resources-scalability-cpu250m
   steps:
@@ -201,7 +194,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-resources-scalability-cpu500m
   steps:
@@ -221,7 +213,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-resources-scalability-cpu1000m
   steps:
@@ -241,7 +232,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-resources-scalability-cpu2000m
   steps:
@@ -261,7 +251,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: search-catalog-scalability
   steps:
@@ -279,7 +268,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "true"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: list-catalog-scalability
   steps:
@@ -297,7 +285,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-catalog-size-api-scalability
   steps:
@@ -317,7 +304,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-catalog-size-component-scalability
   steps:
@@ -337,7 +323,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-catalog-size-api-scalability-20g
   steps:
@@ -357,7 +342,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-catalog-size-component-scalability-20g
   steps:
@@ -377,7 +361,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-rhdh-horizontal-scalability-1to5
   steps:
@@ -397,7 +380,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 - always_run: false
   as: mvp-rhdh-horizontal-scalability-6to10
   steps:
@@ -417,7 +399,6 @@ tests:
       USE_PR_BRANCH: "true"
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: rhdh-v1.2.x
   org: redhat-performance

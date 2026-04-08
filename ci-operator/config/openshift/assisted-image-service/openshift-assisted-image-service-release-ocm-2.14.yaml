@@ -30,10 +30,11 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.image-service
-  to: assisted-image-service
-- dockerfile_path: Dockerfile.image-service-build
-  to: assisted-image-service-build
+  items:
+  - dockerfile_path: Dockerfile.image-service
+    to: assisted-image-service
+  - dockerfile_path: Dockerfile.image-service-build
+    to: assisted-image-service-build
 promotion:
   to:
   - name: ocm-2.14
@@ -57,7 +58,7 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-nightly-image
-  cron: '@daily'
+  cron: 0 7 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
@@ -110,10 +111,10 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- always_run: false
-  as: e2e-ai-operator-ztp
-  cluster: build05
-  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
+- as: e2e-ai-operator-ztp
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

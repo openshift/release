@@ -12,12 +12,15 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
 images:
-- dockerfile_path: Dockerfile
-  from: ubi-min9
-  to: oran-o2ims-operator
-- dockerfile_path: bundle.Dockerfile
-  from: ubi-min9
-  to: oran-o2ims-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator
+  - dockerfile_path: bundle.Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator-bundle
+  - dockerfile_path: Dockerfile.must-gather
+    to: oran-o2ims-operator-must-gather
 operator:
   bundles:
   - as: operator-bundle
@@ -28,18 +31,20 @@ operator:
     with: pipeline:oran-o2ims-operator
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.22"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:

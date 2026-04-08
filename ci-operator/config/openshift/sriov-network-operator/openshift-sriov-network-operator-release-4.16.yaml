@@ -1,12 +1,4 @@
 base_images:
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   openstack-installer:
     name: "4.16"
     namespace: ocp
@@ -38,35 +30,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-webhook
-- dockerfile_path: bundleci.Dockerfile
-  to: sriov-network-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.rhel7
+    to: sriov-network-webhook
+  - dockerfile_path: bundleci.Dockerfile
+    to: sriov-network-operator-bundle
 operator:
   bundles:
   - as: operator-bundle
@@ -130,7 +102,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-operator-bundle
     env:
@@ -166,7 +138,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: e2e-openstack-nfv
+- always_run: false
+  as: e2e-openstack-nfv
   optional: true
   steps:
     cluster_profile: openstack-nfv
@@ -175,7 +148,8 @@ tests:
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
-- as: e2e-openstack-nfv-config-drive
+- always_run: false
+  as: e2e-openstack-nfv-config-drive
   optional: true
   steps:
     cluster_profile: openstack-nfv
@@ -252,7 +226,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: telco5g-sriov
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-telco5g-sriov-sno
   capabilities:
@@ -313,7 +286,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: telco5g-sno-ztp-cnf
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

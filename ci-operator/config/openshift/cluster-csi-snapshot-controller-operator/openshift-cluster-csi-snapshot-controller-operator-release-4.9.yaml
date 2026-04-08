@@ -3,21 +3,14 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: cluster-csi-snapshot-controller-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: cluster-csi-snapshot-controller-operator
 promotion:
   to:
   - name: "4.9"
@@ -50,11 +43,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-csi
   steps:

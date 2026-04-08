@@ -7,26 +7,29 @@ binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile
-  from: base
-  to: multiarch-tuning-operator
-- additional_architectures:
-  - arm64
-  dockerfile_path: bundle.Dockerfile
-  to: multiarch-tuning-op-bundle
-- additional_architectures:
-  - arm64
-  dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
-    FROM src
-    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-  from: src
-  to: operator-sdk-mto
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    from: base
+    to: multiarch-tuning-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: bundle.Dockerfile
+    to: multiarch-tuning-op-bundle
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.33.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-mto
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:v1.x
@@ -59,19 +62,25 @@ resources:
     requests:
       cpu: 500m
       memory: 1Gi
+  multiarch-tuning-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
   sast:
     limits:
-      memory: 6Gi
+      memory: 20Gi
     requests:
-      cpu: 300m
-      memory: 400Mi
+      cpu: "8"
+      memory: 10Gi
 tests:
 - as: e2e-gcp
   capabilities:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
@@ -86,14 +95,13 @@ tests:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
     workflow: ipi-gcp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
   capabilities:
   - arm64
-  cron: 30 10 10 * *
+  cron: 30 10 3 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
@@ -126,13 +134,12 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-mto-origin-post
   cluster: build01
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
@@ -163,7 +170,6 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: v1.x
   org: outrigger-project

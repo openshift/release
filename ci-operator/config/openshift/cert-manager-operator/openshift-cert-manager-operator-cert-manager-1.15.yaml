@@ -7,28 +7,17 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp-golang-builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/ci/Dockerfile
-  from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cert-manager-operator
-- dockerfile_path: images/ci/operand.Dockerfile
-  from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cert-manager
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    from: base-rhel9
+    to: cert-manager-operator
+  - dockerfile_path: images/ci/operand.Dockerfile
+    from: base-rhel9
+    to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -88,7 +77,7 @@ tests:
     - ref: fips-check-image-scan
 - as: e2e-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -119,7 +108,7 @@ tests:
   optional: true
   run_if_changed: ^(api/.*|pkg/operator/setup_manager\.go|pkg/operator/starter\.go|pkg/controller/.*|bindata/istio-csr|test/e2e/.*|Makefile)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:

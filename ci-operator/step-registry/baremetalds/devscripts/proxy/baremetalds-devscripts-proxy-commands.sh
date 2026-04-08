@@ -13,7 +13,6 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-set -x
 # CENTOS STREAM 8 IS END OF LIFE
 # FIXME:Update to CentOS Stream 9
 # Temporary workaround here https://forums.centos.org/viewtopic.php?t=78708&start=30
@@ -24,7 +23,6 @@ if [[ "\$NAME" == "CentOS Stream" && "\$VERSION_ID" == "8" ]]; then
     sudo sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
     sudo dnf clean all
 fi
-set +x
 
 sudo dnf install -y container-tools crun podman firewalld
 
@@ -36,9 +34,18 @@ sudo systemctl restart sshd
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
-acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .okd.on.massopen.cloud .p1.openshiftapps.com sso.redhat.com
-http_access allow cluster
+acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .p1.openshiftapps.com sso.redhat.com
+
+acl allowed_ssl_ports port 443 5000 6443
+acl CONNECT method CONNECT
+acl safe_http_port port 80
+acl safe_http_methods method GET HEAD
+
+http_access deny CONNECT !allowed_ssl_ports
+http_access allow CONNECT cluster
+http_access allow safe_http_port safe_http_methods cluster
 http_access deny all
+
 http_port 8213
 debug_options ALL,2
 coredump_dir /var/spool/squid
@@ -65,8 +72,8 @@ EOF
 
 CIRFILE=$SHARED_DIR/cir
 PROXYPORT=8213
-if [ -f $CIRFILE ] ; then
-    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
+if [ -f "$CIRFILE" ] ; then
+    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" | jq ".ofcir_port_proxy // 8213" -r)
 fi
 
 

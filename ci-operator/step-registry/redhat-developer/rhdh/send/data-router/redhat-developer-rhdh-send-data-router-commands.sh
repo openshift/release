@@ -3,6 +3,23 @@
 set +o errexit
 set +o nounset
 
+# Skip data router reporting when job was triggered via Gangway API with overrides
+OVERRIDE_VARS=(
+  "${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REPO}"
+  "${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REGISTRY}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+  "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}"
+)
+for override in "${OVERRIDE_VARS[@]}"; do
+  if [[ -n "${override}" ]]; then
+    echo "Gangway API override detected, skipping data router reporting."
+    exit 0
+  fi
+done
+
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 export RELEASE_BRANCH_NAME
 
@@ -23,6 +40,112 @@ CONTAINER_PLATFORM=$(cat $SHARED_DIR/CONTAINER_PLATFORM.txt)
 CONTAINER_PLATFORM_VERSION=$(cat $SHARED_DIR/CONTAINER_PLATFORM_VERSION.txt)
 export IS_OPENSHIFT CONTAINER_PLATFORM CONTAINER_PLATFORM_VERSION
 
+save_status_data_router_failed() {
+  local result=$1
+  STATUS_DATA_ROUTER_FAILED=${result}
+  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
+  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+}
+
+# Constructs the artifacts URL for a given namespace based on CI job context
+get_artifacts_url() {
+  local namespace=$1
+
+  if [ -z "${namespace}" ]; then
+    echo "Warning: namespace parameter is empty" >&2
+  fi
+
+  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"
+    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-e2e-}" # e.g. "ocp-operator-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                      # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
+    # Override part_2 for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  else
+    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"         # e.g. "e2e-aks-helm-nightly"
+    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-}" # e.g. "aks-helm-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                                              # e.g. "redhat-developer-rhdh-aks-helm-nightly"
+    # Override part_2 for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  fi
+  echo "${artifacts_complete_url}"
+}
+
+# Process JUnit files: replace attachment placeholders with URLs and fix XML property tags
+process_junit_files() {
+  echo "📝 Processing JUnit files for Data Router compatibility..."
+
+  for junit_file in "${SHARED_DIR}"/junit-results-*.xml; do
+    if [[ ! -f "$junit_file" ]]; then
+      continue
+    fi
+
+    local filename
+    filename=$(basename "$junit_file")
+    echo "Processing: ${filename}"
+
+    # Extract namespace from filename (e.g., "junit-results-showcase-ci-nightly.xml" -> "showcase-ci-nightly")
+    local namespace
+    namespace=$(echo "$filename" | sed 's/^junit-results-//' | sed 's/\.xml$//')
+
+    # Create namespace directory in ARTIFACT_DIR if it doesn't exist
+    mkdir -p "${ARTIFACT_DIR}/${namespace}"
+
+    # Construct artifacts URL for this namespace
+    local artifacts_url
+    artifacts_url=$(get_artifacts_url "${namespace}")
+
+    # Create backup of original file in ARTIFACT_DIR
+    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${filename}.original.xml"
+
+    # Replace attachment placeholders with full URLs to OpenShift CI storage
+    sed -i "s#\[\[ATTACHMENT|\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
+
+    # Fix XML property tags format for Data Router compatibility
+    # Step 1: Remove all closing property tags
+    sed -i 's#</property>##g' "$junit_file"
+    # Step 2: Convert opening property tags to self-closing format
+    sed -i 's#<property name="\([^"]*\)" value="\([^"]*\)">#<property name="\1" value="\2"/>#g' "$junit_file"
+
+    # Save the processed file to the artifact directory
+    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${filename}.processed.xml"
+
+    echo "✅ Processed: ${filename} (namespace: ${namespace})"
+  done
+
+  echo "🗃️ JUnit files processed and ready for Data Router"
+}
+
+get_job_url() {
+  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+  local job_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+  else
+    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
+  fi
+  echo "${job_complete_url}"
+}
+
 # Validate required variables
 validate_required_vars() {
   local required_vars=(
@@ -40,14 +163,6 @@ validate_required_vars() {
   done
 }
 
-save_status_data_router_failed() {
-  local result=$1
-  STATUS_DATA_ROUTER_FAILED=${result}
-  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
-  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-}
-
 save_status_url_reportportal() {
   local url=$1
   STATUS_URL_REPORTPORTAL=${url}
@@ -59,17 +174,6 @@ save_status_url_reportportal() {
 get_metadata_output_path() {
   local metadata_output="data_router_metadata_output.json"
   echo "${ARTIFACT_DIR}/${metadata_output}"
-}
-
-get_job_url() {
-  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
-  local job_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-  else
-    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
-  fi
-  echo "${job_complete_url}"
 }
 
 save_data_router_metadata() {
@@ -152,6 +256,9 @@ main() {
 
   ls -la "${SHARED_DIR}"
 
+  # Process JUnit files before sending to Data Router
+  process_junit_files
+
   # Send test results through DataRouter and save the request ID.
     local max_attempts=10
     local wait_seconds_step=1
@@ -175,7 +282,7 @@ main() {
         return
       fi
 
-      if output=$(/droute send --metadata "$(get_metadata_output_path)" \
+      if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
@@ -213,7 +320,7 @@ main() {
         echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
 
         # Get DataRouter request information.
-        DATA_ROUTER_REQUEST_OUTPUT=$(/droute request get \
+        DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \

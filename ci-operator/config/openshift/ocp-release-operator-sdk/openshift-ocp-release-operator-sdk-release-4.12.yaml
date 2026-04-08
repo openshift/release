@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
   os:
     name: builder
     namespace: ocp
@@ -14,48 +10,37 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ci/dockerfiles/builder.Dockerfile
-  from: root
-  to: osdk-builder
-- dockerfile_path: release/ansible/Dockerfile.rhel8
-  from: os
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: ansible-operator
-- dockerfile_path: release/helm/Dockerfile
-  from: os-minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: helm-operator
-- dockerfile_path: release/sdk/Dockerfile
-  from: os-minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: operator-sdk
-- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
-  from: ansible-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-ansible-e2e
-- context_dir: test/ansible/advanced-molecule-operator
-  dockerfile_path: Dockerfile
-  from: ansible-operator
-  to: osdk-ansible-full-e2e
-- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
-  from: helm-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-helm-e2e
+  items:
+  - dockerfile_path: ci/dockerfiles/builder.Dockerfile
+    from: root
+    to: osdk-builder
+  - dockerfile_path: release/ansible/Dockerfile.rhel8
+    from: os
+    to: ansible-operator
+  - dockerfile_path: release/helm/Dockerfile
+    from: os-minimal
+    to: helm-operator
+  - dockerfile_path: release/sdk/Dockerfile
+    from: os-minimal
+    to: operator-sdk
+  - dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+    from: ansible-operator
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-ansible-e2e
+  - context_dir: test/ansible/advanced-molecule-operator
+    dockerfile_path: Dockerfile
+    from: ansible-operator
+    to: osdk-ansible-full-e2e
+  - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+    from: helm-operator
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-helm-e2e
 promotion:
   to:
   - excluded_images:

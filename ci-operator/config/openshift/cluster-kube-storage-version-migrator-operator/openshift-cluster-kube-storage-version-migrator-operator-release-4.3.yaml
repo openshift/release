@@ -3,24 +3,17 @@ base_images:
     name: "4.3"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 images:
-- dockerfile_path: images/ci/Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
-  to: cluster-kube-storage-version-migrator-operator
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    from: base
+    to: cluster-kube-storage-version-migrator-operator
 promotion:
   to:
   - name: "4.3"
@@ -54,7 +47,7 @@ tests:
     from: test-bin
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.3

@@ -40,19 +40,25 @@ function run_tests {
         .[]
         | select( .kind == \"Policy\" )
         | select( .namespace | endswith(\"${ns_tail}\") )
-        | .health.status' \
+        | .status' \
       || echo \
     ) \
-    | grep -v 'Healthy' \
+    | grep 'OutOfSync' \
     ; [ \$? -ne 0 ]" \
     ${POLICIES_STATUS_CHECK_CADENDE} ${POLICIES_STATUS_CHECK_ATTEMPTS}
 
-  # wait_until_command_is_ok \
-  #   "! oc get policies.policy.open-cluster-management.io -A | \
-  #       grep '${SPOKE_CLUSTER_NAME}' | \
-  #       grep -v -w 'Compliant' | \
-  #       grep -q ." \
-  #   ${POLICIES_STATUS_CHECK_CADENDE} ${POLICIES_STATUS_CHECK_ATTEMPTS}
+  wait_until_command_is_ok \
+    "(
+      oc get policies.policy.open-cluster-management.io -A -ojsonpath='{.items}' | jq '
+        .[]
+        | select( .kind == \"Policy\" )
+        | select( .metadata.namespace | endswith(\"${ns_tail}\") )
+        | .status.compliant' \
+      || echo \
+    ) \
+    | grep 'NonCompliant' \
+    ; [ \$? -ne 0 ]" \
+    ${POLICIES_STATUS_CHECK_CADENDE} ${POLICIES_STATUS_CHECK_ATTEMPTS}
 
   # set -x
   # oc -n openshift-gitops wait apps/policies \
@@ -71,7 +77,7 @@ function run_tests {
 
 function are_there_polices_to_be_verified {
 
-  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})"|wc -l)
+  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PG_RELATED_FILES})"|wc -l)
   if [[ "${num_of_policies}" == "0" ]]; then
     echo "no"
   else

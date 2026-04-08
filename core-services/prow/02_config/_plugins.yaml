@@ -209,7 +209,13 @@ bugzilla:
     openshift-4.19:
       dependent_bug_target_releases:
       - 4.20.0
+      - 4.20.z
       target_release: 4.19.z
+      validate_by_default: true
+    openshift-4.20:
+      dependent_bug_target_releases:
+      - 4.21.0
+      target_release: 4.20.z
       validate_by_default: true
     release-3.11:
       add_external_link: true
@@ -348,7 +354,13 @@ bugzilla:
     release-4.19:
       dependent_bug_target_releases:
       - 4.20.0
+      - 4.20.z
       target_release: 4.19.z
+      validate_by_default: true
+    release-4.20:
+      dependent_bug_target_releases:
+      - 4.21.0
+      target_release: 4.20.z
       validate_by_default: true
 cat: {}
 cherry_pick_unapproved:
@@ -367,9 +379,11 @@ config_updater:
       - build05
       - build06
       - build07
+      - build08
       - build09
       - build10
       - build11
+      - core-ci
       - vsphere02
       namespaces:
       - ci
@@ -383,30 +397,21 @@ config_updater:
       - build05
       - build06
       - build07
+      - build08
       - build09
       - build10
       - build11
+      - core-ci
       - vsphere02
       namespaces:
       - ocp
   gzip: false
   maps:
-    cluster/test-deploy/gcp-3/*:
+    ci-operator/lease/proxy-client.sh:
       cluster_groups:
       - build_farm_ci
-      name: cluster-profile-gcp-3
-    cluster/test-deploy/gcp-openshift-gce-devel-ci-2/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp-openshift-gce-devel-ci-2
-    cluster/test-deploy/gcp/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-gcp
-    cluster/test-deploy/ovirt/*:
-      cluster_groups:
-      - build_farm_ci
-      name: cluster-profile-ovirt
+      key: client.sh
+      name: lease-proxy
     clusters/app.ci/backport-verifier/_config.yaml:
       clusters:
         app.ci:
@@ -419,28 +424,28 @@ config_updater:
         - ci
       key: config.yaml
       name: publicize-config
-    clusters/build-clusters/01_cluster/sshd-bastion/ppc64le-libvirt/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/ppc64le-libvirt/sshd_config:
       clusters:
         build01:
         - bastion-ppc64le-libvirt
         build02:
         - bastion-ppc64le-libvirt
       name: sshd-config-ppc64le-libvirt
-    clusters/build-clusters/01_cluster/sshd-bastion/ppc64le/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/ppc64le/sshd_config:
       clusters:
         build01:
         - bastion-ppc64le
         build02:
         - bastion-ppc64le
       name: sshd-config-ppc64le
-    clusters/build-clusters/01_cluster/sshd-bastion/telco/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/telco/sshd_config:
       clusters:
         build01:
         - bastion-telco
         build02:
         - bastion-telco
       name: sshd-config-telco
-    clusters/build-clusters/01_cluster/sshd-bastion/z/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/z/sshd_config:
       clusters:
         build01:
         - bastion-z
@@ -457,15 +462,29 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       name: ci-secret-bootstrap
+    core-services/ci-secret-bootstrap/gsm-config.yaml:
+      cluster_groups:
+      - build_farm_ci
+      name: gsm-config
+    core-services/ci-secret-bootstrap/gsm-project-config.yaml:
+      cluster_groups:
+      - build_farm_ci
+      name: gsm-config
     core-services/ci-secret-generator/_config.yaml:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       name: ci-secret-generator
     core-services/image-mirroring/**/mapping_*:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       name: image-mirror-mappings
     core-services/jira-lifecycle-plugin/config.yaml:
@@ -478,6 +497,8 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       name: pr-reminder-config
     core-services/prow/02_config/**/_pluginconfig.yaml:
       clusters:
@@ -488,6 +509,8 @@ config_updater:
     core-services/prow/02_config/**/_prowconfig.yaml:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       gzip: true
       name: config
@@ -502,12 +525,16 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       gzip: true
       key: config.yaml
       name: config
     core-services/prow/02_config/_labels.yaml:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       key: labels.yaml
       name: labels
@@ -536,6 +563,12 @@ config_updater:
       cluster_groups:
       - build_farm_ocp
       name: base-repos
+    core-services/release-controller/release-qualifiers.yaml:
+      clusters:
+        app.ci:
+        - ci
+      key: release-qualifiers.yaml
+      name: release-controller-release-qualifiers
     core-services/retester/_config.yaml:
       clusters:
         app.ci:
@@ -591,10 +624,10 @@ label:
   - qe-approved
   - ux-approved
   - no-qe
-  - downstream-change-needed
   - rebase/manual
   - cluster-config-api-changed
   - run-integration-tests
+  - verified
   restricted_labels:
     '*':
     - allowed_teams:
@@ -630,6 +663,12 @@ label:
       - openshift-patch-managers
       - openshift-staff-engineers
       - openshift-release-oversight
+      - openshift-sustaining-engineers
+      label: jira/skip-dependent-bug-check
+    - allowed_teams:
+      - openshift-patch-managers
+      - openshift-staff-engineers
+      - openshift-release-oversight
       label: bugzilla/valid-bug
     - allowed_teams:
       - openshift-release-oversight
@@ -649,6 +688,21 @@ override:
     - openshift-sustaining-engineers
 owners:
   filenames:
+    netobserv/flowlogs-pipeline:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    netobserv/netobserv-cli:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    netobserv/netobserv-ebpf-agent:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    netobserv/netobserv-operator:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    netobserv/netobserv-web-console:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift-kni/scheduler-plugins:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES

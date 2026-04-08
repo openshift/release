@@ -5,9 +5,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.13
 images:
-- dockerfile_literal: FROM bin
-  from: bin
-  to: openstack-tests
+  items:
+  - dockerfile_literal: FROM bin
+    from: bin
+    to: openstack-tests
 promotion:
   to:
   - additional_images:
@@ -36,25 +37,6 @@ tests:
   commands: make verify
   container:
     from: src
-- as: test
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      CONFIG_TYPE: minimal
-    test:
-    - ref: openstack-test-openstack
-    workflow: openshift-e2e-openstack-ipi
-- as: test-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-test-openstack
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

@@ -92,7 +92,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-pools-cm:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-pools-cm\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: dptp-pools-cm
   name: dptp-pools-cm
@@ -109,7 +112,7 @@ spec:
         app: dptp-pools-cm
     spec:
       containers:
-      - image: dptp-pools-cm
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-pools-cm_latest
         name: dptp-pools-cm
         args:
         - --leader-election-namespace=ci
@@ -124,20 +127,3 @@ spec:
             memory: "2Gi"
             cpu: "250m"
       serviceAccountName: dptp-pools-cm
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  namespace: ci
-  name: dptp-pools-cm
-spec:
-  tags:
-  - name: "latest"
-    from:
-      kind: DockerImage
-      name: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-pools-cm_latest
-    importPolicy:
-      scheduled: true
-      importMode: PreserveOriginal
-    referencePolicy:
-      type: Local

@@ -11,11 +11,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-golang-1.15-openshift-4.8
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  to: ironic-agent
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: ironic-agent
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -48,12 +49,14 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-virtualmedia-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia

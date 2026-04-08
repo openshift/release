@@ -3,34 +3,17 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.15_base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
-- dockerfile_path: images/router/base/Dockerfile.rhel
-  inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  optional: true
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: haproxy-router-base
-  to: haproxy-router
-- dockerfile_path: images/router/f5/Dockerfile
-  from: haproxy-router-base
-  to: f5-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.rhel
+    optional: true
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
   - name: 4.15-priv
@@ -61,10 +44,12 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -75,7 +60,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -86,11 +72,12 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -144,7 +131,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: perfscale-aws-ingress-perf
@@ -165,7 +152,6 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 - always_run: false
   as: perfscale-aws-fips-ingress-perf
   optional: true
@@ -187,7 +173,6 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

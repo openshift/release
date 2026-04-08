@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -39,14 +46,58 @@ function create_disconnected_network() {
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
         if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
-	    if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
-	        run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
-	    else
+            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && version_ge "${ocp_version}" "4.17"; then
+                run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+	        else
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
-           fi
+            fi
         fi
     done
     return 0
+}
+
+# calculate the next consecutive subnet for both IPv4 and IPv6 addresses.
+# usage: 
+#   get_next_subnet 10.0.0.0/24 5
+#   get_next_subnet 2001:db8::/64 3
+function get_next_subnet() {
+    local CIDR=$1
+    local COUNT=${2:-1} # Default to 1 if count is not provided
+
+    if [ -z "$CIDR" ]; then
+        echo "Usage: get_next_subnet <ip/prefix> [count]"
+        echo "Error: Missing CIDR argument." >&2
+        return 1
+    fi
+
+    python3 <<-EOF
+import ipaddress
+import sys
+
+try:
+    cidr_str = "${CIDR}"
+    count = ${COUNT}
+
+    net = ipaddress.ip_network(cidr_str, strict=False)
+
+    current_net = net
+    for _ in range(count):
+        next_net_addr = current_net.broadcast_address + 1
+        current_net = ipaddress.ip_network(f"{next_net_addr}/{net.prefixlen}", strict=False)
+
+        if current_net.network_address < net.network_address:
+            print("Error: Address space overflow.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"{current_net.with_prefixlen}")
+
+except ValueError as e:
+    print(f"Error: Invalid input. Details: {e}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"An unexpected error occurred: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
 }
 
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
@@ -62,8 +113,6 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -91,7 +140,11 @@ elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
 
     if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
         cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+        cert_file="/usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem"
+        if ! ls ${cert_file}; then
+            cert_file="/go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem"
+        fi
+        cat ${cert_file} >> /tmp/ca.pem
         export REQUESTS_CA_BUNDLE=/tmp/ca.pem
     fi
     az cloud register \
@@ -123,7 +176,7 @@ fi
 VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 vnet_name="${VNET_BASE_NAME}-vnet"
 controlPlaneSubnet="${VNET_BASE_NAME}-master-subnet"
-computeSubnet="${VNET_BASE_NAME}-worker-subnet"
+computeSubnet_prefix="${VNET_BASE_NAME}-worker-subnet"
 clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 
 # create vnet
@@ -151,15 +204,32 @@ fi
 
 vnet_ipv6=""
 master_ipv6=""
-worker_ipv6=""
-if [[ "${IPSTACK}" == "dualstack" ]]; then
+compute_ipv6_subnets=()
+compute_ipv4_subnets=()
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
     vnet_ipv6="${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-fd00:29cc:9e56::/48}"    
     master_ipv6="${AZURE_CONTROL_PLANE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56::/64}"
     worker_ipv6="${AZURE_COMPUTE_SUBNET_IPV6_PREFIX:-fd00:29cc:9e56:1::/64}"
+    readarray -t compute_ipv6_subnets < <(get_next_subnet ${worker_ipv6} $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1)))
+    compute_ipv6_subnets=("${AZURE_COMPUTE_SUBNET_IPV6_PREFIX}" "${compute_ipv6_subnets[@]}")
 fi
 run_command "az network vnet create --name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefixes ${AZURE_VNET_ADDRESS_PREFIXES} ${vnet_ipv6} ${vnet_option}"
 run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${master_ipv6} --network-security-group ${clusterSubnetSNG}"
-run_command "az network vnet subnet create --name ${computeSubnet} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${AZURE_COMPUTE_SUBNET_PREFIX} ${worker_ipv6} --network-security-group ${clusterSubnetSNG}"
+
+readarray -t compute_ipv4_subnets < <(get_next_subnet ${AZURE_COMPUTE_SUBNET_PREFIX} $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1)))
+compute_ipv4_subnets=("${AZURE_COMPUTE_SUBNET_PREFIX}" "${compute_ipv4_subnets[@]}")
+for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+    if [[ ${#compute_ipv6_subnets[@]} -eq 0 ]]; then
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
+        run_command "az network vnet subnet create --name ${computeSubnet_name} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
+    else
+        run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} ${compute_ipv6_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
+    fi
+done
 
 #Due to sometime frequent vnet list will return empty, so save vnet list output into a local file
 vnet_check "${RESOURCE_GROUP}"
@@ -174,8 +244,10 @@ if [[ "${AZURE_CUSTOM_NSG}" == "yes" ]]; then
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'DenyVnetInbound' --priority 1100 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound"
 
     echo "Create network security rules on specific ports from nodes to nodes"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundTCP' --priority 1010 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-port-ranges 1936 9000-9999 10250-10259 30000-32767 --direction Inbound --protocol Tcp"
-    run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundUDP' --priority 1011 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${AZURE_COMPUTE_SUBNET_PREFIX} --destination-port-ranges 4789 6081 9000-9999 500 4500 30000-32767 --direction Inbound --protocol Udp"
+    for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+        run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundTCP' --priority 1010 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${compute_ipv4_subnets[$i]} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${compute_ipv4_subnets[$i]} --destination-port-ranges 1936 9000-9999 10250-10259 30000-32767 --direction Inbound --protocol Tcp"
+        run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowVnetInboundUDP' --priority 1011 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${compute_ipv4_subnets[$i]} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} ${compute_ipv4_subnets[$i]} --destination-port-ranges 4789 6081 9000-9999 500 4500 30000-32767 --direction Inbound --protocol Udp"
+    done
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowCidr22623InboundTCP' --priority 1012 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-port-ranges 22623 --direction Inbound --protocol Tcp"
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowetcdInboundTCP' --priority 1013 --access Allow --source-port-ranges '*' --source-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-address-prefixes ${AZURE_CONTROL_PLANE_SUBNET_PREFIX} --destination-port-ranges 2379-2380 --direction Inbound --protocol Tcp"
     run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'AllowInboundICMP' --priority 1014 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'VirtualNetwork' --destination-port-ranges '*' --direction Inbound --protocol Icmp"
@@ -201,11 +273,34 @@ networking:
   - cidr: "${AZURE_VNET_ADDRESS_PREFIXES}"
 EOF
 
-cat > "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
+if [[ "${AZURE_BYO_SUBNETS_ENABLED}" == "yes" ]]; then
+     cat > "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
+platform:
+  azure:
+    networkResourceGroupName: ${RESOURCE_GROUP}
+    virtualNetwork: ${vnet_name}
+    subnets:
+    - name: ${controlPlaneSubnet}
+      role: control-plane
+EOF
+    for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
+        cat >> "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
+    - name: ${computeSubnet_name}
+      role: node
+EOF
+    done
+else
+    cat > "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
 platform:
   azure:
     networkResourceGroupName: ${RESOURCE_GROUP}
     virtualNetwork: ${vnet_name}
     controlPlaneSubnet: ${controlPlaneSubnet}
-    computeSubnet: ${computeSubnet}
+    computeSubnet: ${computeSubnet_prefix}
 EOF
+fi

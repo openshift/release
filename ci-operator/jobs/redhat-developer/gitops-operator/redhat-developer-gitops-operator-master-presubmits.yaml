@@ -18,17 +18,29 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -43,6 +55,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -77,7 +95,7 @@ presubmits:
         - --variant=v4.14
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -137,9 +155,17 @@ presubmits:
         - --variant=v4.14
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -207,7 +233,7 @@ presubmits:
         - --variant=v4.14
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -253,6 +279,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-master-v4.14-kuttl-parallel
+    optional: true
     rerun_command: /test v4.14-kuttl-parallel
     skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
@@ -267,9 +294,17 @@ presubmits:
         - --variant=v4.14
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -328,6 +363,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-master-v4.14-kuttl-sequential
+    optional: true
     rerun_command: /test v4.14-kuttl-sequential
     skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
@@ -342,9 +378,17 @@ presubmits:
         - --variant=v4.14
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -394,14 +438,14 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build11
-    context: ci/prow/v4.17-ci-index-gitops-operator-bundle
+    context: ci/prow/v4.19-ci-index-gitops-operator-bundle
     decorate: true
     labels:
-      ci-operator.openshift.io/variant: v4.17
+      ci-operator.openshift.io/variant: v4.19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-gitops-operator-master-v4.17-ci-index-gitops-operator-bundle
-    rerun_command: /test v4.17-ci-index-gitops-operator-bundle
+    name: pull-ci-redhat-developer-gitops-operator-master-v4.19-ci-index-gitops-operator-bundle
+    rerun_command: /test v4.19-ci-index-gitops-operator-bundle
     spec:
       containers:
       - args:
@@ -409,10 +453,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ci-index-gitops-operator-bundle
-        - --variant=v4.17
+        - --variant=v4.19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -442,23 +486,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.17-ci-index-gitops-operator-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.19-ci-index-gitops-operator-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build11
-    context: ci/prow/v4.17-e2e
+    context: ci/prow/v4.19-e2e
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: gitops-aws
-      ci-operator.openshift.io/variant: v4.17
+      ci-operator.openshift.io/variant: v4.19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-gitops-operator-master-v4.17-e2e
-    rerun_command: /test v4.17-e2e
+    name: pull-ci-redhat-developer-gitops-operator-master-v4.19-e2e
+    rerun_command: /test v4.19-e2e
     skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
@@ -469,12 +513,20 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e
-        - --variant=v4.17
+        - --variant=v4.19
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -517,21 +569,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.17-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.19-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build11
-    context: ci/prow/v4.17-images
+    context: ci/prow/v4.19-images
     decorate: true
     labels:
-      ci-operator.openshift.io/variant: v4.17
+      ci-operator.openshift.io/variant: v4.19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-gitops-operator-master-v4.17-images
-    rerun_command: /test v4.17-images
+    name: pull-ci-redhat-developer-gitops-operator-master-v4.19-images
+    rerun_command: /test v4.19-images
     spec:
       containers:
       - args:
@@ -539,10 +591,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=v4.17
+        - --variant=v4.19
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -572,23 +624,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.17-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.19-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build11
-    context: ci/prow/v4.17-kuttl-parallel
+    context: ci/prow/v4.19-kuttl-parallel
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: gitops-aws
-      ci-operator.openshift.io/variant: v4.17
+      ci-operator.openshift.io/variant: v4.19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-gitops-operator-master-v4.17-kuttl-parallel
-    rerun_command: /test v4.17-kuttl-parallel
+    name: pull-ci-redhat-developer-gitops-operator-master-v4.19-kuttl-parallel
+    rerun_command: /test v4.19-kuttl-parallel
     skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
@@ -599,12 +651,20 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=kuttl-parallel
-        - --variant=v4.17
+        - --variant=v4.19
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -647,23 +707,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.17-kuttl-parallel,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.19-kuttl-parallel,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build11
-    context: ci/prow/v4.17-kuttl-sequential
+    context: ci/prow/v4.19-kuttl-sequential
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: gitops-aws
-      ci-operator.openshift.io/variant: v4.17
+      ci-operator.openshift.io/variant: v4.19
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-gitops-operator-master-v4.17-kuttl-sequential
-    rerun_command: /test v4.17-kuttl-sequential
+    name: pull-ci-redhat-developer-gitops-operator-master-v4.19-kuttl-sequential
+    rerun_command: /test v4.19-kuttl-sequential
     skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
@@ -674,12 +734,20 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=kuttl-sequential
-        - --variant=v4.17
+        - --variant=v4.19
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -722,4 +790,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.17-kuttl-sequential,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.19-kuttl-sequential,?($|\s.*)

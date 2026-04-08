@@ -10,6 +10,11 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+if [[ ! -f "${SHARED_DIR}/gotest-completed" ]]; then
+  echo "Gotests did not complete, skipping reporter step"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir -pv "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
@@ -40,7 +45,7 @@ echo "Create reports directory"
 mkdir -pv /tmp/reports
 
 echo "Copy reports to reports directory"
-cp "${SHARED_DIR}"/report_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
+cp "${SHARED_DIR}"/junit_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
 
 echo "Create junit directory"
 mkdir -pv /tmp/junit
@@ -51,7 +56,7 @@ cp "${SHARED_DIR}"/junit_*.xml /tmp/junit/ 2>/dev/null || echo "No junit_*.xml f
 echo "Upload compute-nto test reports"
 cd /eco-ci-cd
 # shellcheck disable=SC2154
-ansible-playbook ./playbooks/cnf/upload-report.yaml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook ./playbooks/upload-report.yaml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig \
         reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports \
         junit_report_dir=/tmp/junit reports_directory=/tmp/upload"

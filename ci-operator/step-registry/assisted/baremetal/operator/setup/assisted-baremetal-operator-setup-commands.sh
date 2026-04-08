@@ -22,12 +22,15 @@ echo "Creating Ansible configuration file"
 cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
 
 [defaults]
-callback_whitelist = profile_tasks
+callbacks_enabled = profile_tasks
 host_key_checking = False
 
 verbosity = 2
-stdout_callback = yaml
+stdout_callback = ansible.builtin.default
 bin_ansible_callbacks = True
+
+[callback_default]
+result_format = yaml
 
 EOF
 
@@ -65,6 +68,7 @@ images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLE
 cat << VARS >> /root/config
 export DISCONNECTED="${DISCONNECTED:-}"
 export ALLOW_CONVERGED_FLOW="${ALLOW_CONVERGED_FLOW:-}"
+export DATABASE_SSLMODE="${DATABASE_SSLMODE:-disable}"
 
 export INDEX_IMAGE="${INDEX_IMAGE}"
 

@@ -2,12 +2,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
-- dockerfile_path: Dockerfile
-  to: odf-operator
-- dockerfile_path: bundle.odf.deps.Dockerfile
-  to: odf-dependencies-bundle
+  items:
+  - dockerfile_path: Dockerfile
+    to: odf-operator
+  - dockerfile_path: bundle.odf.deps.Dockerfile
+    to: odf-dependencies-bundle
 operator:
   bundles:
   - as: odf-operator-bundle
@@ -24,7 +25,7 @@ operator:
 releases:
   latest:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -33,7 +34,8 @@ resources:
       memory: 200Mi
 tests:
 - as: odf-operator-e2e-aws
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: odf-aws
     env:

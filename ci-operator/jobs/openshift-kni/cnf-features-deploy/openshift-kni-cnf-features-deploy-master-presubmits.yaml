@@ -5,18 +5,18 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build11
     context: ci/prow/ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-ci
     rerun_command: /test ci
-    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
     spec:
       containers:
       - args:
@@ -26,9 +26,17 @@ presubmits:
         - --target=ci
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -71,11 +79,11 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-aws-ci-tests
     rerun_command: /test e2e-aws-ci-tests
-    skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
     spec:
       containers:
       - args:
@@ -87,9 +95,17 @@ presubmits:
         - --target=e2e-aws-ci-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -147,7 +163,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-aws-ran-profile
     optional: true
@@ -163,9 +179,17 @@ presubmits:
         - --target=e2e-aws-ran-profile
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -214,16 +238,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-telco5g-cnftests
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 6h0m0s
     labels:
       capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-telco5g-cnftests
     optional: true
@@ -233,18 +256,30 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-telco5g-cnftests
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -262,6 +297,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -280,7 +321,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-telco5g-hcp-cnftests
     decorate: true
     decoration_config:
@@ -288,7 +329,7 @@ presubmits:
     labels:
       capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-telco5g-hcp-cnftests
     optional: true
@@ -298,18 +339,30 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-telco5g-hcp-cnftests
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -327,6 +380,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -341,22 +400,21 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-telco5g-hcp-cnftests,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-images
     rerun_command: /test images
-    skip_if_only_changed: \.tekton/.*
     spec:
       containers:
       - args:
@@ -366,7 +424,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -402,36 +460,48 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build11
     context: ci/prow/security
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-security
     optional: true
     rerun_command: /test security
-    skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -449,6 +519,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -467,14 +543,14 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build11
     context: ci/prow/ztp-ci
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-ztp-ci
     rerun_command: /test ztp-ci
@@ -488,9 +564,17 @@ presubmits:
         - --target=ztp-ci
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

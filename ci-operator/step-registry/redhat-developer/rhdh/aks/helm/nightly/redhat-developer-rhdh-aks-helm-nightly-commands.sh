@@ -1,18 +1,86 @@
 #!/bin/bash
+
+echo "========== Repository, Branch, and PR Variables =========="
+GITHUB_ORG_NAME="redhat-developer"
+echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
+GITHUB_REPOSITORY_NAME="rhdh"
+echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
+RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
+GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
+TAG_NAME=""
+IMAGE_REPO=""
+IMAGE_REGISTRY=""
+QUAY_REPO=""
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
+
+echo "========== Gangway API Overrides =========="
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}" ]]; then
+    GITHUB_ORG_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+    echo "Override applied: GITHUB_ORG_NAME=${GITHUB_ORG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}" ]]; then
+    GITHUB_REPOSITORY_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+    echo "Override applied: GITHUB_REPOSITORY_NAME=${GITHUB_REPOSITORY_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}" ]]; then
+    RELEASE_BRANCH_NAME="${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+    echo "Override applied: RELEASE_BRANCH_NAME=${RELEASE_BRANCH_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}" ]]; then
+    GIT_PR_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+    echo "Override applied: GIT_PR_NUMBER=${GIT_PR_NUMBER}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}" ]]; then
+    TAG_NAME="${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}"
+    echo "Override applied: TAG_NAME=${TAG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REPO}" ]]; then
+    IMAGE_REPO="${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REPO}"
+    echo "Override applied: IMAGE_REPO=${IMAGE_REPO}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REGISTRY}" ]]; then
+    IMAGE_REGISTRY="${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REGISTRY}"
+    echo "Override applied: IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+fi
+
+echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
+echo "========== Cluster Authentication =========="
+echo "Verifying kubeconfig file from Mapt exists in SHARED_DIR..."
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+  echo "Error: kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
+  exit 1
+fi
 
-# use kubeconfig from mapt
-chmod 600 "${SHARED_DIR}/kubeconfig"
+echo "Setting kubeconfig permissions..."
+if ! chmod 600 "${SHARED_DIR}/kubeconfig"; then
+  echo "Error: Failed to set kubeconfig permissions"
+  exit 1
+fi
+
+echo "Setting KUBECONFIG environment variable..."
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
+echo "Verifying kubeconfig file..."
+if ! kubectl config view > /dev/null 2>&1; then
+  echo "Error: Invalid kubeconfig file"
+  exit 1
+fi
+
+echo "Verifying cluster connectivity..."
+if ! kubectl cluster-info > /dev/null 2>&1; then
+  echo "Error: Cannot connect to cluster."
+  exit 1
+fi
+
+echo "========== Cluster Service Account and Token Management =========="
 # Create a service account and assign cluster url and token
 sa_namespace="default"
 sa_name="tester-sa-2"
@@ -67,18 +135,18 @@ fi
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
 export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
 
-# Prepare to git checkout
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
-echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
+echo "========== Platform Environment Variables =========="
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="false"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="aks"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
-export QUAY_REPO RELEASE_BRANCH_NAME
-QUAY_REPO="rhdh-community/rhdh"
-# Get the base branch name based on job.
-RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
-
+echo "========== Git Repository Setup & Checkout =========="
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
@@ -87,7 +155,8 @@ git checkout "$RELEASE_BRANCH_NAME" || exit
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
-if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+echo "========== PR Branch Handling =========="
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}" ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
@@ -96,15 +165,17 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Tag name: $TAG_NAME"
+    echo "TAG_NAME: $TAG_NAME"
     IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
+echo "========== Changeset Analysis =========="
 PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ibm|e2e-tests|docs|.cursor"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.opencode|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
@@ -115,60 +186,82 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    QUAY_REPO="rhdh/rhdh-hub-rhel9"
+echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
+
+echo "========== Image Tag Resolution =========="
+if [[ -n "${IMAGE_REPO}" && -n "${TAG_NAME}" ]]; then
+    echo "Using overridden IMAGE_REPO: $IMAGE_REPO, TAG_NAME: $TAG_NAME"
+elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
+    IMAGE_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
     else
         TAG_NAME="next"
     fi
+    echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    IMAGE_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
-        QUAY_REPO="rhdh/rhdh-hub-rhel9"
-        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
-        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
+        VERSION="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        TAG_NAME="next-${VERSION}"
     else
-        QUAY_REPO="rhdh-community/rhdh"
         TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
-    echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
+    echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
-    # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((55*60))    # Maximum wait time of 55 minutes
-    POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
+    IMAGE_REPO="rhdh-community/rhdh"
+    IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
+    if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+        # Timeout configuration for waiting for Docker image availability
+        MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+        POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
-    ELAPSED_TIME=0
+        ELAPSED_TIME=0
 
-    while true; do
-        # Check image availability
-        response=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=$TAG_NAME")
+        while true; do
+            # Check image availability
+            response=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=$TAG_NAME")
 
-        # Use jq to parse the JSON and see if the tag exists
-        tag_count=$(echo $response | jq '.tags | length')
+            # Use jq to parse the JSON and see if the tag exists
+            tag_count=$(echo $response | jq '.tags | length')
 
-        if [ "$tag_count" -gt "0" ]; then
-            echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
-            break
-        fi
+            if [ "$tag_count" -gt "0" ]; then
+                echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
+                break
+            fi
 
-        # Wait for the interval duration
-        sleep $POLL_INTERVAL_SECONDS
+            # Wait for the interval duration
+            sleep $POLL_INTERVAL_SECONDS
 
-        # Increment the elapsed time
-        ELAPSED_TIME=$(($ELAPSED_TIME + $POLL_INTERVAL_SECONDS))
+            # Increment the elapsed time
+            ELAPSED_TIME=$(($ELAPSED_TIME + $POLL_INTERVAL_SECONDS))
 
-        # If the elapsed time exceeds the timeout, exit with an error
-        if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME_SECONDS ]; then
-            echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
-            exit 1
-        fi
-    done
+            # If the elapsed time exceeds the timeout, exit with an error
+            if [ $ELAPSED_TIME -ge $MAX_WAIT_TIME_SECONDS ]; then
+                echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
+                exit 1
+            fi
+        done
+    else
+        echo "INFO: Skipping image availability check for non-quay.io registry: ${IMAGE_REGISTRY}"
+    fi
+fi
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
+QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
+export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
+
+echo "========== Current branch =========="
+echo "Current branch: $(git branch --show-current)"
+if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+    IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${IMAGE_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
+    echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
+else
+    echo "Using image: ${IMAGE_REGISTRY}/${IMAGE_REPO}:${TAG_NAME}"
 fi
 
-echo "############## Current branch ##############"
-echo "Current branch: $(git branch --show-current)"
-echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
-
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+echo "========== Test Execution =========="
+echo "Executing openshift-ci-tests.sh"
+bash ./.ci/pipelines/openshift-ci-tests.sh

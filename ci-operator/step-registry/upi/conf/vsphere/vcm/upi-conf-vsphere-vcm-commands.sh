@@ -158,7 +158,7 @@ NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 # We expect this to have the correct number of addresses.  If we are short, we need to exit here with meaningful message.
 if jq -e --argjson IPS "$((end_worker_num + 1))" '.spec.ipAddresses | length < $IPS' "${NETWORK_CONFIG}"; then
   echo "SUBNETS.JSON does not contain enough addresses. This workflow is expected to be a single-tenant lease. Please check lease / network type."
-  cat "${SUBNETS_CONFIG}"
+  cat "${NETWORK_CONFIG}"
   exit 1
 fi
 
@@ -232,9 +232,25 @@ if [[ -f "$fcos_json_file" ]]; then
   legacy_installer_json=$fcos_json_file
 fi
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+else
+  export INSTALLER_BINARY="openshift-install"
+fi
+
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
-if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+if ${INSTALLER_BINARY} coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
   echo "Using stream metadata"
   ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' < "${SHARED_DIR}"/coreos.json)
 else
@@ -527,6 +543,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$netmask ="${netmask}"
 
 \$bootstrap_ip_address = "${bootstrap_ip_address}"
+
+\$lb_memory =  $(jq -r '.spec.lb.memoryMB' ${SPEC_CONFIG})
+\$lb_num_cpus = $(jq -r '.spec.lb.cpus' ${SPEC_CONFIG})
+\$lb_cores_per_socket = $(jq -r '.spec.lb.coresPerSocket' ${SPEC_CONFIG})
 \$lb_ip_address = "${lb_ip_address}"
 
 \$control_plane_memory =  $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
@@ -573,7 +593,7 @@ date +%s >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 ### Create manifests
 echo "Creating manifests..."
-openshift-install --dir="${dir}" create manifests &
+${INSTALLER_BINARY} --dir="${dir}" create manifests &
 
 set +e
 wait "$!"
@@ -696,7 +716,7 @@ fi
 
 ### Create Ignition configs
 echo "Creating Ignition configs..."
-openshift-install --dir="${dir}" create ignition-configs &
+${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
 
 set +e
 wait "$!"

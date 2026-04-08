@@ -3,26 +3,19 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.23-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.23-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
-  to: multicluster-operators-application
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: multicluster-operators-application
 promotion:
   to:
-  - name: "2.15"
+  - name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -74,7 +67,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.15
+      DESTINATION_BRANCH: release-2.17
     workflow: ocm-ci-fastforward
 - as: latest-image-mirror
   postsubmit: true

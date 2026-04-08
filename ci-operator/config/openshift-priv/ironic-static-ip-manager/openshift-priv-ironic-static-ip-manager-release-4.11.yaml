@@ -11,9 +11,10 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ironic-static-ip-manager
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-8-base-openshift-4.9
-  to: ironic-static-ip-manager
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: ocp_builder_rhel-8-base-openshift-4.9
+    to: ironic-static-ip-manager
 promotion:
   to:
   - name: 4.11-priv
@@ -35,21 +36,24 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
 - always_run: false
   as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
 - always_run: false
   as: e2e-metal-ipi-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -63,21 +67,24 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
   as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

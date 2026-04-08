@@ -232,66 +232,124 @@ case $CLUSTER_TYPE in
     --tenant "$azure_auth_tenant_id" --output none
   az account set --subscription "${azure_subscription_id}"
   echo "Setting up the boot image for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers..."
-  vhd_url=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
-    yq-v4 ".data.stream \
-         | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.\"rhel-coreos-extensions\".\"azure-disk\".url")
-  vhd_name=$(basename "${vhd_url}")
   infra_id=$(yq-v4 '.infraID' < "${SHARED_DIR}"/metadata.json)
   rg_name="${infra_id}-rg"
-  sa_name=$(az storage account list -g "${rg_name}" | yq-v4 '.[] | select(.name == "cluster*").name')
-  # Starting from 4.17, the default install method is CAPI-based,
-  # the format of storage account name is changed to ${infraId}sa instead of "clusterxxxxx",
-  # and the name could not be more than 24 characters.
-  if [[ -z "${sa_name}" ]]; then
-    sa_prefix=${infra_id//-}
-    sa_prefix=${sa_prefix::22}
-    sa_name=$(az storage account list -g "${rg_name}" | yq-v4 ".[] | select(.name == \"${sa_prefix}sa\").name")
-  fi
-  AZURE_STORAGE_KEY=$(az storage account keys list -g "${rg_name}" --account-name "${sa_name}" --query "[0].value" -o tsv)
-  export AZURE_STORAGE_KEY
-  az storage blob copy start --account-name "${sa_name}" \
-      --destination-blob "${vhd_name}" --destination-container vhd --source-uri "$vhd_url"
-  gallery_name=$(az sig list -g "${rg_name}" | yq-v4 '.[].name')
-  image_name="${infra_id}-gen2-${ADDITIONAL_WORKER_ARCHITECTURE}"
-  storage_blob_url=$(az storage blob url --account-name "${sa_name}" --container-name vhd --name "${vhd_name}" -o tsv)
-  az sig image-definition create --resource-group "${rg_name}" --gallery-name "${gallery_name}" \
-    --gallery-image-definition "${image_name}" --publisher "RedHat" --offer "rhcos" \
-    --sku "rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}" --os-type linux --hyper-v-generation V2 \
-    --architecture "$(sed 's/aarch64/Arm64/;s/x86_64/x64/' <<< "${ADDITIONAL_WORKER_ARCHITECTURE}")"
-
   region=$(az group show --name "${rg_name}" | yq-v4 '.location')
-  for i in $(seq 1 15) max; do
-    [ "$i" == max ] && { echo "Timeout exceeded while waiting for the VHD blob copy to conclude. Failing..."; exit 3; }
-    sleep 60
-    [ X"$(az storage blob show --container-name vhd --name "${vhd_name}" --account-name "${sa_name}" \
-      -o tsv --query properties.copy.status)" == X"success" ] && break
-    echo "Waiting for the VHD blob copy to conclude... (timeout in $(( 15 - i )) minutes)"
-  done
-  echo "The VHD image is now available. Creating the image version..."
-  # The Gallery Image Version need match Major(int).Minor(int).Patch(int), where int is between 0 and 2,147,483,647.
-  # The VHD URL string format might differ across multiple OpenShift versions.
-  # To avoid cut errors, use the OCP version instead.
-  image_version=$(oc get clusterversion --no-headers | awk '{split($2, a, "-"); print a[1]}')
-  az sig image-version create --resource-group "${rg_name}" \
-    --gallery-name "${gallery_name}" --gallery-image-definition "${image_name}" \
-    --gallery-image-version "${image_version}"  --target-regions "${region}" \
-    --os-vhd-uri "${storage_blob_url}" --os-vhd-storage-account "${sa_name}"
-  echo "The image version for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers has been created... "
-  echo "Patching the MachineSet..."
-  resource_id="/resourceGroups/${rg_name}/providers/Microsoft.Compute/galleries/${gallery_name}/images/${image_name}/versions/latest"
-  echo "Duplicate all the machine sets and distribute the number of ADDITIONAL_WORKERS on Azure for some perfscale test"
-  MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
-    .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
-    | .metadata.name += "-additional"
-    | .spec.template.spec.providerSpec.value.vmSize = "${ADDITIONAL_WORKER_VM_TYPE}"
-    | .spec.template.spec.providerSpec.value.image.resourceID = "${resource_id}"
-    | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
-    | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
-    | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
-    | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
-    )
+  # Starting from OCP 4.21, the installer uses the Marketplace RHCOS image on Azure
+  # Manual creation of gallery images is no longer needed
+  # Code updated to handle both pre-4.21 and 4.21+ clusters
+  CLUSTER_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+  CLUSTER_MAIN_VERSION="$(echo "${CLUSTER_VERSION}" | cut -f1 -d.)"
+  CLUSTER_MINOR_VERSION="$(echo "${CLUSTER_VERSION}" | cut -f2 -d.)"
+  echo "Detected OCP version: ${CLUSTER_VERSION}"
+  if [[ "${CLUSTER_MAIN_VERSION}" -gt 4 ]] || \
+     [[ "${CLUSTER_MAIN_VERSION}" -eq 4 && "${CLUSTER_MINOR_VERSION}" -ge 21 ]]; then
+    USE_MARKETPLACE_IMAGE=true
+  else
+    USE_MARKETPLACE_IMAGE=false
+  fi
+  if [[ "$USE_MARKETPLACE_IMAGE" == true ]]; then
+    echo "OCP >= 4.21: Using Azure Marketplace RHCOS image"
+    # Get VM size hyperVGeneration version
+    GENS=$(az vm list-skus \
+      --location "$region" \
+      --size "$ADDITIONAL_WORKER_VM_TYPE" \
+      --query "[].capabilities[?name=='HyperVGenerations'].value" \
+      -o tsv)
+
+    if [[ "$GENS" == *"V2"* ]]; then
+        HYPERV_GEN="hyperVGen2"
+    elif [[ "$GENS" == *"V1"* ]]; then
+        HYPERV_GEN="hyperVGen1"
+    else
+        echo "Error: VM size ${ADDITIONAL_WORKER_VM_TYPE} in region $region does not support HyperVGen1 or HyperVGen2"
+        exit 1
+    fi
+
+    echo "Selected HyperV Generation for $ADDITIONAL_WORKER_ARCHITECTURE in $region: $HYPERV_GEN"
+    # Get boot image info
+    HYPERV_OBJ=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o yaml | \
+      yq-v4 ".data.stream | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.\"rhel-coreos-extensions\".marketplace.azure.\"no-purchase-plan\".${HYPERV_GEN}")
+    image_offer=$(echo "$HYPERV_OBJ" | yq-v4 '.offer')
+    image_publisher=$(echo "$HYPERV_OBJ" | yq-v4 '.publisher')
+    image_sku=$(echo "$HYPERV_OBJ" | yq-v4 '.sku')
+    image_version=$(echo "$HYPERV_OBJ" | yq-v4 '.version')
+
+    MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+      .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
+      | .metadata.name += "-additional"
+      | .spec.template.spec.providerSpec.value.vmSize = "${ADDITIONAL_WORKER_VM_TYPE}"
+      | .spec.template.spec.providerSpec.value.image.offer = "${image_offer}"
+      | .spec.template.spec.providerSpec.value.image.publisher = "${image_publisher}"
+      | .spec.template.spec.providerSpec.value.image.sku = "${image_sku}"
+      | .spec.template.spec.providerSpec.value.image.version = "${image_version}"
+      | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+      | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+      | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
+      | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
+      )
 EOF
 )")
+  else
+    echo "OCP < 4.21: Creating Azure boot image manually"
+    vhd_url=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+      yq-v4 ".data.stream \
+           | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.\"rhel-coreos-extensions\".\"azure-disk\".url")
+    vhd_name=$(basename "${vhd_url}")
+    sa_name=$(az storage account list -g "${rg_name}" | yq-v4 '.[] | select(.name == "cluster*").name')
+    # Starting from 4.17, the default install method is CAPI-based,
+    # the format of storage account name is changed to ${infraId}sa instead of "clusterxxxxx",
+    # and the name could not be more than 24 characters.
+    if [[ -z "${sa_name}" ]]; then
+      sa_prefix=${infra_id//-}
+      sa_prefix=${sa_prefix::22}
+      sa_name=$(az storage account list -g "${rg_name}" | yq-v4 ".[] | select(.name == \"${sa_prefix}sa\").name")
+    fi
+    AZURE_STORAGE_KEY=$(az storage account keys list -g "${rg_name}" --account-name "${sa_name}" --query "[0].value" -o tsv)
+    export AZURE_STORAGE_KEY
+    az storage blob copy start --account-name "${sa_name}" \
+        --destination-blob "${vhd_name}" --destination-container vhd --source-uri "$vhd_url"
+    gallery_name=$(az sig list -g "${rg_name}" | yq-v4 '.[].name')
+    image_name="${infra_id}-gen2-${ADDITIONAL_WORKER_ARCHITECTURE}"
+    storage_blob_url=$(az storage blob url --account-name "${sa_name}" --container-name vhd --name "${vhd_name}" -o tsv)
+    az sig image-definition create --resource-group "${rg_name}" --gallery-name "${gallery_name}" \
+      --gallery-image-definition "${image_name}" --publisher "RedHat" --offer "rhcos" \
+      --sku "rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}" --os-type linux --hyper-v-generation V2 \
+      --architecture "$(sed 's/aarch64/Arm64/;s/x86_64/x64/' <<< "${ADDITIONAL_WORKER_ARCHITECTURE}")"
+  
+    for i in $(seq 1 15) max; do
+      [ "$i" == max ] && { echo "Timeout exceeded while waiting for the VHD blob copy to conclude. Failing..."; exit 3; }
+      sleep 60
+      [ X"$(az storage blob show --container-name vhd --name "${vhd_name}" --account-name "${sa_name}" \
+        -o tsv --query properties.copy.status)" == X"success" ] && break
+      echo "Waiting for the VHD blob copy to conclude... (timeout in $(( 15 - i )) minutes)"
+    done
+    echo "The VHD image is now available. Creating the image version..."
+    # The Gallery Image Version need match Major(int).Minor(int).Patch(int), where int is between 0 and 2,147,483,647.
+    # The VHD URL string format might differ across multiple OpenShift versions.
+    # To avoid cut errors, use the OCP version instead.
+    image_version=$(oc get clusterversion --no-headers | awk '{split($2, a, "-"); print a[1]}')
+    az sig image-version create --resource-group "${rg_name}" \
+      --gallery-name "${gallery_name}" --gallery-image-definition "${image_name}" \
+      --gallery-image-version "${image_version}"  --target-regions "${region}" \
+      --os-vhd-uri "${storage_blob_url}" --os-vhd-storage-account "${sa_name}"
+    echo "The image version for the ${ADDITIONAL_WORKER_ARCHITECTURE} workers has been created... "
+    echo "Patching the MachineSet..."
+    resource_id="/resourceGroups/${rg_name}/providers/Microsoft.Compute/galleries/${gallery_name}/images/${image_name}/versions/latest"
+    echo "Duplicate all the machine sets and distribute the number of ADDITIONAL_WORKERS on Azure for some perfscale test"
+    MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
+      .items |= map(select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")
+      | .metadata.name += "-additional"
+      | .spec.template.spec.providerSpec.value.vmSize = "${ADDITIONAL_WORKER_VM_TYPE}"
+      | .spec.template.spec.providerSpec.value.image.resourceID = "${resource_id}"
+      | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+      | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
+      | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
+      | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
+      )
+EOF
+)")
+  fi
   machineset_nums=$(echo "$MACHINE_SET" | yq-v4 '.items | length')
   base_replicas=$(( ADDITIONAL_WORKERS / machineset_nums ))
   remainder=$(( ADDITIONAL_WORKERS % machineset_nums ))

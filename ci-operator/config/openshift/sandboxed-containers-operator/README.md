@@ -11,7 +11,7 @@ usual changes to those files are::
     base_images:
       tests-private:
         # Always use the latest provided by "skopeo list-tags docker://registry.ci.openshift.org/ci/tests-private"
-        tag: "4.20"
+        tag: "4.22"
     releases:
       latest:
         release:
@@ -26,7 +26,6 @@ usual changes to those files are::
           # Set RPM version and checksum
           # An test case will use that to check the expected operator
           # version is installed
-          EXPECTED_OPERATOR_VERSION: 1.9.0
           KATA_RPM_VERSION: "3.13.0-1.rhaos4.18.el9"
           # Add sleep here if you need to do manual testing
           # connect to cluster and delete the cucushift-installer-wait pod when done
@@ -40,3 +39,11 @@ usual changes to those files are::
       variant: downstream-release
 
 The downstream jobs use custom steps, chains and workflows hosted at [here](../../../step-registry/sandboxed-containers-operator/). Please refer to [their documentation](../../../step-registry/sandboxed-containers-operator/README.md) for further information.
+
+### Development
+
+On workflow change or periodic update please use the
+[create-prowjob](../../../step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh)
+command to refresh the default templates using the pre-defined defaults
+by running: ``sandboxed-containers-operator-create-prowjob-commands.sh update_templates``.
+Avoid modifying the templates directly, always use the ``update_template``!

@@ -3,22 +3,15 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/service-ca-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: service-ca-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: service-ca-operator
 promotion:
   to:
   - name: 4.11-priv
@@ -54,11 +47,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -70,7 +63,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.11

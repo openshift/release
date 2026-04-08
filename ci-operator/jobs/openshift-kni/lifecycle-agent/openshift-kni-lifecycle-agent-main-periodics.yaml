@@ -4,7 +4,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 3h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -12,11 +11,11 @@ periodics:
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.20
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-image-based-install
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-image-based-install
   spec:
     containers:
     - args:
@@ -26,12 +25,20 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-based-install
-      - --variant=nightly-4.20
+      - --variant=nightly-4.22
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -76,6 +83,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
+  cron: 47 9 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -83,14 +91,13 @@ periodics:
   - base_ref: main
     org: openshift-kni
     repo: lifecycle-agent
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.20
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-seedgen-aws-ocp-4-19
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-image-based-install-v4v6
   spec:
     containers:
     - args:
@@ -99,13 +106,103 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=seedgen-aws-ocp-4-19
-      - --variant=nightly-4.20
+      - --target=image-based-install-v4v6
+      - --variant=nightly-4.22
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 47 6 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-image-based-install-v6v4
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=image-based-install-v6v4
+      - --variant=nightly-4.22
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -153,7 +250,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 4h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -161,11 +257,257 @@ periodics:
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
-    ci-operator.openshift.io/variant: nightly-4.20-upgrade-from-stable-4.19
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-upgrade-from-stable-4.19-image-based-upgrade-e2e-parallel-conformance
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-seedgen-aws-ocp-4-22
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=seedgen-aws-ocp-4-22
+      - --variant=nightly-4.22
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-seedgen-aws-ocp-4-22-v4v6
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=seedgen-aws-ocp-4-22-v4v6
+      - --variant=nightly-4.22
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-seedgen-aws-ocp-4-22-v6v4
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=seedgen-aws-ocp-4-22-v6v4
+      - --variant=nightly-4.22
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22-upgrade-from-stable-4.21
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-upgrade-from-stable-4.21-image-based-upgrade-e2e-parallel-conformance
   spec:
     containers:
     - args:
@@ -175,12 +517,20 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-based-upgrade-e2e-parallel-conformance
-      - --variant=nightly-4.20-upgrade-from-stable-4.19
+      - --variant=nightly-4.22-upgrade-from-stable-4.21
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -228,7 +578,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 4h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -236,11 +585,11 @@ periodics:
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.20-upgrade-from-stable-4.19
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22-upgrade-from-stable-4.21
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-upgrade-from-stable-4.19-image-based-upgrade-e2e-parallel-conformance-baseline
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-upgrade-from-stable-4.21-image-based-upgrade-e2e-parallel-conformance-baseline
   spec:
     containers:
     - args:
@@ -250,12 +599,20 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-based-upgrade-e2e-parallel-conformance-baseline
-      - --variant=nightly-4.20-upgrade-from-stable-4.19
+      - --variant=nightly-4.22-upgrade-from-stable-4.21
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -303,7 +660,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 4h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -311,11 +667,11 @@ periodics:
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
-    ci-operator.openshift.io/variant: nightly-4.20-upgrade-from-stable-4.19
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22-upgrade-from-stable-4.21
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-upgrade-from-stable-4.19-image-based-upgrade-e2e-serial-conformance
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-upgrade-from-stable-4.21-image-based-upgrade-e2e-serial-conformance
   spec:
     containers:
     - args:
@@ -325,12 +681,20 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-based-upgrade-e2e-serial-conformance
-      - --variant=nightly-4.20-upgrade-from-stable-4.19
+      - --variant=nightly-4.22-upgrade-from-stable-4.21
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -378,7 +742,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 4h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-kni
@@ -386,11 +749,11 @@ periodics:
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: nightly-4.20-upgrade-from-stable-4.19
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: nightly-4.22-upgrade-from-stable-4.21
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.20-upgrade-from-stable-4.19-image-based-upgrade-e2e-serial-conformance-baseline
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.22-upgrade-from-stable-4.21-image-based-upgrade-e2e-serial-conformance-baseline
   spec:
     containers:
     - args:
@@ -400,12 +763,20 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-based-upgrade-e2e-serial-conformance-baseline
-      - --variant=nightly-4.20-upgrade-from-stable-4.19
+      - --variant=nightly-4.22-upgrade-from-stable-4.21
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

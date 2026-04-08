@@ -1,0 +1,70 @@
+chain:
+  as: trusted-execution-clusters-operator-cleanup
+  steps:
+  - ref: trusted-execution-clusters-ref-operator-beaker-deprovision
+  documentation: |-
+    This chain performs comprehensive cleanup of all resources created during testing
+    on the Beaker bare metal machine.
+
+    The chain executes one step:
+
+    Step 1 - Beaker Deprovision (trusted-execution-clusters-ref-operator-beaker-deprovision):
+      - Connects to Beaker machine via SSH
+      - Collects pre-cleanup system state for post-mortem analysis
+      - Archives important logs before deletion:
+        * Kind deployment logs
+        * Kind cluster logs
+        * Operator installation logs
+      - Performs cleanup operations:
+        * Deletes Kind cluster using 'kind delete cluster'
+        * Removes container images (localhost:5000/*, operator images)
+        * Prunes dangling images from docker
+        * Removes temporary directories (/tmp/kind-*, /tmp/operator-*)
+        * Removes operator working directories (~/operator-kind-setup)
+      - Optionally restarts container runtime services (docker)
+      - Collects post-cleanup system state for verification
+      - Generates cleanup summary report
+
+    Cleanup Strategy:
+    - Best-effort cleanup: Individual operations may fail without causing the step to fail
+    - Ensures cleanup proceeds even if some resources are already gone
+    - Archives logs before deletion to preserve debugging information
+    - Restarts services to ensure clean state for future runs
+
+    Prerequisites:
+    - SSH credentials must be available in Vault
+    - Beaker machine must be accessible
+
+    Environment Variables:
+    - DEPROVISION_TIMEOUT: Timeout for cleanup operations (default: 600 seconds)
+    - CLEANUP_IMAGES: Whether to clean up container images (default: true)
+    - RESTART_SERVICES: Whether to restart services (default: true)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/cleanup-logs/pre-cleanup-state.log: System state before cleanup
+    - ${ARTIFACT_DIR}/cleanup-logs/post-cleanup-state.log: System state after cleanup
+    - ${ARTIFACT_DIR}/cleanup-logs/cleanup-execution.log: Detailed cleanup operation log
+    - ${ARTIFACT_DIR}/cleanup-logs/archived-logs/: Logs archived before deletion
+
+    After successful completion:
+    - Kind cluster is deleted
+    - Container images are cleaned up (if CLEANUP_IMAGES=true)
+    - Temporary files and directories are removed
+    - Operator working directories are removed
+    - Container runtime services are restarted (if RESTART_SERVICES=true)
+    - Beaker machine is ready for next test run
+
+    Exit Codes:
+    - 0: Cleanup completed successfully (best effort)
+    - 1: Critical failure (e.g., SSH connection issues)
+
+    Usage Notes:
+    - This chain should typically be used in the 'post' phase of workflows
+    - It will execute even if previous steps failed (post always runs)
+    - Set CLEANUP_IMAGES=false to preserve images for debugging
+    - Set RESTART_SERVICES=false to skip service restarts
+
+    Scope:
+    This chain is responsible for CLEANUP operations only.
+    It should run in the post phase to ensure resources are released
+    regardless of test success or failure.

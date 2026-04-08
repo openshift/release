@@ -6,8 +6,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: external-dns-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: external-dns-operator
 operator:
   bundles:
   - as: external-dns-operator-bundle
@@ -46,7 +47,7 @@ tests:
     from: src
 - as: e2e-aws-ovn-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -65,7 +66,7 @@ tests:
     workflow: optional-operators-ci-aws
 - as: e2e-gcp-ovn-operator
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -84,7 +85,7 @@ tests:
     workflow: optional-operators-ci-gcp
 - as: e2e-azure-ovn-operator
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -103,7 +104,7 @@ tests:
     workflow: optional-operators-ci-azure
 - as: e2e-azure-ovn-infoblox-operator
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -119,8 +120,7 @@ tests:
         export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
         make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/infoblox-credentials
+      - mount_path: /var/run/infoblox-credentials
         name: infoblox-credentials
         namespace: test-credentials
       from: src

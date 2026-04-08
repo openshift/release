@@ -118,8 +118,18 @@ queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --reque
 
 # Must gather steps to collect OpenShift logs
 mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
+
+# Download the binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
-find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+
+# Sanitize MCO resources to remove sensitive information.
+# If the sanitizer fails, fall back to manual redaction.
+if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather-appstudio"; then
+  find "${ARTIFACT_DIR}/must-gather-appstudio" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+fi       
 
 mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log

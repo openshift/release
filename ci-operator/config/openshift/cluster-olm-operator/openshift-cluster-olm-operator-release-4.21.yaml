@@ -1,25 +1,10 @@
-base_images:
-  ocp_4.20_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cluster-olm-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-olm-operator
 promotion:
   to:
   - name: "4.21"
@@ -42,6 +27,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
 - as: lint
   commands: make lint
   container:
@@ -53,26 +42,26 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-devpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-customnoupgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '[NewOLMWebhookProviderOpenshiftServiceCA=true]'
       FEATURE_SET: CustomNoUpgrade

@@ -14,18 +14,19 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
 images:
-- dockerfile_path: tools/openshift-ci/Dockerfile
-  from: base
-  to: verification-tests
-- dockerfile_literal: |
-    FROM this-is-ignored-and-not-used
-    USER root
-    RUN set -x && \
-        curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz -o /tmp/gcloud.tar.gz && \
-        tar -C /opt -xf /tmp/gcloud.tar.gz && \
-        /opt/google-cloud-sdk/install.sh --usage-reporting false --quiet --path-update true
-  from: droute
-  to: junit2reportportal
+  items:
+  - dockerfile_path: tools/openshift-ci/Dockerfile
+    from: base
+    to: verification-tests
+  - dockerfile_literal: |
+      FROM this-is-ignored-and-not-used
+      USER root
+      RUN set -x && \
+          curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz -o /tmp/gcloud.tar.gz && \
+          tar -C /opt -xf /tmp/gcloud.tar.gz && \
+          /opt/google-cloud-sdk/install.sh --usage-reporting false --quiet --path-update true
+    from: droute
+    to: datarouter2reportportal
 promotion:
   to:
   - namespace: ci

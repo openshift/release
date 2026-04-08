@@ -114,6 +114,19 @@ for _ in {1..60}; do
 done
 echo "Quay Operator is deployed successfully"
 
+echo "Waiting for QuayRegistry CRD to be available..."
+for _ in {1..30}; do
+  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "QuayRegistry CRD is available"
+    break
+  fi
+  sleep 5
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  echo "Timed out waiting for QuayRegistry CRD" >&2
+  exit 1
+fi
+
 #Deploy Quay, here disable monitoring component
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
@@ -129,6 +142,7 @@ FEATURE_PROXY_STORAGE: true
 FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_UI_MODELCARD: true
 SUPER_USERS:
   - quay
 USERFILES_LOCATION: default
@@ -153,11 +167,32 @@ AUTHENTICATION_TYPE: Database
 FEATURE_LISTEN_IP_VERSION: IPv4
 REPO_MIRROR_ROLLBACK: false
 AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+FEATURE_IMAGE_EXPIRY_TRIGGER: true 
+NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1 
 DEFAULT_TAG_EXPIRATION: 2w
 TAG_EXPIRATION_OPTIONS:
   - 2w
+  - 4w
+  - 8w
   - 1d
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+FEATURE_IMAGE_PULL_STATS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_IMMUTABLE_TAGS: true
+PULL_METRICS_REDIS:
+        host: quay-quay-redis
+        port: 6379
+        db: 1
 EOF
+
+# Merge caller-provided extra config if set
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+	echo "Merging extra Quay config into defaults..."
+	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+		-o /tmp/yq && chmod +x /tmp/yq
+	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+fi
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 

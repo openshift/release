@@ -4,11 +4,11 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: must-gather
-  ocp_4.20_base-rhel9:
-    name: "4.20"
+  ocp_4.22_base-rhel9:
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
 binary_build_commands: make build build-vgmanager
@@ -16,49 +16,57 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.25-openshift-4.22
 images:
-- dockerfile_literal: |-
-    FROM ocp_4.20_base-rhel9
-    RUN dnf install -y make git python3 python3-pip patch
-    RUN pip3 install pre-commit
+  items:
+  - dockerfile_literal: |-
+      FROM ocp_4.22_base-rhel9
+      RUN dnf install -y make git python3 python3-pip patch
+      RUN pip3 install pre-commit
 
-    COPY --from=root:current /usr/lib/golang /usr/local/go
-    ENV PATH=$PATH:/usr/local/go/bin
+      COPY --from=root:current /usr/lib/golang /usr/local/go
+      ENV PATH=$PATH:/usr/local/go/bin
 
-    ENV GOPATH=/tmp/go
-    ENV GOTOOLCHAIN=auto
-    ENV GOTOOLDIR=/tmp/gotools
+      ENV GOPATH=/tmp/go
+      ENV GOTOOLCHAIN=auto
+      ENV GOTOOLDIR=/tmp/gotools
 
-    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
-    RUN mkdir /.local && chmod 777 /.local
-    RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
+      RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+      RUN mkdir /.local && chmod 777 /.local
+      RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
 
-    ENV PRE_COMMIT_HOME=/.cache/precommit
-    ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+      ENV PRE_COMMIT_HOME=/.cache/precommit
+      ENV GOLANGCI_LINT_CACHE=/.cache/golangci
 
-    # Snyk
-    ENV SNYK_DIR=/tmp/snyk
-    RUN mkdir -p ${SNYK_DIR}
-    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-    RUN chmod +x ${SNYK_DIR}/snyk
-    ENV PATH=$PATH:${SNYK_DIR}
-  from: ocp_4.20_base-rhel9
-  inputs:
-    root:
-      as:
-      - root:current
-  to: lvms-pre-commit
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - fedora:latest
-  to: lvm-operator
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: lvms-must-gather
+      # Snyk
+      ENV SNYK_DIR=/tmp/snyk
+      RUN mkdir -p ${SNYK_DIR}
+      RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
+      RUN chmod +x ${SNYK_DIR}/snyk
+      ENV PATH=$PATH:${SNYK_DIR}
+    from: ocp_4.22_base-rhel9
+    inputs:
+      root:
+        as:
+        - root:current
+    to: lvms-pre-commit
+  - dockerfile_path: Dockerfile
+    inputs:
+      ocp_4.22_base-rhel9:
+        as:
+        - fedora:latest
+    to: lvm-operator
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: lvms-must-gather
+  - context_dir: .
+    dockerfile_path: test/integration/Dockerfile
+    inputs:
+      ocp_4.22_base-rhel9:
+        as:
+        - registry.access.redhat.com/ubi9/ubi-minimal:latest
+    to: lvm-operator-integration-test
 operator:
   bundles:
   - as: lvm-operator-bundle
@@ -72,25 +80,26 @@ promotion:
       lvm-operator-bundle: lvm-operator-bundle
     excluded_images:
     - lvms-pre-commit
+    - lvm-operator-integration-test
     namespace: lvms
     tag: latest
     tag_by_commit: true
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -98,6 +107,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  precommit-check:
+    requests:
+      cpu: 100m
+      memory: 4Gi
 test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
@@ -158,7 +171,7 @@ tests:
   presubmit: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -167,7 +180,10 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: make e2e
+      commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
       from: test-bin
       resources:
         requests:
@@ -191,7 +207,7 @@ tests:
   presubmit: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -201,6 +217,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
       from: test-bin
       resources:
         requests:
@@ -222,12 +241,12 @@ tests:
 - as: e2e-aws-hypershift
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
-      HYPERSHFIT_SKIP_VERSION_VALIDATION: "true"
+      HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
       OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
@@ -252,6 +271,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-aws-single-node-integration-tests
+  cron: '@weekly'
+  presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
 zz_generated_metadata:
   branch: main
   org: openshift

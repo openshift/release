@@ -1,41 +1,33 @@
-base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cluster-api-actuator-pkg-test
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
     excluded_images:
     - cluster-api-actuator-pkg-test
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   multi-initial:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -53,7 +45,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -62,12 +54,14 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
-- as: e2e-aws-capi-techpreview
+- always_run: false
+  as: e2e-aws-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/aws\.go
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -78,6 +72,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-vsphere-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -91,11 +86,12 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-vsphere
 - as: e2e-azure-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -104,12 +100,14 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
-- as: e2e-azure-capi-techpreview
+- always_run: false
+  as: e2e-azure-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/azure\.go
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -120,10 +118,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -135,8 +134,10 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-capi-techpreview
+- always_run: false
+  as: e2e-gcp-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/gcp\.go
   steps:
@@ -152,10 +153,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-openstack-operator
+- always_run: false
+  as: e2e-openstack-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -169,12 +171,13 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -183,11 +186,12 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-aws-operator-periodic
   interval: 72h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -196,6 +200,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - always_run: false
   as: e2e-vsphere-operator-periodic-pre
@@ -210,9 +215,10 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator-periodic
-  interval: 72h
+  cron: 56 11 * * 3,4,5
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -223,12 +229,13 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-azure-operator-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -237,11 +244,12 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
 - as: e2e-azure-operator-periodic
   interval: 72h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -250,6 +258,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
 - always_run: false
   as: e2e-gcp-periodic-pre
@@ -264,6 +273,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-operator-periodic
   interval: 72h
@@ -277,6 +287,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-multi-operator-periodic
   interval: 72h
@@ -297,6 +308,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-openstack-operator-periodic-pre
@@ -314,6 +326,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-operator-periodic
   minimum_interval: 72h
@@ -329,13 +342,8 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-openstack-ipi
-- as: security
-  optional: true
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-actuator-pkg
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

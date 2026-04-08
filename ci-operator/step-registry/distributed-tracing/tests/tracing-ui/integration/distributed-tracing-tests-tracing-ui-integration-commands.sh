@@ -20,6 +20,10 @@ vars=(
   CYPRESS_CUSTOM_COO_BUNDLE_IMAGE
   CYPRESS_DT_CONSOLE_IMAGE
   CYPRESS_COO_NAMESPACE
+  CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
+  CYPRESS_LIGHTSPEED_PROVIDER_URL
+  CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -46,6 +50,30 @@ fi
 kubeadmin_password=$(cat "${KUBEADMIN_PASSWORD_FILE}")
 echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
 
+# Read Lightspeed credentials from vault if not already set
+LIGHTSPEED_PROVIDER_TOKEN_FILE="/var/run/vault/dt-secrets/lightspeed-provider-token"
+LIGHTSPEED_PROVIDER_URL_FILE="/var/run/vault/dt-secrets/lightspeed-provider-url"
+
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_TOKEN:-}" ]]; then
+  if [[ -f "${LIGHTSPEED_PROVIDER_TOKEN_FILE}" ]]; then
+    CYPRESS_LIGHTSPEED_PROVIDER_TOKEN=$(cat "${LIGHTSPEED_PROVIDER_TOKEN_FILE}")
+    export CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+    echo "Successfully read Lightspeed provider token from ${LIGHTSPEED_PROVIDER_TOKEN_FILE}"
+  else
+    echo "Warning: Lightspeed provider token file ${LIGHTSPEED_PROVIDER_TOKEN_FILE} does not exist"
+  fi
+fi
+
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_URL:-}" ]]; then
+  if [[ -f "${LIGHTSPEED_PROVIDER_URL_FILE}" ]]; then
+    CYPRESS_LIGHTSPEED_PROVIDER_URL=$(cat "${LIGHTSPEED_PROVIDER_URL_FILE}")
+    export CYPRESS_LIGHTSPEED_PROVIDER_URL
+    echo "Successfully read Lightspeed provider URL from ${LIGHTSPEED_PROVIDER_URL_FILE}"
+  else
+    echo "Warning: Lightspeed provider URL file ${LIGHTSPEED_PROVIDER_URL_FILE} does not exist"
+  fi
+fi
+
 # Set proxy vars.
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
@@ -60,6 +88,10 @@ fi
 # Function to copy artifacts to the artifact directory after test run.
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
+    # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
+    cp gui_test_screenshots/junit_cypress-*.xml "${ARTIFACT_DIR}/junit_distributed-tracing-console-plugin.xml" 2>/dev/null || true
+    # Remove the duplicate junit file from gui_test_screenshots before copying to artifact dir
+    rm -f gui_test_screenshots/junit_cypress-*.xml 2>/dev/null || true
     cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
     echo "Artifacts copied successfully."
   else
@@ -139,47 +171,29 @@ export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
-# Fetch the OpenShift version and extract the minor version
-oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d . -f 2)
-
-echo "Detected OpenShift minor version: $oc_version_minor"
-
 # Define the repository URL and target directory
 repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
 target_dir="/tmp/distributed-tracing-console-plugin"
 
-# Clone the repository and checkout the appropriate branch based on the OpenShift version
-if [[ "$oc_version_minor" -ge 19 ]]; then
-  echo "OpenShift version is 4.$oc_version_minor or greater. Cloning the main branch."
-  git clone "$repo_url" "$target_dir"
-  if [ $? -eq 0 ]; then
-    cd "$target_dir/tests" || exit 0
-    git checkout release-1.0
-    echo "Successfully cloned the repository and changed directory to $target_dir/tests."
-  else
-    echo "Error cloning the repository."
-    exit 0
-  fi
+# Clone the repository (uses main branch by default)
+echo "Cloning the repository."
+git clone "$repo_url" "$target_dir"
+if [ $? -eq 0 ]; then
+  cd "$target_dir/tests" || exit 0
+  echo "Successfully cloned the repository and changed directory to $target_dir/tests."
 else
-  echo "OpenShift version is less than 4.19. Cloning and checking out the release-0.4 branch."
-  git clone "$repo_url" "$target_dir"
-  if [ $? -eq 0 ]; then
-    cd "$target_dir/tests" || exit 0
-    git checkout release-0.4
-    if [ $? -eq 0 ]; then
-      echo "Successfully cloned the repository, changed directory to $target_dir/tests, and checked out the release-0.4 branch."
-    else
-      echo "Error checking out the release-0.4 branch."
-      exit 0
-    fi
-  else
-    echo "Error cloning the repository."
-    exit 0
-  fi
+  echo "Error cloning the repository."
+  exit 0
 fi
 
 # Install npm modules
 npm install || true
 
-# Run the Cypress tests.
-npm run test-cypress-console-headless || true
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true || true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless || true
+fi

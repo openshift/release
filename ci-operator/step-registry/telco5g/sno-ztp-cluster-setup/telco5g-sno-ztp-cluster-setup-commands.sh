@@ -22,7 +22,7 @@ BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 
 # Use latest stable version for mgmt cluster
-MGMT_VERSION=4.18
+MGMT_VERSION=4.19
 MGMT_RELEASE=stable
 
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"

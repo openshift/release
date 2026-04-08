@@ -33,6 +33,10 @@ function config_agentserviceconfig() {
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
+ annotations:
+  # TODO: Remove after OCPBUGS-55106 is fixed
+  # OCPBUGS-55106 workaround
+  unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
  name: agent
 spec:
  databaseStorage:
@@ -69,6 +73,43 @@ $( [ "${DISCONNECTED}" = "true" ] && echo \
 END
 }
 
+# See https://issues.redhat.com/browse/OCPQE-31328
+# Specific images need to be pulled from stage registry as they're no longer available in Brew.
+function deploy_image_digest_mirror_set() {
+  local mirror=${1:?mirror is required}
+  oc apply -f - <<END
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-agentserviceconfig
+  namespace: ${ASSISTED_NAMESPACE}
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${mirror}/rhel8/postgresql-12
+    source: registry.redhat.io/rhel8/postgresql-12
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-13
+    source: registry.redhat.io/rhel9/postgresql-13
+END
+}
+
+function set_cluster_auth_stage() {
+  local mirror=${1:?mirror is required}
+  local registry_creds
+
+  echo "Setting cluster authentication for stage proxy registry"
+  oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+
+  registry_creds=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+
+  jq --argjson a "{\"${mirror}\": {\"auth\": \"$registry_creds\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
+
+  echo "Proxy registry authentication configured"
+}
+
 function deploy_mirror_config_map() {
   if [ "${DISCONNECTED}" = "true" ]; then
     oc get configmap -n openshift-config user-ca-bundle -o json | \
@@ -90,7 +131,7 @@ $( [ "${DISCONNECTED}" = "true" ] && cat /tmp/ca-bundle-crt)
 
     # Check if ImageDigestMirrorSet exists and has items
     $(if [[ $(oc get ImageDigestMirrorSet -o name 2>/dev/null | wc -l) -gt 0 ]]; then
-      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.mirrors[] | [.mirror, .source]')" | \
+      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.imageDigestMirrors[] | [.mirrors[0], .source]')" | \
         while read row; do
           row=$(echo ${row} | tr -d '[]"');
           source=$(echo ${row} | cut -d',' -f2);
@@ -121,6 +162,42 @@ if [ "${DISCONNECTED}" = "true" ]; then
   result=$(ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_VERSION" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 CLUSTER_VERSION="${1}"
 
+# Workaround for https://issues.redhat.com/browse/OCPBUGS-74263
+function mirror_capi_specific_release() {
+
+  # Use oc adm release mirror which preserves digests in the target registry
+  # Same as the one defined in support/backwardcompat/backwardcompat.go in openshift/hypershift
+  if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+    oc adm release mirror \
+      --insecure=true --keep-manifest-list=true \
+      -a ${PULL_SECRET_FILE}  \
+      --from quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962 \
+      --to ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+  fi
+
+  # Might need to be udpated in the future when a backport is merged for
+  # https://github.com/openshift/hypershift/pull/7575
+  if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+    oc adm release mirror \
+      --insecure=true --keep-manifest-list=true \
+      -a ${PULL_SECRET_FILE}  \
+      --from quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58 \
+      --to ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+  fi
+
+  oc apply -f - <<END
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+END
+}
+
 function mirror_file() {
   remote_url="${1}"
   httpd_path="${2}"
@@ -143,6 +220,8 @@ cd /root/dev-scripts
 source common.sh
 source network.sh
 
+mirror_capi_specific_release
+
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' /root/default_os_images.json)
 MIRROR_BASE_URL="http://$(wrap_if_ipv6 ${PROVISIONING_HOST_IP})/images"
 for i in $(seq 0 $(($(echo ${OS_IMAGES} | jq length) - 1))); do
@@ -158,6 +237,17 @@ EOF
     mirror_rhcos_image="${MIRROR_BASE_URL}/$(echo ${OS_IMAGES} | jq -r ".[$i].url" | cut -d / -f 4-)"
     OS_IMAGES=$(echo ${OS_IMAGES} | jq ".[$i].url=\"${mirror_rhcos_image}\"")
   done
+fi
+
+if [ "${DISCONNECTED}" = "true" ]; then
+  if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    echo "Mirror registry URL file not found"
+    exit 1
+  fi
+  mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  mirror_registry_stage_url="${mirror_registry_url//5000/6003}"
+  set_cluster_auth_stage "${mirror_registry_stage_url}"
+  deploy_image_digest_mirror_set "${mirror_registry_stage_url}"
 fi
 
 deploy_mirror_config_map

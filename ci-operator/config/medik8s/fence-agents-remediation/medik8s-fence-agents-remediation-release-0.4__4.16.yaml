@@ -7,9 +7,10 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: os
-  to: fence-agents-remediation
+  items:
+  - dockerfile_path: Dockerfile
+    from: os
+    to: fence-agents-remediation
 operator:
   bundles:
   - as: my-bundle
@@ -40,10 +41,10 @@ tests:
   steps:
     cluster_profile: medik8s-aws
     env:
-      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: far-install
     test:
-    - as: e2e-install-operator-last-version
+    - as: install-last-operator-version
       cli: latest
       commands: |
         make create-ns
@@ -61,7 +62,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-upgrade-operator-latest
+    - as: upgrade-operator-latest
       cli: latest
       commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
       dependencies:
@@ -74,7 +75,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-test
+    - as: test-command
       cli: latest
       commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make ocp-aws-credentials
         test-e2e

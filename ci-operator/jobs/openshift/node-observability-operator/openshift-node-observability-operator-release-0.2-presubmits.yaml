@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build04
+    cluster: build08
     context: ci/prow/ci-index-node-observability-operator-bundle
     decorate: true
     labels:
@@ -22,7 +22,7 @@ presubmits:
         - --target=ci-index-node-observability-operator-bundle
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -79,9 +79,17 @@ presubmits:
         - --target=e2e-gcp
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -130,7 +138,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build04
+    cluster: build08
     context: ci/prow/images
     decorate: true
     labels:
@@ -147,7 +155,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -183,7 +191,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build04
+    cluster: build08
     context: ci/prow/unit
     decorate: true
     labels:
@@ -200,9 +208,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -236,7 +252,7 @@ presubmits:
     branches:
     - ^release-0\.2$
     - ^release-0\.2-
-    cluster: build04
+    cluster: build08
     context: ci/prow/verify
     decorate: true
     labels:
@@ -253,9 +269,17 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

@@ -34,55 +34,56 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ci-images/Dockerfile.base
-  to: assisted-service-base
-- dockerfile_path: ci-images/Dockerfile.unit-tests
-  from: assisted-service-base
-  to: assisted-service-unit-test
-- dockerfile_path: ci-images/Dockerfile.lint
-  from: assisted-service-base
-  to: assisted-service-lint
-- dockerfile_path: ci-images/Dockerfile.subsystem
-  from: assisted-service-base
-  to: assisted-service-subsystem
-- dockerfile_path: ci-images/Dockerfile.code-generation
-  from: assisted-service-base
-  to: assisted-service-generate
-- dockerfile_path: Dockerfile.assisted-service-build
-  to: assisted-service-build-base
-- dockerfile_literal: |
-    FROM base-build
-    COPY . .
-  inputs:
-    assisted-service-build-base:
-      as:
-      - base-build
-    src:
-      paths:
-      - destination_dir: ./
-        source_path: /go/src/github.com/openshift/assisted-service/.
-  to: assisted-service-build
-- dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service
-- build_args:
-  - name: RHEL_VERSION
-    value: "8"
-  dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service-el8
-- dockerfile_literal: |
-    FROM quay.io/multi-arch/yq:4.30.5 as yq4
-    FROM coreos/stream9:9
-    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
-    COPY . .
-  from: src
-  to: assisted-service-scripts
-- dockerfile_path: Dockerfile.assisted-service-debug
-  to: assisted-service-debug
-- dockerfile_literal: |
-    FROM coreos/stream9:9
-    RUN dnf install -y --skip-broken skopeo pip
-  from: src
-  to: assisted-service-publish-index
+  items:
+  - dockerfile_path: ci-images/Dockerfile.base
+    to: assisted-service-base
+  - dockerfile_path: ci-images/Dockerfile.unit-tests
+    from: assisted-service-base
+    to: assisted-service-unit-test
+  - dockerfile_path: ci-images/Dockerfile.lint
+    from: assisted-service-base
+    to: assisted-service-lint
+  - dockerfile_path: ci-images/Dockerfile.subsystem
+    from: assisted-service-base
+    to: assisted-service-subsystem
+  - dockerfile_path: ci-images/Dockerfile.code-generation
+    from: assisted-service-base
+    to: assisted-service-generate
+  - dockerfile_path: Dockerfile.assisted-service-build
+    to: assisted-service-build-base
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      assisted-service-build-base:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./
+          source_path: /go/src/github.com/openshift/assisted-service/.
+    to: assisted-service-build
+  - dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service
+  - build_args:
+    - name: RHEL_VERSION
+      value: "8"
+    dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service-el8
+  - dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM coreos/stream9:9
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY . .
+    from: src
+    to: assisted-service-scripts
+  - dockerfile_path: Dockerfile.assisted-service-debug
+    to: assisted-service-debug
+  - dockerfile_literal: |
+      FROM coreos/stream9:9
+      RUN dnf install -y --skip-broken skopeo pip
+    from: src
+    to: assisted-service-publish-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -124,7 +125,7 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-nightly-image
-  cron: '@daily'
+  cron: 10 21 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
@@ -133,7 +134,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-nightly-image-el8
-  cron: '@daily'
+  cron: 30 21 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service-el8
@@ -264,7 +265,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  cron: 00 21 * * 6
+  cron: 0 20 * * 6
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -335,7 +336,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  cron: 00 16 * * 6
+  cron: 30 20 * * 6
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -364,7 +365,8 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -374,10 +376,10 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-periodic
-  cluster: build05
-  cron: 00 07 * * 6
+  capabilities:
+  - intranet
+  cron: 0 21 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -386,10 +388,10 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-3masters
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -401,10 +403,10 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cluster: build05
-  cron: 00 09 * * 6
+  capabilities:
+  - intranet
+  cron: 30 21 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -416,9 +418,9 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -430,10 +432,10 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cluster: build05
-  cron: 00 06 * * 6
+  capabilities:
+  - intranet
+  cron: 0 22 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -444,10 +446,10 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-workers
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -460,10 +462,10 @@ tests:
         NUMBER_OF_DAY2_HOSTS=2
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-compact-day2-masters
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -477,10 +479,10 @@ tests:
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -493,10 +495,10 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cluster: build05
-  cron: 00 17 * * 6
+  capabilities:
+  - intranet
+  cron: 30 22 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -509,10 +511,10 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-node-labels-periodic
-  cluster: build05
-  cron: 00 19 * * 6
+  capabilities:
+  - intranet
+  cron: 0 23 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -530,10 +532,10 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-node-labels
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -551,10 +553,10 @@ tests:
         TEST_TO_RUN='node-labels'
       NUM_EXTRA_WORKERS: "6"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -568,10 +570,10 @@ tests:
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cluster: build05
-  cron: 00 23 * * 6
+  capabilities:
+  - intranet
+  cron: 30 23 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -585,10 +587,10 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -602,10 +604,10 @@ tests:
         BAREMETALHOSTS_IGNITION_OVERRIDE='{"ignition":{"version":"3.2.0"},"storage":{"disks":[{"device":"/dev/sda","partitions":[{"label":"root","number":4,"resize":true,"sizeMiB":61440},{"label":"lso_1G_1","sizeMiB":1024},{"label":"lso_1G_2","sizeMiB":1024},{"label":"lso_1G_3","sizeMiB":1024}],"wipeTable":false}]}}'
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-sno-day2-masters
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -619,9 +621,9 @@ tests:
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -634,10 +636,10 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-ofcir-baremetal-operator-capi
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-capi-periodic
-  cluster: build05
-  cron: 00 15 * * 6
+  capabilities:
+  - intranet
+  cron: 0 0 * * 0
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -650,9 +652,9 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal-operator-capi
-  timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -668,10 +670,10 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-capi
-  timeout: 6h0m0s
 - as: e2e-ai-operator-disconnected-capi-periodic
-  cluster: build05
-  cron: 00 09 * * 6
+  capabilities:
+  - intranet
+  cron: 30 1 * * 0
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -687,10 +689,10 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-capi
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-3masters-ocp
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -702,10 +704,10 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ai-operator-ztp-multiarch-sno-ocp
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -717,10 +719,10 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 - as: e2e-ai-operator-ztp-remove-node-periodic
-  cluster: build05
-  cron: 00 22 * * 6
+  capabilities:
+  - intranet
+  cron: 0 1 * * 0
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -736,7 +738,6 @@ tests:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-ofcir-baremetal-operator-ztp
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-ocm-2.12
   org: openshift

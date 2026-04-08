@@ -4,9 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3.6
+git checkout rhosdt-3.9
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
@@ -40,37 +46,59 @@ fi
 # Initialize a variable to keep track of errors
 any_errors=false
 
+# Determine OpenShift version and set sidecar selector (unified parsing)
+oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d . -f 2 || true)
+selector="sidecar=legacy"
+if [[ -n "$oc_version_minor" ]] && [[ "$oc_version_minor" -ge 16 ]]; then
+  selector="sidecar=native"
+fi
+
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
 tests/e2e \
 tests/e2e-autoscale \
+tests/e2e-crd-validations \
 tests/e2e-openshift \
-tests/e2e-prometheuscr \
 tests/e2e-instrumentation \
 tests/e2e-pdb \
-tests/e2e-opampbridge \
 tests/e2e-otel \
 tests/e2e-multi-instrumentation \
 tests/e2e-targetallocator-cr \
 tests/e2e-targetallocator || any_errors=true
 
-# Set the operator args required for tests execution.
+# Execute sidecar-related tests with version-dependent selector
+chainsaw test \
+--quiet \
+--report-name "junit_otel_e2e_sidecar_prometheuscr" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--selector "$selector" \
+--test-dir \
+tests/e2e-prometheuscr \
+tests/e2e-sidecar || any_errors=true
+
+# Set the operator environment variables for metadata filters tests.
 OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\"]}]"
+oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"ANNOTATIONS_FILTER","value":".*filter.out,config.*.gke.io.*"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"LABELS_FILTER","value":".*filter.out"}}
+]'
 sleep 60
-if oc -n openshift-opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-product.openshift-opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
-    echo "CSV updated successfully, continuing script execution..."
+if oc -n openshift-opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+    echo "Operator deployment updated successfully for metadata filters, continuing script execution..."
 else
-    echo "Operator CSV update failed, exiting with error."
+    echo "Operator deployment update for metadata filters failed, exiting with error."
     exit 1
 fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_metadata_filters" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \

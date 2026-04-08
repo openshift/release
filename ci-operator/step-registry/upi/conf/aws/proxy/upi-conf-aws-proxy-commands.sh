@@ -1,11 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; if [[ -n "$tmpDir" ]]; then rm -rf ${tmpDir}; fi' EXIT TERM
+
+pushd ${SHARED_DIR}
+USER_NAME=$(yq-go r "install-config.yaml" "metadata.name")
+base_domain=$(yq-go r "install-config.yaml" "baseDomain")
+PROXY_DNS="squid.${USER_NAME}.${base_domain}"
+popd
+
 echo "Generating proxy certs..."
-ROOTCA=${SHARED_DIR}/CA
+tmpDir=$(mktemp -d)
+ROOTCA="${tmpDir}/CA"
 INTERMEDIATE=${ROOTCA}/INTERMEDIATE
 
-mkdir ${ROOTCA}
+mkdir -p ${ROOTCA}
 pushd ${ROOTCA}
 mkdir certs crl newcerts private
 chmod 700 private
@@ -124,7 +139,7 @@ openssl req -config openssl.cnf \
 
 chmod 444 certs/ca.cert.pem
 
-mkdir ${INTERMEDIATE}
+mkdir -p ${INTERMEDIATE}
 pushd ${INTERMEDIATE}
 
 mkdir certs crl csr newcerts private
@@ -195,7 +210,7 @@ organizationName        = "OpenShift Origin"
 organizationalUnitName  = "CI Proxy"
 commonName              = "CI Proxy"
 [ req_ext ]
-subjectAltName          = "DNS.1:*.compute-1.amazonaws.com"
+subjectAltName          = "DNS.1:${PROXY_DNS}"
 [ v3_ca ]
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
@@ -272,10 +287,6 @@ PROXY_KEY_PASSWORD="$(cat ${ROOTCA}/intpassfile)"
 
 CA_CHAIN="$(base64 -w0 ${INTERMEDIATE}/certs/ca-chain.cert.pem)"
 # create random uname and pw
-pushd ${SHARED_DIR}
-USER_NAME=$(yq-go r "install-config.yaml" "metadata.name")
-base_domain=$(yq-go r "install-config.yaml" "baseDomain")
-popd
 PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
 
 HTPASSWD_CONTENTS="${USER_NAME}:$(openssl passwd -apr1 ${PASSWORD})"
@@ -286,22 +297,19 @@ KEY_PASSWORD="$(base64 -w0 << EOF
 echo ${PROXY_KEY_PASSWORD}
 EOF
 )"
-PROXY_DNS="squid.${USER_NAME}.${base_domain}"
 
 export PROXY_URL="http://${USER_NAME}:${PASSWORD}@${PROXY_DNS}:3128/"
 export TLS_PROXY_URL="https://${USER_NAME}:${PASSWORD}@${PROXY_DNS}:3130/"
 
-echo ${PROXY_URL} > ${SHARED_DIR}/PROXY_URL 
-echo ${TLS_PROXY_URL} > ${SHARED_DIR}/TLS_PROXY_URL
+echo ${PROXY_URL} > ${SHARED_DIR}/http_proxy_url
+echo ${TLS_PROXY_URL} > ${SHARED_DIR}/https_proxy_url
 
-# TODO:
-# restore using "httpsProxy: ${TLS_PROXY_URL}"
-# once we have a squid image with at least version 4.x so that we can do a TLS 1.3 handshake.
-# Currently 3.5 only does up to 1.2 which podman fails to do a handshake with  https://github.com/containers/image/issues/699
-
+# need a squid image with at least version 4.x so that we can do a TLS 1.3 handshake.
+# 4.5:egress-http-proxy image only does up to 1.2 which podman fails to do a handshake with  https://github.com/containers/image/issues/699
+PROXY_IMAGE=registry.ci.openshift.org/origin/4.18:egress-http-proxy
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 proxy:
-  httpsProxy: ${PROXY_URL}
+  httpsProxy: ${TLS_PROXY_URL}
   httpProxy: ${PROXY_URL}
 additionalTrustBundle: |
 $(cat ${INTERMEDIATE}/certs/ca-chain.cert.pem | awk '{print "  "$0}')
@@ -313,36 +321,26 @@ http_port 3128
 sslpassword_program /squid/passwd.sh
 https_port 3130 cert=/squid/tls.crt key=/squid/tls.key cafile=/squid/ca-chain.pem
 cache deny all
-access_log stdio:/tmp/squid-access.log all
 debug_options ALL,1
 shutdown_lifetime 0
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /squid/passwords
 auth_param basic realm proxy
 acl authenticated proxy_auth REQUIRED
 http_access allow authenticated
-pid_filename /tmp/proxy-setup
 EOF
 )"
-
-PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
 
 # define squid.sh
 SQUID_SH="$(base64 -w0 << EOF
 #!/bin/bash
-podman run --entrypoint='["bash", "/squid/proxy.sh"]' --expose=3128 --net host --volume /tmp/squid:/squid:Z ${PROXY_IMAGE}
+podman run --entrypoint='["bash", "/squid/proxy.sh"]' -p 3128:3128 -p 3130:3130 --net host --volume /srv/squid:/squid:Z --volume /srv/squid/log:/var/log/squid:Z ${PROXY_IMAGE}
 EOF
 )"
 
 # define proxy.sh
 PROXY_SH="$(base64 -w0 << EOF
 #!/bin/bash
-function print_logs() {
-while [[ ! -f /tmp/squid-access.log ]]; do
-sleep 5
-done
-tail -f /tmp/squid-access.log
-}
-print_logs &
+chown -R squid:squid /var/log/squid
 squid -N -f /squid/squid.conf
 EOF
 )"
@@ -350,7 +348,6 @@ EOF
 # create ignition entries for certs and script to start squid and systemd unit entry
 # create the proxy stack and then get its IP
 # generate proxy ignition
-export SSH_PUB_KEY=${CLUSTER_PROFILE_DIR}/ssh-publickey
 cat > ${SHARED_DIR}/proxy.ign << EOF
 {
   "ignition": {
@@ -359,106 +356,78 @@ cat > ${SHARED_DIR}/proxy.ign << EOF
       "tls": {}
     },
     "timeouts": {},
-    "version": "2.2.0"
+    "version": "3.0.0"
   },
   "passwd": {
     "users": [
       {
         "name": "core",
-        "sshAuthorizedKeys": [
-          "${SSH_PUB_KEY}"
-        ]
+        "sshAuthorizedKeys": []
       }
     ]
   },
   "storage": {
     "files": [
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/passwords",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/passwords",
         "contents": {
           "source": "data:text/plain;base64,${HTPASSWD_CONTENTS}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/tls.crt",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/tls.crt",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_CERT}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/tls.key",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/tls.key",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_KEY}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/ca-chain.pem",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/ca-chain.pem",
         "contents": {
           "source": "data:text/plain;base64,${CA_CHAIN}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/squid.conf",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/squid.conf",
         "contents": {
           "source": "data:text/plain;base64,${SQUID_CONFIG}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid.sh",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid.sh",
         "contents": {
           "source": "data:text/plain;base64,${SQUID_SH}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/proxy.sh",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/proxy.sh",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_SH}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
-        "path": "/tmp/squid/passwd.sh",
-        "user": {
-          "name": "root"
-        },
+        "path": "/srv/squid/passwd.sh",
         "contents": {
           "source": "data:text/plain;base64,${KEY_PASSWORD}"
         },
+        "mode": 493
+      }
+    ],
+    "directories": [
+      {
+        "path": "/srv/squid/log",
         "mode": 493
       }
     ]
@@ -466,7 +435,7 @@ cat > ${SHARED_DIR}/proxy.ign << EOF
   "systemd": {
     "units": [
       {
-        "contents": "[Service]\n\nExecStart=bash /tmp/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Service]\n\nExecStart=bash /srv/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
         "enabled": true,
         "name": "squid.service"
       },
@@ -487,6 +456,21 @@ cat > ${SHARED_DIR}/proxy.ign << EOF
   }
 }
 EOF
+# update ssh keys
+tmp_keys_json=`mktemp`
+tmp_file=`mktemp`
+echo '[]' > "$tmp_keys_json"
+
+ssh_pub_keys_file="${CLUSTER_PROFILE_DIR}/ssh-publickey"
+readarray -t contents < "${ssh_pub_keys_file}"
+for ssh_key_content in "${contents[@]}"; do
+  jq --arg k "$ssh_key_content" '. += [$k]' < "${tmp_keys_json}" > "${tmp_file}"
+  mv "${tmp_file}" "${tmp_keys_json}"
+done
+
+jq --argjson k "`jq '.| unique' "${tmp_keys_json}"`" '.passwd.users[0].sshAuthorizedKeys = $k' < "${SHARED_DIR}/proxy.ign" > "${tmp_file}"
+mv "${tmp_file}" "${SHARED_DIR}/proxy.ign"
+
 cat > ${SHARED_DIR}/04_cluster_proxy.yaml << EOF
 AWSTemplateFormatVersion: 2010-09-09
 Description: Template for OpenShift Cluster Proxy (EC2 Instance, Security Groups and IAM)
@@ -649,6 +633,12 @@ Resources:
           - Effect: "Allow"
             Action: "ec2:Describe*"
             Resource: "*"
+          - Effect: "Allow"
+            Action: "s3:Get*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "s3:List*"
+            Resource: "*"
 
   ProxyInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -695,7 +685,7 @@ Resources:
         SubnetId: !Ref "PublicSubnet"
       UserData:
         Fn::Base64: !Sub
-        - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}'
+        - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}"}},"version":"3.0.0"}}'
         - {
           IgnitionLocation: !Ref ProxyIgnitionLocation
         }
@@ -707,11 +697,17 @@ Resources:
       HostedZoneId: !Ref PrivateHostedZoneId
       Name: !Join [".", ["squid", !Ref PrivateHostedZoneName]]
       ResourceRecords:
-      - !GetAtt ProxyInstance.PublicIp
+      - !GetAtt ProxyInstance.PrivateIp
       TTL: 60
       Type: A
 
 Outputs:
+  ProxyInstanceId:
+    Description: The proxy node Instance ID
+    Value: !Ref ProxyInstance
+  ProxyPrivateIP:
+    Description: The proxy node private IP address
+    Value: !GetAtt ProxyInstance.PrivateIp
   ProxyPublicIp:
     Description: The proxy node public IP address.
     Value: !GetAtt ProxyInstance.PublicIp

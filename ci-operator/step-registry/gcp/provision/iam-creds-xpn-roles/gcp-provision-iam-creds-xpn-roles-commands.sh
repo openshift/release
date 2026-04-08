@@ -55,14 +55,9 @@ readarray -t iam_accounts < <(gcloud iam service-accounts list --filter="display
 for sa_email in "${iam_accounts[@]}"; do
   display_name=$(gcloud iam service-accounts describe "${sa_email}" --format=json | jq -r .displayName)
   echo "INFO: email '${sa_email}' displayName '${display_name}'"
-  if [[ "${display_name}" =~ openshift-(machine-a|cloud-network-config) ]]; then
-    echo "INFO: Granting 'roles/compute.networkUser' to '${sa_email}'..."
-    cmd="gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member \"serviceAccount:${sa_email}\" --role \"roles/compute.networkUser\" 1>/dev/null"
-    backoff "${cmd}"
-    echo "$cmd" >>"${SHARED_DIR}/iam_creds_xpn_roles"
-  elif [[ "${display_name}" =~ openshift-ingre ]]; then
-    echo "INFO: Granting 'dns.networks.bindPrivateDNSZone' (custom role) to '${sa_email}'..."
-    cmd="gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member \"serviceAccount:${sa_email}\" --role \"projects/${HOST_PROJECT}/roles/dns.networks.bindPrivateDNSZone\" 1>/dev/null"
+  if [[ "${display_name}" =~ openshift-machine-a ]]; then
+    echo "INFO: Granting 'compute.subnetworks.use' (custom role) to '${sa_email}'..."
+    cmd="gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member \"serviceAccount:${sa_email}\" --role \"projects/${HOST_PROJECT}/roles/compute.subnetworks.use\" 1>/dev/null"
     backoff "${cmd}"
     echo "$cmd" >>"${SHARED_DIR}/iam_creds_xpn_roles"
   fi

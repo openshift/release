@@ -10,20 +10,21 @@ base_images:
 build_root:
   from_repository: true
 images:
-- context_dir: openshift-ci/build-root/source-image
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: oc-bin-image
-- dockerfile_path: openshift-ci/build-root/Dockerfile
-  from: oc-bin-image
-  to: dependencies
-- context_dir: .
-  from: src
-  to: gitops-operator
+  items:
+  - context_dir: openshift-ci/build-root/source-image
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: oc-bin-image
+  - dockerfile_path: openshift-ci/build-root/Dockerfile
+    from: oc-bin-image
+    to: dependencies
+  - context_dir: .
+    from: src
+    to: gitops-operator
 operator:
   bundles:
   - as: gitops-operator-bundle
@@ -49,6 +50,7 @@ resources:
       memory: 6Gi
 tests:
 - as: kuttl-sequential
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: gitops-aws
@@ -79,8 +81,10 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
+      timeout: 3h30m0s
     workflow: ipi-aws
 - as: kuttl-parallel
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: gitops-aws

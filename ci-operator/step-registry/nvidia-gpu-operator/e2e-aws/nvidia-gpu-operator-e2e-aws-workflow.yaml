@@ -3,7 +3,6 @@ workflow:
   steps:
     pre:
       - chain: ipi-conf-aws
-      - ref: single-node-conf-aws
       - chain: ipi-install
     test:
       - as: gpu-operator-e2e
@@ -27,10 +26,6 @@ workflow:
             default: "nvidiagpu"
             documentation: |-
               The subset of tests to run.
-          - name: NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE
-            default: "g4dn.xlarge"
-            documentation: |-
-              The AWS instance type with a NVIDIA GPU.
           - name: NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
             default: ""
             documentation: |-
@@ -52,7 +47,17 @@ workflow:
               A JSON patch that if specified, will be applied to the default cluster policy from ALM examples.
               The patch must be written according to RFC 6902, which is used with `kubectl patch` command.
     post:
-      - chain: ipi-aws-post
+      - ref: gather-must-gather
+      - ref: ipi-deprovision-deprovision
+      - ref: aws-deprovision-users-and-policies
+      - ref: aws-deprovision-verification
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      CONTROL_PLANE_REPLICAS: "1"
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
   documentation: |-
     This workflow provisions an OpenShift cluster on AWS suitable for installing the
     NVIDIA GPU operator, and preforms E2E tests on the operator.

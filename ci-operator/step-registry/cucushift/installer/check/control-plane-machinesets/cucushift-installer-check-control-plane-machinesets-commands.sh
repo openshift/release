@@ -48,15 +48,20 @@ function hasCPMS() {
 # check if the cluster is by IPI or UPI
 # return 0 if it is an IPI cluster, otherwise 1
 function isIPI() {
-    #oc get machines -n openshift-machine-api -o json | jq -r '.items[].metadata.labels."machine.openshift.io/cluster-api-machine-role"' | grep master
-    oc get cm -n openshift-config openshift-install -o yaml
-    if [ $? -eq 0 ]; then
-        # an IPI cluster
-        return 0
-    else
-        # a UPI cluster
-        return 1
-    fi
+  local invoker=""
+  if oc get cm openshift-install -n openshift-config &>/dev/null; then
+      invoker=$(oc get cm openshift-install -n openshift-config -o jsonpath='{.data.invoker}' 2>/dev/null)
+      if [ -n "$invoker" ]; then
+          # an IPI cluster
+          return 0
+      else
+          # a UPI cluster, some step also might manually create the configmap, e.g: ipi-install-times-collection
+          return 1
+      fi
+  else
+      # a UPI cluster
+      return 1
+  fi
 }
 
 # check if it is a Single-Node cluster

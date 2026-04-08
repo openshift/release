@@ -74,14 +74,8 @@ groups:
     - infra-image-mirroring.yaml
     - '[^-]infra-periodics.yaml'
   build01:
-    jobs:
-    - periodic-build01-upgrade
-    - release-openshift-ocp-installer-e2e-metal-serial-4.8
     paths:
     - infra-periodics-origin-release-images.yaml
-  build02:
-    jobs:
-    - periodic-build02-upgrade
 kvm:
 - build02
 - build04

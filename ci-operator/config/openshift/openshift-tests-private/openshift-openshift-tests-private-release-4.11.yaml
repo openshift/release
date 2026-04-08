@@ -3,14 +3,6 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.11"
-  ci_tests-private-baseui_4.11:
-    name: tests-private-baseui
-    namespace: ci
-    tag: "4.11"
-  ci_tests-private-builder_4.11:
-    name: tests-private-builder
-    namespace: ci
-    tag: "4.11"
   cli:
     name: "4.11"
     namespace: ocp
@@ -26,43 +18,34 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.11
 images:
-- dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.11
-  inputs:
-    ci_tests-private-builder_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.11
-  to: tests-private
-- dockerfile_literal: |
-    FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.11
-    RUN mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    ci_tests-private-baseui_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.11
-    src:
-      as:
-      - src
-  to: tests-private-ui
-- dockerfile_literal: |
-    FROM bin AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.11
-    RUN mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
-        rm -rf /usr/bin/oc /usr/bin/kubectl
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    bin:
-      as:
-      - bin
-    ci_tests-private-base_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-base:4.11
-  to: tests-private-pr
+  items:
+  - dockerfile_path: images/Dockerfile.golang
+    from: ci_tests-private-base_4.11
+    to: tests-private
+  - dockerfile_literal: |
+      FROM src AS builder
+      FROM registry.ci.openshift.org/ci/tests-private-baseui:4.11
+      RUN mkdir -p /go/src/github.com/openshift
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    inputs:
+      src:
+        as:
+        - src
+    to: tests-private-ui
+  - dockerfile_literal: |
+      FROM bin AS builder
+      FROM registry.ci.openshift.org/ci/tests-private-base:4.11
+      RUN mkdir -p /go/src/github.com/openshift
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+          rm -rf /usr/bin/oc /usr/bin/kubectl
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    inputs:
+      bin:
+        as:
+        - bin
+    to: tests-private-pr
 promotion:
   to:
   - excluded_images:
@@ -104,12 +87,12 @@ tests:
   container:
     from: src
   skip_if_only_changed: OWNERS$
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   optional: true
-  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|testdata|winc)/|OWNERS$
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -153,7 +136,8 @@ tests:
           cpu: "1"
           memory: 1Gi
     workflow: ipi-aws
-- as: e2e-console
+- always_run: false
+  as: e2e-console
   optional: true
   run_if_changed: frontend/tests/.*.ts
   steps:

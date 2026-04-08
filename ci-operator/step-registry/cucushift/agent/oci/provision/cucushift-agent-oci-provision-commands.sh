@@ -15,7 +15,7 @@ echo "export NAMESPACE_NAME=${NAMESPACE_NAME}; export BUCKET_NAME=${BUCKET_NAME}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/cluster-name.txt)
 BASE_DOMAIN=$(<"${SHARED_DIR}"/base-domain.txt)
 
-machineNetwork=$( [ "${ISCSI:-false}" == "true" ] && echo "10.0.32.0/20" || echo "10.0.16.0/20" )
+machineNetwork="10.0.16.0/20"
 
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 baseDomain: ${BASE_DOMAIN}
@@ -34,13 +34,10 @@ platform:
     platformName: oci
 "
 
-pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build03_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build03_auth=$(jq -c '.auths."registry.build03.ci.openshift.org"' ${build03_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build03_auth" '.auths["registry.build03.ci.openshift.org"] += $auth' "${pull_secret_path}")
-
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+pull_secret_path=/tmp/pull-secret
+pull_secret=$(jq -c . < "$pull_secret_path")
 
 # Add build03 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
@@ -57,9 +54,9 @@ pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
 echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
   --command=openshift-install --to=/tmp
-
+rm ${pull_secret_path}
 echo "Copying Custom Manifest"
 oci resource-manager job-output-summary list-job-outputs \
 --job-id "${JOB_ID}" \
@@ -108,12 +105,17 @@ VARIABLES=$(cat <<EOF
 "tenancy_ocid":"${OCI_CLI_TENANCY}",
 "create_openshift_instances":true,
 "compartment_ocid":"${COMPARTMENT_ID}",
-"region":"${OCI_CLI_REGION}"}
+"region":"${OCI_CLI_REGION}",
+"tag_namespace_name":"openshift-ci-abi",
+"enable_public_api_lb":true,
+"use_existing_tags":true,
+"tag_namespace_compartment_ocid":"${COMPARTMENT_ID}",
+"tag_namespace_compartment_ocid_resource_tagging":"${OCI_CLI_TENANCY}"}
 EOF
 )
 
 if [ "${ISCSI:-false}" = "true" ]; then
-    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.32.20"}')
+    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.16.20"}')
 fi
 
 echo "Updating Stack Variables"

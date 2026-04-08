@@ -1,0 +1,51 @@
+ref:
+  as: hypershift-mce-ibmz-create-s390xmgmt 
+  cli: latest
+  env:
+    - name: CLUSTER_NAME_PREFIX
+      documentation: "Desired cluster name prefix"
+      default: "hcp-s390x-mgmt-ci"
+    - name: CLUSTER_VERSION
+      documentation: "Desired openshift cluster version"
+    - name: CONTROL_NODE_COUNT
+      documentation: "Desired number of master / control nodes for the openshift cluster"
+    - name: COMPUTE_NODE_COUNT
+      documentation: "Desired number of worker / compute nodes for the openshift cluster"
+    - name: REGION
+      documentation: "IBM Cloud region name to create the cluster"
+    - name: RESOURCE_GROUP
+      documentation: "Your resource group name in IBM Cloud, which is already created and has access"
+    - name: AGENT_IBMZ_CREDENTIALS
+      default: /etc/hypershift-agent-ibmz-credentials
+    - name: IC_CLI_VERSION
+      documentation: "Your IC CLI VERSION will be the IBM Cloud CLI version"
+    - name: CONTROL_NODE_PROFILE
+      documentation: "Desired control node profile"
+      default: "cz2-16x32"
+    - name: COMPUTE_NODE_PROFILE
+      documentation: "Desired compute node profile"
+      default: "cz2-16x32"
+    - name: VSI_IMAGE_NAME
+      documentation: "The image to bring up the VSI created in IBM cloud"
+      default: "ibm-ubuntu-22-04-5-minimal-s390x-6"
+    - name: ENABLE_NESTED_VIRT 
+      documentation: "Enables nested virtualisation on IBM cloud cluster"
+      default: "false"
+    - name: CREATE_STORAGE_CLASS 
+      documentation: "Creates a storage class after cluster installation"
+      default: "true"
+  commands: hypershift-mce-ibmz-create-s390xmgmt-commands.sh
+  from: dev-scripts
+  grace_period: 59m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 2h
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_RELEASE_IMAGE
+      name: release:s390x-latest

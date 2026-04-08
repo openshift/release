@@ -1,0 +1,58 @@
+chain:
+  as: trusted-execution-clusters-operator-infra-provision
+  steps:
+  - ref: trusted-execution-clusters-ref-operator-beaker-kind-provision
+  - ref: trusted-execution-clusters-ref-operator-kind-cluster-create
+  documentation: |-
+    This chain prepares the complete infrastructure for trusted-execution-clusters operator testing
+    on a Beaker bare metal machine.
+
+    The chain executes two sequential steps:
+
+    Step 1 - Beaker Environment Preparation (trusted-execution-clusters-ref-operator-beaker-kind-provision):
+      - Establishes SSH connection from CI pod to Beaker bare metal machine
+      - Installs all system dependencies:
+        * Docker CE (container runtime)
+        * kubectl v1.29.0 (Kubernetes CLI)
+        * kind v0.30.0 (Kubernetes in Docker)
+        * Rust (via rustup) with system-wide PATH configuration
+        * Go 1.25.0 (downloaded from official release, required for operator build)
+        * Build tools: make, gcc, jq
+      - Downloads operator repository (configurable via env vars)
+      - Applies required patches (PR #113, PR #119)
+      - Adapts kind cluster configuration for external access
+      - Verifies all tools are correctly installed
+
+    Step 2 - Kind Cluster Creation (trusted-execution-clusters-ref-operator-kind-cluster-create):
+      - Executes 'make cluster-up' on Beaker machine to create Kind cluster
+      - Sets up local container registry (localhost:5000)
+      - Retrieves kubeconfig and saves to ${SHARED_DIR}/kubeconfig
+      - Verifies cluster is accessible from both Beaker machine and CI pod
+      - Collects cluster creation logs to ${ARTIFACT_DIR}/kind-cluster-logs/
+
+    Prerequisites:
+    - Beaker bare metal machine pre-provisioned with Fedora
+    - SSH public key pre-configured on Beaker machine (~/.ssh/authorized_keys)
+    - Vault secret configured at: secrets/kv/selfservice/confidential-qe/beaker-bm
+      Required fields:
+        - beaker-ssh-private-key: SSH private key (matching public key on Beaker)
+        - beaker-ip: IP address of Beaker machine
+      Optional fields:
+        - beaker-user: SSH username (defaults to 'root')
+    - Vault secret synced to K8s secret 'beaker-bm' in 'test-credentials' namespace
+
+    Outputs:
+    - ${SHARED_DIR}/beaker_info: Beaker machine configuration and metadata
+    - ${SHARED_DIR}/kubeconfig: Kind cluster kubeconfig for subsequent steps
+    - ${ARTIFACT_DIR}/beaker-logs/: Environment preparation logs and diagnostics
+    - ${ARTIFACT_DIR}/kind-cluster-logs/: Cluster creation logs
+
+    After successful completion:
+    - Beaker machine has all required tools installed (Docker, kubectl, kind, Rust, Go)
+    - Kind cluster is running and accessible
+    - kubeconfig is available for subsequent operator deployment steps
+    - Local container registry is ready at localhost:5000
+
+    Scope:
+    This chain is responsible ONLY for infrastructure preparation.
+    Application deployment (operator) is handled by a separate chain.

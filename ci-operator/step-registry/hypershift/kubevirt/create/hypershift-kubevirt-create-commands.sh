@@ -20,28 +20,24 @@ fi
 if [[ -n ${MCE} ]] ; then
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
-    if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-      echo "MCE version is less than 2.4, use hypershift command"
-      downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hypershift CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hypershift.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hypershift.tar.gz"
-      chmod +x "/tmp/hypershift"
-      HCP_CLI="/tmp/hypershift"
-      cd -
-    else
-      downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
-      chmod +x "/tmp/hcp"
-      HCP_CLI="/tmp/hcp"
-      cd -
-    fi
+    downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
+    cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
+    chmod +x "/tmp/hcp"
+    HCP_CLI="/tmp/hcp"
+    cd -
   fi
 fi
 
 function support_np_skew() {
-  curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
   local EXTRA_FLARGS=""
-  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" ]]; then
-    EXTRA_FLARGS+=$( (( $(awk 'BEGIN {print ("'"$MCE"'" > 2.6)}') )) && echo "--render-sensitive --render > /tmp/hc.yaml " || echo "--render > /tmp/hc.yaml " )
+  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" && "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
+    # >= 2.7: "--render-sensitive --render", else: "--render"
+    if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+      EXTRA_FLARGS+="--render-sensitive --render > /tmp/hc.yaml "
+    else
+      EXTRA_FLARGS+="--render > /tmp/hc.yaml "
+    fi
     EXTRA_FLARGS+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
     EXTRA_FLARGS+="&& oc apply -f /tmp/hc.yaml"
   fi
@@ -162,9 +158,9 @@ spec:
   }'
 EOF
   if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   fi
 fi
 
@@ -172,7 +168,25 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
-EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE} "
+
+case "${IP_STACK}" in
+ "v4")
+   EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
+   ;;
+ "v4v6")
+   # Use explicit CIDRs with IPv4 first (primary) since --default-dual doesn't work for KubeVirt
+   # Use non-conflicting IPv6 CIDRs (fd03::/48, fd04::/112) to avoid conflicts with management cluster
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+   ;;
+ "v6v4")
+   # Use explicit CIDRs with IPv6 first (primary) for v6v4 stack
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
+   ;;
+ "v6")
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr fd03::/48 --service-cidr fd04::/112 "
+   ;;
+esac
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
@@ -197,8 +211,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --generate-ssh \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
-    --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14 ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+    ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
@@ -214,47 +227,12 @@ else
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
-    --infra-availability-policy ${INFRA_AVAILABILITY} \
-    --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
-fi
-
-
-if [[ -n ${MCE} ]] ; then
-  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-    oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-    oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  annotations:
-    import.open-cluster-management.io/hosting-cluster-name: local-cluster
-    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-    open-cluster-management/created-via: other
-  labels:
-    cloud: auto-detect
-    cluster.open-cluster-management.io/clusterset: default
-    name: ${CLUSTER_NAME}
-    vendor: OpenShift
-  name: ${CLUSTER_NAME}
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
-  fi
+    --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
-
-if [ -n "${KUBEVIRT_CSI_INFRA}" ]
-then
-  for item in $(oc get sc --no-headers | awk '{print $1}'); do
-  oc annotate --overwrite sc "${item}" storageclass.kubernetes.io/is-default-class='false'
-  done
-  oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
-fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

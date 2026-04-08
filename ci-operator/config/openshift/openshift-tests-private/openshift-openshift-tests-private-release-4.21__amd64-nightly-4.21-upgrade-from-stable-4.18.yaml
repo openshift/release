@@ -1,0 +1,117 @@
+base_images:
+  ansible:
+    name: "4.18"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  custom:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  intermediate1:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  intermediate2:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ibmcloud-ipi-proxy-private-rt-f28
+  cron: 10 16 1 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      RT_ENABLED: "true"
+    test:
+    - ref: cucushift-upgrade-setedge-3hops
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: nutanix-ipi-boot-categories-project-rt-f28
+  cluster: build01
+  cron: 13 0 27 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      RT_ENABLED: "true"
+    test:
+    - ref: cucushift-upgrade-setedge-3hops
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 18 4 16 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: cucushift-upgrade-setedge-3hops
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.21-upgrade-from-stable-4.18

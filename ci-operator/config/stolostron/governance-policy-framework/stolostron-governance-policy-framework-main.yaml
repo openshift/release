@@ -6,16 +6,13 @@ base_images:
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.e2etest
-  from: base
-  optional: true
-  to: grc-policy-framework-tests
-promotion:
-  to:
-  - name: "2.15"
-    namespace: stolostron
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: build/Dockerfile.e2etest
+    from: base
+    optional: true
+    to: grc-policy-framework-tests
 resources:
   '*':
     requests:
@@ -28,7 +25,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: grc-policy-framework-tests
     env:
-      ACM_RELEASE_VERSION: release-2.15
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_GROUP_NAME: policy-grc
       CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
@@ -36,7 +33,7 @@ tests:
       CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
       CLUSTERPOOL_MANAGED_COUNT: "1"
-      PIPELINE_STAGE: integration
+      PIPELINE_STAGE: dev
       SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e
@@ -49,16 +46,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: latest-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grc-policy-framework-tests
-    env:
-      IMAGE_REPO: grc-policy-framework-tests
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: stolostron

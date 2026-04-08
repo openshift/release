@@ -1,0 +1,29 @@
+ref:
+  as: interop-tests-ibm-fusion-access-custom-ibm-must-gather
+  best_effort: true
+  credentials:
+    - namespace: test-credentials
+      name: fusion-access-operator
+      mount_path: /var/run/secrets
+  optional_on_success: true
+  from: cli
+  commands: interop-tests-ibm-fusion-access-custom-ibm-must-gather-commands.sh
+  timeout: 1h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Collect IBM Spectrum Scale must-gather for debugging.
+    
+    This step handles IBM entitlement credentials gracefully:
+    - Checks standard credential location at /var/run/secrets/ibm-entitlement-key
+    - Continues execution even without credentials
+    - Provides clear messaging about credential status
+  dependencies:
+  - name: "pipeline:ibm-must-gather"
+    env: MUST_GATHER_IMAGE
+  env:
+  - name: MUST_GATHER_IMAGE
+    documentation: IBM Spectrum Scale must-gather image
+    default: "pipeline:ibm-must-gather"

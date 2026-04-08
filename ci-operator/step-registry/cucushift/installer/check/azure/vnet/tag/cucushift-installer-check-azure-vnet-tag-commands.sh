@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -67,8 +73,8 @@ fi
 
 critical_check_result=0
 #nsg rule 'apiserver_in' check
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 15 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+if version_lt "${ocp_version}" "4.15"; then
     echo "Shared Tags on vnet checking is only applicable on 4.15+, skip the check!"
     exit 0
 else

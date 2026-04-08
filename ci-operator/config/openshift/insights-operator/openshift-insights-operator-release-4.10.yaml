@@ -7,19 +7,12 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: "4.10"
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
   to:
   - name: "4.10"
@@ -55,7 +48,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   steps:
@@ -68,8 +61,7 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests
@@ -89,8 +81,7 @@ tests:
       cli: latest
       commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests

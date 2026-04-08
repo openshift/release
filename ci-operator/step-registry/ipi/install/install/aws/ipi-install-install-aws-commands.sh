@@ -38,6 +38,22 @@ function populate_artifact_dir() {
     mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
     cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output/" 2>/dev/null
   fi
+
+  # Capture infrastructure issue log to help gather the datailed failure message in junit files
+  if [[ "$ret" == "4" ]] || [[ "$ret" == "5" ]]; then
+    grep -Er "Throttling: Rate exceeded|\
+rateLimitExceeded|\
+The maximum number of [A-Za-z ]* has been reached|\
+The number of .* is larger than the maximum allowed size|\
+Quota .* exceeded|\
+Cannot create more than .* for this subscription|\
+The request is being throttled as the limit has been reached|\
+SkuNotAvailable|\
+Exceeded limit .* for zone|\
+Operation could not be completed as it results in exceeding approved .* quota|\
+A quota has been reached for project|\
+LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastructure_failure.log" || true
+  fi
 }
 
 function prepare_next_steps() {
@@ -54,6 +70,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
   
+   # capture install duration for post e2e-analysis
+  awk '/Time elapsed per stage:/,/Time elapsed:/' "${dir}/.openshift_install.log" > "${SHARED_DIR}/install-duration.log"
+
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -167,25 +186,37 @@ EOF
   echo 'Patched efa pg into 99_openshift-cluster-api_worker-machineset-0.yaml'
 }
 
+function is_dualstack() {
+  if [[ "${IP_FAMILY:-}" == *"DualStack"* ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
+
+export INSTALLER_BINARY="openshift-install"
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "User specified a custom payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+elif [[ "${USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
-fi
-
-if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
-  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
-  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
-  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
-  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
-  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-  --command=openshift-install --to="/tmp" || exit 1
-  export INSTALLER_BINARY="/tmp/openshift-install"
-else
-  export INSTALLER_BINARY="openshift-install"
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -207,7 +238,7 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
@@ -434,7 +465,12 @@ EOF
   router_lb=$(oc -n openshift-ingress get service router-default -o json | jq -r '.status.loadBalancer.ingress[].hostname')
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
-    router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
+    if is_dualstack; then
+      router_lb_hostzone_id=$(aws --region ${REGION} elbv2 describe-load-balancers | jq -r ".LoadBalancers[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneId")
+    else
+      router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
+    fi
+
     aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
       --template-body 'file:///tmp/ingress_app.yml' \
       --parameters \
@@ -457,7 +493,7 @@ EOF
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
-  fi    
+  fi
     
   echo "Created stack $APPS_DNS_STACK_NAME"
 

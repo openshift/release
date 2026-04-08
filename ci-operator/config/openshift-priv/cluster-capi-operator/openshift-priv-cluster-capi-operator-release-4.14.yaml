@@ -3,22 +3,15 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: go build -o bin/cluster-capi-operator cmd/cluster-capi-operator
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-capi-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: cluster-capi-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    from: base
+    to: cluster-capi-operator
 promotion:
   to:
   - name: 4.14-priv
@@ -63,23 +56,23 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -90,11 +83,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: e2e-gcp-ovn-techpreview
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -112,11 +105,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp
-- as: e2e-azure-ovn-techpreview
+- always_run: false
+  as: e2e-azure-ovn-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure

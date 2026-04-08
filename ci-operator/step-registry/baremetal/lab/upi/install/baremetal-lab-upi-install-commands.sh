@@ -262,6 +262,8 @@ INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
 
@@ -304,6 +306,10 @@ done
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 

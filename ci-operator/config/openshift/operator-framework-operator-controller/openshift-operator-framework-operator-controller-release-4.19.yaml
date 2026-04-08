@@ -3,44 +3,16 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 images:
-- dockerfile_path: openshift/catalogd.Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: olm-catalogd
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/catalogd.Dockerfile
+    to: olm-catalogd
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
+  - dockerfile_path: openshift/registry.Dockerfile
+    to: e2e-test-registry
 promotion:
   to:
   - excluded_images:
@@ -103,7 +75,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: upstream-e2e
       cli: latest
@@ -117,11 +89,11 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: openshift-e2e-aws-techpreview
+- always_run: false
+  as: openshift-e2e-aws-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -147,8 +119,7 @@ tests:
         cd openshift/default-catalog-consistency
         REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
       credentials:
-      - collection: ""
-        mount_path: /var/run/secrets/ci-pull-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
         name: ci-pull-credentials
         namespace: ci
       from: src

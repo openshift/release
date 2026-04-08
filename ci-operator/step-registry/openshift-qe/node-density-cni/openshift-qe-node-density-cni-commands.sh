@@ -11,6 +11,8 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+UUID=$(uuidgen)
+
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -24,13 +26,13 @@ fi
 cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
 if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then	
-        echo "Executing cluster-density-v2 in hypershift cluster"
-        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
-                echo "Set http proxy for hypershift cluster"
-                . $SHARED_DIR/proxy-conf.sh
-        fi
-        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
-        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+    echo "Executing cluster-density-v2 in hypershift cluster"
+    if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+        echo "Set http proxy for hypershift cluster"
+        . $SHARED_DIR/proxy-conf.sh
+    fi
+    echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+    export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
 fi
 
 # Managment Kubeconfig for ROSA-HCP
@@ -54,18 +56,29 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-cni
-
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=2m" ./run.sh
-
-# The measurable run
-export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE}"
-
+EXTRA_FLAGS="${KB_FLAGS} ${ND_CNI_EXTRA_FLAGS} --gc=$GC --gc-metrics=$GC_METRICS --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
-rm -f ${SHARED_DIR}/index.json
+export EXTRA_FLAGS UUID
+
 ./run.sh
 
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+METRICS_FOLDER="collected-metrics-${UUID}"
+if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
+  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
+  if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
+    set +e
+    OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
+    OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
+    METRICS="${METRICS_FOLDER}/*QuantilesMeasurement*.json ${METRICS_FOLDER}/jobSummary.json"
+    SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"
+    scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
+    set -e
+  fi
+fi
+
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
+fi

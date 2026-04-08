@@ -10,6 +10,7 @@
             'for': '5m',
             labels: {
               severity: 'critical',
+              team: 'crt',
             },
             annotations: {
               message: '{{ $labels.deployment }} has been down for 5 minutes.',
@@ -62,6 +63,23 @@
             },
             annotations: {
               message: 'Unable to save the {{ $labels.exported_namespace }}/{{ $labels.name }} secret.',
+            },
+          },
+        ],
+      },
+      {
+        name: 'release-controller-container-waiting',
+        rules: [
+          {
+            alert: 'releaseControllerContainerWaiting',
+            expr: 'kube_pod_container_status_waiting_reason{reason!="CrashLoopBackOff", namespace="ci", pod=~"release-controller.*"} > 0',
+            'for': '1h',
+            labels: {
+              severity: 'warning',
+              team: 'crt',
+            },
+            annotations: {
+              message: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container}} has been in waiting state for longer than 1 hour. (reason: "{{ $labels.reason }}").',
             },
           },
         ],

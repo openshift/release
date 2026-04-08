@@ -8,26 +8,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/multiarch-tuning-operator
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile
-  from: base
-  to: multiarch-tuning-operator
-- additional_architectures:
-  - arm64
-  dockerfile_path: bundle.Dockerfile
-  to: multiarch-tuning-op-bundle
-- additional_architectures:
-  - arm64
-  dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
-    FROM src
-    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-  from: src
-  to: operator-sdk-mto
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    from: base
+    to: multiarch-tuning-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: bundle.Dockerfile
+    to: multiarch-tuning-op-bundle
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.33.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-mto
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:v1.x
@@ -59,12 +62,18 @@ resources:
     requests:
       cpu: 500m
       memory: 1Gi
+  multiarch-tuning-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
   sast:
     limits:
-      memory: 6Gi
+      memory: 20Gi
     requests:
-      cpu: 300m
-      memory: 400Mi
+      cpu: "8"
+      memory: 10Gi
 tests:
 - as: fmt
   capabilities:

@@ -1,27 +1,28 @@
 base_images:
   base-rhel9:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base-rhel9
-  to: operator-marketplace
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base-rhel9
+    to: operator-marketplace
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -39,7 +40,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-gcp-operator
   steps:
@@ -55,7 +56,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-console-olm
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest

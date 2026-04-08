@@ -1,0 +1,41 @@
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make install
+tests:
+- as: unit
+  capabilities:
+  - intranet
+  commands: make test
+  container:
+    from: src
+  optional: true
+  restrict_network_access: false
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-online
+  repo: access-transparency-service

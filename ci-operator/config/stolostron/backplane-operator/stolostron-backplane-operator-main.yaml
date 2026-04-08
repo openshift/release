@@ -12,24 +12,19 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-  to: backplane-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-  to: backplane-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: backplane-operator
+  - dockerfile_path: build/Dockerfile.test.prow
+    to: backplane-operator-test
 promotion:
   to:
-  - name: "2.10"
+  - name: "2.17"
+    namespace: stolostron
+  - name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -45,6 +40,14 @@ tests:
       IMAGE_REPO: backplane-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    export SELF="make -f Makefile"
+    make -f Makefile test
+  container:
+    from: src
 - as: sonar-pre-submit
   commands: |
     export ocm_dir=$(mktemp -d -t ocm-XXXXX)
@@ -88,7 +91,13 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.10
+      DESTINATION_BRANCH: backplane-2.17
+    workflow: ocm-ci-fastforward
+- as: backplane-fast-forward-5-0
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-5.0
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

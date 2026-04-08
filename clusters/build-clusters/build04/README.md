@@ -1,13 +1,13 @@
-# 02-Cluster
+# build04
 
-[02-Cluster](https://console-openshift-console.apps.build04.gcp.ci.openshift.org) is an OpenShift-cluster managed by DPTP-team. It is one of the clusters for running Prow job pods.
+[build04](https://console-openshift-console.apps.build04.gcp.ci.openshift.org) is an OpenShift-cluster managed by DPTP-team. It is one of the clusters for running Prow job pods.
 
-The secrets have been uploaded to BitWarden item `build_farm_build04`:
+The secrets have been uploaded to BitWarden item `build_farm_04_cluster`:
 
 * the key file for the service account `ocp-cluster-installer`
-* the SSH key pair (`id_rsa` and `id_rsa.pub`)
+* the SSH key pair (`build04` and `build04.pub`)
 * install-config.yaml.001 (the one with the desired instance type)
-* The auth info for `kubeadmin` and the cert-based kubeconfig file (attachment `b02.admin.cert.kubeconfig`).
+* The auth info for `kubeadmin` and the cert-based kubeconfig file (attachment `install-root.tar.gz`).
 
 ## Installation
 

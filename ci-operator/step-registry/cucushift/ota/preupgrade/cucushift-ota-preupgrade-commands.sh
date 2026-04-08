@@ -275,6 +275,217 @@ function pre-OCP-24358(){
     return 0
 }
 
+function verify_no_update_with_overrides(){
+    echo "Verifying upgrade is blocked due to overrides..."
+    local wait=0 max_wait=300 msg history_count
+
+    while (( wait <= max_wait )); do
+        msg=$(oc adm upgrade 2>&1)
+        if [[ "${msg}" != *"ReleaseAccepted=False"* ]] || [[ "${msg}" != *"Precondition \"ClusterVersionUpgradeable\" failed because of \"ClusterVersionOverridesSet\""* ]]; then
+            echo "Waiting for ReleaseAccepted condition to be set... (${wait}s/${max_wait}s)"
+            sleep 60
+            wait=$((wait + 60))
+        else
+            # Check no update happened in history
+            history_count=$(oc get clusterversion version -o json | jq '.status.history | length')
+            if [[ "${history_count}" != "1" ]]; then
+                echo "Unexpected update happened! History count: ${history_count}"
+                oc get clusterversion version -o jsonpath='{.status.history}' | jq .
+                return 1
+            else
+                echo "Verified: upgrade is blocked and no update happened"
+                return 0
+            fi
+        fi
+    done
+
+    echo "The error msg is not expected after ${max_wait}s!"
+    echo "Current upgrade status:"
+    oc adm upgrade
+    return 1
+}
+
+function bump_channel(){
+    # Get current version and calculate target Y-version
+    local version x_ver y_ver target_y_ver target_channel
+    version="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}')"
+    if [ -z "${version}" ]; then
+        echo "Failed to get cluster version!"
+        return 1
+    fi
+    x_ver=$(echo "${version}" | cut -f1 -d.)
+    y_ver=$(echo "${version}" | cut -f2 -d.)
+    target_y_ver=$((y_ver + 1))
+    target_channel="candidate-${x_ver}.${target_y_ver}"
+
+    # Set the channel to candidate-x.y for Y-version upgrade
+    echo "Setting channel to ${target_channel}..."
+    if ! oc adm upgrade channel --allow-explicit-channel "${target_channel}"; then
+        echo "Failed to set channel to ${target_channel}!"
+        return 1
+    fi
+
+    # Verify channel was set
+    local current_channel
+    current_channel="$(oc get clusterversion version -o jsonpath='{.spec.channel}')"
+    if [[ "${current_channel}" != "${target_channel}" ]]; then
+        echo "Channel verification failed. Expected: ${target_channel}, Got: ${current_channel}"
+        return 1
+    fi
+    echo "Successfully set channel to ${target_channel}"
+
+    # Export the target version pattern for the caller
+    export target_version_pattern="${x_ver}.${target_y_ver}"
+    return 0
+}
+
+function set_operator_unmanaged(){
+    echo "Setting network-operator to be unmanaged..."
+    if ! oc patch clusterversion version --type=merge -p '{"spec": {"overrides":[{"kind": "Deployment", "name": "network-operator", "namespace": "openshift-network-operator", "unmanaged": true, "group": "apps"}]}}'; then
+        echo "Failed to patch clusterversion!"
+        return 1
+    fi
+
+    # Wait for ClusterVersionOverridesSet condition and CVO to finish reconciling
+    local wait=0 max_wait=300 reason progressing
+    while (( wait <= max_wait )); do
+        reason=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].reason}')
+        progressing=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')
+
+        if [[ "${reason}" == "ClusterVersionOverridesSet" ]] && [[ "${progressing}" == "False" ]]; then
+            echo "Overrides set and CVO reconciliation complete (${wait}s)"
+            break
+        else
+            echo "Waiting for overrides to be applied and reconciled... (${wait}s/${max_wait}s)"
+            sleep 30
+            wait=$((wait + 30))
+        fi
+    done
+
+    if (( wait > max_wait )); then
+        echo "Setting overrides timeout!"
+        return 1
+    fi
+
+    echo "Successfully set operator to unmanaged and verified ClusterVersionOverridesSet condition"
+    return 0
+}
+
+function unset_operator_unmanaged(){
+    echo "Removing overrides from clusterversion to allow upgrade to proceed..."
+    if ! oc patch clusterversion version --type=json -p '[{"op": "remove","path":"/spec/overrides"}]'; then
+        echo "Failed to remove overrides!"
+        return 1
+    fi
+
+    # Wait for overrides to be cleared and upgrade to continue
+    local wait=0 max_wait=300 reason history_count
+    while (( wait <= max_wait )); do
+        reason=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].reason}')
+        history_count=$(oc get clusterversion version -o json | jq '.status.history | length')
+
+        if [[ "${reason}" != "ClusterVersionOverridesSet" ]] && [[ "${history_count}" -gt "1" ]]; then
+            echo "Overrides cleared and upgrade has started (history count: ${history_count})"
+            return 0
+        fi
+
+        echo "Waiting for overrides to be cleared and upgrade to continue... (${wait}s/${max_wait}s)"
+        sleep 60
+        wait=$((wait + 60))
+    done
+
+    echo "No update happened! Unsetting overrides timeout!"
+    return 1
+}
+
+function pre-OCP-30087(){
+    echo "Test Start: ${FUNCNAME[0]}"
+
+    # Set operator to unmanaged to block upgrade
+    if ! set_operator_unmanaged; then
+        echo "Failed to set operator to unmanaged!"
+        return 1
+    fi
+
+    # Bump channel to candidate-x.y for Y-version upgrade
+    if ! bump_channel; then
+        echo "Failed to bump channel!"
+        return 1
+    fi
+
+    # Get recommended updates and trigger upgrade with --to
+    echo "Getting recommended updates..."
+    local retry=3 versions target_version version_array filtered_versions
+    while (( retry > 0 )); do
+        versions=$(oc get clusterversion version -o json | jq -r '.status.availableUpdates[]?.version' | xargs)
+        if [[ "${versions}" == "null" ]] || [[ -z "${versions}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No recommended update available! Retry..."
+        else
+            echo "Recommended updates: ${versions}"
+            # Filter updates to only include versions matching target Y-version pattern
+            filtered_versions=""
+            for ver in ${versions}; do
+                if [[ "${ver}" == ${target_version_pattern}.* ]]; then
+                    filtered_versions="${filtered_versions} ${ver}"
+                fi
+            done
+            filtered_versions=$(echo "${filtered_versions}" | xargs)
+
+            if [[ -z "${filtered_versions}" ]]; then
+                echo "No updates matching target version pattern ${target_version_pattern}.* found"
+                retry=0
+            else
+                echo "Filtered updates matching ${target_version_pattern}.*: ${filtered_versions}"
+                break
+            fi
+        fi
+    done
+
+    if (( retry == 0 )); then
+        echo "Skipping upgrade trigger with --to step"
+    else
+        # Randomly choose one version from filtered available updates
+        IFS=' ' read -r -a version_array <<< "${filtered_versions}"
+        target_version="${version_array[$RANDOM % ${#version_array[@]}]}"
+        echo "Randomly selected target version: ${target_version}"
+
+        # Trigger upgrade with --to
+        run_command "oc adm upgrade --to=\"${target_version}\""
+
+        # Verify upgrade with --to is blocked due to overrides
+        if ! verify_no_update_with_overrides; then
+            echo "Failed to verify upgrade with --to is blocked!"
+            return 1
+        fi
+        oc adm upgrade --clear || true
+    fi
+
+    # Trigger upgrade with --to-image if OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is set
+    if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        run_command "oc adm upgrade --allow-explicit-upgrade --to-image=\"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}\""
+
+        # Verify upgrade with --to-image is blocked due to overrides
+        if ! verify_no_update_with_overrides; then
+            echo "Failed to verify upgrade with --to-image is blocked!"
+            return 1
+        fi
+
+        # Unset operator unmanaged to restore upgrade
+        if ! unset_operator_unmanaged; then
+            echo "Failed to unset operator unmanaged!"
+            return 1
+        fi
+    else
+        echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE not set for upgrade with --to-image step"
+        return 1
+    fi
+
+    echo "Test Passed: ${FUNCNAME[0]}"
+    return 0
+}
+
 function pre-OCP-32747(){
     local reason alerts alert namespace severity description state summary retry=10
     
@@ -638,13 +849,12 @@ function defer-OCP-60397(){
 }
 
 function check_mcp_status() {
-    local machineCount updatedMachineCount counter
+    local machineCount updatedMachineCount counter=0 interval=120
     machineCount=$(oc get mcp $1 -o=jsonpath='{.status.machineCount}')
-    counter=0
-    while [ $counter -lt 1200 ]
+    while [ $counter -lt 1800 ]
     do
-        sleep 20
-        counter=`expr $counter + 20`
+        sleep ${interval}
+        counter=$((counter + interval))
         echo "waiting ${counter}s"
         updatedMachineCount=$(oc get mcp $1 -o=jsonpath='{.status.updatedMachineCount}')
         if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
@@ -694,6 +904,11 @@ function pre-OCP-47160(){
     fs=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
     if [[ "${fs}" != "TechPreviewNoUpgrade" ]]; then
         echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    echo "Wait for MCP rollout to start..."
+    if ! oc wait mcp --all --for condition=updating --timeout=300s; then
+        echo "The mcp rollout does not start in 5m!"
         return 1
     fi
     if ! check_mcp_status master || ! check_mcp_status worker ; then
@@ -789,6 +1004,11 @@ function pre-OCP-47200(){
     fs_after=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
     if [[ "${fs_after}" != "CustomNoUpgrade" ]]; then
         echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    echo "Wait for MCP rollout to start..."
+    if ! oc wait mcp --all --for condition=updating --timeout=300s; then
+        echo "The mcp rollout does not start in 5m!"
         return 1
     fi
     if ! check_mcp_status master || ! check_mcp_status worker ; then

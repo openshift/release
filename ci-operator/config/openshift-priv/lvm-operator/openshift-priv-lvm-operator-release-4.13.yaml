@@ -20,41 +20,42 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.21-openshift-4.18
 canonical_go_repository: github.com/openshift/lvm-operator
 images:
-- dockerfile_path: Dockerfile.combined
-  from: ubi_minimal
-  to: lvm-operator
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  to: lvm-operator-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
-    RUN opm index add \
-    --bundles "${BUNDLE_IMG}" \
-    --out-dockerfile index.Dockerfile \
-    --generate
-  from: opm-builder
-  to: lvm-operator-index-gen
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/opm:latest
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    COPY database/index.db /database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  inputs:
-    lvm-operator-index-gen:
-      paths:
-      - destination_dir: .
-        source_path: /database
-  to: lvm-operator-deps-index
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: lvm-must-gather
+  items:
+  - dockerfile_path: Dockerfile.combined
+    from: ubi_minimal
+    to: lvm-operator
+  - dockerfile_path: bundle.Dockerfile
+    from: base
+    to: lvm-operator-bundle
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
+      RUN opm index add \
+      --bundles "${BUNDLE_IMG}" \
+      --out-dockerfile index.Dockerfile \
+      --generate
+    from: opm-builder
+    to: lvm-operator-index-gen
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/opm:latest
+      LABEL operators.operatorframework.io.index.database.v1=/database/index.db
+      COPY database/index.db /database/index.db
+      EXPOSE 50051
+      ENTRYPOINT ["/bin/opm"]
+      CMD ["registry", "serve", "--database", "/database/index.db"]
+    from: opm-builder
+    inputs:
+      lvm-operator-index-gen:
+        paths:
+        - destination_dir: .
+          source_path: /database
+    to: lvm-operator-deps-index
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: lvm-must-gather
 operator:
   bundles:
   - as: lvm-operator-static-deps
@@ -101,7 +102,7 @@ tests:
   optional: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       MUST_GATHER_FULL_IMAGE_NAME: lvm-must-gather
       OO_INDEX: ci-index-lvm-operator-static-deps

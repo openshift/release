@@ -182,6 +182,13 @@ function post-OCP-53921(){
         echo "Fail to get cluster version!"
         return 1
     fi
+    pre_recommended_versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+    if [[ "${pre_recommended_versions}" == *"${version}"* ]]; then
+        echo "Current version ${version} should not be in recommended updates: ${pre_recommended_versions}"
+        return 1
+    else
+        echo "Before channel update, no installed version found in recommended updates as expected!"
+    fi
     x_ver=$( echo "${version}" | cut -f1 -d. )
     y_ver=$( echo "${version}" | cut -f2 -d. )
     y_ver=$((y_ver+1))
@@ -190,11 +197,27 @@ function post-OCP-53921(){
         echo "Fail to change channel to candidate-${ver}!"
         return 1
     fi
-    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
-    if [[ "${recommends}" == "null" ]]; then
-        echo "No recommended update available!"
+    local retry=3
+    while (( retry > 0 ));do
+        post_recommended_versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+        if [[ -z "${post_recommended_versions}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No recommended update available after updating channel! Retry..."
+        else
+            if [[ "${post_recommended_versions}" == *"${version}"* ]]; then
+                echo "Current version ${version} should not be in recommended updates: ${post_recommended_versions}!"
+                return 1
+            fi
+            echo "After channel update, no installed version found in recommended updates as expected!"
+            break
+        fi
+    done
+    if (( retry == 0 )); then
+        echo "Timeout to get recommended update!" 
         return 1
     fi
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
     mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
     if [ -z "${images[*]}" ]; then
         echo "No image extracted from recommended update!"

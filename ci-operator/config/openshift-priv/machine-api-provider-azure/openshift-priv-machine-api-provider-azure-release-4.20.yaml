@@ -2,15 +2,7 @@ base_images:
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
-    tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: "4.20"
   tests-private:
     name: tests-private
     namespace: ci
@@ -19,19 +11,12 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-api-provider-azure
 images:
-- dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: azure-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: azure-machine-controllers
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -66,16 +51,16 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-azure-ovn
+- always_run: false
+  as: e2e-azure-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -85,27 +70,25 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azurestack-ipi
   cluster: build01
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
-  timeout: 6h0m0s
 - as: regression-clusterinfra-azure-ipi-mapi
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   shard_count: 3
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
@@ -113,12 +96,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-azure-ipi
-  timeout: 7h0m0s
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: machine-api-provider-azure
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

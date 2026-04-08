@@ -3,14 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  cli-ocm:
-    name: cli-ocm
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
-  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -21,23 +17,20 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.ci
-  from: base
-  inputs:
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
-  to: compliance-operator
-- additional_architectures:
-  - arm64
-  dockerfile_path: images/testcontent/Dockerfile.ci
-  to: testcontent
-- additional_architectures:
-  - arm64
-  dockerfile_path: images/openscap/Dockerfile
-  to: testopenscap
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.ci
+    from: base
+    to: compliance-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: images/testcontent/Dockerfile.ci
+    to: testcontent
+  - additional_architectures:
+    - arm64
+    dockerfile_path: images/openscap/Dockerfile
+    to: testopenscap
 promotion:
   to:
   - excluded_images:
@@ -135,7 +128,7 @@ tests:
       CHANNEL_GROUP: stable
       ENABLE_BILLING_ACCOUNT: "yes"
       OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: 4.15.48
+      OPENSHIFT_VERSION: 4.19.9
       REGION: us-east-2
     test:
     - ref: ipi-install-rbac

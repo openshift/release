@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+# generate a health check reuslt file
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-health-check-status.txt";' EXIT TERM INT
+
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"

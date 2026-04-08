@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
-  cron: 10 2 * * *
+  cluster: build06
+  cron: 00 16 * * 4
   decorate: true
   extra_refs:
   - base_ref: release-ocm-2.14
@@ -17,18 +17,30 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mirror-nightly-image
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -46,6 +58,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -59,17 +77,17 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
-  cron: 00 20 * * 2,4,6
+  cluster: build07
+  cron: 00 23 * * 4
   decorate: true
   extra_refs:
   - base_ref: release-ocm-2.14
     org: openshift
     repo: assisted-installer-agent
   labels:
+    capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci-operator.openshift.io/cluster: build05
     ci.openshift.io/generator: prowgen
     job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -85,9 +103,17 @@ periodics:
       - --target=subsystem-test-periodic
       command:
       - ci-operator
-      image: ci-operator:latest
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

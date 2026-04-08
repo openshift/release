@@ -2,32 +2,33 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_literal: |-
-    FROM src
-    SHELL ["/bin/bash", "-c"]
+  items:
+  - dockerfile_literal: |-
+      FROM src
+      SHELL ["/bin/bash", "-c"]
 
-    # Workaround to resolve mirrorlist issue from broken links
-    RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
-    RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
-    RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+      # Workaround to resolve mirrorlist issue from broken links
+      RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+      RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+      RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
 
-    # Install tools
-    RUN yum install -y httpd-tools parallel
-    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-linux64 && chmod +x /usr/local/bin/jq
-    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.42.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq
-    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
-    RUN curl -L https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
-    RUN python3 -m pip install kubernetes
-  from: src
-  to: openshift-pipelines-performance-runner
+      # Install tools
+      RUN yum install -y httpd-tools parallel
+      RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-linux64 && chmod +x /usr/local/bin/jq
+      RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.42.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+      RUN curl -L https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+      RUN python3 -m pip install kubernetes
+    from: src
+    to: openshift-pipelines-performance-runner
 releases:
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -38,7 +39,7 @@ resources:
       memory: 2Gi
 tests:
 - as: max-concurrency-downstream-nightly-daily
-  cron: 0 8 * * *
+  cron: 0 1 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -50,9 +51,35 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
+- as: max-concurrency-downstream-nightly-daily-ha-10
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-daily-ha-10-state
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
 - as: max-concurrency-downstream-pipelines1-19-daily
-  cron: 0 0 * * *
+  cron: 0 4 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -63,9 +90,74 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
-- as: max-concurrency-downstream-pipelines1-18-daily
+- as: max-concurrency-downstream-pipelines1-19-daily-ha-10
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-daily-ha-10-state
   cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-daily
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-daily-ha-10
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-daily-ha-10-state
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-18-daily
+  cron: 0 10 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -76,9 +168,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - as: max-concurrency-downstream-pipelines-1-17-daily
-  cron: 0 12 * * *
+  cron: 0 11 * * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -89,14 +180,12 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-12
   optional: true
   steps:
     cluster_profile: aws-pipelines-performance
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-11
   optional: true
@@ -106,7 +195,6 @@ tests:
       DEPLOYMENT_VERSION: "1.11"
       MUST_GATHER_TIMEOUT: 35m
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-upstream-stable
   optional: true
@@ -117,7 +205,6 @@ tests:
       DEPLOYMENT_VERSION: stable
       MUST_GATHER_TIMEOUT: 35m
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-upstream-nightly
   optional: true
@@ -128,14 +215,12 @@ tests:
       DEPLOYMENT_VERSION: nightly
       MUST_GATHER_TIMEOUT: 35m
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12
   optional: true
   steps:
     cluster_profile: aws-pipelines-performance
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-600-60
   optional: true
@@ -145,7 +230,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 600/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-700-70
   optional: true
@@ -155,7 +239,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 700/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-100
   optional: true
@@ -165,7 +248,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-100
   optional: true
@@ -176,7 +258,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-60
   optional: true
@@ -186,7 +267,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-60
   optional: true
@@ -197,7 +277,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-70
   optional: true
@@ -208,7 +287,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-80
   optional: true
@@ -219,7 +297,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-90
   optional: true
@@ -230,7 +307,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70
   optional: true
@@ -240,7 +316,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-80
   optional: true
@@ -250,7 +325,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-90
   optional: true
@@ -260,7 +334,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-600-70
   optional: true
@@ -270,7 +343,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 600/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-800-70
   optional: true
@@ -280,7 +352,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 800/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-900-70
   optional: true
@@ -290,7 +361,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 900/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1100-70
   optional: true
@@ -300,7 +370,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1100/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1200-70
   optional: true
@@ -310,7 +379,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1200/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1300-70
   optional: true
@@ -320,7 +388,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1300/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-120
   optional: true
@@ -331,7 +398,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/120
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-140
   optional: true
@@ -342,7 +408,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/140
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-160
   optional: true
@@ -353,7 +418,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/160
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-180
   optional: true
@@ -364,7 +428,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/180
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-200
   optional: true
@@ -375,7 +438,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/200
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-noreqlim
   optional: true
@@ -386,7 +448,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-500m-1gi
   optional: true
@@ -397,7 +458,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-2-4gi
   optional: true
@@ -408,7 +468,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-60-ha-2
   optional: true
@@ -419,7 +478,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-ha-2
   optional: true
@@ -430,7 +488,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-80-ha-2
   optional: true
@@ -441,7 +498,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-90-ha-2
   optional: true
@@ -452,7 +508,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-100-ha-2
   optional: true
@@ -463,7 +518,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-60-ha-4
   optional: true
@@ -474,7 +528,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-ha-4
   optional: true
@@ -485,7 +538,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-80-ha-4
   optional: true
@@ -496,7 +548,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-90-ha-4
   optional: true
@@ -507,7 +558,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-100-ha-4
   optional: true
@@ -518,7 +568,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-60-ha-8
   optional: true
@@ -529,7 +578,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-70-ha-8
   optional: true
@@ -540,7 +588,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-80-ha-8
   optional: true
@@ -551,7 +598,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-90-ha-8
   optional: true
@@ -562,7 +608,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-12-1000-100-ha-8
   optional: true
@@ -573,7 +618,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-60-ha-10
   optional: true
@@ -585,7 +629,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/60
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-70-ha-10
   optional: true
@@ -597,7 +640,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/70
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-80-ha-10
   optional: true
@@ -609,7 +651,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/80
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-90-ha-10
   optional: true
@@ -621,7 +662,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/90
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-100-ha-10
   optional: true
@@ -633,7 +673,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-120-ha-10
   optional: true
@@ -645,7 +684,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/120
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-140-ha-10
   optional: true
@@ -657,7 +695,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/140
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-160-ha-10
   optional: true
@@ -669,7 +706,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/160
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-180-ha-10
   optional: true
@@ -681,7 +717,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/180
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-200-ha-10
   optional: true
@@ -693,7 +728,6 @@ tests:
       MUST_GATHER_TIMEOUT: 35m
       TEST_SCENARIOS: 1000/200
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-100-x-build
   optional: true
@@ -705,7 +739,6 @@ tests:
       TEST_SCENARIO: build
       TEST_SCENARIOS: 100/10 100/20 100/30 100/40 100/50
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-50-signing-bigbang
   optional: true
@@ -717,7 +750,6 @@ tests:
       TEST_SCENARIO: signing-bigbang
       TEST_SCENARIOS: 1000/50
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-x-signing-ongoing
   optional: true
@@ -729,7 +761,6 @@ tests:
       TEST_SCENARIO: signing-ongoing
       TEST_SCENARIOS: 1000/10 1000/20 1000/40 1000/60 1000/80 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-bigbang-ha10
   optional: true
@@ -743,7 +774,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 2000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-bigbang
   optional: true
@@ -755,7 +785,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 2000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-ongoing-ha10
   optional: true
@@ -769,7 +798,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-ongoing
       TEST_SCENARIOS: 2000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-ongoing
   optional: true
@@ -781,7 +809,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-ongoing
       TEST_SCENARIOS: 2000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-1000-x-math
   optional: true
@@ -792,7 +819,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 1000/60 1000/70 1000/80 1000/90 1000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-1000-x-math
   optional: true
@@ -804,7 +830,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-1000-x-math
   optional: true
@@ -812,6 +837,44 @@ tests:
     cluster_profile: aws-pipelines-performance
     env:
       DEPLOYMENT_VERSION: "1.15"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_TYPE: downstream
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: “1.20”
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
@@ -829,7 +892,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 1000/50 1000/100 1000/150 1000/200
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-1000-x-math-ha-10
   optional: true
@@ -843,7 +905,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/10 200/20 200/30 200/40
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-1000-x-math-ha-10
   optional: true
@@ -852,6 +913,80 @@ tests:
     env:
       DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
       DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha-10-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-state-1-20-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-state-1-19-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: “1.20"
       MUST_GATHER_TIMEOUT: 35m
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
@@ -873,6 +1008,56 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/10 200/20 200/30 200/40
     workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-qbt-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: “1.20”
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
   timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-1000-x-math-qbt
@@ -889,7 +1074,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/10 200/20 200/30 200/40
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-1000-x-math-ha10-qbt
   optional: true
@@ -906,7 +1090,6 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/10 200/20 200/30 200/40
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-1000-x-math-ha10-qbt
   optional: true
@@ -918,6 +1101,59 @@ tests:
       DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
       DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
       DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha10-qbt-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: “1.20”
       MUST_GATHER_TIMEOUT: 35m
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
@@ -935,7 +1171,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 2500/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-2500-sign-tekton-bigbang
   optional: true
@@ -948,7 +1183,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-2500-sign-tekton-bigbang
   optional: true
@@ -961,7 +1195,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-5000-sign-tekton-bigbang
   optional: true
@@ -973,7 +1206,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 5000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-5000-sign-tekton-bigbang
   optional: true
@@ -986,7 +1218,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-5000-sign-tekton-bigbang
   optional: true
@@ -999,7 +1230,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-7500-sign-tekton-bigbang
   optional: true
@@ -1012,7 +1242,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-7500-sign-tekton-bigbang
   optional: true
@@ -1025,7 +1254,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-2500-sign-tekton-bigbang-ha
   optional: true
@@ -1038,7 +1266,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 2500/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-2500-sign-tekton-bigbang-ha
   optional: true
@@ -1052,7 +1279,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-2500-sign-tekton-bigbang-ha
   optional: true
@@ -1066,7 +1292,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-5000-sign-tekton-bigbang-ha
   optional: true
@@ -1079,7 +1304,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 5000/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-5000-sign-tekton-bigbang-ha
   optional: true
@@ -1093,7 +1317,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-5000-sign-tekton-bigbang-ha
   optional: true
@@ -1107,7 +1330,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-13-7500-sign-tekton-bigbang-ha
   optional: true
@@ -1120,7 +1342,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 7500/100
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-7500-sign-tekton-bigbang-ha
   optional: true
@@ -1134,7 +1355,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-7500-sign-tekton-bigbang-ha
   optional: true
@@ -1148,7 +1368,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-2500-sign-tkn-bigbang-qbt
   optional: true
@@ -1164,7 +1383,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-2500-sign-tkn-bigbang-qbt
   optional: true
@@ -1180,7 +1398,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-5000-sign-tkn-bigbang-qbt
   optional: true
@@ -1196,7 +1413,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-5000-sign-tkn-bigbang-qbt
   optional: true
@@ -1212,7 +1428,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-7500-sig-tkn-bigbang-qbt
   optional: true
@@ -1228,7 +1443,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-7500-sign-tkn-bigbang-qbt
   optional: true
@@ -1244,7 +1458,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-2500-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1261,7 +1474,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-2500-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1278,7 +1490,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-5000-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1295,7 +1506,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-5000-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1312,7 +1522,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1000/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-7500-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1329,7 +1538,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-15-7500-sign-tkn-bigbang-ha-qbt
   optional: true
@@ -1346,7 +1554,6 @@ tests:
       TEST_SCENARIO: signing-tr-tekton-bigbang
       TEST_SCENARIOS: 1500/20
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-1000-100-baseline-bigbang
   optional: true
@@ -1359,7 +1566,6 @@ tests:
       TEST_SCENARIOS: 1000/100
       WAIT_TIME: "1200"
     workflow: openshift-pipelines-max-concurrency
-  timeout: 8h0m0s
 - always_run: false
   as: max-concurrency-downstream-1-14-sig-tkn-pruner
   optional: true
@@ -1377,7 +1583,6 @@ tests:
       TEST_TOTAL: "1000000"
       WAIT_TIME: "600"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-14-vary-concur-simple-ha
   optional: true
@@ -1403,7 +1608,6 @@ tests:
       TEST_SCENARIO: signing-tr-varying-concurrency
       TEST_TOTAL: "1000000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-14-vary-concur-complex-ha
   optional: true
@@ -1429,7 +1633,6 @@ tests:
       TEST_SCENARIO: signing-tr-varying-concurrency
       TEST_TOTAL: "1000000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-14-vary-concur-with-chains
   optional: true
@@ -1455,7 +1658,6 @@ tests:
       TEST_SCENARIO: signing-tr-varying-concurrency
       TEST_TOTAL: "1000000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-14-vary-concur-without-chains
   optional: true
@@ -1477,7 +1679,6 @@ tests:
       TEST_SCENARIO: signing-tr-varying-concurrency
       TEST_TOTAL: "1000000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-concur-60
   optional: true
@@ -1493,7 +1694,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-60
   optional: true
@@ -1509,7 +1709,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-concur-70
   optional: true
@@ -1525,7 +1724,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-70
   optional: true
@@ -1541,7 +1739,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-concur-80
   optional: true
@@ -1557,7 +1754,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-80
   optional: true
@@ -1573,7 +1769,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-concur-90
   optional: true
@@ -1589,7 +1784,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-90
   optional: true
@@ -1605,7 +1799,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-concur-100
   optional: true
@@ -1621,7 +1814,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-100
   optional: true
@@ -1637,7 +1829,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-ns-3
   optional: true
@@ -1653,7 +1844,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "140"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-3
   optional: true
@@ -1669,7 +1859,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "140"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-ns-4
   optional: true
@@ -1685,7 +1874,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "105"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-4
   optional: true
@@ -1701,7 +1889,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "105"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-ns-5
   optional: true
@@ -1717,7 +1904,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "84"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-5
   optional: true
@@ -1733,7 +1919,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "84"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-ns-6
   optional: true
@@ -1749,7 +1934,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "70"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-6
   optional: true
@@ -1765,7 +1949,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "70"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-ns-7
   optional: true
@@ -1781,7 +1964,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "60"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-7
   optional: true
@@ -1797,7 +1979,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "60"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-steps-1
   optional: true
@@ -1813,7 +1994,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-1
   optional: true
@@ -1829,7 +2009,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-steps-5
   optional: true
@@ -1845,7 +2024,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-5
   optional: true
@@ -1861,7 +2039,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-steps-10
   optional: true
@@ -1877,7 +2054,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-10
   optional: true
@@ -1893,7 +2069,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-default-steps-20
   optional: true
@@ -1909,7 +2084,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 - always_run: false
   as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-20
   optional: true
@@ -1925,7 +2099,6 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-pipelines

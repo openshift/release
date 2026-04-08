@@ -88,11 +88,94 @@ oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube
 oc adm ocp-certificates regenerate-leaf -n openshift-kube-apiserver-operator secrets node-system-admin-client
 oc adm ocp-certificates regenerate-leaf -n openshift-kube-apiserver secrets check-endpoints-client-cert-key control-plane-node-admin-client-cert-key external-loadbalancer-serving-certkey internal-loadbalancer-serving-certkey kubelet-client localhost-recovery-serving-certkey localhost-serving-cert-certkey service-network-serving-certkey
 oc adm wait-for-stable-cluster
+# Verify old service-network-serving-signer cert is in kube-root-ca.crt before rotation
+# Related to: https://issues.redhat.com/browse/OCPBUGS-60045
+echo "Verifying service-network-serving-signer cert is in kube-root-ca.crt before rotation..."
+old_cert_subject=$(oc get secret service-network-serving-signer -o jsonpath='{.data.tls\.crt}' -n openshift-kube-apiserver-operator 2>/dev/null | base64 -d | openssl x509 -subject -noout 2>/dev/null)
+old_cert_notbefore=$(oc get secret service-network-serving-signer -o jsonpath='{.data.tls\.crt}' -n openshift-kube-apiserver-operator 2>/dev/null | base64 -d | openssl x509 -dates -noout 2>/dev/null | grep notBefore)
+
+if [ -z "$old_cert_subject" ] || [ -z "$old_cert_notbefore" ]; then
+    echo "ERROR: Failed to extract service-network-serving-signer cert details before rotation"
+    echo "  old_cert_subject: '$old_cert_subject'"
+    echo "  old_cert_notbefore: '$old_cert_notbefore'"
+    exit 1
+fi
+
+echo "Current service-network-serving-signer cert: $old_cert_subject, $old_cert_notbefore"
+
 # generate new roots of trust
 oc adm ocp-certificates regenerate-top-level -n openshift-kube-apiserver-operator secrets kube-apiserver-to-kubelet-signer kube-control-plane-signer loadbalancer-serving-signer localhost-serving-signer service-network-serving-signer
 oc -n openshift-kube-controller-manager-operator delete secrets/next-service-account-private-key
 oc -n openshift-kube-apiserver-operator delete secrets/next-bound-service-account-signing-key
 oc adm wait-for-stable-cluster
+
+# Verify new service-network-serving-signer cert is reflected in kube-root-ca.crt configmap
+# After rotating the kube-apiserver-service-network-signer cert, the new cert must be reflected
+# in the kube-root-ca.crt configmap in openshift-kube-apiserver namespace.
+# Testing shows this can take up to 10 minutes, so we wait up to 15 minutes.
+echo "Verifying new service-network-serving-signer cert is reflected in kube-root-ca.crt configmap..."
+max_retries=90  # 90 retries * 10 seconds = 15 minutes
+retry_count=0
+cert_included=false
+
+while [ $retry_count -lt $max_retries ]; do
+    # Get the subject and notBefore of the current service-network-serving-signer cert
+    new_cert_subject=$(oc get secret service-network-serving-signer -o jsonpath='{.data.tls\.crt}' -n openshift-kube-apiserver-operator 2>/dev/null | base64 -d | openssl x509 -subject -noout 2>/dev/null)
+    new_cert_notbefore=$(oc get secret service-network-serving-signer -o jsonpath='{.data.tls\.crt}' -n openshift-kube-apiserver-operator 2>/dev/null | base64 -d | openssl x509 -dates -noout 2>/dev/null | grep notBefore)
+
+    if [ -z "$new_cert_subject" ]; then
+        echo "Warning: Could not extract service-network-serving-signer cert subject"
+        retry_count=$((retry_count + 1))
+        sleep 10
+        continue
+    fi
+
+    # Verify the cert has actually been rotated (subject or notBefore changed)
+    if [ "$new_cert_subject" = "$old_cert_subject" ] && [ "$new_cert_notbefore" = "$old_cert_notbefore" ]; then
+        retry_count=$((retry_count + 1))
+        echo "Waiting for service-network-serving-signer cert to be rotated... (attempt $retry_count/$max_retries)"
+        sleep 10
+        continue
+    fi
+
+    # Extract the subject CN from the new cert to search for it in the configmap
+    new_cert_cn=$(echo "$new_cert_subject" | sed -n 's/.*CN[[:space:]]*=[[:space:]]*\([^,]*\).*/\1/p')
+
+    if [ -z "$new_cert_cn" ]; then
+        echo "Warning: Could not extract CN from service-network-serving-signer cert"
+        retry_count=$((retry_count + 1))
+        sleep 10
+        continue
+    fi
+
+    # Check if the new cert CN is in the kube-root-ca.crt configmap by searching for the CN value
+    if oc get cm kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' -n openshift-kube-apiserver 2>/dev/null | openssl crl2pkcs7 -certfile /dev/stdin -nocrl 2>/dev/null | openssl pkcs7 -print_certs -text -in /dev/stdin 2>/dev/null | grep -F "CN=$new_cert_cn"; then
+        echo "SUCCESS: New service-network-serving-signer cert is included in kube-root-ca.crt configmap"
+        echo "  New cert: $new_cert_subject, $new_cert_notbefore"
+        cert_included=true
+        break
+    fi
+
+    retry_count=$((retry_count + 1))
+    echo "Waiting for new service-network-serving-signer cert to be reflected in kube-root-ca.crt... (attempt $retry_count/$max_retries)"
+    echo "  New cert: $new_cert_subject, $new_cert_notbefore"
+    sleep 10
+done
+
+if [ "$cert_included" = false ]; then
+    echo "ERROR: New service-network-serving-signer cert is NOT included in kube-root-ca.crt configmap in openshift-kube-apiserver namespace after 15 minutes"
+    echo "This may cause cluster degradation with x509 errors in kube-apiserver, kube-controller-manager, and kube-scheduler"
+    echo ""
+    echo "Old service-network-serving-signer cert: $old_cert_subject, $old_cert_notbefore"
+    echo "New service-network-serving-signer cert: $new_cert_subject, $new_cert_notbefore"
+    echo ""
+    echo "Current service-network-serving-signer cert details:"
+    oc get secret service-network-serving-signer -o jsonpath='{.data.tls\.crt}' -n openshift-kube-apiserver-operator 2>/dev/null | base64 -d | openssl x509 -text -noout 2>/dev/null | head -20 || echo "Failed to extract cert details"
+    echo ""
+    echo "Certs in kube-root-ca.crt configmap:"
+    oc get cm kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' -n openshift-kube-apiserver 2>/dev/null | openssl crl2pkcs7 -certfile /dev/stdin -nocrl 2>/dev/null | openssl pkcs7 -print_certs -text -in /dev/stdin 2>/dev/null | grep "Issuer:" -A5 || echo "Failed to extract configmap certs"
+    exit 1
+fi
 
 cloud_type=$(oc get infrastructures.config.openshift.io -ojsonpath='{.items[0].spec.platformSpec.type}')
 # Configuration for the cluster in manual mode with GCP Workload Identity

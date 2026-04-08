@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail -x
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -19,6 +19,28 @@ echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
 
 echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+cp "$KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
+
+# Copy token file if kubeconfig references one
+CURRENT_CONTEXT=$(oc config current-context)
+if [[ -n "${CURRENT_CONTEXT}" ]]; then
+  CURRENT_USER=$(oc config view -o jsonpath="{.contexts[?(@.name==\"${CURRENT_CONTEXT}\")].context.user}")
+  if [[ -n "${CURRENT_USER}" ]]; then
+    TOKEN_FILE=$(oc config view -o jsonpath="{.users[?(@.name==\"${CURRENT_USER}\")].user.tokenFile}")
+    if [[ -n "${TOKEN_FILE}" ]]; then
+      # tokenFile is just a basename, relative to the directory containing KUBECONFIG
+      KUBECONFIG_DIR=$(dirname "${KUBECONFIG}")
+      TOKEN_FILE_PATH="${KUBECONFIG_DIR}/${TOKEN_FILE}"
+      if [[ -f "${TOKEN_FILE_PATH}" ]]; then
+        cp "${TOKEN_FILE_PATH}" "${SHARED_DIR}/${TOKEN_FILE}"
+        echo "Copied token file to the SHARED_DIR"
+      else
+        echo "Error: Token file not found"
+        exit 1
+      fi
+    fi
+  fi
+fi
 
 if [[ "${PLATFORM}" == "aws" ]]; then
   AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -37,15 +59,13 @@ else
   exit 1
 fi
 
-# We need to modify BASE_DOMAIN based on which account this job is running.
 if [[ -z "$BASE_DOMAIN" ]]; then
-	if [[ "${CLUSTER_PROFILE_NAME}" == "aws" ]]; then
-		BASE_DOMAIN='hypershift.origin-ci-int-aws.dev.rhcloud.com'
-	else
-		BASE_DOMAIN="hypershift.${CLUSTER_PROFILE_NAME}.ci.openshift.org"
+	if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+		BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
 	fi
 fi
 
+DOMAIN=""
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"
@@ -59,6 +79,8 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Using cluster name $CLUSTER_NAME and infra id $INFRA_ID"
 echo "CLUSTER_NAME=$CLUSTER_NAME" > ${SHARED_DIR}/hosted_cluster.txt
+echo "$CLUSTER_NAME" > ${SHARED_DIR}/cluster-name # idp-htpasswd step needs
+echo "clusters" > ${SHARED_DIR}/hypershift-clusters-namespace # idp-htpasswd step needs
 echo "INFRA_ID=$INFRA_ID" >> ${SHARED_DIR}/hosted_cluster.txt
 
 if [[ -f ${SHARED_DIR}/pull-secret-build-farm.json ]]; then
@@ -109,11 +131,21 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+    if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
+    echo "Updating featureset configuration if found set"
+    if [[ -n "${GUEST_FEATURE_SET}" ]] ; then
+      if [[ ! "${GUEST_FEATURE_SET}" =~ ^(TechPreviewNoUpgrade|DevPreviewNoUpgrade|CustomNoUpgrade)$ ]]; then
+        echo "invalid GUEST_FEATURE_SET=${GUEST_FEATURE_SET}, TechPreviewNoUpgrade,DevPreviewNoUpgrade,CustomNoUpgrade are only allowed"
+        exit 1
+      fi
+      ARGS+=( --feature-set "${GUEST_FEATURE_SET}")
+    fi
+
     echo "Creating cluster with the following arguments:"
+    echo "${ARGS[@]}"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
@@ -182,7 +214,6 @@ case "${PLATFORM}" in
     ;;
 esac
 
-
 echo "Wait to check if release image is valid"
 n=0
 until [ $n -ge 60 ]; do
@@ -202,9 +233,11 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
-oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
+oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
   echo "Cluster did not become available"
-  oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
+  echo "Collect minimal required cluster information"
+  mkdir -p $ARTIFACT_DIR/hypershift-snapshot
+  oc get hostedcluster ${CLUSTER_NAME} --namespace=clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/hostedcluster_failed.yaml
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
@@ -221,6 +254,8 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > $
 
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing protected stuff, in case this script happens to enable tracing again in future
 echo "Retrieving kubeadmin password"
 for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
@@ -232,6 +267,7 @@ for _ in {1..50}; do
     break
   fi
 done
+$WAS_TRACING && set -x
 
 if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
   echo "Failed to get kubeadmin password for the cluster"
@@ -249,6 +285,29 @@ until \
     sleep 5s
 done
 
+if [[ -n "${GUEST_FEATURE_SET}" ]]; then
+  echo "checking if cluster has expected featureset"
+  value_set=
+  for _ in {1..3}; do
+    cluster_featureset=$(oc get featuregates.config.openshift.io/cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null) || cluster_featureset=""
+    if [[ "$cluster_featureset" == "${GUEST_FEATURE_SET}" ]]; then
+      echo "Cluster has expected featureset=${GUEST_FEATURE_SET}"
+      value_set=1
+      break
+    fi
+    echo "Cluster featureset not ready yet (expected: ${GUEST_FEATURE_SET}, got: ${cluster_featureset}), retrying in 10s"
+    sleep 10
+  done
+
+  if [[ -z "${value_set}" ]]; then
+    echo "ERROR: Cluster does not have the expected featureset after 3 attempts (expected: ${GUEST_FEATURE_SET}, got: ${cluster_featureset})"
+    exit 1
+  fi
+fi
+
 # Data for cluster bot.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+$WAS_TRACING && set -x
 KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

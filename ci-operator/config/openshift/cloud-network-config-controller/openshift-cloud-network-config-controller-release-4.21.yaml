@@ -7,28 +7,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cloud-network-config-controller
+  items:
+  - dockerfile_path: Dockerfile
+    to: cloud-network-config-controller
 promotion:
   to:
   - name: "4.21"
@@ -54,7 +40,7 @@ test_binary_build_commands: make test
 tests:
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
   steps:
@@ -62,25 +48,25 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-azure-ovn
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-serial
   shard_count: 2
   steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-serial
 - as: unit
   commands: make test
   container:
     from: src
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-openstack-ovn-serial-e2e-only
+- always_run: false
+  as: e2e-openstack-ovn-serial-e2e-only
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -102,10 +88,11 @@ tests:
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:

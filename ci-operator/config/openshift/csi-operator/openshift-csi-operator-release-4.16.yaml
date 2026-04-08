@@ -15,14 +15,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -51,54 +43,27 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.aws-ebs
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.azure-disk
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: azure-disk-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: aws-ebs-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-disk-csi-driver-operator-test
-- dockerfile_path: Dockerfile.azure-file
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: azure-file-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-file-csi-driver-operator-test
-- dockerfile_path: Dockerfile.samba
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: smb-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: smb-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.aws-ebs
+    to: aws-ebs-csi-driver-operator
+  - dockerfile_path: Dockerfile.azure-disk
+    to: azure-disk-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: aws-ebs-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-disk-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.azure-file
+    to: azure-file-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-file-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.samba
+    to: smb-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: smb-csi-driver-operator-test
 operator:
   bundles:
   - as: smb-csi-driver-operator-bundle
@@ -151,42 +116,44 @@ tests:
     from: src
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: hypershift-aws-e2e-external
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-csi-extended
+- always_run: false
+  as: e2e-aws-csi-extended
   optional: true
   steps:
     cluster_profile: aws-qe
     workflow: openshift-e2e-aws-csi-extended
 - as: e2e-azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
-- as: e2e-azure-csi-extended
+- always_run: false
+  as: e2e-azure-csi-extended
   optional: true
   steps:
     cluster_profile: azure-qe
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]|\[Azure-Disk-CSI-Driver-Operator\]
     workflow: openshift-e2e-azure-csi-extended
-- as: e2e-azurestack-csi
+- always_run: false
+  as: e2e-azurestack-csi
   cluster: build01
   optional: true
   run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
@@ -199,27 +166,29 @@ tests:
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-file-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file
 - as: e2e-azure-file-nfs-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file-nfs
-- as: e2e-azure-file-csi-extended
+- always_run: false
+  as: e2e-azure-file-csi-extended
   optional: true
   steps:
     cluster_profile: azure-qe
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]|\[Azure-File-CSI-Driver-Operator\]
     workflow: openshift-e2e-azure-csi-extended
-- as: smb-operator-e2e
+- always_run: false
+  as: smb-operator-e2e
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-smb-csi-driver-operator-bundle
     env:
@@ -228,10 +197,11 @@ tests:
       OO_PACKAGE: smb-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
     workflow: openshift-e2e-azure-csi-smb
-- as: smb-operator-e2e-extended
+- always_run: false
+  as: smb-operator-e2e-extended
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-smb-csi-driver-operator-bundle
     env:

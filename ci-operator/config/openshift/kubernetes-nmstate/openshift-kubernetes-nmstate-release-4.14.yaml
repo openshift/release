@@ -7,46 +7,25 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.14_base-rhel9:
-    name: "4.14"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile.openshift
-  inputs:
-    ocp_4.14_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
-  to: kubernetes-nmstate-handler
-- dockerfile_path: build/Dockerfile.operator.openshift
-  inputs:
-    ocp_4.14_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
-  to: kubernetes-nmstate-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-with-oc-and-kubectl
+  items:
+  - dockerfile_path: build/Dockerfile.openshift
+    to: kubernetes-nmstate-handler
+  - dockerfile_path: build/Dockerfile.operator.openshift
+    to: kubernetes-nmstate-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-with-oc-and-kubectl
 promotion:
   to:
   - excluded_images:
@@ -99,7 +78,8 @@ tests:
   container:
     from: src
 - as: e2e-handler-sdn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -109,7 +89,8 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -119,7 +100,8 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -129,7 +111,8 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-operator
 - as: e2e-handler-sdn-ipv4-nightly-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 56 16 2 7 *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -142,7 +125,8 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4-nightly-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 9 20 26 4 *
   steps:
     cluster_profile: equinix-ocp-metal

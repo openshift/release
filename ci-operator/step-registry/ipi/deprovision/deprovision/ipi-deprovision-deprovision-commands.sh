@@ -4,11 +4,31 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# shellcheck disable=SC1090
+source "$LEASE_PROXY_CLIENT_SH"
+install_lease_handle=''
+
+function acquire_install_lease() {
+  if ! lease__install_lease_eligible; then
+      return 0
+  fi
+
+  install_lease_handle=$(lease__acquire --type="${CLUSTER_PROFILE_SET_NAME}--${CLUSTER_PROFILE_NAME}--install-quota-slice" --scope=step)
+  printf 'Install lease acquired at %s: %s\n' "$(date "+%F %X")" "$(lease__cat --handle="$install_lease_handle" --format=csv)"
+}
+
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
   echo "Skipping: ${SHARED_DIR}/metadata.json not found."
   exit
 fi
+
+acquire_install_lease || true
+
+function on_exit() {
+    lease__release --handle="$install_lease_handle" || true
+    save_logs
+}
 
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
@@ -16,7 +36,7 @@ function save_logs() {
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'save_logs' EXIT TERM
+trap 'on_exit' EXIT TERM
 
 export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
@@ -37,6 +57,9 @@ elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
 elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+elif [ -f "${SHARED_DIR}/xpn_min_perm_cco_manual.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC with CCO in Manual mode..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_cco_manual.json"
 elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"

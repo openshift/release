@@ -2,22 +2,23 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- build_args:
-  - name: max_jobs
-    value: "24"
-  - name: nvcc_threads
-    value: "2"
-  - name: TORCH_CUDA_ARCH_LIST
-    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
-  - name: vllm_fa_cmake_gpu_arches
-    value: 80-real;90-real
-  - name: PYTHON_VERSION
-    value: "3.12"
-  context_dir: .
-  dockerfile_path: Dockerfile.ubi
-  to: vllm-build-ibm-dev-cuda
+  items:
+  - build_args:
+    - name: max_jobs
+      value: "24"
+    - name: nvcc_threads
+      value: "2"
+    - name: TORCH_CUDA_ARCH_LIST
+      value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+    - name: vllm_fa_cmake_gpu_arches
+      value: 80-real;90-real
+    - name: PYTHON_VERSION
+      value: "3.12"
+    context_dir: .
+    dockerfile_path: Dockerfile.ubi
+    to: vllm-build-ibm-dev-cuda
 promotion:
   to:
   - namespace: opendatahub-io
@@ -75,7 +76,6 @@ tests:
       IMAGE_REPO: vllm
       RELEASE_VERSION: fast-ibm
     workflow: opendatahub-io-ci-image-mirror
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: ibm-dev
   org: opendatahub-io

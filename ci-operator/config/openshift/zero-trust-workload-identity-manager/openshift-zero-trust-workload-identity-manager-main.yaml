@@ -1,27 +1,19 @@
 base_images:
-  base-rhel9:
-    name: "4.18"
+  cli-operator-sdk:
+    name: cli-operator-sdk
     namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.18
+    tag: v1.39.2
   operator-sdk:
-    name: "4.18"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.18
-  to: zero-trust-workload-identity-manager
+  items:
+  - dockerfile_path: Dockerfile
+    to: zero-trust-workload-identity-manager
 operator:
   bundles:
   - as: zero-trust-workload-identity-manager-bundle
@@ -31,12 +23,14 @@ operator:
   - pullspec: openshift.io/zero-trust-workload-identity-manager:latest
     with: pipeline:zero-trust-workload-identity-manager
 releases:
+  initial:
+    integration:
+      name: "4.22"
+      namespace: ocp
   latest:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.18"
+    integration:
+      name: "4.22"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -60,8 +54,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.18"
-  optional: true
+    version: "4.20"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -86,6 +79,72 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- always_run: false
+  as: e2e-operator-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-operator-rhcos10-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-operator-rhcos10
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: gangway
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -19,7 +22,7 @@ objects:
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
-      termination: Reencrypt
+      termination: reencrypt
     to:
       kind: Service
       name: gangway
@@ -54,6 +57,11 @@ objects:
     labels:
       app: prow
       component: gangway
+    annotations:
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 1
     selector:
@@ -73,7 +81,7 @@ objects:
           - /git-sync
           args:
           - --repo=https://github.com/openshift/release.git
-          - --ref=master
+          - --ref=main
           - --root=/tmp/git-sync
           - --one-time=true
           - --depth=1
@@ -83,63 +91,8 @@ objects:
           - name: release
             mountPath: /tmp/git-sync
         containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: oauth-proxy
-          image: quay.io/openshift/origin-oauth-proxy:4.16
-          imagePullPolicy: IfNotPresent
-          ports:
-          - containerPort: 8443
-            name: web
-          args:
-          - -provider=openshift
-          - -https-address=:8443
-          - -http-address=
-          - -email-domain=*
-          - -upstream=http://localhost:31999
-          - -client-id=system:serviceaccount:ci:gangway
-          - -openshift-ca=/etc/pki/tls/cert.pem
-          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - '-openshift-sar=[{"resource": "namespaces", "verb": "get"},{"resource": "systemusers", "verb": "impersonate"}]'
-          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}, "/bulk-job-status-update": {"resource": "systemusers", "verb": "impersonate"}}'
-          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -cookie-secret-file=/etc/proxy/secrets/session_secret
-          - -cookie-samesite=none
-          - -tls-cert=/etc/tls/private/tls.crt
-          - -tls-key=/etc/tls/private/tls.key
-          volumeMounts:
-          - mountPath: /etc/tls/private
-            name: gangway-tls
-          - mountPath: /etc/proxy/secrets
-            name: session-secret
-        - name: envoyproxy
-          imagePullPolicy: Always
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_tp-envoyproxy_latest
-        - name: nginx-rate-limit
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_nging-rate-limit_latest
-          volumeMounts:
-          - mountPath: /var/cache/nginx
-            name: nginx-cache
-          - mountPath: /tmp
-            name: nginx-tmp
         - name: gangway
-          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20250823-25d79acb8
+          image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20260328-dc2bbc9fc
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -196,6 +149,62 @@ objects:
             requests:
               memory: "5Gi"
               cpu: "1"
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:31999
+          - -client-id=system:serviceaccount:ci:gangway
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar=[{"resource": "namespaces", "verb": "get"},{"resource": "systemusers", "verb": "impersonate"}]'
+          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}, "/bulk-job-status-update": {"resource": "systemusers", "verb": "impersonate"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: gangway-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - name: envoyproxy
+          imagePullPolicy: Always
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_tp-envoyproxy_latest
+        - name: nginx-rate-limit
+          imagePullPolicy: Always
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_nging-rate-limit_latest
+          volumeMounts:
+          - mountPath: /var/cache/nginx
+            name: nginx-cache
+          - mountPath: /tmp
+            name: nginx-tmp
         volumes:
         - name: github-app-credentials
           secret:
@@ -289,4 +298,22 @@ objects:
     name: periodic-job-bot
   - kind: ServiceAccount
     namespace: oadp-dev
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-hcp-prow-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: aro-classic-prow-ci
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: ocp-isc-qe-team
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: osc-prow
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: ocp-errata-reliability-team
+    name: periodic-job-bot
+  - kind: ServiceAccount
+    namespace: quaykonflux
     name: periodic-job-bot

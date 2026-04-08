@@ -20,7 +20,7 @@ HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Clusters to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
+PREPARED_CLUSTER=("cnfdu1")
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -62,11 +62,8 @@ ADDITIONAL_ARG=""
 # default to the first cluster in the array, unless 4.17 or 4.18
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.17" ]] || [[ "$T5CI_VERSION" == "4.18" ]]; then
-        ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
-    fi
 else
-    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} "
 fi
 
 # Choose topology for different job types:
@@ -96,7 +93,7 @@ elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
 
-if [[ "$JOB_NAME" == *"telcov10n-functional-llc-cnf"* ]]; then
+if [[ "$JOB_NAME" == *"telcov10n-functional-cnf-compute-llc-"* ]]; then
     # For QE AMD jobs
     INTERNAL=true
     INTERNAL_ONLY=true

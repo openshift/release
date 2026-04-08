@@ -19,9 +19,9 @@ fi
 
 # directory name, e.g. node-healthcheck-operator
 REPO=../${1}
-# branch name, e.g. release-0.7
+# branch name, e.g. release-0.11
 BRANCH=${2}
-# old released operator version (without the leading v), e.g. 0.8.0
+# old released operator version (without the leading v), e.g. 0.10.0
 OPERATOR_RELEASED_VERSION=${3}
 
 # verify that the repo exists
@@ -32,18 +32,27 @@ fi
 
 cd ${REPO}
 
-# copy all main config files
-for file in $(ls | grep main__); do
-  # rename the config file with the branch name
-  new_file=$(echo ${file} | sed "s/main__/${BRANCH}__/")
-  cp ${file} ${new_file}
-  # update the branch name in the config file
-  sed -i "s/branch: main/branch: ${BRANCH}/g" ${new_file}
-  # update the old released operator version in the config file if possible
-  if [ $# -eq 3 ]; then
-    sed -i "s/OPERATOR_RELEASED_VERSION: .*/OPERATOR_RELEASED_VERSION: ${OPERATOR_RELEASED_VERSION}/g" ${new_file}
-  fi
-done
+# copy only the newest main config (highest OCP version)
+latest_main=$(ls | grep 'main__' | sed -r 's#^.*__##; s#\\.yaml$##' | sort -V | tail -1)
+if [ -z "${latest_main}" ]; then
+  echo "No main__*.yaml config files found"
+  exit 1
+fi
+
+file="medik8s-${1}-main__${latest_main}"
+if [ ! -f "${file}" ]; then
+  echo "Expected config ${file} not found"
+  exit 1
+fi
+
+# rename the config file with the branch name
+new_file=$(echo ${file} | sed "s/main__/${BRANCH}__/")
+cp ${file} ${new_file}
+# update the branch name in the config file
+sed -i "s/branch: main/branch: ${BRANCH}/g" ${new_file}
+# update the old released operator version in the config file if possible
+if [ $# -eq 3 ]; then
+  sed -i "s/OPERATOR_RELEASED_VERSION: .*/OPERATOR_RELEASED_VERSION: ${OPERATOR_RELEASED_VERSION}/g" ${new_file}
+fi
 
 echo "Done, please run 'make update' for creating jobs"
-

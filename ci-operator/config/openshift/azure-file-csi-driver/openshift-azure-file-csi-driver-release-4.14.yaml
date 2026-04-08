@@ -7,10 +7,6 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_builder_rhel-8-golang-1.21-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.14
   tests-private:
     name: tests-private
     namespace: ci
@@ -19,13 +15,10 @@ binary_build_commands: make azurefile
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.14
-  to: azure-file-csi-driver
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: azure-file-csi-driver
 promotion:
   to:
   - name: "4.14"
@@ -62,18 +55,18 @@ tests:
           memory: 2Gi
 - as: e2e-azure-file-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
 - as: e2e-azure-file-nfs-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file-nfs
-- as: e2e-azure-file-csi-extended
+- always_run: false
+  as: e2e-azure-file-csi-extended
   optional: true
   steps:
     cluster_profile: azure-qe
@@ -88,7 +81,7 @@ tests:
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: verify-commits
   commands: |

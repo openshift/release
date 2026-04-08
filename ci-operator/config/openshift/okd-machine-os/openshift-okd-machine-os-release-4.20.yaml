@@ -1,33 +1,24 @@
-base_images:
-  origin_4.16_artifacts:
-    name: "4.20"
-    namespace: origin
-    tag: artifacts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_path: Dockerfile.ci
-  to: layering-build
-- dockerfile_path: Dockerfile.rpms
-  inputs:
-    origin_4.16_artifacts:
-      as:
-      - registry.ci.openshift.org/origin/4.16:artifacts
-  to: okd-rpms
-- dockerfile_path: Dockerfile.generated
-  inputs:
-    layering-build:
-      paths:
-      - destination_dir: .
-        source_path: /tmp/Dockerfile.generated
-  to: fedora-coreos
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: layering-build
+  - dockerfile_path: Dockerfile.rpms
+    to: okd-rpms
+  - dockerfile_path: Dockerfile.generated
+    inputs:
+      layering-build:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile.generated
+    to: fedora-coreos
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - layering-build
     name: "4.20"
     namespace: origin
@@ -55,7 +46,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-vsphere
@@ -77,7 +68,7 @@ tests:
   as: e2e-aws-crun
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-crun
 zz_generated_metadata:
   branch: release-4.20

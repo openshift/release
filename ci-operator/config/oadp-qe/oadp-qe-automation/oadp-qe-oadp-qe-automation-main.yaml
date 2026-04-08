@@ -1,0 +1,41 @@
+base_images:
+  oadp-apps-deployer:
+    name: oadp-apps-deployer
+    namespace: oadp-qe
+    tag: master
+  oadp-e2e-qe:
+    name: oadp-e2e-qe
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.17
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: dockerfiles/testing/interop/Dockerfile
+    inputs:
+      oadp-apps-deployer:
+        paths:
+        - destination_dir: oadp-apps-deployer.tar.gz
+          source_path: /oadp-apps-deployer.tar.gz
+      oadp-e2e-qe:
+        paths:
+        - destination_dir: oadp-e2e-qe.tar.gz
+          source_path: /oadp-e2e-qe.tar.gz
+    to: oadp-runner
+promotion:
+  to:
+  - namespace: oadp-qe
+    tag: master
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation

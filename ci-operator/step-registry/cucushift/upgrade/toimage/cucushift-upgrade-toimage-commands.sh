@@ -579,6 +579,18 @@ function check_ota_case_enabled() {
     return 1
 }
 
+echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+if [[ "${USE_ORIGINAL_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster upgrade, overwrite OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}
+fi
+
+if [[ -z "$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE" ]]; then
+  echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
+  exit 1
+fi
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -602,7 +614,7 @@ run_command "oc get machineconfig"
 
 export TARGET_MINOR_VERSION=""
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
-TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=json | jq -r '.metadata.version')"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"

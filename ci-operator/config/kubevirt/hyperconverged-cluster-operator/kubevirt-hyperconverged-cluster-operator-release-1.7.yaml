@@ -15,10 +15,6 @@ base_images:
     name: hyperconverged-cluster-index
     namespace: ci
     tag: 1.6.0-unstable
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -26,39 +22,36 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.11
 images:
-- dockerfile_path: build/Dockerfile.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-operator
-  to: hyperconverged-cluster-operator
-- dockerfile_path: build/Dockerfile.wh.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-webhook
-  to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.artifacts
-  optional: true
-  to: virt-artifacts-server
-- dockerfile_path: build/Dockerfile.functest.ci
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: hyperconverged-cluster-functest
-- dockerfile_path: deploy/Dockerfile.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image
+  items:
+  - dockerfile_path: build/Dockerfile.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-operator
+    to: hyperconverged-cluster-operator
+  - dockerfile_path: build/Dockerfile.wh.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-webhook
+    to: hyperconverged-cluster-webhook
+  - dockerfile_path: build/Dockerfile.artifacts
+    optional: true
+    to: virt-artifacts-server
+  - dockerfile_path: build/Dockerfile.functest.ci
+    to: hyperconverged-cluster-functest
+  - dockerfile_path: deploy/Dockerfile.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image
 operator:
   bundles:
   - context_dir: deploy/index-image

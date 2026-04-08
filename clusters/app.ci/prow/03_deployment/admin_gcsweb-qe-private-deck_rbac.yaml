@@ -1,39 +1,39 @@
-kind: List
+---
+kind: ServiceAccount
 apiVersion: v1
-items:
+metadata:
+  name: gcsweb-qe-private-deck
+  namespace: ci
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.gcsweb-qe-private-deck: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"gcsweb-qe-private-deck"}}'
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcsweb-qe-private-deck-oauth
+rules:
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcsweb-qe-private-deck-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gcsweb-qe-private-deck-oauth
+subjects:
 - kind: ServiceAccount
-  apiVersion: v1
-  metadata:
-    name: gcsweb-qe-private-deck
-    namespace: ci
-    annotations:
-      serviceaccounts.openshift.io/oauth-redirectreference.gcsweb-qe-private-deck: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"gcsweb-qe-private-deck"}}'
-- kind: ClusterRole
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gcsweb-qe-private-deck-oauth
-  rules:
-    - apiGroups:
-      - authentication.k8s.io
-      resources:
-      - tokenreviews
-      verbs:
-      - create
-    - apiGroups:
-      - authorization.k8s.io
-      resources:
-      - subjectaccessreviews
-      verbs:
-      - create
-- kind: ClusterRoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gcsweb-qe-private-deck-oauth
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: gcsweb-qe-private-deck-oauth
-  subjects:
-  - kind: ServiceAccount
-    name: gcsweb-qe-private-deck
-    namespace: ci
+  name: gcsweb-qe-private-deck
+  namespace: ci

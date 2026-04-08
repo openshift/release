@@ -29,155 +29,80 @@ EOF
   oc apply -f "${catsrc_path}"
 }
 
-# The default catalog image doesn't have a "latest" tag associated with, so
-# we search in quay.io for the latest built tag.
+# The "latest" tag does not convey information about the build time, so
+# we search in quay.io for an X.Y.Z-unix_epoch (e.g., 1.11.1-1766149846)
+# the first X.Y.Z-unix_epoch tag we find is the newest one because Quay
+# returns tags sorted by creation time (newest first).and we return it
+# if no tag is found, we return "latest"
+#
+# Optimization: Quay returns tags sorted by creation time (newest first).
+# So the first X.Y.Z-unix_epoch tag we find is the newest one - we can stop immediately.
 latest_catsrc_image_tag() {
+    local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/"
     local page=1
-    while true; do
-        local resp
-        resp=$(curl -sf "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/?limit=100&page=$page")
+    local max_pages=20 # safety limit, typically exits much earlier
 
-        if ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null; then
+    while [ "$page" -le "$max_pages" ]; do
+        local resp
+        # Query with onlyActiveTags to skip deleted tags
+        resp=$(curl -sf "${api_url}?limit=100&page=${page}&onlyActiveTags=true")
+
+        if [ -z "$resp" ] || ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null 2>&1; then
             break
         fi
 
-        latest_tag=$(echo "$resp" | \
-          jq -r '.tags[]? | select(.name | test("^osc-test-fbc-on-push-.*-build-image-index$")) | "\(.start_ts) \(.name)"' | \
-          sort -nr | head -n1 | awk '{print $2}')
-        if [ -n "${latest_tag}" ]; then
-            echo "${latest_tag}"
-            break
+        # Find the first matching tag on this page (X.Y.Z-unix_epoch pattern)
+        # Since Quay returns newest first, the first match is the latest tag
+        local first_match
+        first_match=$(echo "$resp" | \
+            jq -r '.tags[]? | select(.name | test("^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$")) | .name' | head -1)
+
+        if [ -n "$first_match" ]; then
+            echo "$first_match"
+            return 0
         fi
 
         ((page++))
     done
+
+    # Check if we hit max_pages without finding a tag (potential issue)
+    if [ "$page" -gt "$max_pages" ]; then
+        echo "ERROR: Hit max_pages ($max_pages) limit while searching for tags." >&2
+    fi
+
+    # Fallback to :latest if no matching tag found
+    echo "WARNING: No X.Y.Z-unix_epoch tag found, using :latest" >&2
+    echo "latest"
 }
 
 mirror_konflux() {
-  local mirror_path="${SHARED_DIR:-$(pwd)}/mirror_konflux.yaml"
-
   echo "Create mirror for konflux images"
-
-cat<<EOF | tee "${mirror_path}"
----
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: osc-registry
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-monitor
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-monitor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa-webhook
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-webhook-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-builder
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-builder-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-payload
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-payload-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
-
----
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: osc-registry
-spec:
-  imageDigestMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-monitor
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-monitor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa-webhook
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-webhook-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-builder
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-builder-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-payload
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-payload-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
----
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
----
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageDigestMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
-EOF
-
-  oc apply -f "${mirror_path}"
+  # create the mirror set for the sandboxed-containers-operator and trustee-fbc devel branches
+  oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
+  oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
 }
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
 
   default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+  # Only resolve the tag if it's :latest
+  # Other tags (specific versions like 1.11.1-1766149846 or SHAs) are passed through unchanged
   if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
     catsrc_image_tag=$(latest_catsrc_image_tag)
     CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+    echo "Resolved :latest to tag: ${catsrc_image_tag}"
+  else
+    echo "Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
   fi
 
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
-  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
+
+  # Save resolved CATALOG_SOURCE_IMAGE for subsequent steps
+  echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
+  echo "Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
 else
-  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
+  if [[ -n "$CATALOG_SOURCE_IMAGE" ]]; then
     echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
     exit 1
   fi
@@ -191,9 +116,9 @@ metadata:
   namespace: default
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
-  operatorVer: "${EXPECTED_OPERATOR_VERSION}"
+  operatorVer: ""
   channel: "${OPERATOR_UPDATE_CHANNEL}"
-  redirectNeeded: "true"
+  redirectNeeded: "false"
   exists: "true"
   labelSingleNode: "false"
   eligibility: "false"
@@ -201,8 +126,8 @@ data:
   enableGPU: "${ENABLEGPU}"
   podvmImageUrl: "${PODVM_IMAGE_URL}"
   runtimeClassName: "${RUNTIMECLASS}"
-  trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"
+  INITDATA: "${INITDATA}"
   enablePeerPods: "${ENABLEPEERPODS}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"

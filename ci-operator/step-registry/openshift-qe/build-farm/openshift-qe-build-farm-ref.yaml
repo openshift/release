@@ -1,0 +1,74 @@
+ref:
+  as: openshift-qe-build-farm
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: CHURN
+    default: "true"
+    documentation: |-
+      Default is true, which means the workload deletes the the resources inside the created namespaces
+  - name: BUILD_FARM_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Default build-farm parameters
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "false"
+    documentation: |-
+      Default is false which means the resource that kube-burner ocp created don't get deleted
+  - name: QPS
+    default: "40"
+    documentation: |-
+     QPS for kube-burner
+  - name: BURST
+    default: "40"
+    documentation: |-
+      Burst for kube-burner
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: USER_METADATA
+    default: ""
+    documentation: |-
+      Arbitrary metadata provided to the kube-burner workload in YAML format
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  commands: openshift-qe-build-farm-commands.sh
+  timeout: 8h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale build-farm workload in the deployed cluster

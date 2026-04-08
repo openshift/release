@@ -7,50 +7,51 @@ build_root:
   project_image:
     dockerfile_path: .openshift-ci/Dockerfile.build_root
 images:
-- dockerfile_path: .openshift-ci/build/Dockerfile.generate-genesis-dump
-  from: src
-  to: genesis-dump
-- dockerfile_path: .openshift-ci/build/Dockerfile.generate-db-dump
-  from: genesis-dump
-  to: db-dump
-- dockerfile_path: .openshift-ci/build/Dockerfile.build-bundle
-  from: genesis-dump
-  to: scanner-bundle
-- dockerfile_path: .openshift-ci/build/Dockerfile.build-db-bundle
-  from: db-dump
-  to: scanner-db-bundle
-- dockerfile_path: Dockerfile
-  from: ubi-minimal
-  inputs:
-    scanner-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
-  to: scanner
-- dockerfile_path: Dockerfile.slim
-  from: ubi-minimal
-  inputs:
-    scanner-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
-  to: scanner-slim
-- dockerfile_path: Dockerfile
-  from: ubi-minimal
-  inputs:
-    scanner-db-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
-  to: scanner-db
-- dockerfile_path: Dockerfile.slim
-  from: ubi-minimal
-  inputs:
-    scanner-db-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
-  to: scanner-db-slim
+  items:
+  - dockerfile_path: .openshift-ci/build/Dockerfile.generate-genesis-dump
+    from: src
+    to: genesis-dump
+  - dockerfile_path: .openshift-ci/build/Dockerfile.generate-db-dump
+    from: genesis-dump
+    to: db-dump
+  - dockerfile_path: .openshift-ci/build/Dockerfile.build-bundle
+    from: genesis-dump
+    to: scanner-bundle
+  - dockerfile_path: .openshift-ci/build/Dockerfile.build-db-bundle
+    from: db-dump
+    to: scanner-db-bundle
+  - dockerfile_path: Dockerfile
+    from: ubi-minimal
+    inputs:
+      scanner-bundle:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
+    to: scanner
+  - dockerfile_path: Dockerfile.slim
+    from: ubi-minimal
+    inputs:
+      scanner-bundle:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
+    to: scanner-slim
+  - dockerfile_path: Dockerfile
+    from: ubi-minimal
+    inputs:
+      scanner-db-bundle:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
+    to: scanner-db
+  - dockerfile_path: Dockerfile.slim
+    from: ubi-minimal
+    inputs:
+      scanner-db-bundle:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
+    to: scanner-db-slim
 resources:
   '*':
     requests:
@@ -70,8 +71,7 @@ tests:
     - as: e2e-tests
       commands: .openshift-ci/dispatch.sh e2e-tests
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/stackrox-scanner-secrets
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -84,15 +84,13 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-  timeout: 3h0m0s
 - as: push-images
   steps:
     test:
     - as: push
       commands: .openshift-ci/dispatch.sh push-images
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -116,8 +114,7 @@ tests:
     - as: e2e-tests
       commands: .openshift-ci/dispatch.sh slim-e2e-tests
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/stackrox-scanner-secrets
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -130,7 +127,6 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-  timeout: 3h0m0s
 - as: store-db-dump
   optional: true
   steps:
@@ -138,8 +134,7 @@ tests:
     - as: store-db-dump
       commands: .openshift-ci/dispatch.sh store-db-dump
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       from: db-dump
@@ -154,8 +149,7 @@ tests:
     - as: store-genesis-dump
       commands: .openshift-ci/dispatch.sh store-genesis-dump
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       from: genesis-dump
@@ -183,8 +177,7 @@ tests:
     - as: e2e-tests
       commands: .openshift-ci/dispatch.sh e2e-tests
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/stackrox-scanner-secrets
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -197,7 +190,6 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-  timeout: 3h0m0s
 - as: merge-push-images
   postsubmit: true
   steps:
@@ -205,8 +197,7 @@ tests:
     - as: push
       commands: .openshift-ci/dispatch.sh push-images
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -230,8 +221,7 @@ tests:
     - as: e2e-tests
       commands: .openshift-ci/dispatch.sh slim-e2e-tests
       credentials:
-      - collection: ""
-        mount_path: /tmp/secret/stackrox-scanner-secrets
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       dependencies:
@@ -244,7 +234,6 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-  timeout: 3h0m0s
 - as: merge-store-db-dump
   postsubmit: true
   steps:
@@ -252,8 +241,7 @@ tests:
     - as: store-db-dump
       commands: .openshift-ci/dispatch.sh store-db-dump
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       from: db-dump
@@ -268,8 +256,7 @@ tests:
     - as: store-genesis-dump
       commands: .openshift-ci/dispatch.sh store-genesis-dump
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       from: genesis-dump
@@ -294,8 +281,7 @@ tests:
     - as: upload-dumps
       commands: .openshift-ci/dispatch.sh upload-dumps-for-downstream
       credentials:
-      - collection: ""
-        mount_path: /tmp/vault/stackrox-scanner-secrets
+      - mount_path: /tmp/vault/stackrox-scanner-secrets
         name: stackrox-scanner-secrets
         namespace: test-credentials
       from: db-dump

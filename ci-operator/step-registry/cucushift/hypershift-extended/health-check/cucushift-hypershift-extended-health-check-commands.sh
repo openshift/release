@@ -124,7 +124,7 @@ check_control_plane_pod_status() {
 check_pod_status() {
     log "Checking all pod statuses..."
     local unhealthy_pods
-    unhealthy_pods=$(oc get pods --all-namespaces -o 'jsonpath={range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' | grep -vE " (Running|Succeeded)$" || true)
+    unhealthy_pods=$(oc get pods --all-namespaces -o 'jsonpath={range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' | grep -v "open-cluster-management-agent-addon" | grep -vE " (Running|Succeeded)$" || true)
     
     # Ignore some pods for ROSA HCP as they can take a long time to recover.
     unhealthy_pods=$(echo "$unhealthy_pods" | grep -v "azure-path-fix" | grep -v "osd-delete-backplane" | grep -v "osd-cluster-ready" || true)
@@ -247,7 +247,7 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         log "Detected ROSA/OSD HyperShift cluster. Running health checks..."
         print_clusterversion
-        check_node_status || exit 1
+        retry check_node_status || exit 1
         retry check_cluster_operators || exit 1
         retry check_pod_status || exit 1
         log "✅ ROSA/OSD health checks passed."
@@ -274,7 +274,7 @@ log "Checking guest cluster..."
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 check_disabled_capability || exit 1
 print_clusterversion
-check_node_status || exit 1
+retry check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
 

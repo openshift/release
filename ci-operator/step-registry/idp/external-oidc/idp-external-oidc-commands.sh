@@ -76,7 +76,7 @@ function configure_external_oidc () {
 
     OIDC_PROVIDERS_UPPER_FIELD=$(echo '{}' | jq "$OIDC_PROVIDERS_UPPER_FIELD = $(< $SHARED_DIR/oidcProviders.json)")
     [ "$IS_HYPERSHIFT_ENV" == "no" ] && OIDC_PROVIDERS_UPPER_FIELD=$(jq '.spec.webhookTokenAuthenticator = null' <<< "$OIDC_PROVIDERS_UPPER_FIELD")
-    oc create -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
+    oc apply -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
 
     # This step can be applied in both OCP CI jobs and HyperShift hosted cluster CI jobs.
     # Note: for HyperShift hosted cluster CI jobs, oidcProviders must be configured in day-1. The corresponding workflow is
@@ -116,9 +116,19 @@ function configure_external_oidc () {
     fi
     echo "KAS completed rollout"
 
+    IS_GOOD_STATUS="yes"
     # Below cluster operators should be in good status
     if oc get co kube-apiserver authentication console --no-headers --kubeconfig "$CLUSTER_IN_TEST" | grep -v "True  *False  *False"; then
         echo '"oc get co kube-apiserver authentication console" shows some cluster operator not in good status!'
+        IS_GOOD_STATUS="no"
+    fi
+    # Below covers regression bugs like OCPBUGS-60219 in case the clusterversion is not in good status
+    if oc get clusterversion version --kubeconfig "$CLUSTER_IN_TEST" | grep -iE "(err|warn|fail|bad|not available)"; then
+        echo '"oc get clusterversion version" shows not good status! The ".status.conditions" shows:'
+        oc get clusterversion version -o jsonpath='{.status.conditions}' --kubeconfig "$CLUSTER_IN_TEST"
+        IS_GOOD_STATUS="no"
+    fi
+    if [ "$IS_GOOD_STATUS" != "yes" ]; then
         exit 1
     fi
 }

@@ -1,0 +1,44 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-publish-mixed-ingress-internal-custom-dns-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-operator-publish-strategy
+  - chain: azure-provision-service-principal-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-in-bastion
+  - ref: azure-provision-mixed-custom-dns
+  - ref: bastion-dnsmasq
+  - ref: aws-provision-route53-public-record-sets
+  - ref: proxy-config-generate
+  - ref: ipi-conf-operator-publish-strategy-noproxy
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-azure-publish-mixed
+  - ref: cucushift-installer-check-user-provisioned-dns
+  env:
+  - name: APISERVER_PUBLISH_STRATEGY
+    default: "External"
+  - name: INGRESS_PUBLISH_STRATEGY
+    default: "Internal"
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+  - name: BASE_DOMAIN
+    default: "qe1.devcluster.openshift.com"
+  - name: BASTION_VM_SIZE
+    default: "Standard_D4s_v3"
+  - name: ENALBE_DNSMASQ_METHOD
+    default: "NetworkManager"
+  documentation: |-
+    Create an IPI mixed-publish cluster on AZURE for QE e2e tests.
+    Configure public and private exposure for OpenShift API and OpenShift Ingress separately at installation time.
+    Supported on 4.15+.
+    Enble custom dns on 4.19+.

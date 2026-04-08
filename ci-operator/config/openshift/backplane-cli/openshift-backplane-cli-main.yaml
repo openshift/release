@@ -7,11 +7,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: unused
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: unused
 resources:
   '*':
     requests:
@@ -20,6 +21,8 @@ resources:
 tests:
 - as: lint
   commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
     make lint
   container:
     from: src

@@ -7,16 +7,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
-- dockerfile_path: hack/Dockerfile.upgrade.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-upgrade-ci
+  items:
+  - dockerfile_path: hack/Dockerfile.upgrade.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-upgrade-ci
 releases:
   initial:
     integration:
@@ -35,7 +36,8 @@ resources:
       cpu: 100m
       memory: 600Mi
 tests:
-- as: e2e-deploy
+- always_run: false
+  as: e2e-deploy
   steps:
     cluster_profile: azure-virtualization
     env:
@@ -46,8 +48,7 @@ tests:
       cli: latest
       commands: make deploy_test
       credentials:
-      - collection: ""
-        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -69,7 +70,8 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
     cluster_profile: azure-virtualization
     env:
@@ -79,8 +81,7 @@ tests:
     - as: test
       commands: make upgrade_test
       credentials:
-      - collection: ""
-        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:

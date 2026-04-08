@@ -3,16 +3,21 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.25-openshift-4.22
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
-- context_dir: .
-  dockerfile_path: ./tests/e2e-openshift/Dockerfile
-  to: opentelemetry-tests-runner
+  items:
+  - context_dir: .
+    dockerfile_path: ./tests/e2e-openshift/Dockerfile
+    to: opentelemetry-tests-runner
 releases:
   latest:
     candidate:
@@ -26,18 +31,12 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
   cron: 0 0 30 2 *
   steps:
+    cluster_profile: azure-observability
     env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1105399
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -47,12 +46,12 @@ tests:
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
-      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-openshift/must-gather
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: generic-claim
+    - ref: distributed-tracing-tests-opentelemetry-stage
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

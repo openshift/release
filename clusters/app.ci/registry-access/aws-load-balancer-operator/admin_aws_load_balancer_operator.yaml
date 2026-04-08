@@ -1,50 +1,53 @@
-kind: List
+---
+kind: Namespace
 apiVersion: v1
-items:
-- kind: Namespace
-  apiVersion: v1
-  metadata:
-    name: aws-load-balancer-operator
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: image-puller
-    namespace: aws-load-balancer-operator
-  subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: system:unauthenticated
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: system:authenticated
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: system:image-puller
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: admin
-    namespace: aws-load-balancer-operator
-  subjects:
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+  name: aws-load-balancer-operator
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-puller
+  namespace: aws-load-balancer-operator
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:unauthenticated
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:authenticated
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: admin
+  namespace: aws-load-balancer-operator
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: aws-load-balancer-operator-dev
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aws-load-balancer-operator-viewer
+  namespace: aws-load-balancer-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: aws-load-balancer-operator-dev
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: pull-secret-namespace-manager
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: aws-load-balancer-operator-viewer
     namespace: aws-load-balancer-operator
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: view
-  subjects:
-    - kind: Group
-      apiGroup: rbac.authorization.k8s.io
-      name: aws-load-balancer-operator-dev
-      namespace: aws-load-balancer-operator

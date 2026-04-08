@@ -15,7 +15,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 source "${SHARED_DIR}/proxy-conf.sh"
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+PULL_SECRET=$(jq -c -n '{"auths":{"test":{"auth":"dXNlcjpwYXNzCg=="}}}')
 RENDEZVOUS_IP=$(<"${SHARED_DIR}/node-zero-ip.txt")
 PROXY_URL=$(<"${CLUSTER_PROFILE_DIR}/proxy")
 

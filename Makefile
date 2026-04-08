@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services check-validate-main-promotion dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -22,12 +22,28 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos
+check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation check-validate-main-promotion
 	@echo "Service config check: PASS"
 
 check-boskos:
 	hack/validate-boskos.sh
 	@echo "Boskos config check: PASS"
+
+check-labels: python-help
+	python3 hack/validate-labels.py
+	@echo "Labels config check: PASS"
+
+check-cluster-profiles: python-help
+	python3 hack/validate-cluster-profiles-config.py ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+	@echo "Cluster profiles config check: PASS"
+
+check-yaml-indentation: python-help
+	hack/validate-yaml-indentation.sh .
+	@echo "YAML indentation check: PASS"
+
+check-validate-main-promotion: python-help
+	python3 hack/validate-main-promotion-guard.py
+	@echo "Main promotion validation: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -77,7 +93,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250823-25d79acb8 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260328-dc2bbc9fc --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -132,8 +148,9 @@ revert-acknowledge-critical-fixes-only:
 	fi
 	# ocp-build-data is special
 	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --revert
+	$(eval REPOS ?= ./hack/acknowledge-critical-fix-repos.txt)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_tide-config-manager_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
 tide-config-manager-verified:
@@ -159,7 +176,7 @@ python-validation:
 # You should not need to add new targets here.
 
 export RELEASE_URL=https://github.com/openshift/release.git
-export RELEASE_REF=master
+export RELEASE_REF=main
 export SKIP_PERMISSIONS_JOB=0
 
 # tide-config-manager verified mode settings
@@ -388,12 +405,12 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
-	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
+	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
 download_crt_crd:
-	curl -o clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml https://raw.githubusercontent.com/openshift/release-controller/master/artifacts/release.openshift.io_releasepayloads.yaml
+	curl -o clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml https://raw.githubusercontent.com/openshift/release-controller/main/artifacts/release.openshift.io_releasepayloads.yaml
 .PHONY: download_crt_crd
 
 sed_cmd := sed
@@ -463,6 +480,7 @@ secret-config-updater:
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build06.config=$(TMPDIR)/sa.config-updater.build06.config \
 	--from-file=sa.config-updater.build07.config=$(TMPDIR)/sa.config-updater.build07.config \
+	--from-file=sa.config-updater.build08.config=$(TMPDIR)/sa.config-updater.build08.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
 	--from-file=sa.config-updater.build10.config=$(TMPDIR)/sa.config-updater.build10.config \
 	--from-file=sa.config-updater.build11.config=$(TMPDIR)/sa.config-updater.build11.config \

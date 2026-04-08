@@ -3,29 +3,15 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_4.12_cli:
-    name: "4.12"
-    namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.base
-  from: base
-  to: ovn-kubernetes-base
-- from: ovn-kubernetes-base
-  inputs:
-    ocp_4.12_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.12:cli
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: ovn-kubernetes
+  items:
+  - dockerfile_path: Dockerfile.base
+    from: base
+    to: ovn-kubernetes-base
+  - from: ovn-kubernetes-base
+    to: ovn-kubernetes
 releases:
   initial:
     candidate:
@@ -45,7 +31,7 @@ resources:
 tests:
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn

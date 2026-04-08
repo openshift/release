@@ -21,8 +21,9 @@ build_root:
       WORKDIR /go
       USER 1001:1001
 images:
-- dockerfile_path: Containerfile
-  to: rebasebot
+  items:
+  - dockerfile_path: Containerfile
+    to: rebasebot
 resources:
   '*':
     limits:
@@ -42,17 +43,16 @@ tests:
                   --dest openshift/cloud-provider-aws:main \
                   --rebase openshift-cloud-team/cloud-provider-aws:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -61,6 +61,36 @@ tests:
         requests:
           cpu: 400m
           memory: 1Gi
+- as: cluster-api-provider-nutanix
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-nutanix
+      commands: |
+        rebasebot --source-repo nutanix-cloud-native/cluster-api-provider-nutanix \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api-provider-nutanix:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-nutanix:rebase-bot-main \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
 - as: cluster-api-provider-azure
   cron: 0 12 * * Mon,Thu
   steps:
@@ -69,21 +99,20 @@ tests:
       commands: |
         rebasebot --source-repo kubernetes-sigs/cluster-api-provider-azure \
                   --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
-                  --dest openshift/cluster-api-provider-azure:master \
-                  --rebase openshift-cloud-team/cluster-api-provider-azure:rebase-bot-master \
+                  --dest openshift/cluster-api-provider-azure:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-azure:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -104,17 +133,16 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-aws:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -135,17 +163,16 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-gcp:rebase-bot-master \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -166,17 +193,16 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-vsphere:rebase-bot-master \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -197,17 +223,16 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-ibmcloud:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -228,17 +253,16 @@ tests:
                   --rebase openshift-cloud-team/cluster-api:rebase-bot-master \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -258,17 +282,16 @@ tests:
                   --dest openshift/cloud-provider-ibm:main \
                   --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -287,17 +310,16 @@ tests:
                   --dest openshift/cloud-provider-vpc-controller:master \
                   --rebase openshift-cloud-team/cloud-provider-vpc-controller:rebase-bot-master \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -317,17 +339,16 @@ tests:
                   --dest openshift/cloud-provider-powervs:main \
                   --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -346,17 +367,16 @@ tests:
                   --dest openshift/cloud-provider-azure:main \
                   --rebase openshift-cloud-team/cloud-provider-azure:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -375,17 +395,16 @@ tests:
                   --dest openshift/cloud-provider-gcp:main \
                   --rebase openshift-cloud-team/cloud-provider-gcp:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -404,17 +423,16 @@ tests:
                   --dest openshift/cloud-provider-vsphere:main \
                   --rebase openshift-cloud-team/cloud-provider-vsphere:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -433,17 +451,16 @@ tests:
                   --dest openshift/cloud-provider-nutanix:main \
                   --rebase openshift-cloud-team/cloud-provider-nutanix:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -469,12 +486,10 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - collection: ""
-        mount_path: /secrets/slack-hooks
+      - mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/ironic-bot
+      - mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -501,12 +516,10 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - collection: ""
-        mount_path: /secrets/slack-hooks
+      - mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/ironic-bot
+      - mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -533,12 +546,10 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - collection: ""
-        mount_path: /secrets/slack-hooks
+      - mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/ironic-bot
+      - mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -548,15 +559,15 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: openstack-ironic-inspector
+- as: openstack-ironic-prometheus-exporter
   cron: 30 10 * * Mon,Wed,Fri
   steps:
     test:
-    - as: openstack-ironic-inspector
+    - as: openstack-ironic-prometheus-exporter
       commands: |
-        rebasebot --source https://github.com/openstack/ironic-inspector:master \
-                  --dest openshift/openstack-ironic-inspector:main \
-                  --rebase openshift-metal3/openstack-ironic-inspector:ironic-bot-master \
+        rebasebot --source https://github.com/openstack/ironic-prometheus-exporter:master \
+                  --dest openshift/openstack-ironic-prometheus-exporter:main \
+                  --rebase openshift-metal3/openstack-ironic-prometheus-exporter:ironic-bot-master \
                   --github-app-id 259896 \
                   --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
                   --github-cloner-id 318353 \
@@ -565,12 +576,10 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - collection: ""
-        mount_path: /secrets/slack-hooks
+      - mount_path: /secrets/slack-hooks
         name: metal-platform-slack-hooks
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/ironic-bot
+      - mount_path: /secrets/ironic-bot
         name: metal-platform-bot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -590,17 +599,16 @@ tests:
         rebasebot --source https://github.com/kubernetes/autoscaler:"${UPSTREAM_VERSION}" \
                   --dest openshift/kubernetes-autoscaler:main \
                   --rebase openshift-cloud-team/kubernetes-autoscaler:rebase-bot-main \
-                  --slack-webhook /secrets/rebasebot/slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
                   --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -627,12 +635,10 @@ tests:
                   --tag-policy=none \
                   --post-rebase-hook git:dest/main:hack/ocp-update-bundle-manifests.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:go-deps.sh git:https://github.com/openshift-networking/rebasebot-helpers/main:git.sh
       credentials:
-      - collection: ""
-        mount_path: /secrets/metal-net-merge-bot
+      - mount_path: /secrets/metal-net-merge-bot
         name: metal-net-merge-bot-private-key
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/metal-net-cloner-bot
+      - mount_path: /secrets/metal-net-cloner-bot
         name: metal-net-cloner-bot-private-key
         namespace: test-credentials
       from: rebasebot
@@ -651,8 +657,7 @@ tests:
         rebasebot --source https://github.com/grafana/tempo-operator:main \
                   --dest openshift/grafana-tempo-operator:main \
                   --rebase IshwarKanse/tempo-operator:rebase-bot-main \
-                  --update-go-modules \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/dt-secrets/dt-cloner \
                   --github-cloner-id 811756 \
                   --git-username tracing-team-rebase-bot \
@@ -660,13 +665,11 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - collection: ""
-        mount_path: /secrets/dt-secrets
+      - mount_path: /secrets/dt-secrets
         name: dt-secrets
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -684,8 +687,7 @@ tests:
         rebasebot --source https://github.com/open-telemetry/opentelemetry-operator:main \
                   --dest openshift/open-telemetry-opentelemetry-operator:main \
                   --rebase IshwarKanse/opentelemetry-operator:rebase-bot-main \
-                  --update-go-modules \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/dt-secrets/dt-cloner \
                   --github-cloner-id 811756 \
                   --git-username tracing-team-rebase-bot \
@@ -693,46 +695,11 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - collection: ""
-        mount_path: /secrets/dt-secrets
+      - mount_path: /secrets/dt-secrets
         name: dt-secrets
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
-        namespace: test-credentials
-      from: rebasebot
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 400m
-          memory: 1Gi
-- as: jaeger-operator
-  cron: 0 23 * * 1-5
-  steps:
-    test:
-    - as: jaeger-operator
-      commands: |
-        rebasebot --source https://github.com/jaegertracing/jaeger-operator:main \
-                  --dest openshift/jaegertracing-jaeger-operator:main \
-                  --rebase IshwarKanse/jaeger-operator:rebase-bot-main \
-                  --update-go-modules \
-                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
-                  --github-cloner-key /secrets/dt-secrets/dt-cloner \
-                  --github-cloner-id 811756 \
-                  --git-username tracing-team-rebase-bot \
-                  --git-email tracing-team@redhat.com \
-                  --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
-                  --tag-policy=none
-      credentials:
-      - collection: ""
-        mount_path: /secrets/dt-secrets
-        name: dt-secrets
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/rebasebot
-        name: rebase-bot-creds
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:
@@ -758,8 +725,7 @@ tests:
                   --git-email openshift-edge-enablement@redhat.com \
                   --tag-policy=none
       credentials:
-      - collection: ""
-        mount_path: /secrets/lvms/rebase-bot
+      - mount_path: /secrets/lvms/rebase-bot
         name: lvms-rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
@@ -790,8 +756,7 @@ tests:
                           --bot-emails autoscaling-team-rebase-bot@redhat.com \
                           --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
+      - mount_path: /secrets/rebasebot
         name: autoscaling-team-rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -823,8 +788,7 @@ tests:
                           --bot-emails autoscaling-team-rebase-bot@redhat.com \
                           --tag-policy=strict
       credentials:
-      - collection: ""
-        mount_path: /secrets/rebasebot
+      - mount_path: /secrets/rebasebot
         name: autoscaling-team-rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
@@ -834,6 +798,354 @@ tests:
         requests:
           cpu: 400m
           memory: 1Gi
+- as: migtools-udistribution-main
+  cron: 0 1 * * Mon
+  steps:
+    test:
+    - as: migtools-udistribution-main
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_udistribution_main.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: migtools-filebrowser-oadp-dev
+  cron: 0 1 * * Mon
+  steps:
+    test:
+    - as: migtools-filebrowser-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_filebrowser_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: migtools-kopia-oadp-dev
+  cron: 0 1 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: migtools-kopia-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_kopia_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: migtools-kopia-oadp-1-5
+  cron: 0 1 * * Mon
+  steps:
+    test:
+    - as: migtools-kopia-oadp-1-5
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_kopia_oadp-1.5.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: migtools-kubevirt-velero-plugin-main
+  cron: 0 1 * * Mon
+  steps:
+    test:
+    - as: migtools-kubevirt-velero-plugin-main
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/migtools_kubevirt_velero_plugin_main.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-velero-oadp-dev
+  cron: 0 2 * * Tue,Thu,Sat
+  steps:
+    test:
+    - as: openshift-velero-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-velero-oadp-1-5
+  cron: 0 2 * * Tue
+  steps:
+    test:
+    - as: openshift-velero-oadp-1-5
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_oadp-1.5.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-oadp-operator-oadp-dev
+  cron: 0 3 * * Wed,Fri,Sun
+  steps:
+    test:
+    - as: openshift-oadp-operator-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_oadp-operator_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-oadp-operator-oadp-1-5
+  cron: 0 3 * * Wed
+  steps:
+    test:
+    - as: openshift-oadp-operator-oadp-1-5
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_oadp-operator_oadp-1.5.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-velero-plugin-for-aws-oadp-dev
+  cron: 0 3 * * Wed,Fri,Sun
+  steps:
+    test:
+    - as: openshift-velero-plugin-for-aws-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_plugin_for_aws_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-velero-plugin-for-microsoft-azure-oadp-dev
+  cron: 0 3 * * Wed,Fri,Sun
+  steps:
+    test:
+    - as: openshift-velero-plugin-for-microsoft-azure-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_plugin_for_microsoft_azure_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openshift-velero-plugin-for-gcp-oadp-dev
+  cron: 0 3 * * Wed,Fri,Sun
+  steps:
+    test:
+    - as: openshift-velero-plugin-for-gcp-oadp-dev
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_plugin_for_gcp_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:

@@ -11,18 +11,6 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
-# TODO: update to 4.19 once ODF 4.19 is released in the official redhat-operators 4.19 catalog
-ODF_MAX_VERSION="4.18"
-ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
-
-function ocp_version() {
-  oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
-}
-
-function ocp_version_numeric() {
-  ocp_version | awk -F. '{ printf "%d%02d", $1, $2 }'
-}
-
 # Make the masters schedulable so we have more capacity to run VMs
 CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
 if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
@@ -30,12 +18,70 @@ then
   oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
 fi
 
-if [ "$(ocp_version_numeric)" -ge "${ODF_MAX_VERSION_NUMERIC}" ]
-then
-  ODF_OPERATOR_CHANNEL=stable-${ODF_MAX_VERSION}
+ODF_CATALOG_SOURCE="${ODF_SUBSCRIPTION_SOURCE}"
+if oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+  echo "odf-operator package found in ${ODF_SUBSCRIPTION_SOURCE} catalog"
+  ODF_OPERATOR_CHANNEL=$(oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace \
+    -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
 else
-  ODF_OPERATOR_CHANNEL=stable-$(ocp_version)
+  echo "odf-operator package not found in ${ODF_SUBSCRIPTION_SOURCE} catalog, creating fallback catalog source"
+
+  CURRENT_IMAGE=$(oc get catalogsource redhat-operators -n openshift-marketplace -o jsonpath='{.spec.image}')
+  echo "Current redhat-operators catalog image: ${CURRENT_IMAGE}"
+
+  CURRENT_TAG=$(echo "${CURRENT_IMAGE}" | sed 's/.*:v//')
+  CURRENT_MAJOR=$(echo "${CURRENT_TAG}" | cut -d. -f1)
+  CURRENT_MINOR=$(echo "${CURRENT_TAG}" | cut -d. -f2)
+  FALLBACK_MINOR=$((CURRENT_MINOR - 1))
+  FALLBACK_TAG="v${CURRENT_MAJOR}.${FALLBACK_MINOR}"
+  FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:${FALLBACK_TAG}"
+
+  echo "Creating fallback catalog source with image: ${FALLBACK_IMAGE}"
+  ODF_CATALOG_SOURCE="redhat-operators-fallback"
+  oc apply -f - <<EOCATALOG
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${ODF_CATALOG_SOURCE}
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators Fallback (${FALLBACK_TAG})
+  image: ${FALLBACK_IMAGE}
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOCATALOG
+
+  echo "Waiting for fallback catalog source to become ready"
+  for ((i=1; i <= 60; i++)); do
+    STATE=$(oc get catalogsource "${ODF_CATALOG_SOURCE}" -n openshift-marketplace \
+      -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+    if [[ "${STATE}" == "READY" ]]; then
+      echo "Fallback catalog source is ready"
+      break
+    fi
+    echo "Try ${i}/60: catalog source not ready yet (state: ${STATE}). Retrying in 10s"
+    sleep 10
+  done
+
+  echo "Waiting for odf-operator packagemanifest to appear in fallback catalog"
+  for ((i=1; i <= 60; i++)); do
+    if oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+      echo "odf-operator package found in fallback catalog"
+      break
+    fi
+    echo "Try ${i}/60: odf-operator not available yet. Retrying in 10s"
+    sleep 10
+  done
+
+  ODF_OPERATOR_CHANNEL=$(oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace \
+    -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
 fi
+
+ODF_SUBSCRIPTION_SOURCE="${ODF_CATALOG_SOURCE}"
+echo "Using catalog source: ${ODF_SUBSCRIPTION_SOURCE}, channel: ${ODF_OPERATOR_CHANNEL}"
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
 # create the install namespace
@@ -114,6 +160,13 @@ echo "Preparing nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
   --selector='node-role.kubernetes.io/worker' --overwrite
 
+echo "Wait for StorageCluster CRD to be created"
+timeout 30m bash -c '
+  until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
+    sleep 5
+  done
+'
+
 echo "Create StorageCluster"
 cat <<EOF | oc apply -f -
 kind: StorageCluster
@@ -133,10 +186,8 @@ spec:
         memory: "0"
   monDataDirHostPath: /var/lib/rook
   managedResources:
-    cephFilesystems:
-      reconcileStrategy: ignore
-    cephObjectStores:
-      reconcileStrategy: ignore
+    cephFilesystems: {}
+    cephObjectStores: {}
   multiCloudGateway:
     reconcileStrategy: ignore
   storageDeviceSets:
@@ -165,12 +216,22 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m'
 
 echo "ODF/OCS Operator is deployed successfully"
+ODF_VIRT_SC=ocs-storagecluster-ceph-rbd-virtualization
 
-# Setting ocs-storagecluster-ceph-rbd the default storage class
+echo "Wait for the storage class ${ODF_VIRT_SC} to be created"
+timeout 30m bash -c "
+  until oc get storageclass ${ODF_VIRT_SC} &>/dev/null; do
+    sleep 5
+  done
+" || true
+
+oc get sc
+
+# Setting ocs-storagecluster-ceph-rbd-virtualization the default storage class
 for item in $(oc get sc --no-headers | awk '{print $1}'); do
 	oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
 done
-oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
+oc annotate --overwrite sc ${ODF_VIRT_SC} storageclass.kubernetes.io/is-default-class='true'
 oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"
 
@@ -200,4 +261,3 @@ echo "managing deployment again, will restore to needed value"
 oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "add", "path": "/spec/managementState", "value": "Managed"}]' -n openshift-cluster-storage-operator
 echo "waiting for deployment to be ready"
 oc rollout status deployment/csi-snapshot-controller -n openshift-cluster-storage-operator
-

@@ -10,6 +10,12 @@ if [ "${ENABLE_DISK_ENCRYPTION:-false}" != "true" ] && [ "${ENABLE_DISK_MIRRORIN
   exit 0
 fi
 
+if [[ "${ipv4_enabled:-true}" == "false" ]] && [[ "${ipv6_enabled:-false}" == "true" ]]; then
+  tang_url="http://[${INTERNAL_NET_IPV6}]:7500"
+else
+  tang_url="http://${AUX_HOST}:7500"
+fi
+
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
@@ -78,7 +84,7 @@ EOF
     cat >> "$bu_file" << EOF
   luks:
     tang:
-      - url: http://${AUX_HOST}:7500
+      - url: ${tang_url}
         thumbprint: ${TANG_SERVER_KEY}
     threshold: 1
 EOF

@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -12,8 +18,9 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 17 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+
+if version_lt "${ocp_version}" "4.17"; then
     echo "This step only supports to covert cluster into private one in day2 on 4.17+ currently!"
     exit 1
 fi
@@ -106,6 +113,9 @@ echo "Restricting the API server to private - delete inbound rule api-v4 from ex
 run_command "az network lb rule delete -n api-v4 --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete associated frontend public ip from external lb"
+# Try to clean up the stale reference by updating LB
+echo "Attempting to clean stale references..."
+run_command "az network lb update --name  ${INFRA_ID} -g ${RESOURCE_GROUP}"
 run_command "az network lb frontend-ip delete --name ${frontend_ip} --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete frontend public IP associated with rule api-v4"
@@ -137,5 +147,6 @@ fi
 # Optional: Disabling redirect when using a private storage endpoint on Azure
 
 echo "Waiting for image registry become Available..."
-run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s"
+sleep 600s
+#run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s" || ret=1
 run_command "oc wait --for=condition=Available --for condition=Progressing=False --for condition=Degraded=False co/image-registry --timeout=1200s"

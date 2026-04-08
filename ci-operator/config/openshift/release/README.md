@@ -10,8 +10,8 @@ OpenShift has three separate streams of images - those generated immediately on 
 
 ci-operator config in this directory should be named with the following patterns:
 
-* `openshift-release-master__<stream>-<release_number>.yaml` - Contains all jobs that share the same integration stream
-* `openshift-release-master__<stream>-<release_number>-upgrade-from-[<relative>-]<stream>-<release_number>.yaml` - Contains upgrade jobs from stream to stream
+* `openshift-release-main__<stream>-<release_number>.yaml` - Contains all jobs that share the same integration stream
+* `openshift-release-main__<stream>-<release_number>-upgrade-from-[<relative>-]<stream>-<release_number>.yaml` - Contains upgrade jobs from stream to stream
 
 Variables:
 
@@ -26,5 +26,5 @@ Variables:
 
 Examples:
 
-* `openshift-release-master__ci-4.8-upgrade-from-stable-4.7.yaml` tests upgrading to a ci 4.8 release from the current stable 4.7 release
-* `openshift-release-master__nightly-4.7.yaml` contains tests for releases built from ART, and should also contain upgrades from the previous nightly job by default.
+* `openshift-release-main__ci-4.8-upgrade-from-stable-4.7.yaml` tests upgrading to a ci 4.8 release from the current stable 4.7 release
+* `openshift-release-main__nightly-4.7.yaml` contains tests for releases built from ART, and should also contain upgrades from the previous nightly job by default.

@@ -17,41 +17,41 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
 images:
-- dockerfile_path: Dockerfile.must-gather
-  from: os-min9
-  to: numaresources-must-gather
-- dockerfile_path: Dockerfile.openshift
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: numaresources-operator
-- dockerfile_path: bundle.Dockerfile
-  to: numaresources-operator-bundle
-- dockerfile_path: Dockerfile.openshift.rte
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: resource-topology-exporter
-- dockerfile_path: Dockerfile.openshift.tests
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: numaresources-operator-tests
+  items:
+  - dockerfile_path: Dockerfile.must-gather
+    to: numaresources-must-gather
+  - dockerfile_path: Dockerfile.openshift
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: numaresources-operator-bundle
+  - dockerfile_path: Dockerfile.openshift.rte
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: resource-topology-exporter
+  - dockerfile_path: Dockerfile.openshift.tests
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator-tests
 operator:
   bundles:
   - as: tested-numaresources-operator-bundle
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.20.999-snapshot
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.22.999-snapshot
     with: pipeline:numaresources-operator
 promotion:
   to:
@@ -62,12 +62,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -78,7 +78,9 @@ tests:
   commands: make test-unit
   container:
     from: src
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
 - as: ci-install-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -105,6 +107,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -131,6 +134,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-must-gather-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -149,7 +153,10 @@ tests:
     test:
     - as: must-gather-e2e-test
       cli: latest
-      commands: make test-must-gather-e2e
+      commands: E2E_NROP_MUSTGATHER_IMAGE_REF=${MUSTGATHER_IMAGE} make test-must-gather-e2e
+      dependencies:
+      - env: MUSTGATHER_IMAGE
+        name: pipeline:numaresources-must-gather
       from: src
       resources:
         requests:
@@ -157,6 +164,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e-install-hypershift
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     dependencies:

@@ -59,6 +59,7 @@ def _cluster_scoped_rbac_resources(gendoc):
         }
     ])
 
+
 def _docker_credentials_rbac_resources(gendoc, namespace):
     config = gendoc.context.config
 
@@ -181,7 +182,10 @@ def _deployment_resources(gendoc, namespaces):
             'kind': 'Deployment',
             'metadata': {
                 'annotations': {
-                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-mirror-cleanup-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                    'keel.sh/policy': 'force',
+                    'keel.sh/matchTag': 'true',
+                    'keel.sh/trigger': 'poll',
+                    'keel.sh/pollSchedule': '@every 5m'
                 },
                 'name': 'release-mirror-cleanup-controller',
                 'namespace': context.config.rc_deployment_namespace,
@@ -216,9 +220,10 @@ def _deployment_resources(gendoc, namespaces):
                                                '/usr/bin/release-mirror-cleanup-controller',
                                                'start',
                                                '-v=4',
-                                               '--credentials-namespace='+context.jobs_namespace,
+                                               '--credentials-namespace=' + context.jobs_namespace,
                                            ] + _namespace_list(namespaces),
-                                'image': 'release-mirror-cleanup-controller:latest',
+                                'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-mirror-cleanup-controller_latest',
+                                'imagePullPolicy': 'Always',
                                 'name': 'controller',
                             }
                         ],

@@ -7,30 +7,23 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.16-openshift-4.8
 images:
-- dockerfile_path: images/router/base/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  optional: true
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: haproxy-router-base
-  to: haproxy-router
-- dockerfile_path: images/router/f5/Dockerfile
-  from: haproxy-router-base
-  to: f5-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.rhel
+    from: base
+    optional: true
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
+    from: haproxy-router-base
+    to: haproxy-router
+  - dockerfile_path: images/router/f5/Dockerfile
+    from: haproxy-router-base
+    to: f5-router
 promotion:
   to:
   - name: "4.8"
@@ -63,8 +56,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -75,7 +70,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -86,11 +82,12 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -144,7 +141,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: release-4.8

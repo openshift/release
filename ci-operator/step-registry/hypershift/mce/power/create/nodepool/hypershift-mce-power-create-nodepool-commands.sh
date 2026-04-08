@@ -82,8 +82,7 @@ for line in "${config_lines[@]}"; do
 
     # Check for architecture condition
     if [[ "${NODE_ARCH}" == "ppc64le" ]]; then
-        MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -o jsonpath="{.status.currentVersion}" | cut -c 1-3)
-        if (( $(echo "${MCE_VERSION} < 2.6" | bc -l) )); then
+        if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" != "2.6" ]]; then
             NODE_ARCH="amd64"  # Support for using ppc64le arch added after MCE 2.6
         fi
     fi

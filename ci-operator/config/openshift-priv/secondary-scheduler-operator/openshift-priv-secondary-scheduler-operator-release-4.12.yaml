@@ -3,21 +3,14 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/secondary-scheduler-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-  to: secondary-scheduler-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: secondary-scheduler-operator
 promotion:
   to:
   - name: 4.12-priv
@@ -41,7 +34,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

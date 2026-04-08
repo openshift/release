@@ -10,9 +10,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  to: ironic-agent
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: ironic-agent
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -36,7 +37,8 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-bm-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
@@ -44,25 +46,29 @@ tests:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-serial-ipv4-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-virtualmedia-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-ipi-ovn-ipv6-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: .*packages-list.*
   steps:

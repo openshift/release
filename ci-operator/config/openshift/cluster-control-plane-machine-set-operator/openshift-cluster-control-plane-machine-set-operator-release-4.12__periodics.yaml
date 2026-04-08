@@ -3,20 +3,13 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: cluster-control-plane-machine-set-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
     candidate:
@@ -40,7 +33,7 @@ tests:
 - as: e2e-aws
   cron: 54 11 13 2 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       commands: |
@@ -54,7 +47,7 @@ tests:
 - as: e2e-aws-arm
   cron: 37 15 6 1 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:

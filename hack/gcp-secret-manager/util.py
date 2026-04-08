@@ -26,6 +26,10 @@ INDEX_SECRET_NAME = "__index"
 # The string reserved for the service account secret associated with each collection.
 UPDATER_SA_SECRET_NAME = "updater-service-account"
 
+# GCP limit for a secret name is 255 chars, 200 should be plenty
+# (we must also take into account the collection).
+SECRET_NAME_MAX_LENGTH = 200
+
 
 def ensure_authentication():
     """
@@ -43,9 +47,24 @@ def ensure_authentication():
 
 
 def validate_collection(_ctx, _param, value):
-    if not re.fullmatch("[a-z0-9-]*", value):
+    if value == "":
+        return value
+
+    if "__" in value:
         raise click.BadParameter(
-            "May only contain lowercase letters, numbers or dashes."
+            "Cannot contain double underscores (__), which are reserved as delimiters"
+        )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
+
+    if not re.fullmatch(r"[a-z0-9-]([a-z0-9-_]*[a-z0-9-])?|[a-z0-9-]", value):
+        invalid_chars = set(re.findall(r"[^a-z0-9-_]", value))
+        raise click.BadParameter(
+            f"May only contain lowercase letters, numbers, dashes, or an underscore. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
         )
     return value
 
@@ -59,23 +78,109 @@ def validate_secret_name(_ctx, _param, value):
         raise click.ClickException(
             f"The name '{UPDATER_SA_SECRET_NAME}' is reserved for internal use and cannot be used as a secret name."
         )
-    if not re.fullmatch("[A-Za-z0-9-]+", value):
-        raise click.BadParameter("May only contain letters, numbers or dashes.")
+
+    if "__" in value:
+        raise click.BadParameter(
+            "Cannot contain double underscores (__), which are reserved as delimiters"
+        )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
+
+    # Allow single char OR multi-char with underscores in middle only
+    if not re.fullmatch(r"[A-Za-z0-9-]([A-Za-z0-9-_]*[A-Za-z0-9-])?|[A-Za-z0-9-]", value):
+        invalid_chars = set(re.findall(r"[^A-Za-z0-9-_]", value))
+        raise click.BadParameter(
+            f"May only contain letters, numbers, dashes, or an underscore. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+        )
+    if len(value) > SECRET_NAME_MAX_LENGTH:
+        raise click.BadParameter(f"Secret name must be less than {SECRET_NAME_MAX_LENGTH} characters.")
     return value
 
 
-def get_secret_name(collection: str, name: str) -> str:
+def validate_group_name(_ctx, _param, value):
     """
-    Returns a normalized secret name by combining the collection and secret name.
+    Validates group name:
+    - Required (cannot be empty)
+    - Can contain single underscores (_)
+    - Cannot contain double underscores (__)
+    - Cannot start or end with underscore
+    - Can contain forward slashes (/) for hierarchy
+    - Only lowercase letters, numbers, dashes, underscores, slashes
+    """
+    if not value:
+        raise click.BadParameter("Group name is required")
+
+    if "__" in value:
+        raise click.BadParameter(
+            "Cannot contain double underscores (__), which are reserved as delimiters"
+        )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
+
+    # Allow: a-z, 0-9, -, _, /
+    if not re.fullmatch(r"[a-z0-9_/-]+", value):
+        invalid_chars = set(re.findall(r"[^a-z0-9_/-]", value))
+        raise click.BadParameter(
+            f"May only contain lowercase letters, numbers, dashes, an underscore, or slashes. "
+            f"Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+        )
+
+    return value
+
+
+def validate_path(_ctx, _param, value):
+    """
+    Validates the secret path in the format 'group/field' or 'group/subgroup/field'.
+    """
+    if not value:
+        raise click.BadParameter("Path is required")
+
+    if "/" not in value:
+        raise click.BadParameter(
+            "Secret path must include both group and field name, separated by '/'\n"
+            "Examples: 'default/token', 'aws/prod/password'"
+        )
+
+    parts = value.split("/")
+    field = parts[-1]
+    group = "/".join(parts[:-1])
+
+    validate_group_name(None, None, group)
+    validate_secret_name(None, None, field)
+
+    return value
+
+
+def get_secret_name(collection: str, path: str) -> str:
+    """
+    Returns a normalized secret name as it is saved in Google Secret Manager.
 
     Args:
         collection (str): The name of the secret collection.
-        name (str): The base name of the secret.
+        path (str): The group/field path of the secret.
 
     Returns:
-        str: A string in the format "{collection}__{name}".
+        str: A string in the format "{collection}__{group}__{field}".
+        Forward slashes in {group} are converted to double underscores.
     """
-    return f"{collection}__{name}"
+    path_normalized = path.replace("/", "__")
+    return f"{collection}__{path_normalized}"
+
+
+def get_index_secret_for_collection(collection: str) -> str:
+    return f"{collection}__{INDEX_SECRET_NAME}"
+
+
+def get_updater_sa_secret_for_collection(collection: str) -> str:
+    return f"{collection}__{UPDATER_SA_SECRET_NAME}"
 
 
 def validate_secret_source(from_file: str, from_literal: str):
@@ -219,13 +324,13 @@ def get_secrets_from_index(
         List[str]: A list of secrets.
     """
     index_secret = client.secret_version_path(
-        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME), "latest"
+        PROJECT_ID, get_index_secret_for_collection(collection), "latest"
     )
     try:
         response = client.access_secret_version(request={"name": index_secret})
     except PermissionDenied:
         raise click.ClickException(
-            f"Access denied: You do not have permission to list secrets in collection '{collection}'."
+            f"You don't have permission to access secrets in collection '{collection}'."
         )
     except Exception as e:
         raise click.ClickException(
@@ -255,9 +360,7 @@ def update_index_secret(
         secret_names (List[str]): A list of the new list of secrets to write into the index.
     """
 
-    name = client.secret_path(
-        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME)
-    )
+    name = client.secret_path(PROJECT_ID, get_index_secret_for_collection(collection))
     payload = yaml.safe_dump(sorted(secret_names))
     try:
         client.add_secret_version(

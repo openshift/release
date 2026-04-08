@@ -7,21 +7,22 @@ build_root:
   project_image:
     dockerfile_path: ci-builder/Dockerfile
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY prom-metrics-linter /usr/bin/prom-metrics-linter
-    RUN dnf install -y jq && dnf clean all
-  from: src
-  inputs:
-    metrics-linter:
-      paths:
-      - destination_dir: .
-        source_path: /prom-metrics-linter
-  to: ssp-metrics-linter
-- dockerfile_path: Dockerfile
-  to: ssp-operator-container
-- dockerfile_path: validator.Dockerfile
-  to: template-validator-container
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY prom-metrics-linter /usr/bin/prom-metrics-linter
+      RUN dnf install -y jq && dnf clean all
+    from: src
+    inputs:
+      metrics-linter:
+        paths:
+        - destination_dir: .
+          source_path: /prom-metrics-linter
+    to: ssp-metrics-linter
+  - dockerfile_path: Dockerfile
+    to: ssp-operator-container
+  - dockerfile_path: validator.Dockerfile
+    to: template-validator-container
 releases:
   initial:
     integration:
@@ -85,7 +86,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-  timeout: 8h0m0s
 - as: e2e-upgrade-functests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
@@ -112,7 +112,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-  timeout: 8h0m0s
 - as: e2e-single-node-functests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
@@ -138,7 +137,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp-single-node
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-v0.24
   org: kubevirt

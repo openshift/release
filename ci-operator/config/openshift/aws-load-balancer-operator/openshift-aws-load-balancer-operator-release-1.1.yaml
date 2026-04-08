@@ -14,8 +14,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: aws-load-balancer-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: aws-load-balancer-operator
 operator:
   bundles:
   - as: aws-load-balancer-operator-bundle
@@ -57,10 +58,12 @@ tests:
   container:
     from: src
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      ZONES_COUNT: "2"
     test:
     - as: install
       cli: latest
@@ -84,6 +87,7 @@ tests:
           cpu: 100m
     workflow: aws-load-balancer-install
 - as: e2e-aws-rosa-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -110,12 +114,13 @@ tests:
         requests:
           cpu: 100m
     workflow: aws-load-balancer-install-rosa
-  timeout: 5h0m0s
 - as: e2e-aws-proxy-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      ZONES_COUNT: "2"
     test:
     - as: install
       cli: latest

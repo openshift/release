@@ -19,14 +19,6 @@ base_images:
     name: 4.18-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
-  ocp_4.18_base-rhel9:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
   openstack-cinder-csi-driver-operator-test:
     name: 4.18-priv
     namespace: ocp-private
@@ -36,15 +28,9 @@ build_root:
   use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: hypershift
+  items:
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
 promotion:
   to:
   - name: 4.18-priv
@@ -83,6 +69,13 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
 tests:
 - as: verify
   commands: make verify
@@ -97,18 +90,18 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
@@ -120,7 +113,7 @@ tests:
   as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -134,7 +127,7 @@ tests:
   as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -149,17 +142,19 @@ tests:
   as: e2e-aws-metrics
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-metrics
 - always_run: false
   as: e2e-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-kubevirt-metal-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp
@@ -178,7 +173,7 @@ tests:
   as: e2e-openstack-aws
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
@@ -188,12 +183,12 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-openstack-aws-nfv
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-nfv
       NFV_NODEPOOLS: "true"
@@ -207,7 +202,7 @@ tests:
   as: e2e-openstack-aws-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
@@ -221,7 +216,7 @@ tests:
   as: e2e-openstack-aws-csi-cinder
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool
@@ -236,7 +231,7 @@ tests:
   as: e2e-openstack-aws-csi-manila
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       RHCOS_IMAGE_NAME: rhcos-4.18-hcp-nodepool

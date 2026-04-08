@@ -1,0 +1,42 @@
+base_images:
+  openstack-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: openstack-installer
+  openstack-tests:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-tests
+releases:
+  initial:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        upper: 4.22.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-openstack-ovn-upgrade
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE: ci.m1.xlarge
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-openstack
+zz_generated_metadata:
+  branch: release-4.22
+  org: shiftstack
+  repo: ci
+  variant: upgrade-from-stable-4.21

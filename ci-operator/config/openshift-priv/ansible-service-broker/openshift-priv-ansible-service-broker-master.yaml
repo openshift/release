@@ -1,10 +1,10 @@
 base_images:
   ansible_operator:
-    name: 4.20-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: ansible-operator
   base:
-    name: 4.20-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: base
 binary_build_commands: make openshift-ci-make-rpm
@@ -13,26 +13,27 @@ build_root:
     dockerfile_path: build/custom-ci-build-root.Dockerfile
 canonical_go_repository: github.com/openshift/ansible-service-broker
 images:
-- context_dir: operator
-  dockerfile_path: build/Dockerfile
-  from: ansible_operator
-  to: ansible-service-broker-operator
-- dockerfile_path: build/Dockerfile-ubi
-  from: base
-  to: ansible-service-broker
+  items:
+  - context_dir: operator
+    dockerfile_path: build/Dockerfile
+    from: ansible_operator
+    to: ansible-service-broker-operator
+  - dockerfile_path: build/Dockerfile-ubi
+    from: base
+    to: ansible-service-broker
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -67,7 +68,7 @@ tests:
     from: test-bin
 - as: operator-molecule-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -82,7 +83,7 @@ tests:
     workflow: ipi-aws
 - as: operator-molecule-olm-e2e
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

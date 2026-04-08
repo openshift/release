@@ -11,19 +11,12 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: stage
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
   to:
   - disabled: true
@@ -60,7 +53,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   steps:
@@ -73,8 +66,7 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests
@@ -94,8 +86,7 @@ tests:
       cli: latest
       commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests
@@ -106,7 +97,7 @@ tests:
 - as: insights-operator-test-time-periodic
   cron: 11 21 */14,28 * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -120,7 +111,8 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

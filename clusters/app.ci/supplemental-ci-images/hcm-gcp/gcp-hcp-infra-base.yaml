@@ -1,0 +1,52 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: gcp-hcp-infra-base
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_gcp-hcp-infra-base_latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi_10
+      ARG TERRAFORM_VERSION
+      ARG UV_VERSION
+      ENV TF_PLUGIN_CACHE_DIR="/tmp/.terraform-cache"
+      ENV UV_CACHE_DIR="/tmp/.uv-cache"
+      ENV UV_PYTHON_INSTALL_DIR="/tmp/.uv-python"
+      ENV UV_NO_PROGRESS="true"
+      RUN mkdir -p --mode=2775 ${TF_PLUGIN_CACHE_DIR} ${UV_CACHE_DIR} ${UV_PYTHON_INSTALL_DIR}
+      # Install all tools in one RUN to avoid re-downloading repo metadata
+      RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+          dnf install -y \
+            git \
+            make \
+            jq \
+            python3-pip \
+            terraform-${TERRAFORM_VERSION} && \
+          pip install uv==${UV_VERSION} && \
+          dnf clean all
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      buildArgs:
+      - name: TERRAFORM_VERSION
+        value: "1.14.3-1"
+      - name: UV_VERSION
+        value: "0.9.26"
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "ubi:10"
+        namespace: ocp
+    type: ImageChange

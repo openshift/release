@@ -7,17 +7,18 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
-- dockerfile_path: hack/Dockerfile.upgrade.src.ci
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  optional: true
-  to: src-upgrade-ci
+  items:
+  - dockerfile_path: hack/Dockerfile.upgrade.src.ci
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    optional: true
+    to: src-upgrade-ci
 promotion:
   to:
   - additional_images:
@@ -55,8 +56,7 @@ tests:
       cli: latest
       commands: make deploy_test
       credentials:
-      - collection: ""
-        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:
@@ -89,8 +89,7 @@ tests:
     - as: test
       commands: make upgrade_test
       credentials:
-      - collection: ""
-        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
         namespace: test-credentials
       env:

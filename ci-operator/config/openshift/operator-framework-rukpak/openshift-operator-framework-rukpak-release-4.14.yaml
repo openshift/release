@@ -7,20 +7,13 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 images:
-- dockerfile_path: openshift/Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: olm-rukpak
+  items:
+  - dockerfile_path: openshift/Dockerfile
+    from: base
+    to: olm-rukpak
 promotion:
   to:
   - name: "4.14"
@@ -76,7 +69,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws

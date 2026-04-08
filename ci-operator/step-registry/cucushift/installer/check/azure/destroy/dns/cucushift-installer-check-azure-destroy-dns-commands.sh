@@ -46,6 +46,13 @@ base_domain_rg=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.baseDomainResourceG
 cluster_name=$(jq -r '.clusterName' ${SHARED_DIR}/metadata.json)
 infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 metadata_str="{'kubernetes.io_cluster.${infra_id}':'owned'}"
+user_provisioned_dns=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.userProvisionedDNS')
+
+if [[ "${user_provisioned_dns}" == "Enabled" ]]; then
+    echo "Parameter 'userProvisionedDNS' is set to Enabled, skip the dns records check!"
+    exit 0
+fi
+
 check_result=0
 
 # case-1: ensure all cluster dns records are cleaned, even cluster resource group is removed prior to destoyer

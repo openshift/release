@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
   openstack-installer:
     name: "4.14"
     namespace: ocp
@@ -14,13 +10,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: cluster-control-plane-machine-set-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
     candidate:
@@ -44,7 +37,7 @@ tests:
 - as: e2e-aws
   cron: 42 3 19 7 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       commands: |
@@ -58,7 +51,7 @@ tests:
 - as: e2e-aws-arm
   cron: 16 16 23 10 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -76,7 +69,7 @@ tests:
 - as: e2e-azure
   cron: 51 14 12 5 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       commands: |

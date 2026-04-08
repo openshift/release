@@ -3,69 +3,84 @@
 set -o errexit
 set +o nounset
 
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_SKIP_SEND_ALERT}" == "true" ]]; then
+  echo "SKIP_SEND_ALERT override is set to true, skipping alert."
+  exit 0
+fi
+
 if [[ "$JOB_TYPE" != "periodic" ]]; then
   echo "This job is not a nightly job, skipping alert."
   exit 0
 fi
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
-SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
-export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
+export RELEASE_BRANCH_NAME
 
-# Download and source the reporting.sh file from RHDH repository
-REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
-REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
-
-echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
-if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
-  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
-  # shellcheck source=/dev/null
-  source "${REPORTING_SCRIPT_TMP}"
-  rm -f "${REPORTING_SCRIPT_TMP}"
-  echo "✅ Successfully sourced reporting.sh from upstream"
-else
-  echo "⚠️ Warning: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}, using local implementation"
-  # Define fallback functions if download fails
-  get_job_url() {
-    local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
-    local job_complete_url
-    if [ -n "${PULL_NUMBER:-}" ]; then
-      job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-    else
-      job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
-    fi
-    echo "${job_complete_url}"
-  }
-  get_artifacts_url() {
-    local project="${1:-""}"
-
-    local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
-    local artifacts_complete_url
-
-    if [ -n "${PULL_NUMBER:-}" ]; then
-      artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-tests/${REPO_OWNER}-${REPO_NAME}/artifacts/${project}"
-    else
-      local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}" # e.g. "e2e-tests-aks-helm-nightly"
-      local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-tests-}" # e.g. "aks-helm-nightly"
-      local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-aks-helm-nightly"
-      # Override part_2 based for specific cases that do not follow the standard naming convention.
-      case "$JOB_NAME" in
-        *osd-gcp*)
-        part_2="redhat-developer-rhdh-osd-gcp-nightly"
-        ;;
-        *auth-providers*)
-        part_2="redhat-developer-rhdh-auth-providers-nightly"
-        ;;
-        *ocp-v*)
-        part_2="redhat-developer-rhdh-nightly"
-        ;;
-      esac
-      artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${project}"
-    fi
-    echo "${artifacts_complete_url}"
-  }
-  echo "📋 Using local fallback functions"
+SLACK_ALERTS_WEBHOOK_URL_FILE="/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL"
+if [[ "${JOB_NAME}" =~ release-([0-9]+\.[0-9]+) ]]; then
+  RELEASE_VERSION="${BASH_REMATCH[1]}"
+  VERSIONED_FILE="/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL_${RELEASE_VERSION//./_}"
+  if [[ -f "${VERSIONED_FILE}" ]]; then
+    echo "Using release-specific webhook URL from ${VERSIONED_FILE}"
+    SLACK_ALERTS_WEBHOOK_URL_FILE="${VERSIONED_FILE}"
+  else
+    echo "Versioned webhook file ${VERSIONED_FILE} not found, falling back to default."
+  fi
 fi
+SLACK_ALERTS_WEBHOOK_URL=$(cat "${SLACK_ALERTS_WEBHOOK_URL_FILE}")
+export SLACK_ALERTS_WEBHOOK_URL
+
+get_artifacts_url() {
+  local namespace=$1
+
+  if [ -z "${namespace}" ]; then
+    echo "Warning: namespace parameter is empty (this is expected only for top level artifacts directory)" >&2
+  fi
+
+  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"
+    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-e2e-}" # e.g. "ocp-operator-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                      # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
+    # Override part_2 based for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  else
+    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"         # e.g. "e2e-aks-helm-nightly"
+    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-}" # e.g. "aks-helm-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                                              # e.g. "redhat-developer-rhdh-aks-helm-nightly"
+    # Override part_2 based for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  fi
+  echo "${artifacts_complete_url}"
+}
+
+get_job_url() {
+  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+  local job_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+  else
+    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
+  fi
+  echo "${job_complete_url}"
+}
 
 get_slack_alert_text() {
   URL_CI_RESULTS=$(get_job_url)
@@ -173,7 +188,7 @@ main() {
     echo "No fine-grained results available, sending default message."
     curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\":failed: \`$JOB_NAME\`, 📜 <$URL_CI_RESULTS|logs>, 📦 <$URL_ARTIFACTS_TOP|artifacts>, <!subteam^S07BMJ56R8S> <@U08UP0REWG1>.\"}" \
-      "$SLACK_NIGHTLY_WEBHOOK_URL"
+      "$SLACK_ALERTS_WEBHOOK_URL"
     exit 1
   else
     echo "Sending Slack notification with the following text:"
@@ -182,7 +197,7 @@ main() {
     echo "==================================================="
     if ! curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\"${SLACK_ALERT_MESSAGE}\"}" \
-      "$SLACK_NIGHTLY_WEBHOOK_URL"; then
+      "$SLACK_ALERTS_WEBHOOK_URL"; then
       echo "Failed to send alert message to Slack, error: $?"
       exit 1
     else

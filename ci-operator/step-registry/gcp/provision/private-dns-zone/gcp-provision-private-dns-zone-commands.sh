@@ -23,9 +23,11 @@ fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
-GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
-if [[ -n "${BASE_DOMAIN}" ]]; then
-  GCP_BASE_DOMAIN="${BASE_DOMAIN}"
+CONFIG="${SHARED_DIR}/install-config.yaml"
+GCP_BASE_DOMAIN=$(yq-go r "${CONFIG}" baseDomain)
+if [[ "${GCP_BASE_DOMAIN}" == "" ]]; then
+  echo "ERROR: can not read \"baseDomain\" from install-config.yaml, please check."
+  exit 1
 fi
 
 CLUSTER_PVTZ_PROJECT="${GCP_PROJECT}"

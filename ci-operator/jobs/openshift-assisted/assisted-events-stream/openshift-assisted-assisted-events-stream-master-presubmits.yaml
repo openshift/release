@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -24,7 +24,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -79,9 +79,17 @@ presubmits:
         - --target=lint
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -115,7 +123,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build03
     context: ci/prow/template-generation
     decorate: true
     decoration_config:
@@ -134,9 +142,17 @@ presubmits:
         - --target=template-generation
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -170,12 +186,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build07
+    cluster: build03
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      capability/nested-podman: nested-podman
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-assisted-events-stream-master-unit-test
@@ -189,9 +206,17 @@ presubmits:
         - --target=unit-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

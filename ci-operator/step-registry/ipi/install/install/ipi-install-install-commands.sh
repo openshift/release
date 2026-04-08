@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# shellcheck disable=SC1090
+source "$LEASE_PROXY_CLIENT_SH"
+install_lease_handle=''
+
 function set-cluster-version-spec-update-service() {
     local payload_version
     local jsonpath_flag
@@ -17,9 +21,9 @@ function set-cluster-version-spec-update-service() {
     fi
 
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.version}")"
     else
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep -oP '(?<=^  Version:  ).*$')"
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$')"
     fi
     echo "Release payload version: ${payload_version}"
 
@@ -47,13 +51,13 @@ function set-cluster-version-spec-update-service() {
     # and fall back to manifest-declared architecture
     local payload_arch
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
         if [[ -z "${payload_arch}" ]]; then
             echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
-            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.config.architecture}")"
         fi
     else
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep "^OS/Arch: " | cut -d/ -f3)"
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep "^OS/Arch: " | cut -d/ -f3)"
     fi
     local payload_arch_param
     if [[ -n "${payload_arch}" ]]; then
@@ -131,6 +135,23 @@ function populate_artifact_dir() {
     echo "Copying Cluster API generated manifests..."
     mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
     cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
+  fi
+
+  # Capture infrastructure issue log to help gather the datailed failure message in junit files
+  if [[ "$ret" == "4" ]] || [[ "$ret" == "5" ]]; then
+    grep -Er "Throttling: Rate exceeded|\
+rateLimitExceeded|\
+The maximum number of [A-Za-z ]* has been reached|\
+The number of .* is larger than the maximum allowed size|\
+Quota .* exceeded|\
+Cannot create more than .* for this subscription|\
+The request is being throttled as the limit has been reached|\
+SkuNotAvailable|\
+Exceeded limit .* for zone|\
+ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS|\
+Operation could not be completed as it results in exceeding approved .* quota|\
+A quota has been reached for project|\
+LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastructure_failure.log" || true
   fi
 }
 
@@ -217,6 +238,8 @@ function write_install_status() {
 }
 
 function prepare_next_steps() {
+  printf 'Releasing install lease (if any)\n'
+  lease__release --handle="$install_lease_handle" || true
   write_install_status
   set +e
   echo "Tear down the backgroup process of copying kube config"
@@ -245,6 +268,9 @@ function prepare_next_steps() {
   if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f ${SHARED_DIR}/install-config-patch-preloadedOSImageName.yaml ]]; then
       grep -A 10 'Creating infrastructure resources...' "${dir}/.openshift_install.log" > "${SHARED_DIR}/nutanix-preload-image-openshift_install.log"
   fi
+  # capture install duration for post e2e-analysis
+  awk '/Time elapsed per stage:/,/Time elapsed:/' "${dir}/.openshift_install.log" > "${SHARED_DIR}/install-duration.log"
+
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -556,25 +582,45 @@ function get_arch() {
   echo "${ARCH}"
 }
 
+function release_install_lease() {
+  lease__release --delay=20m --handle="$install_lease_handle"
+  printf 'Install lease released at %s\n' "$(date "+%F %X")"
+}
+
+function refresh_install_lease() {
+  if ! lease__install_lease_eligible; then
+      return 0
+  fi
+
+  lease__release --handle="$install_lease_handle"
+  install_lease_handle=$(lease__acquire --type="${CLUSTER_PROFILE_SET_NAME}--${CLUSTER_PROFILE_NAME}--install-quota-slice" --scope=step)
+  printf 'Install lease acquired at %s: %s\n' "$(date "+%F %X")" "$(lease__cat --handle="$install_lease_handle" --format=csv)"
+  release_install_lease &
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM INT
+
+export INSTALLER_BINARY="openshift-install"
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "User specified a custom payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+elif [[ "${USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
-fi
-
-if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
-  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
-  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
-  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
-  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
-  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-  --command=openshift-install --to="/tmp" || exit 1
-  export INSTALLER_BINARY="/tmp/openshift-install"
-else
-  export INSTALLER_BINARY="openshift-install"
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -594,7 +640,7 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
@@ -630,6 +676,9 @@ gcp)
     elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+    elif [ -f "${SHARED_DIR}/xpn_min_perm_cco_manual.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC with CCO in Manual mode..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_cco_manual.json"
     elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
@@ -707,7 +756,7 @@ azure4|azure-arm64)
       inject_boot_diagnostics ${dir}
     fi
     ;;
-aws|aws-arm64|aws-usgov)
+aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config "${dir}" "workers"
     fi
@@ -764,9 +813,9 @@ done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -n
 
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
+azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-true} ;;
 esac
-if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
   ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
@@ -791,24 +840,10 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $CLUSTER_TYPE in
-  vsphere*)
-    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
-    max=1
-    ;;
-  aws*)
-    # Do not retry because aws resources can collide when re-using installer assets
-    max=1
-    ;;
-  azure*)
-    # Do not retry because azure resources always collide when re-using installer assets
-    max=1
-    ;;
-  ibmcloud*)
-    # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
-    max=1
-    ;;
   *)
-    max=3
+  # Installs are stable enough to not benefit from retries; and not all platforms support retries.
+  # If a platform could benefit from retries (e.g. flaking due to resource contention), add a case for the platform above.
+    max=1
     ;;
 esac
 ret=4
@@ -840,6 +875,7 @@ do
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
 
+  refresh_install_lease || true
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
   ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &

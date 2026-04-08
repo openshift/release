@@ -21,20 +21,21 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-418-up
-- dockerfile_literal: |-
-    FROM prow-scripts.prow
-    RUN ls
-  from: prow-scripts.prow
-  to: prow-scripts-417-up
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-418-up
+  - dockerfile_literal: |-
+      FROM prow-scripts.prow
+      RUN ls
+    from: prow-scripts.prow
+    to: prow-scripts-417-up
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   initial:
     prerelease:
@@ -55,8 +56,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: chaos-aws-loaded-upgrade-417to418-pod-scenarios
-  cron: 0 12 11 * *
+- always_run: false
+  as: chaos-aws-loaded-upgrade-417to418-pod-scenarios
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
@@ -65,7 +66,6 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
       MAX_UNAVAILABLE: "3"
@@ -79,12 +79,12 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
-- as: chaos-aws-loaded-upgrade-417to418-node-scenarios
-  cron: 0 1 11 * *
+- always_run: false
+  as: chaos-aws-loaded-upgrade-417to418-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
@@ -93,7 +93,6 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
       MAX_UNAVAILABLE: "3"
@@ -110,12 +109,12 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
-- as: chaos-gcp-loaded-upgrade-417to418-node-scenarios
-  cron: 0 12 5 * *
+- always_run: false
+  as: chaos-gcp-loaded-upgrade-417to418-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: gcp-chaos
@@ -123,7 +122,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
-      CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
       MAX_UNAVAILABLE: "3"
@@ -132,11 +130,11 @@ tests:
       - redhat-chaos-cerberus
       - redhat-chaos-node-disruptions-worker-outage-observer
     test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - ref: redhat-chaos-start-krkn
-    - chain: openshift-qe-cluster-density-v2
     - ref: openshift-qe-upgrade
     workflow: redhat-chaos-installer-gcp
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

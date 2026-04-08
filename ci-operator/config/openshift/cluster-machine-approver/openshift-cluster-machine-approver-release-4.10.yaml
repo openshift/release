@@ -3,20 +3,13 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: cluster-machine-approver
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    from: base
+    to: cluster-machine-approver
 promotion:
   to:
   - name: "4.10"
@@ -43,11 +36,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -57,10 +50,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-azure-operator
+- always_run: false
+  as: e2e-azure-operator
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -70,7 +64,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
   steps:
     cluster_profile: gcp
@@ -85,12 +80,13 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-disruptive
+- always_run: false
+  as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 zz_generated_metadata:
   branch: release-4.10

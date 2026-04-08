@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 workdir=`mktemp -d`
 
@@ -88,10 +94,12 @@ EOF
 # that would result in instablity for clients when the failover did
 # not happen yet. So here make the proxy use ipv4 to resolve the
 # dual-stack websites as the default behavior.
-proxy_dns_config="dns_v4_first on"
-if [[ "${IPSTACK}" == "dualstack" ]]; then
+
+if [[ "$IP_FAMILY" == *"DualStackIPv6Primary"* ]]; then
     # when no setting, ipv6 DNS is preferred in squid process
-    proxy_dns_config=""
+    proxy_dns_config="dns_v4_first off"
+else
+    proxy_dns_config="dns_v4_first on"
 fi
 
 ## PROXY Config
@@ -103,6 +111,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+https_port 3129 cert=/etc/squid/server_domain.crt key=/etc/squid/server_domain.pem cafile=/etc/squid/client_ca.crt
 cache deny all
 ${proxy_dns_config}
 EOF
@@ -145,6 +154,9 @@ fi
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
 PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')
+PROXY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+PROXY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+PROXY_CA_CONTENT=$(cat "/var/run/vault/mirror-registry/client_ca.crt" | base64 -w0)
 
 # proxy ignition
 proxy_ignition_patch=$(mktemp)
@@ -163,6 +175,27 @@ cat > "${proxy_ignition_patch}" << EOF
         "path": "/srv/squid/etc/squid.conf",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_CONFIG_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CRT_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.pem",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_KEY_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/client_ca.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CA_CONTENT}"
         },
         "mode": 420
       },
@@ -299,8 +332,8 @@ ExecStart=/usr/bin/podman run --name poc-registry-${port} \
 -v /opt/registry-${port}/data:/var/lib/registry:z \
 -v /opt/registry-${port}/auth:/auth \
 -v /opt/registry-${port}/certs:/certs:z \
--v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
-quay.io/openshifttest/registry:2
+-v /opt/registry-${port}/config.yaml:/etc/distribution/config.yml \
+quay.io/openshifttest/registry:3
 
 ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
 ExecReload=-/usr/bin/podman rm "poc-registry-${port}"

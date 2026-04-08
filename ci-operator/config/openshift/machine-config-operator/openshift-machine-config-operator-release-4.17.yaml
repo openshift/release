@@ -27,26 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
-    name: "4.17"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   ocp_os:
     name: "4.17"
     namespace: ocp
@@ -54,30 +38,21 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: machine-config-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
-    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
-        chmod +x /usr/bin/rg && \
-        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
-        chmod +x /usr/bin/yq && \
-        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
-        rpm-ostree install tailscale && \
-        systemctl enable tailscaled && \
-        ostree container commit
-  from: ocp_os
-  to: custom-os-image
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: machine-config-operator
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+      RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
+          chmod +x /usr/bin/rg && \
+          curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
+          chmod +x /usr/bin/yq && \
+          cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
+          rpm-ostree install tailscale && \
+          systemctl enable tailscaled && \
+          ostree container commit
+    from: ocp_os
+    to: custom-os-image
 promotion:
   to:
   - excluded_images:
@@ -108,7 +83,7 @@ tests:
   as: e2e-aws-ovn-fips-op
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -127,7 +102,7 @@ tests:
   as: e2e-aws-ovn-fips
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -136,37 +111,36 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-azure-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-azure-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - always_run: false
   as: e2e-aws-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
@@ -201,10 +175,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-op
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -218,10 +193,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-  timeout: 5h0m0s
-- as: e2e-gcp-op-techpreview
+- always_run: false
+  as: e2e-gcp-op-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -236,16 +210,17 @@ tests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-aws-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -254,7 +229,7 @@ tests:
   as: e2e-aws-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
@@ -262,7 +237,7 @@ tests:
   as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-ovn-workers-rhel
@@ -270,12 +245,12 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: cluster-bootimages
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -297,24 +272,24 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-ovn-zones
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -323,19 +298,19 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-upgrade
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-aws-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-proxy
 - always_run: false
   as: e2e-vsphere
@@ -353,11 +328,12 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-metal-assisted
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -378,7 +354,7 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-gcp-rt
@@ -400,8 +376,9 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-single-node
-- as: e2e-gcp-op-single-node
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-single-node
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -420,7 +397,7 @@ tests:
   as: e2e-aws-upgrade-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-single-node
 - always_run: false
   as: e2e-openstack
@@ -449,10 +426,11 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-external-lb
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-openstack-dualstack
@@ -466,6 +444,12 @@ tests:
     env:
       PROJECT_NAME: machine-config-operator
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

@@ -1,0 +1,44 @@
+workflow:
+  as: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
+  documentation: |-
+    The HyperShift mce agent conformance (connected) workflow executes tests against a new ephemeral cluster
+    deployed in the baremetal infrastructure.
+    The installation method for nodepool is metal3.
+    TODO[LiangquanLi930]: To group the steps in the pre chain of the workflow as one or more chains to allow
+    re-usability of the steps in other workflows.
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - chain: baremetal-lab-post
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: baremetal-lab-agent-conf
+    - ref: baremetal-lab-agent-conf-dynamic
+    - chain: baremetal-lab-agent-install
+    - ref: hypershift-mce-agent-lvm-file-create
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-agent-create-agentserviceconfig-baremetal
+    - ref: hypershift-mce-agent-create-hostedcluster
+    - chain: baremetal-lab-hypershift-hosted-pre-load-balancer
+    - ref: baremetal-lab-hypershift-hosted-pre-dns
+    - ref: hypershift-agent-create-add-worker-metal3-lab
+    - ref: hypershift-agent-create-ingress-nodeport
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-installer-reportportal-marker
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AGENT_PLATFORM_TYPE: baremetal
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "3"
+      HYPERSHIFT: "true"
+      HYPERSHIFT_NAMESPACE: "local-cluster"

@@ -3,28 +3,17 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.22-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.22-linux
-  stolostron_builder_go1.23-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.23-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.23-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
-  to: cluster-proxy-addon
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-proxy-addon
 promotion:
   to:
   - name: "2.9"
@@ -32,12 +21,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -108,8 +97,7 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

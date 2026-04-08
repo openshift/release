@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build09
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -24,7 +24,7 @@ postsubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -61,10 +61,10 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
-    cluster: build09
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -72,22 +72,35 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-rh-ecosystem-edge-console-plugin-nvidia-gpu-main-mirror-vcsref-image
+    skip_if_only_changed: ^OWNERS$|^README\.md$|^deployment/
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=mirror-vcsref-image
         command:
         - ci-operator
-        image: ci-operator:latest
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -102,6 +115,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

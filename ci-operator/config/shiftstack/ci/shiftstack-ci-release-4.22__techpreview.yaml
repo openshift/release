@@ -1,0 +1,64 @@
+base_images:
+  manila-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
+  openstack-cinder-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+  openstack-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-installer
+  openstack-tests:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-tests
+  stolostron:
+    name: builder
+    namespace: stolostron
+    tag: go1.21-linux
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-openstack-ovn-techpreview
+  minimum_interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn-serial-techpreview
+  minimum_interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.22
+  org: shiftstack
+  repo: ci
+  variant: techpreview

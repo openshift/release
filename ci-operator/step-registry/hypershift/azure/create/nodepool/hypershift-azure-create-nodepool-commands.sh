@@ -16,6 +16,7 @@ COMMAND=(
     --cluster-name "$CLUSTER_NAME"
     --name "$NODEPOOL_NAME"
     --nodepool-subnet-id "$SUBNET_ID"
+    --release-image "${NODEPOOL_RELEASE_IMAGE_LATEST}"
 )
 
 if [[ -n $ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE ]]; then

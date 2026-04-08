@@ -26,7 +26,7 @@ def add_art_publish(gendoc):
     }, comment='Long lived API token for art-publish')
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-manage-art-equivalent-buildconfigs',
@@ -82,6 +82,70 @@ in 3.11).''')
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'art-publish',
+            'namespace': 'origin'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'system:image-builder'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to mirror images to the origin namespace so that OKD images can be provided')
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'origin'
+        },
+        'rules': [
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreams'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamimports'],
+                'verbs': ['create']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamtags'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
+            }
+        ]
+    })
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'origin'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'art-publish-modify-release'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    })
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish',
             'namespace': 'ocp-private'
         },
         'roleRef': {
@@ -97,7 +161,7 @@ in 3.11).''')
     }, comment='Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed')
 
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-publish-modify-release',
@@ -108,6 +172,11 @@ in 3.11).''')
                 'apiGroups': ['image.openshift.io'],
                 'resources': ['imagestreams'],
                 'verbs': ['get', 'list', 'watch', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamimports'],
+                'verbs': ['create']
             },
             {
                 'apiGroups': ['image.openshift.io'],
@@ -137,7 +206,7 @@ in 3.11).''')
     })
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-prowjob',
@@ -168,7 +237,7 @@ in 3.11).''')
     }], comment='Allow ART to create prowjobs in the ci namespace for running upgrade tests')
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
             'name': 'art-publish-release-admin',
@@ -233,17 +302,9 @@ in 3.11).''')
                         'namespace': f'ocp{config.get_suffix(arch, private)}'
                     }
                 })
-                gendoc.append({
-                    'apiVersion': 'image.openshift.io/v1',
-                    'kind': 'ImageStream',
-                    'metadata': {
-                        'name': f'{major_minor}-konflux-art-latest{config.get_suffix(arch, private)}',
-                        'namespace': f'ocp{config.get_suffix(arch, private)}'
-                    }
-                })
 
             gendoc.append({
-                'apiVersion': 'authorization.openshift.io/v1',
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
                 'kind': 'Role',
                 'metadata': {
                     'name': 'art-publish-modify-release',
@@ -257,6 +318,11 @@ in 3.11).''')
                     },
                     {
                         'apiGroups': ['image.openshift.io'],
+                        'resources': ['imagestreamimports'],
+                        'verbs': ['create']
+                    },
+                    {
+                        'apiGroups': ['image.openshift.io'],
                         'resources': ['imagestreamtags'],
                         'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
                     }
@@ -264,7 +330,7 @@ in 3.11).''')
             })
 
             gendoc.append({
-                'apiVersion': 'authorization.openshift.io/v1',
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
                 'kind': 'Role',
                 'metadata': {
                     'name': 'art-backup-upgrade-graph',
