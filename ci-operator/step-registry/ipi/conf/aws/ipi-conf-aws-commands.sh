@@ -616,3 +616,38 @@ EOF
   cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
   echo "Dual-stack networking configuration added to install-config.yaml"
 fi
+
+# Configure PKI signer certificates if PKI_ALGORITHM is set
+if [[ -n "${PKI_ALGORITHM:-}" ]]; then
+  echo "Configuring PKI with algorithm: ${PKI_ALGORITHM}"
+  patch_pki="${SHARED_DIR}/install-config-pki.yaml.patch"
+  case "${PKI_ALGORITHM}" in
+    RSA)
+      cat > "${patch_pki}" << EOF
+pki:
+  signerCertificates:
+    key:
+      algorithm: RSA
+      rsa:
+        keySize: ${PKI_RSA_KEY_SIZE}
+EOF
+      ;;
+    ECDSA)
+      cat > "${patch_pki}" << EOF
+pki:
+  signerCertificates:
+    key:
+      algorithm: ECDSA
+      ecdsa:
+        curve: ${PKI_ECDSA_CURVE}
+EOF
+      ;;
+    *)
+      echo "ERROR: Unsupported PKI_ALGORITHM: ${PKI_ALGORITHM}. Must be RSA or ECDSA."
+      exit 1
+      ;;
+  esac
+  yq-go m -x -i "${CONFIG}" "${patch_pki}"
+  cp "${patch_pki}" "${ARTIFACT_DIR}/"
+  echo "PKI configuration added to install-config.yaml"
+fi
