@@ -15,6 +15,10 @@ base_images:
     name: cluster-api-actuator-pkg-test
     namespace: ci
     tag: "4.22"
+  csi-driver-smb-test:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-driver-smb-test
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -47,6 +51,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  smb-csi-driver-operator-test:
+    name: "4.21"
+    namespace: ocp
+    tag: smb-csi-driver-operator-test
   tests-private:
     name: tests-private
     namespace: ci
@@ -125,6 +133,55 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: aws-efs-operator-e2e-extended
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/efs-csi-operator:index
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
+- as: smb-operator-e2e
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: azure4
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/csi-operator:samba-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: smb-operator-e2e-extended
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: azure4
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/csi-operator:samba-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb-extended
+- as: smb-operator-e2e-manual-verify
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: azure4
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/csi-operator:samba-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: openshift-e2e-azure-csi-smb
 - as: olmv1-benchmark-test
   capabilities:
   - intranet
