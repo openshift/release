@@ -1,0 +1,14 @@
+chain:
+  as: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-deprovision
+  steps:
+  - ref: hypershift-mce-dump
+  # Destroy Cluster B (external KubeVirt guest) first, since its VMs run on Cluster A
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-deprovision-destroy-external-guest
+  # Destroy Cluster A (MCE agent-based HCP)
+  - chain: hypershift-mce-agent-destroy
+  # Deprovision BM management cluster
+  - chain: cucushift-installer-rehearse-baremetalds-ipi-deprovision
+  documentation: |-
+    Deprovision chain for KubeVirt external infrastructure on bare metal.
+    Dumps MCE diagnostics, then destroys Cluster B (external infra KubeVirt guest),
+    then Cluster A (MCE agent HCP), then the BM management cluster.

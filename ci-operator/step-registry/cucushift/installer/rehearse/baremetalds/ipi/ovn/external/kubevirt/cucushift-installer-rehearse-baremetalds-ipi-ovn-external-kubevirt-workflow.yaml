@@ -1,0 +1,51 @@
+workflow:
+  as: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-deprovision
+      - ref: send-results-to-reportportal
+    env:
+      CLUSTERTYPE: host_384gb_el9
+      MCE_VERSION: "2.11"
+      AGENT_NAMESPACE: hypershift-agents
+      IP_STACK: v4
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_TARGET_OPERATORS: metallb
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=3
+        WORKER_VCPU=16
+        WORKER_MEMORY=32768
+        NUM_EXTRA_WORKERS=4
+        EXTRA_WORKER_VCPU=16
+        EXTRA_WORKER_MEMORY=65536
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=500G
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      EXTERNAL_INFRA_NS: guest-external-infra-ns
+  documentation: |-
+    Workflow for testing HyperShift KubeVirt external infrastructure on bare metal.
+    Provisions a BM management cluster (host_384gb_el9) with worker nodes for agent HCP.
+    Installs MCE to manage HyperShift, then creates Cluster A as an MCE agent-based HCP.
+    Installs LVM, ODF, and KubeVirt on Cluster A, then creates Cluster B as a KubeVirt HCP
+    whose worker VMs run on Cluster A via external infrastructure.
+    Storage layout:
+      Management cluster: /dev/vda → LVM (lvms-vg1) for etcd
+      Cluster A: /dev/vda → ODF (Ceph RBD, RWX) for KubeVirt VM root disks
+      Cluster A: /dev/vdb → LVM (lvms-vg1) for general-purpose storage
