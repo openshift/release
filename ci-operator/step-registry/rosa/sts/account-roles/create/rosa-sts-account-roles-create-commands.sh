@@ -66,6 +66,19 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   fi
 
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
+
+  # Verify the version has published policies. If not, fall back to the latest
+  # available version. This handles cases where nightly builds for unreleased
+  # versions (e.g., 4.23, 5.0) don't have IAM policies published yet.
+  if ! rosa list account-roles --output json 2>/dev/null | jq -e --arg v "${OPENSHIFT_VERSION}" '.[] | select(.Version // "" | startswith($v))' > /dev/null 2>&1; then
+    echo "Version ${OPENSHIFT_VERSION} may not have published policies, checking available versions..."
+    available_version=$(rosa list versions --channel-group ${CHANNEL_GROUP} ${CLUSTER_SWITCH} -o json 2>/dev/null | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1)
+    if [[ -n "${available_version}" ]]; then
+      echo "Falling back from ${OPENSHIFT_VERSION} to ${available_version}"
+      OPENSHIFT_VERSION="${available_version}"
+    fi
+  fi
+
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
 
