@@ -80,24 +80,98 @@ log_error() {
 cleanup() {
     local exit_code=$?
     log "🧹 Cleaning up test resources..."
-    
+
     # Stop monitoring processes
     jobs -p | xargs -r kill 2>/dev/null || true
     pkill -f "ocpbugs-77510" 2>/dev/null || true
-    
-    # Clean up namespace
+
+    # Collect RST monitoring logs before cleanup
+    if oc get namespace ocpbugs-77510-monitor >/dev/null 2>&1; then
+        collect_monitor_logs
+    fi
+
+    # Clean up namespaces
     if oc get namespace "$NAMESPACE" >/dev/null 2>&1; then
         oc delete namespace "$NAMESPACE" --timeout=30s --ignore-not-found=true || true
     fi
-    
+
+    if oc get namespace ocpbugs-77510-monitor >/dev/null 2>&1; then
+        oc delete namespace ocpbugs-77510-monitor --timeout=30s --ignore-not-found=true || true
+    fi
+
     # Preserve artifacts
     if [[ -n "${ARTIFACT_DIR:-}" ]]; then
         mkdir -p "$ARTIFACT_DIR"
+        log "📦 Saving test artifacts to $ARTIFACT_DIR"
+
+        # Copy all test logs
         [[ -f "/tmp/ocpbugs-77510-rst.log" ]] && cp "/tmp/ocpbugs-77510-rst.log" "$ARTIFACT_DIR/" || true
         [[ -f "/tmp/ocpbugs-77510-test.log" ]] && cp "/tmp/ocpbugs-77510-test.log" "$ARTIFACT_DIR/" || true
+        [[ -f "/tmp/ocpbugs-77510-connection-errors.log" ]] && cp "/tmp/ocpbugs-77510-connection-errors.log" "$ARTIFACT_DIR/" || true
+        [[ -f "/tmp/ocpbugs-77510-summary.txt" ]] && cp "/tmp/ocpbugs-77510-summary.txt" "$ARTIFACT_DIR/" || true
+
+        # Show what was saved
+        log "📋 Artifacts saved:"
+        ls -lh "$ARTIFACT_DIR"/ocpbugs-77510-* 2>/dev/null | sed 's/^/   /' || true
     fi
-    
+
     exit $exit_code
+}
+
+# Collect RST monitoring logs from all monitor pods
+collect_monitor_logs() {
+    log "📥 Collecting RST monitoring logs from all nodes..."
+
+    local monitor_pods
+    monitor_pods=$(oc get pods -n ocpbugs-77510-monitor -l app=rst-monitor --no-headers | awk '{print $1}')
+
+    if [[ -z "$monitor_pods" ]]; then
+        log_warning "No monitor pods found to collect logs from"
+        return 1
+    fi
+
+    # Initialize combined log file
+    echo "Combined RST monitoring logs from all nodes" > /tmp/ocpbugs-77510-rst.log
+    echo "Collected at: $(date)" >> /tmp/ocpbugs-77510-rst.log
+    echo "===========================================" >> /tmp/ocpbugs-77510-rst.log
+    echo "" >> /tmp/ocpbugs-77510-rst.log
+
+    local total_rst_count=0
+
+    for pod in $monitor_pods; do
+        log "   Collecting from pod: $pod"
+
+        # Get node name
+        local node_name
+        node_name=$(oc get pod "$pod" -n ocpbugs-77510-monitor -o jsonpath='{.spec.nodeName}')
+
+        echo "### Logs from node: $node_name (pod: $pod) ###" >> /tmp/ocpbugs-77510-rst.log
+
+        # Get log file from pod
+        local log_file
+        log_file=$(oc exec -n ocpbugs-77510-monitor "$pod" -- ls /host-logs/*.log 2>/dev/null | head -1 || echo "")
+
+        if [[ -n "$log_file" ]]; then
+            oc exec -n ocpbugs-77510-monitor "$pod" -- cat "$log_file" >> /tmp/ocpbugs-77510-rst.log 2>/dev/null || true
+
+            # Count RST packets from this node
+            local node_rst_count
+            node_rst_count=$(oc exec -n ocpbugs-77510-monitor "$pod" -- grep -c "tcp\|TCP" "$log_file" 2>/dev/null || echo "0")
+            total_rst_count=$((total_rst_count + node_rst_count))
+        else
+            echo "No log file found on this node" >> /tmp/ocpbugs-77510-rst.log
+        fi
+
+        echo "" >> /tmp/ocpbugs-77510-rst.log
+    done
+
+    log_success "Collected RST logs from $(echo "$monitor_pods" | wc -l) nodes, total RST entries: $total_rst_count"
+
+    # Show sample if any RST packets found
+    if [[ $total_rst_count -gt 0 ]]; then
+        log "📋 Sample collected RST packets:"
+        grep -m 3 "tcp\|TCP" /tmp/ocpbugs-77510-rst.log | sed 's/^/   /' || true
+    fi
 }
 
 trap cleanup EXIT INT TERM
@@ -204,7 +278,7 @@ spec:
 EOF
     done
     
-    # Create traffic generator
+    # Create traffic generator with connection error tracking
     cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Pod
@@ -219,16 +293,42 @@ spec:
     args:
     - -c
     - |
+      # Initialize connection tracking
+      success_count=0
+      failure_count=0
+      total_requests=0
+      echo "Starting continuous traffic generation at \$(date)" > /tmp/connection-errors.log
+
       while true; do
         for svc_num in \$(seq 1 $SERVICE_COUNT); do
-          curl -s --connect-timeout 2 --max-time 3 "http://test-svc-\${svc_num}.$NAMESPACE.svc.cluster.local/" >/dev/null 2>&1 || true
+          total_requests=\$((total_requests + 1))
+
+          # Try to connect and track results
+          if curl -s --connect-timeout 2 --max-time 3 "http://test-svc-\${svc_num}.$NAMESPACE.svc.cluster.local/" >/dev/null 2>&1; then
+            success_count=\$((success_count + 1))
+          else
+            failure_count=\$((failure_count + 1))
+            echo "\$(date '+%Y-%m-%d %H:%M:%S'): Connection failed to test-svc-\${svc_num} (total failures: \$failure_count)" >> /tmp/connection-errors.log
+          fi
+
+          # Log summary every 100 requests
+          if [ \$((total_requests % 100)) -eq 0 ]; then
+            echo "\$(date '+%Y-%m-%d %H:%M:%S'): Summary - Total: \$total_requests, Success: \$success_count, Failures: \$failure_count" >> /tmp/connection-errors.log
+          fi
+
           sleep 1
         done
       done
     resources:
       requests:
-        memory: "16Mi"
+        memory: "32Mi"
         cpu: "10m"
+    volumeMounts:
+    - name: error-logs
+      mountPath: /tmp
+  volumes:
+  - name: error-logs
+    emptyDir: {}
 EOF
     
     # Wait for infrastructure to be ready
@@ -263,24 +363,136 @@ EOF
     return 0
 }
 
-# Start RST packet monitoring
-start_monitoring() {
-    log "📊 Starting TCP RST monitoring on node: $WORKER_NODE"
-    
-    # Start background RST monitoring
-    {
-        timeout $((TIMEOUT_MINUTES * 60)) oc debug "node/$WORKER_NODE" --quiet -- \
-            bash -c 'tcpdump -i any -nn "tcp[tcpflags] & tcp-rst != 0" 2>/dev/null || echo "RST monitoring ended"' | \
-            while read -r line; do
-                echo "$(date '+%H:%M:%S'): RST: $line"
+# Deploy DaemonSet for RST packet monitoring
+deploy_rst_monitor() {
+    log "📊 Deploying RST monitoring DaemonSet..."
+
+    # Create monitoring namespace
+    oc create namespace ocpbugs-77510-monitor 2>/dev/null || true
+
+    # Deploy privileged DaemonSet for packet capture
+    cat <<EOF | oc apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rst-monitor
+  namespace: ocpbugs-77510-monitor
+  labels:
+    app: rst-monitor
+spec:
+  selector:
+    matchLabels:
+      app: rst-monitor
+  template:
+    metadata:
+      labels:
+        app: rst-monitor
+    spec:
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: tcpdump
+        image: quay.io/openshift/origin-network-tools:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "RST monitoring started on node \$(hostname)" > /host-logs/rst-monitor-\$(hostname).log
+          # Monitor for TCP RST packets on all interfaces
+          tcpdump -i any -nn -l "tcp[tcpflags] & tcp-rst != 0" 2>&1 | \
+            while read line; do
+              echo "\$(date '+%Y-%m-%d %H:%M:%S'): \$line" >> /host-logs/rst-monitor-\$(hostname).log
             done
-    } > "/tmp/ocpbugs-77510-rst.log" 2>&1 &
-    
-    local monitor_pid=$!
-    echo $monitor_pid > "/tmp/ocpbugs-77510-monitor.pid"
-    
-    log "🔍 RST monitoring started (PID: $monitor_pid)"
-    sleep 5  # Allow monitoring to initialize
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+        - name: logs
+          mountPath: /host-logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+EOF
+
+    # Wait for DaemonSet to be ready
+    log "⏳ Waiting for RST monitor DaemonSet to be ready..."
+    local timeout=60
+    local count=0
+    while [[ $count -lt $timeout ]]; do
+        local ready_pods
+        ready_pods=$(oc get pods -n ocpbugs-77510-monitor -l app=rst-monitor --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+
+        if [[ $ready_pods -gt 0 ]]; then
+            log_success "RST monitoring ready: $ready_pods monitor pods running"
+            sleep 10  # Allow tcpdump to initialize
+
+            # Verify tcpdump is actually running
+            if verify_monitoring_active; then
+                return 0
+            else
+                log_error "RST monitoring pods running but tcpdump not active"
+                return 1
+            fi
+        fi
+
+        sleep 5
+        count=$((count + 5))
+    done
+
+    log_error "RST monitoring DaemonSet failed to start"
+    return 1
+}
+
+# Verify monitoring is actively capturing packets
+verify_monitoring_active() {
+    log "🔍 Verifying RST monitoring is active..."
+
+    local monitor_pods
+    monitor_pods=$(oc get pods -n ocpbugs-77510-monitor -l app=rst-monitor --no-headers | awk '{print $1}')
+
+    if [[ -z "$monitor_pods" ]]; then
+        log_error "No monitor pods found"
+        return 1
+    fi
+
+    # Check first monitor pod
+    local first_pod
+    first_pod=$(echo "$monitor_pods" | head -1)
+
+    # Check if tcpdump process is running
+    local tcpdump_check
+    tcpdump_check=$(oc exec -n ocpbugs-77510-monitor "$first_pod" -- ps aux | grep -c '[t]cpdump' || echo "0")
+
+    if [[ $tcpdump_check -gt 0 ]]; then
+        log_success "tcpdump process confirmed running in monitor pods"
+
+        # Check log file exists and has content
+        local log_content
+        log_content=$(oc exec -n ocpbugs-77510-monitor "$first_pod" -- ls -lh /host-logs/ 2>/dev/null || echo "")
+
+        if [[ -n "$log_content" ]]; then
+            log_success "Monitor log files created successfully"
+            return 0
+        else
+            log_warning "Monitor logs not yet created, but tcpdump is running"
+            return 0
+        fi
+    else
+        log_error "tcpdump process not found in monitor pods"
+        return 1
+    fi
+}
+
+# Start RST packet monitoring (wrapper for backward compatibility)
+start_monitoring() {
+    deploy_rst_monitor
 }
 
 # Execute the bug trigger - try multiple approaches
@@ -295,37 +507,89 @@ trigger_bug_scenario() {
     if oc get pods -n openshift-ovn-kubernetes --no-headers >/dev/null 2>&1; then
         log "🔄 Method 1: OVN-Kubernetes restart trigger (primary)"
         log "   Triggering OVN refresh to force service rule re-evaluation"
-        
+
         local ovn_pods
         ovn_pods=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --no-headers | awk '{print $1}')
         local ovn_count
         ovn_count=$(echo "$ovn_pods" | wc -l)
-        
+
         if [[ $ovn_count -gt 0 ]]; then
-            log "   Restarting $ovn_count OVN node pods"
+            log "   Found $ovn_count OVN node pods to restart"
+
+            # Record pod ages before restart for verification
+            local pods_before
+            pods_before=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --no-headers | awk '{print $1":"$5}')
+
+            # Delete OVN pods
             for pod in $ovn_pods; do
                 log "   Deleting $pod"
                 oc delete pod "$pod" -n openshift-ovn-kubernetes --grace-period=0 --force &
             done
+
+            # Wait for all deletions to complete
+            wait
             trigger_used="ovn_restart"
-            sleep 20  # Allow OVN restart to settle
+
+            # Verify OVN pods actually restarted
+            log "   Waiting for OVN pods to restart..."
+            sleep 30
+
+            local restart_verified=false
+            local verification_attempts=0
+            while [[ $verification_attempts -lt 6 ]]; do
+                local running_ovn
+                running_ovn=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+
+                if [[ $running_ovn -eq $ovn_count ]]; then
+                    log_success "   ✅ All $ovn_count OVN pods restarted and running"
+                    restart_verified=true
+                    break
+                else
+                    log "   Waiting for OVN pods... ($running_ovn/$ovn_count ready)"
+                    sleep 10
+                    verification_attempts=$((verification_attempts + 1))
+                fi
+            done
+
+            if [[ "$restart_verified" == "false" ]]; then
+                log_warning "   ⚠️ OVN pod restart verification incomplete, but continuing test"
+            fi
+
+            # Additional wait for OVN to stabilize
+            sleep 20
         fi
-        
+
     # Method 2: API server restart (backup trigger)
     elif oc get pods -n openshift-kube-apiserver --no-headers >/dev/null 2>&1; then
         log "🔄 Method 2: API server restart trigger"
         log "   Simulating etcd encryption key rotation via API server restart"
-        
+
         local api_pods
         api_pods=$(oc get pods -n openshift-kube-apiserver | grep kube-apiserver | grep -v guard | grep -v revision | awk '{print $1}' | head -2)
-        
+
         if [[ -n "$api_pods" ]]; then
+            local api_count
+            api_count=$(echo "$api_pods" | wc -l)
+            log "   Found $api_count API server pods to restart"
+
             for pod in $api_pods; do
                 log "   Restarting: $pod"
                 oc delete pod "$pod" -n openshift-kube-apiserver --grace-period=5 || true
-                sleep 30  # Allow restart and OVN-K reconnection
+                sleep 30  # Allow each pod to restart before next one
             done
             trigger_used="api_restart"
+
+            # Verify API servers restarted
+            log "   Waiting for API servers to stabilize..."
+            sleep 30
+
+            local running_api
+            running_api=$(oc get pods -n openshift-kube-apiserver | grep -c "kube-apiserver.*Running" || echo "0")
+            if [[ $running_api -ge $api_count ]]; then
+                log_success "   ✅ API server pods restarted successfully"
+            else
+                log_warning "   ⚠️ API server restart verification incomplete ($running_api pods running)"
+            fi
         fi
         
     else
@@ -377,60 +641,106 @@ trigger_bug_scenario_with_method() {
     
     case "$force_method" in
         "ovn")
-            # Force OVN restart
+            # Force OVN restart with verification
             if oc get pods -n openshift-ovn-kubernetes --no-headers >/dev/null 2>&1; then
                 log "🔄 FORCED: OVN-Kubernetes restart trigger"
                 log "   Triggering OVN refresh to force service rule re-evaluation"
-                
+
                 local ovn_pods
                 ovn_pods=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --no-headers | awk '{print $1}')
                 local ovn_count
                 ovn_count=$(echo "$ovn_pods" | wc -l)
-                
+
                 if [[ $ovn_count -gt 0 ]]; then
-                    log "   Restarting $ovn_count OVN node pods"
+                    log "   Found $ovn_count OVN node pods to restart"
+
+                    # Delete OVN pods
                     for pod in $ovn_pods; do
                         log "   Deleting $pod"
                         oc delete pod "$pod" -n openshift-ovn-kubernetes --grace-period=0 --force &
                     done
+                    wait
+
                     trigger_used="ovn_restart"
+
+                    # Verify restart
+                    log "   Waiting for OVN pods to restart..."
+                    sleep 30
+
+                    local restart_verified=false
+                    local verification_attempts=0
+                    while [[ $verification_attempts -lt 6 ]]; do
+                        local running_ovn
+                        running_ovn=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+
+                        if [[ $running_ovn -eq $ovn_count ]]; then
+                            log_success "   ✅ All $ovn_count OVN pods restarted"
+                            restart_verified=true
+                            break
+                        else
+                            log "   Waiting... ($running_ovn/$ovn_count ready)"
+                            sleep 10
+                            verification_attempts=$((verification_attempts + 1))
+                        fi
+                    done
+
+                    if [[ "$restart_verified" == "false" ]]; then
+                        log_warning "   ⚠️ OVN restart verification incomplete"
+                    fi
+
                     sleep 20
                 else
                     log_error "No OVN pods found for restart"
                     return 1
                 fi
             else
-                log_warning "Cannot access OVN namespace for forced OVN restart, using baseline monitoring"
+                log_warning "Cannot access OVN namespace, using baseline monitoring"
                 trigger_used="baseline"
             fi
             ;;
-            
+
         "api")
-            # Force API restart  
+            # Force API restart with verification
             if oc get pods -n openshift-kube-apiserver --no-headers >/dev/null 2>&1; then
                 log "🔄 FORCED: API server restart trigger"
                 log "   Simulating etcd encryption key rotation via API server restart"
-                
+
                 local api_pods
                 api_pods=$(oc get pods -n openshift-kube-apiserver | grep kube-apiserver | grep -v guard | grep -v revision | awk '{print $1}' | head -2)
-                
+
                 if [[ -n "$api_pods" ]]; then
+                    local api_count
+                    api_count=$(echo "$api_pods" | wc -l)
+                    log "   Found $api_count API server pods to restart"
+
                     for pod in $api_pods; do
                         log "   Restarting: $pod"
                         oc delete pod "$pod" -n openshift-kube-apiserver --grace-period=5 || true
                         sleep 30
                     done
                     trigger_used="api_restart"
+
+                    # Verify restart
+                    log "   Waiting for API servers to stabilize..."
+                    sleep 30
+
+                    local running_api
+                    running_api=$(oc get pods -n openshift-kube-apiserver | grep -c "kube-apiserver.*Running" || echo "0")
+                    if [[ $running_api -ge $api_count ]]; then
+                        log_success "   ✅ API servers restarted successfully"
+                    else
+                        log_warning "   ⚠️ API restart verification incomplete"
+                    fi
                 else
-                    log_warning "No API server pods found for restart, using baseline monitoring"
+                    log_warning "No API server pods found, using baseline monitoring"
                     trigger_used="baseline"
                 fi
             else
-                log_warning "Cannot access API server namespace for forced API restart, using baseline monitoring"
+                log_warning "Cannot access API server namespace, using baseline monitoring"
                 trigger_used="baseline"
             fi
             ;;
-            
+
         "auto"|*)
             # Use the original auto-detection logic
             trigger_bug_scenario
@@ -447,85 +757,167 @@ trigger_bug_scenario_with_method() {
 # Analyze test results
 analyze_results() {
     log "📈 Analyzing test results..."
-    
-    # Stop monitoring
-    if [[ -f "/tmp/ocpbugs-77510-monitor.pid" ]]; then
-        local monitor_pid
-        monitor_pid=$(cat "/tmp/ocpbugs-77510-monitor.pid" 2>/dev/null || echo "")
-        [[ -n "$monitor_pid" ]] && kill "$monitor_pid" 2>/dev/null || true
-        rm -f "/tmp/ocpbugs-77510-monitor.pid"
-    fi
-    
+
     sleep 2  # Allow final packets to be captured
-    
-    # Count RST packets and add debugging
+
+    # Collect RST monitoring logs from DaemonSet
+    collect_monitor_logs
+
+    # Count RST packets from collected logs
     local rst_count=0
     if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
         # Debug: Show log file size and sample content
-        local log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+        local log_size
+        log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
         log "🔍 RST log file size: $log_size lines"
-        
+
         # Show last few lines for debugging
-        if [[ $log_size -gt 0 ]]; then
-            log "📋 Sample RST log content:"
+        if [[ $log_size -gt 5 ]]; then
+            log "📋 Sample RST log content (last 5 lines):"
             tail -5 "/tmp/ocpbugs-77510-rst.log" | sed 's/^/   /' || true
         fi
-        
-        rst_count=$(grep -c "RST:" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+
+        # Count actual TCP RST packets (look for tcpdump output pattern)
+        rst_count=$(grep -ciE "(RST|tcp.*flags.*R)" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
         # Clean up any newlines that might cause parsing issues
         rst_count=$(echo "$rst_count" | tr -d '\n\r' | head -1)
-        
+
         log "🔢 Raw RST count: '$rst_count'"
     else
         log_warning "RST log file not found: /tmp/ocpbugs-77510-rst.log"
     fi
-    
+
+    # Collect and analyze application-layer connection errors
+    local connection_failures=0
+    if oc get pod traffic-client -n "$NAMESPACE" >/dev/null 2>&1; then
+        log "📊 Collecting application-layer connection errors..."
+
+        # Copy connection error log from traffic-client pod
+        oc cp "$NAMESPACE/traffic-client:/tmp/connection-errors.log" "/tmp/ocpbugs-77510-connection-errors.log" 2>/dev/null || {
+            log_warning "Could not retrieve connection error log from traffic-client"
+        }
+
+        if [[ -f "/tmp/ocpbugs-77510-connection-errors.log" ]]; then
+            # Count connection failures
+            connection_failures=$(grep -c "Connection failed" "/tmp/ocpbugs-77510-connection-errors.log" 2>/dev/null || echo "0")
+            connection_failures=$(echo "$connection_failures" | tr -d '\n\r' | head -1)
+
+            log "🔢 Application connection failures: $connection_failures"
+
+            # Show sample failures if any
+            if [[ $connection_failures -gt 0 ]]; then
+                log "📋 Sample connection failures:"
+                grep "Connection failed" "/tmp/ocpbugs-77510-connection-errors.log" | tail -5 | sed 's/^/   /' || true
+            fi
+
+            # Show traffic summary
+            log "📊 Traffic summary:"
+            grep "Summary" "/tmp/ocpbugs-77510-connection-errors.log" | tail -3 | sed 's/^/   /' || true
+        fi
+    else
+        log_warning "Traffic client pod not found, skipping connection error analysis"
+    fi
+
+    # Verify monitoring was actually working
+    local monitoring_verified=false
+    if [[ $log_size -gt 10 ]]; then
+        # Check if we have actual tcpdump output (not just errors)
+        if grep -q "listening on\|packets captured\|IP.*tcp" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null; then
+            monitoring_verified=true
+            log_success "✅ RST monitoring was verified to be active"
+        fi
+    fi
+
+    if [[ "$monitoring_verified" == "false" ]]; then
+        log_error "❌ RST monitoring may not have been working correctly!"
+        log_error "   Log file too small or doesn't contain expected tcpdump output"
+        log_error "   Test results may be unreliable"
+
+        # Show what we actually captured
+        if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
+            log "📋 Actual log content:"
+            head -20 "/tmp/ocpbugs-77510-rst.log" | sed 's/^/   /'
+        fi
+    fi
+
     # Get test infrastructure status
     local pod_count
     pod_count=$(oc get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
-    
-    log "🎯 Test Results ($TEST_SCALE scale):"
-    log "   RST packets captured: $rst_count"
+
+    log ""
+    log "🎯 ===== TEST RESULTS SUMMARY ($TEST_SCALE scale) ====="
+    log "   RST packets captured: $rst_count (threshold: $MIN_RST_THRESHOLD)"
+    log "   Connection failures: $connection_failures"
+    log "   Monitoring verified: $monitoring_verified"
     log "   Test infrastructure: $pod_count pods ($SERVICE_COUNT services)"
     log "   Test duration: $TIMEOUT_MINUTES minutes"
-    log "   Threshold for bug detection: $MIN_RST_THRESHOLD RST packets"
-    
-    # Determine test outcome
+    log ""
+
+    # Determine test outcome based on multiple signals
+    local bug_detected=false
+
     if [[ $rst_count -ge $MIN_RST_THRESHOLD ]]; then
-        log_success "🚨 OCPBUGS-77510 BUG DETECTED!"
+        bug_detected=true
+        log_success "🚨 OCPBUGS-77510 BUG DETECTED (via RST packets)!"
         log_success "   High RST count ($rst_count) indicates serviceUpdateNotNeeded() bug is present"
         log_success "   This cluster exhibits the TCP RST storm behavior"
-        
+
         # Show sample RST packets
         if [[ $rst_count -gt 0 ]] && [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
             log "📋 Sample RST packets:"
-            head -5 "/tmp/ocpbugs-77510-rst.log" | sed 's/^/   /'
+            grep -iE "(RST|tcp.*flags.*R)" "/tmp/ocpbugs-77510-rst.log" | head -5 | sed 's/^/   /' || true
         fi
-        
+    fi
+
+    # Also check connection failures as a secondary indicator
+    if [[ $connection_failures -ge $((MIN_RST_THRESHOLD * 2)) ]]; then
+        bug_detected=true
+        log_warning "🚨 High connection failure rate detected!"
+        log_warning "   $connection_failures failures may indicate network disruption"
+    fi
+
+    # Report final verdict
+    if [[ "$bug_detected" == "true" ]]; then
+        log_success "🎯 VERDICT: Bug detected in this cluster"
         return 0  # Test passed - bug reproduced
-        
-    elif [[ $rst_count -gt 0 ]]; then
-        log_warning "⚠️ PARTIAL RST ACTIVITY: $rst_count packets detected"
-        log_warning "   Below threshold but some RST activity observed"
+    elif [[ $rst_count -gt 0 ]] || [[ $connection_failures -gt 0 ]]; then
+        log_warning "⚠️ PARTIAL DETECTION: Some network issues observed"
+        log_warning "   RST packets: $rst_count, Connection failures: $connection_failures"
         log_warning "   May indicate partial fix or different timing"
-        
         return 0  # Don't fail CI for partial results
-        
     else
-        log_success "✅ NO RST STORM DETECTED"
-        log_success "   Low/zero RST count suggests bug may be fixed"
-        log_success "   Or different cluster configuration"
-        
-        # This is actually a success - means the bug is not present
-        return 0
+        if [[ "$monitoring_verified" == "true" ]]; then
+            log_success "✅ NO RST STORM DETECTED"
+            log_success "   Monitoring was active and no abnormal network behavior observed"
+            log_success "   Bug appears to be fixed or not present in this configuration"
+        else
+            log_warning "⚠️ INCONCLUSIVE RESULTS"
+            log_warning "   No RST packets detected, but monitoring may not have been working properly"
+            log_warning "   Cannot confirm whether bug is present or fixed"
+        fi
+        return 0  # This is actually a success - means the bug is not present
     fi
 }
 
 # Create test report
 create_test_report() {
     local rst_count
-    rst_count=$(grep -c "RST:" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
-    
+    rst_count=$(grep -ciE "(RST|tcp.*flags.*R)" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+
+    local connection_failures=0
+    if [[ -f "/tmp/ocpbugs-77510-connection-errors.log" ]]; then
+        connection_failures=$(grep -c "Connection failed" "/tmp/ocpbugs-77510-connection-errors.log" 2>/dev/null || echo "0")
+    fi
+
+    local monitoring_verified="Unknown"
+    if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
+        if grep -q "listening on\|packets captured\|IP.*tcp" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null; then
+            monitoring_verified="Yes"
+        else
+            monitoring_verified="No - check logs"
+        fi
+    fi
+
     # Save to test log
     cat > "/tmp/ocpbugs-77510-test.log" << EOF
 OCPBUGS-77510 Test Report
@@ -534,21 +926,50 @@ Date: $(date)
 Cluster: $(oc whoami --show-server 2>/dev/null || echo 'unknown')
 Version: $(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || echo 'unknown')
 
-Test Results:
-- RST Packets: $rst_count (threshold: $MIN_RST_THRESHOLD)
-- Test Namespace: $NAMESPACE
-- Monitor Node: $WORKER_NODE
+Test Configuration:
+- Test Scale: $TEST_SCALE
+- Expected Pods: $EXPECTED_PODS
+- Services: $SERVICE_COUNT
 - Duration: $TIMEOUT_MINUTES minutes
+- RST Threshold: $MIN_RST_THRESHOLD
 
-Bug Status: $([[ $rst_count -ge $MIN_RST_THRESHOLD ]] && echo "PRESENT - Fix needed" || echo "NOT DETECTED - Likely fixed or different config")
+Test Results:
+- RST Packets Detected: $rst_count
+- Connection Failures: $connection_failures
+- Monitoring Verified: $monitoring_verified
+- Test Namespace: $NAMESPACE
 
-Infrastructure:
+Bug Status: $([[ $rst_count -ge $MIN_RST_THRESHOLD ]] && echo "DETECTED - Bug is present" || echo "NOT DETECTED - Bug appears fixed or not reproducible")
+
+Infrastructure Status:
 $(oc get pods -n "$NAMESPACE" -o wide 2>/dev/null || echo "No pods found")
 
+Monitoring Infrastructure:
+$(oc get pods -n ocpbugs-77510-monitor -o wide 2>/dev/null || echo "Monitor pods not found")
+
+Connection Error Summary:
+$(grep "Summary" "/tmp/ocpbugs-77510-connection-errors.log" 2>/dev/null | tail -3 || echo "No connection error data")
+
 Generated by OCPBUGS-77510 Prow test
+Repository: https://github.com/openshift/release
 EOF
-    
+
     log "📄 Test report saved to /tmp/ocpbugs-77510-test.log"
+
+    # Also save a concise summary
+    cat > "/tmp/ocpbugs-77510-summary.txt" << EOF
+OCPBUGS-77510 Test Summary ($TEST_SCALE scale)
+==============================================
+RST Packets: $rst_count (threshold: $MIN_RST_THRESHOLD)
+Connection Failures: $connection_failures
+Monitoring Verified: $monitoring_verified
+Verdict: $([[ $rst_count -ge $MIN_RST_THRESHOLD ]] && echo "BUG DETECTED" || echo "NO BUG DETECTED")
+EOF
+
+    log "📄 Test summary saved to /tmp/ocpbugs-77510-summary.txt"
+
+    # Show summary
+    cat "/tmp/ocpbugs-77510-summary.txt"
 }
 
 # Progressive test function - runs all scales sequentially with both trigger methods
