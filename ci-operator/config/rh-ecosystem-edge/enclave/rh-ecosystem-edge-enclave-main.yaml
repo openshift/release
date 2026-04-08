@@ -1,0 +1,49 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/edge-infrastructure/enclave-lab-ci:latest
+      ENV HOME=/tmp ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: make -f Makefile.ci validate-shell
+  container:
+    from: src
+- as: yamllint
+  commands: make -f Makefile.ci validate-yaml
+  container:
+    from: src
+- as: json-schema
+  commands: make -f Makefile.ci validate-json-schema
+  container:
+    from: src
+- as: ansible-lint
+  commands: make -f Makefile.ci validate-ansible
+  container:
+    from: src
+- as: ansible-tags
+  commands: make -f Makefile.ci validate-tags
+  container:
+    from: src
+- as: template-rendering
+  commands: make -f Makefile.ci validate-templates
+  container:
+    from: src
+- as: makefile-validation
+  commands: make -f Makefile.ci validate-makefile
+  container:
+    from: src
+- as: plugin-validation
+  commands: make -f Makefile.ci validate-plugins
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: enclave
