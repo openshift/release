@@ -316,7 +316,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
         'us-central1': 30,
