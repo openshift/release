@@ -73,6 +73,7 @@ function create_sp_with_custom_role() {
     # create service principal with custom role at the scope of subscription
     # sometimes, failed to create sp as role assignment creation failed, retry
     run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
+    echo "debug in create_sp_with_custom_role"
 }
 
 # az should already be there
@@ -123,6 +124,7 @@ for sp_type in ${sp_list}; do
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
     create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
+    echo "Debug after create_sp_with_custom_role"
     sp_app_id=$(jq -r .appId "${sp_output}")
     sp_id=$(az ad sp show --id ${sp_app_id} --query id -otsv)
     sp_password=$(jq -r .password "${sp_output}")
