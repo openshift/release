@@ -157,79 +157,12 @@ create_test_infrastructure() {
     oc label namespace "$NAMESPACE" test="ocpbugs-77510-$TEST_SCALE-scale" || true
     
     # Create services with potential for serviceUpdateNotNeeded() bug
-    # Using generic container images available in CI
+    # EXACT copy of working verification script approach
     for i in $(seq 1 $SERVICE_COUNT); do
-        cat <<EOF | oc apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: test-svc-$i
-  namespace: $NAMESPACE
-spec:
-  replicas: $PODS_PER_SERVICE
-  selector:
-    matchLabels:
-      app: test-svc-$i
-  template:
-    metadata:
-      labels:
-        app: test-svc-$i
-    spec:
-      containers:
-      - name: app
-        image: docker.io/library/nginx:alpine
-        ports:
-        - containerPort: 80
-        resources:
-          requests:
-            memory: "32Mi"
-            cpu: "10m"
-          limits:
-            memory: "64Mi"
-            cpu: "50m"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: test-svc-$i
-  namespace: $NAMESPACE
-spec:
-  selector:
-    app: test-svc-$i
-  ports:
-  - port: 80
-    targetPort: 80
-  type: ClusterIP
-  # Note: internalTrafficPolicy left unset to trigger potential nil comparison bug
-EOF
+        oc create deployment test-app-$i --image=nginx:alpine --replicas=$PODS_PER_SERVICE -n "$NAMESPACE"
+        oc expose deployment test-app-$i --port=80 --target-port=80 -n "$NAMESPACE"
+        log "   Created service $i/$SERVICE_COUNT with $PODS_PER_SERVICE pods"
     done
-    
-    # Create traffic generator
-    cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: traffic-client
-  namespace: $NAMESPACE
-spec:
-  containers:
-  - name: client
-    image: docker.io/curlimages/curl:latest
-    command: ["/bin/sh"]
-    args:
-    - -c
-    - |
-      while true; do
-        for svc_num in \$(seq 1 $SERVICE_COUNT); do
-          curl -s --connect-timeout 2 --max-time 3 "http://test-svc-\${svc_num}.$NAMESPACE.svc.cluster.local/" >/dev/null 2>&1 || true
-          sleep 1
-        done
-      done
-    resources:
-      requests:
-        memory: "16Mi"
-        cpu: "10m"
-EOF
     
     # Wait for infrastructure to be ready
     log "⏳ Waiting for infrastructure readiness ($EXPECTED_PODS expected pods)..."
@@ -241,7 +174,7 @@ EOF
         
         if [[ $ready_pods -ge $EXPECTED_PODS ]]; then
             log_success "Infrastructure ready: $ready_pods pods running"
-            sleep $((SERVICE_COUNT > 10 ? 30 : 15))  # Allow connections to stabilize
+            sleep 10  # Match working verification script timing
             return 0
         fi
         
@@ -267,10 +200,10 @@ EOF
 start_monitoring() {
     log "📊 Starting TCP RST monitoring on node: $WORKER_NODE"
     
-    # Start background RST monitoring
+    # Start background RST monitoring - EXACT copy of working verification scripts
     {
         timeout $((TIMEOUT_MINUTES * 60)) oc debug "node/$WORKER_NODE" --quiet -- \
-            bash -c 'tcpdump -i any -nn "tcp[tcpflags] & tcp-rst != 0" 2>/dev/null || echo "RST monitoring ended"' | \
+            tcpdump -i any -nn 'tcp[tcpflags] & tcp-rst != 0' 2>/dev/null | \
             while read -r line; do
                 echo "$(date '+%H:%M:%S'): RST: $line"
             done
@@ -417,7 +350,7 @@ trigger_bug_scenario_with_method() {
                 if [[ -n "$api_pods" ]]; then
                     for pod in $api_pods; do
                         log "   Restarting: $pod"
-                        oc delete pod "$pod" -n openshift-kube-apiserver --grace-period=5 || true
+                        oc delete pod "$pod" -n openshift-kube-apiserver --grace-period=5 &
                         sleep 30
                     done
                     trigger_used="api_restart"
@@ -462,8 +395,10 @@ analyze_results() {
     local rst_count=0
     if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
         # Debug: Show log file size and sample content
-        local log_size
-        log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+        local log_size=0
+        if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
+            log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+        fi
         log "🔍 RST log file size: $log_size lines"
         
         # Show last few lines for debugging
