@@ -2,12 +2,13 @@
 set -euo pipefail
 
 # ============================================================================
-# Verify: CPO v2 preserves HCCO modifications to OCM Controllers field
+# Verify: CPO v2 preserves modifications to OCM Controllers field
 # Bug: OCPBUGS-81836 / OCPBUGS-79539
 #
-# When Image Registry managementState is set to Removed, HCCO disables the
-# pull-secrets controller in the OCM ConfigMap. CPO v2 must preserve this
-# modification instead of overwriting it.
+# When Image Registry managementState is set to Removed, the
+# cluster-openshift-controller-manager-operator disables the pull-secrets
+# controller in the OCM ConfigMap. CPO v2 must preserve this modification
+# instead of overwriting it on reconciliation.
 # ============================================================================
 
 PASS_COUNT=0; FAIL_COUNT=0; SKIP_COUNT=0
@@ -108,19 +109,92 @@ KUBECONFIG="${GUEST_KUBECONFIG}" oc wait --timeout=10m --for='condition=Availabl
 
 echo ""
 echo "============================================================"
-echo "=== Step 1: Record baseline OCM ConfigMap ==="
+echo "=== Step 0: Verify CPO image override ==="
 echo "============================================================"
 
-# Get the OCM ConfigMap from the HC namespace (management cluster)
-BASELINE_CONTROLLERS=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config \
-  -n "${HC_NAMESPACE}" \
-  -o go-template='{{index .data "config.yaml"}}' 2>/dev/null | grep -o '"controllers":.*' | head -1 || echo "not-found")
+# Check the HostedCluster annotation
+CPO_ANNOTATION=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get hostedcluster ${CLUSTER_NAME} -n clusters \
+  -o jsonpath='{.metadata.annotations.hypershift\.openshift\.io/control-plane-operator-image}' 2>/dev/null || echo "not-set")
+echo "CPO annotation on HostedCluster: ${CPO_ANNOTATION}"
 
-echo "Baseline Controllers field: ${BASELINE_CONTROLLERS}"
+# Check the actual CPO pod image
+CPO_POD_IMAGE=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" \
+  -l app=control-plane-operator \
+  -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null || echo "unknown")
+echo "CPO pod image: ${CPO_POD_IMAGE}"
+
+if [[ -n "${CPO_IMAGE:-}" ]]; then
+  if [[ "${CPO_POD_IMAGE}" == *"${CPO_IMAGE}"* ]] || [[ "${CPO_ANNOTATION}" == "${CPO_IMAGE}" ]]; then
+    pass "CPO image override is active"
+  else
+    fail "CPO image override not applied — expected ${CPO_IMAGE}, got pod=${CPO_POD_IMAGE}"
+  fi
+else
+  skip "No CPO image override specified"
+fi
 
 echo ""
 echo "============================================================"
-echo "=== Step 2: Set Image Registry managementState to Removed ==="
+echo "=== Step 1: Debug — list ConfigMaps and OCM pods ==="
+echo "============================================================"
+
+echo "ConfigMaps in ${HC_NAMESPACE} matching 'controller-manager':"
+KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmaps -n "${HC_NAMESPACE}" 2>/dev/null | grep -i "controller-manager" || echo "(none found)"
+
+echo ""
+echo "OCM pods in ${HC_NAMESPACE}:"
+KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" 2>/dev/null | grep -i "openshift-controller-manager" || echo "(none found)"
+
+echo ""
+echo "Dumping OCM ConfigMap (openshift-controller-manager) content:"
+KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || echo "ConfigMap 'openshift-controller-manager' not found"
+
+echo ""
+echo "Trying 'openshift-controller-manager-config':"
+KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || echo "ConfigMap 'openshift-controller-manager-config' not found"
+
+# Try to find the right ConfigMap and data key
+OCM_CM_NAME=""
+OCM_CM_KEY=""
+for cm_name in openshift-controller-manager-config openshift-controller-manager config; do
+  for key in config.yaml config; do
+    CONTENT=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${cm_name}" -n "${HC_NAMESPACE}" \
+      -o go-template="{{index .data \"${key}\"}}" 2>/dev/null || echo "")
+    if [[ -n "${CONTENT}" ]]; then
+      echo "Found ConfigMap=${cm_name} key=${key} with content (first 200 chars):"
+      echo "${CONTENT}" | head -c 200
+      echo ""
+      OCM_CM_NAME="${cm_name}"
+      OCM_CM_KEY="${key}"
+      break 2
+    fi
+  done
+done
+
+if [[ -z "${OCM_CM_NAME}" ]]; then
+  echo "ERROR: Could not find OCM ConfigMap — listing all configmaps:"
+  KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmaps -n "${HC_NAMESPACE}" 2>/dev/null || true
+  fail "Could not find OCM ConfigMap in ${HC_NAMESPACE}"
+  # Still continue with remaining tests
+fi
+
+echo ""
+echo "============================================================"
+echo "=== Step 2: Record baseline Controllers field ==="
+echo "============================================================"
+
+if [[ -n "${OCM_CM_NAME}" ]]; then
+  BASELINE=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
+    -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
+  echo "Baseline config content (controllers-related):"
+  echo "${BASELINE}" | grep -i "controller" || echo "(no controller references found)"
+else
+  echo "Skipping — no ConfigMap found"
+fi
+
+echo ""
+echo "============================================================"
+echo "=== Step 3: Set Image Registry managementState to Removed ==="
 echo "============================================================"
 
 echo "Patching imageregistry config to managementState: Removed..."
@@ -131,79 +205,92 @@ KUBECONFIG="${GUEST_KUBECONFIG}" oc patch configs.imageregistry.operator.openshi
   exit 1
 }
 
-echo "Waiting 30s for HCCO to process the managementState change..."
-sleep 30
+echo "Waiting for cluster-openshift-controller-manager-operator to process the change..."
 
 echo ""
 echo "============================================================"
-echo "=== Step 3: Verify HCCO modified OCM Controllers field ==="
+echo "=== Step 4: Wait for Controllers field to be modified ==="
 echo "============================================================"
 
-# Wait for HCCO to set the Controllers field to disable pull-secrets controller
-MAX_WAIT=180
-INTERVAL=10
+# Wait for the Controllers field to include the pull-secrets disable entry.
+# The cluster-openshift-controller-manager-operator watches the imageregistry
+# config and modifies the OCM ConfigMap when managementState is Removed.
+MAX_WAIT=300
+INTERVAL=15
 ELAPSED=0
-HCCO_MODIFIED=false
+CONTROLLERS_MODIFIED=false
 
 while [[ ${ELAPSED} -lt ${MAX_WAIT} ]]; do
-  CURRENT_CONTROLLERS=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config \
-    -n "${HC_NAMESPACE}" \
-    -o go-template='{{index .data "config.yaml"}}' 2>/dev/null | grep -o '"controllers":\[[^]]*\]' || echo "")
+  if [[ -n "${OCM_CM_NAME}" ]]; then
+    CURRENT_CONFIG=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
+      -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
 
-  if echo "${CURRENT_CONTROLLERS}" | grep -q "serviceaccount-pull-secrets"; then
-    echo "HCCO has modified Controllers field after ${ELAPSED}s"
-    echo "Controllers: ${CURRENT_CONTROLLERS}"
-    HCCO_MODIFIED=true
-    break
+    # Check for the pull-secrets controller disable entry (handles both JSON and YAML formats)
+    if echo "${CURRENT_CONFIG}" | grep -q "serviceaccount-pull-secrets"; then
+      echo "Controllers field modified after ${ELAPSED}s"
+      echo "Matching line:"
+      echo "${CURRENT_CONFIG}" | grep "serviceaccount-pull-secrets"
+      CONTROLLERS_MODIFIED=true
+      break
+    fi
   fi
-  echo "Waiting for HCCO to modify Controllers... (${ELAPSED}s/${MAX_WAIT}s)"
+  echo "Waiting for Controllers modification... (${ELAPSED}s/${MAX_WAIT}s)"
   sleep ${INTERVAL}
   ELAPSED=$((ELAPSED + INTERVAL))
 done
 
-if [[ "${HCCO_MODIFIED}" == "true" ]]; then
-  pass "HCCO modified OCM Controllers to disable pull-secrets controller"
+if [[ "${CONTROLLERS_MODIFIED}" == "true" ]]; then
+  pass "Controllers field modified to disable pull-secrets controller"
 else
-  fail "HCCO did not modify OCM Controllers within ${MAX_WAIT}s"
-  echo "Current ConfigMap data:"
-  KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config \
-    -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
+  fail "Controllers field not modified within ${MAX_WAIT}s"
+  echo "Current ConfigMap content:"
+  if [[ -n "${OCM_CM_NAME}" ]]; then
+    KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
+  fi
+  echo ""
+  echo "OCM operator logs (last 30 lines):"
+  KUBECONFIG="${MGMT_KUBECONFIG}" oc logs -n "${HC_NAMESPACE}" \
+    -l app=openshift-controller-manager-operator --tail=30 2>/dev/null || echo "(no logs available)"
 fi
 
 echo ""
 echo "============================================================"
-echo "=== Step 4: Wait for CPO v2 reconciliation cycles ==="
+echo "=== Step 5: Wait for CPO v2 reconciliation cycles ==="
 echo "============================================================"
 
-# CPO v2 reconciles on a regular interval. Wait for multiple cycles
-# to ensure the Controllers field is NOT overwritten.
 echo "Waiting 120s for 2-3 CPO v2 reconciliation cycles..."
 sleep 120
 
 echo ""
 echo "============================================================"
-echo "=== Step 5: Verify Controllers field is preserved ==="
+echo "=== Step 6: Verify Controllers field is preserved ==="
 echo "============================================================"
 
-FINAL_CONTROLLERS=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config \
-  -n "${HC_NAMESPACE}" \
-  -o go-template='{{index .data "config.yaml"}}' 2>/dev/null | grep -o '"controllers":\[[^]]*\]' || echo "")
+if [[ -n "${OCM_CM_NAME}" ]]; then
+  FINAL_CONFIG=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
+    -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
 
-echo "Final Controllers field: ${FINAL_CONTROLLERS}"
+  echo "Final config (controllers-related):"
+  echo "${FINAL_CONFIG}" | grep -i "controller" || echo "(no controller references)"
 
-if echo "${FINAL_CONTROLLERS}" | grep -q "serviceaccount-pull-secrets"; then
-  pass "CPO v2 preserved HCCO's Controllers modification (pull-secrets controller disabled)"
+  if echo "${FINAL_CONFIG}" | grep -q "serviceaccount-pull-secrets"; then
+    pass "CPO v2 preserved Controllers modification (pull-secrets controller disabled)"
+  else
+    if [[ "${CONTROLLERS_MODIFIED}" == "true" ]]; then
+      fail "CPO v2 overwrote Controllers modification — pull-secrets controller re-enabled"
+    else
+      skip "Controllers field was never modified — cannot verify preservation"
+    fi
+    echo "Full ConfigMap:"
+    KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
+  fi
 else
-  fail "CPO v2 overwrote HCCO's Controllers modification — pull-secrets controller re-enabled"
-  echo "Expected Controllers to contain 'serviceaccount-pull-secrets' disable entry"
-  echo "Full OCM ConfigMap:"
-  KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config \
-    -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
+  skip "No ConfigMap found — cannot verify preservation"
 fi
 
 echo ""
 echo "============================================================"
-echo "=== Step 6: Verify no pull secrets created for new SA ==="
+echo "=== Step 7: Verify no pull secrets created for new SA ==="
 echo "============================================================"
 
 TEST_NS="verify-ocm-${CLUSTER_NAME:0:10}"
@@ -225,7 +312,6 @@ echo "Pull secrets found: '${PULL_SECRETS}'"
 if [[ -z "${PULL_SECRETS}" ]]; then
   pass "No pull secrets created for new ServiceAccount (registry disabled correctly)"
 else
-  # Check if any are linked to the SA
   SA_PULL_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get serviceaccount test-sa -n "${TEST_NS}" \
     -o go-template='{{range .imagePullSecrets}}{{.name}} {{end}}' 2>/dev/null || echo "")
   if echo "${SA_PULL_SECRETS}" | grep -q "dockercfg"; then
@@ -241,11 +327,9 @@ KUBECONFIG="${GUEST_KUBECONFIG}" oc delete namespace "${TEST_NS}" --wait=false 2
 
 echo ""
 echo "============================================================"
-echo "=== Step 7: Verify OCM pod stability (no restart loop) ==="
+echo "=== Step 8: Verify OCM pod stability (no restart loop) ==="
 echo "============================================================"
 
-# Check OCM pod restart count — if CPO v2 was overwriting the ConfigMap,
-# OCM would restart on every reconciliation cycle
 OCM_RESTARTS=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" \
   -l app=openshift-controller-manager \
   -o go-template='{{range .items}}{{range .status.containerStatuses}}{{.restartCount}}{{end}}{{end}}' 2>/dev/null || echo "unknown")
