@@ -122,11 +122,22 @@ cleanup() {
 collect_monitor_logs() {
     log "📥 Collecting RST monitoring logs from all nodes..."
 
+    # Check if monitor namespace exists
+    if ! oc get namespace ocpbugs-77510-monitor >/dev/null 2>&1; then
+        log_warning "Monitor namespace does not exist - monitoring was never deployed"
+        # Create empty log file to avoid errors in analysis
+        echo "No RST monitoring data - DaemonSet deployment failed" > /tmp/ocpbugs-77510-rst.log
+        return 1
+    fi
+
     local monitor_pods
-    monitor_pods=$(oc get pods -n ocpbugs-77510-monitor -l app=rst-monitor --no-headers | awk '{print $1}')
+    monitor_pods=$(oc get pods -n ocpbugs-77510-monitor -l app=rst-monitor --no-headers 2>/dev/null | awk '{print $1}')
 
     if [[ -z "$monitor_pods" ]]; then
         log_warning "No monitor pods found to collect logs from"
+        # Create placeholder log file
+        echo "No RST monitoring data - No monitor pods were running" > /tmp/ocpbugs-77510-rst.log
+        echo "This indicates monitoring DaemonSet failed to deploy" >> /tmp/ocpbugs-77510-rst.log
         return 1
     fi
 
@@ -137,13 +148,14 @@ collect_monitor_logs() {
     echo "" >> /tmp/ocpbugs-77510-rst.log
 
     local total_rst_count=0
+    local pods_collected=0
 
     for pod in $monitor_pods; do
         log "   Collecting from pod: $pod"
 
         # Get node name
         local node_name
-        node_name=$(oc get pod "$pod" -n ocpbugs-77510-monitor -o jsonpath='{.spec.nodeName}')
+        node_name=$(oc get pod "$pod" -n ocpbugs-77510-monitor -o jsonpath='{.spec.nodeName}' 2>/dev/null || echo "unknown")
 
         echo "### Logs from node: $node_name (pod: $pod) ###" >> /tmp/ocpbugs-77510-rst.log
 
@@ -152,12 +164,15 @@ collect_monitor_logs() {
         log_file=$(oc exec -n ocpbugs-77510-monitor "$pod" -- ls /host-logs/*.log 2>/dev/null | head -1 || echo "")
 
         if [[ -n "$log_file" ]]; then
-            oc exec -n ocpbugs-77510-monitor "$pod" -- cat "$log_file" >> /tmp/ocpbugs-77510-rst.log 2>/dev/null || true
+            oc exec -n ocpbugs-77510-monitor "$pod" -- cat "$log_file" >> /tmp/ocpbugs-77510-rst.log 2>/dev/null || {
+                echo "Error reading log from pod $pod" >> /tmp/ocpbugs-77510-rst.log
+            }
 
             # Count RST packets from this node
             local node_rst_count
             node_rst_count=$(oc exec -n ocpbugs-77510-monitor "$pod" -- grep -c "tcp\|TCP" "$log_file" 2>/dev/null || echo "0")
             total_rst_count=$((total_rst_count + node_rst_count))
+            pods_collected=$((pods_collected + 1))
         else
             echo "No log file found on this node" >> /tmp/ocpbugs-77510-rst.log
         fi
@@ -165,13 +180,15 @@ collect_monitor_logs() {
         echo "" >> /tmp/ocpbugs-77510-rst.log
     done
 
-    log_success "Collected RST logs from $(echo "$monitor_pods" | wc -l) nodes, total RST entries: $total_rst_count"
+    log_success "Collected RST logs from $pods_collected/$(echo "$monitor_pods" | wc -l) nodes, total RST entries: $total_rst_count"
 
     # Show sample if any RST packets found
     if [[ $total_rst_count -gt 0 ]]; then
         log "📋 Sample collected RST packets:"
         grep -m 3 "tcp\|TCP" /tmp/ocpbugs-77510-rst.log | sed 's/^/   /' || true
     fi
+
+    return 0
 }
 
 trap cleanup EXIT INT TERM
@@ -367,8 +384,18 @@ EOF
 deploy_rst_monitor() {
     log "📊 Deploying RST monitoring DaemonSet..."
 
-    # Create monitoring namespace
-    oc create namespace ocpbugs-77510-monitor 2>/dev/null || true
+    # Create privileged namespace for monitoring (bypass Pod Security Admission)
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ocpbugs-77510-monitor
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+EOF
 
     # Deploy privileged DaemonSet for packet capture
     cat <<EOF | oc apply -f -
@@ -389,6 +416,7 @@ spec:
         app: rst-monitor
     spec:
       hostNetwork: true
+      serviceAccountName: rst-monitor
       tolerations:
       - operator: Exists
       containers:
@@ -406,6 +434,7 @@ spec:
             done
         securityContext:
           privileged: true
+          runAsUser: 0
         resources:
           requests:
             cpu: 50m
@@ -419,6 +448,25 @@ spec:
       volumes:
       - name: logs
         emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rst-monitor
+  namespace: ocpbugs-77510-monitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rst-monitor-privileged
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: rst-monitor
+  namespace: ocpbugs-77510-monitor
 EOF
 
     # Wait for DaemonSet to be ready
@@ -760,19 +808,20 @@ analyze_results() {
 
     sleep 2  # Allow final packets to be captured
 
-    # Collect RST monitoring logs from DaemonSet
-    collect_monitor_logs
+    # Collect RST monitoring logs from DaemonSet (continue even if fails)
+    collect_monitor_logs || log_warning "Failed to collect monitor logs, continuing with analysis"
 
     # Count RST packets from collected logs
     local rst_count=0
+    local log_size=0
+
     if [[ -f "/tmp/ocpbugs-77510-rst.log" ]]; then
         # Debug: Show log file size and sample content
-        local log_size
         log_size=$(wc -l < "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
         log "🔍 RST log file size: $log_size lines"
 
         # Show last few lines for debugging
-        if [[ $log_size -gt 5 ]]; then
+        if [[ ${log_size:-0} -gt 5 ]]; then
             log "📋 Sample RST log content (last 5 lines):"
             tail -5 "/tmp/ocpbugs-77510-rst.log" | sed 's/^/   /' || true
         fi
@@ -870,30 +919,60 @@ analyze_results() {
     fi
 
     # Also check connection failures as a secondary indicator
-    if [[ $connection_failures -ge $((MIN_RST_THRESHOLD * 2)) ]]; then
+    # Use a more sensitive threshold: if more than 50% of expected connections fail, it's likely the bug
+    local failure_threshold=$((MIN_RST_THRESHOLD * 2))
+
+    # For progressive tests or when we have many connection attempts, be more sensitive
+    if [[ $connection_failures -ge 50 ]]; then
+        # More than 50 absolute failures is a strong signal
+        bug_detected=true
+        log_error "🚨 OCPBUGS-77510 BUG DETECTED (via connection failures)!"
+        log_error "   High connection failure count ($connection_failures) indicates network disruption"
+        log_error "   This is consistent with serviceUpdateNotNeeded() bug after OVN restart"
+    elif [[ $connection_failures -ge $failure_threshold ]]; then
         bug_detected=true
         log_warning "🚨 High connection failure rate detected!"
-        log_warning "   $connection_failures failures may indicate network disruption"
+        log_warning "   $connection_failures failures (threshold: $failure_threshold) may indicate network disruption"
     fi
 
     # Report final verdict
+    log ""
     if [[ "$bug_detected" == "true" ]]; then
-        log_success "🎯 VERDICT: Bug detected in this cluster"
+        log_error "╔════════════════════════════════════════════════════════╗"
+        log_error "║  🚨 VERDICT: OCPBUGS-77510 BUG DETECTED IN CLUSTER  🚨 ║"
+        log_error "╚════════════════════════════════════════════════════════╝"
+        log_error ""
+        log_error "Evidence:"
+        [[ $rst_count -gt 0 ]] && log_error "  • RST packets: $rst_count (threshold: $MIN_RST_THRESHOLD)"
+        [[ $connection_failures -gt 0 ]] && log_error "  • Connection failures: $connection_failures"
+        log_error ""
+        log_error "The serviceUpdateNotNeeded() bug is present and causing network disruption"
+        log_error "after OVN-Kubernetes or API server restarts."
         return 0  # Test passed - bug reproduced
-    elif [[ $rst_count -gt 0 ]] || [[ $connection_failures -gt 0 ]]; then
+    elif [[ $rst_count -gt 0 ]] || [[ $connection_failures -gt 10 ]]; then
         log_warning "⚠️ PARTIAL DETECTION: Some network issues observed"
         log_warning "   RST packets: $rst_count, Connection failures: $connection_failures"
-        log_warning "   May indicate partial fix or different timing"
+        log_warning "   May indicate partial fix, different timing, or transient issues"
         return 0  # Don't fail CI for partial results
     else
         if [[ "$monitoring_verified" == "true" ]]; then
-            log_success "✅ NO RST STORM DETECTED"
-            log_success "   Monitoring was active and no abnormal network behavior observed"
-            log_success "   Bug appears to be fixed or not present in this configuration"
+            log_success "╔════════════════════════════════════════════════════╗"
+            log_success "║  ✅ VERDICT: NO BUG DETECTED IN THIS CLUSTER  ✅  ║"
+            log_success "╚════════════════════════════════════════════════════╝"
+            log_success ""
+            log_success "  • Monitoring was active and verified"
+            log_success "  • No abnormal network behavior observed"
+            log_success "  • Bug appears to be fixed or not present"
         else
-            log_warning "⚠️ INCONCLUSIVE RESULTS"
-            log_warning "   No RST packets detected, but monitoring may not have been working properly"
-            log_warning "   Cannot confirm whether bug is present or fixed"
+            log_warning "╔═══════════════════════════════════════════════════╗"
+            log_warning "║  ⚠️  VERDICT: INCONCLUSIVE RESULTS  ⚠️            ║"
+            log_warning "╚═══════════════════════════════════════════════════╝"
+            log_warning ""
+            log_warning "  • RST monitoring may not have been working properly"
+            log_warning "  • No connection failures detected (${connection_failures:-0} failures)"
+            log_warning "  • Cannot confirm whether bug is present or fixed"
+            log_warning ""
+            log_warning "Action required: Investigate monitoring setup issues"
         fi
         return 0  # This is actually a success - means the bug is not present
     fi
