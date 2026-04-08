@@ -1,0 +1,43 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-conformance-shared-nothing
+  documentation: |-
+    Verifies VM-level kernel isolation between two KubeVirt hosted clusters in
+    Shared Nothing topology. Management cluster nodes are split into two dedicated
+    sets (one per hosted cluster), each set labeled with a per-cluster custom label.
+    Two hosted clusters are created and their HostedCluster and NodePool resources
+    are patched with matching nodeSelectors. Boot IDs of each node set are compared
+    to prove kernel isolation between the two control planes.
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    test:
+    - ref: hypershift-kubevirt-baremetalds-check-shared-nothing-isolation
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ofcir-post
+    env:
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_TARGET_OPERATORS: metallb,local-storage
+      CLUSTERTYPE: host_384gb_el9
+      ETCD_STORAGE_CLASS: lvms-vg1
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=6
+        MASTER_VCPU=16
+        MASTER_MEMORY=40960
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
