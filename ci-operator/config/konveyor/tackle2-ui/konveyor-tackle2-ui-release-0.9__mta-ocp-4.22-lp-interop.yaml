@@ -58,7 +58,7 @@ tests:
     test:
     - as: mta-prepare-operator-catalog
       commands: |
-        set -euo pipefail
+        set -euxo pipefail
         shopt -s inherit_errexit
         # RHBK / MTA deps may be missing from default catalog for this OCP minor; RHOI v4.21 is used per channel guidance.
         CS_NAME=mta-421-test-catalog
@@ -80,8 +80,6 @@ tests:
             registryPoll:
               interval: 10m
           grpcPodConfig:
-            # Do not require node-role.kubernetes.io/master; some builds label control plane only
-            # as control-plane. Tolerations still allow scheduling onto tainted control-plane nodes.
             nodeSelector:
               kubernetes.io/os: linux
             priorityClassName: system-cluster-critical
@@ -108,14 +106,13 @@ tests:
               limits:
                 memory: 4Gi
         APPLY
-        # Do not use oc wait --for=condition=Ready; it often never becomes True (rehearsal ~20m timeouts).
-        echo "mta-prepare-operator-catalog: polling connectionState + catalog pod (step timeout 45m; loop up to ~30m)"
+        : "mta-prepare-operator-catalog: polling connectionState + catalog pod (45m step timeout, ~30m loop max)"
         for i in $(seq 1 180); do
-          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || true)
-          echo "attempt ${i}: connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' || true)
+          : "poll i=${i} connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
           if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
-            echo "catalog usable"
+            : "catalog gRPC / pod ready"
             exit 0
           fi
           sleep 10
@@ -164,7 +161,7 @@ tests:
     test:
     - as: mta-prepare-operator-catalog
       commands: |
-        set -euo pipefail
+        set -euxo pipefail
         shopt -s inherit_errexit
         CS_NAME=mta-421-test-catalog
         CS_NS=openshift-marketplace
@@ -211,13 +208,13 @@ tests:
               limits:
                 memory: 4Gi
         APPLY
-        echo "mta-prepare-operator-catalog: polling connectionState + catalog pod (step timeout 45m; loop up to ~30m)"
+        : "mta-prepare-operator-catalog: polling connectionState + catalog pod (45m step timeout, ~30m loop max)"
         for i in $(seq 1 180); do
-          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || true)
-          echo "attempt ${i}: connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' || true)
+          : "poll i=${i} connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
           if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
-            echo "catalog usable"
+            : "catalog gRPC / pod ready"
             exit 0
           fi
           sleep 10
@@ -236,7 +233,7 @@ tests:
     - ref: mta-tests-ui
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
-  branch: release-0.8
+  branch: release-0.9
   org: konveyor
   repo: tackle2-ui
   variant: mta-ocp-4.22-lp-interop

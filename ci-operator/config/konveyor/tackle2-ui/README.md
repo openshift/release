@@ -67,6 +67,6 @@ Following the test cluster being provisioned, the following steps are executed i
 ### Custom Images
 
 - `mta-runner`
-  - [Dockerfile](https://github.com/konveyor/tackle2-ui/blob/release-0.8/cypress/dockerfiles/interop/Dockerfile)
+  - [Dockerfile (release-0.9 — mta-ocp-4.22-lp-interop)](https://github.com/konveyor/tackle2-ui/blob/release-0.9/cypress/dockerfiles/interop/Dockerfile)
   - The custom image for this scenario uses the [`cypress/included`](https://hub.docker.com/r/cypress/included) image as its base. The image should have all of the required dependencies installed and the [konveyor/tackle2-ui repository](https://github.com/konveyor/tackle2-ui) cypress directory contents copied into `/tmp/tackle2-ui`
 
