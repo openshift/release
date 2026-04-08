@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -39,7 +46,7 @@ function create_disconnected_network() {
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
         if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
-            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 17 )) || (( ocp_major_version > 4 )) ); then
+            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && version_ge "${ocp_version}" "4.17"; then
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
 	        else
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
@@ -106,8 +113,6 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -215,7 +220,12 @@ readarray -t compute_ipv4_subnets < <(get_next_subnet ${AZURE_COMPUTE_SUBNET_PRE
 compute_ipv4_subnets=("${AZURE_COMPUTE_SUBNET_PREFIX}" "${compute_ipv4_subnets[@]}")
 for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
     if [[ ${#compute_ipv6_subnets[@]} -eq 0 ]]; then
-        run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
+        run_command "az network vnet subnet create --name ${computeSubnet_name} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     else
         run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} ${compute_ipv6_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     fi
@@ -274,8 +284,13 @@ platform:
       role: control-plane
 EOF
     for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
+        computeSubnet_name="${computeSubnet_prefix}-${i}"
+        if [[ $i -eq 0 ]]; then
+            computeSubnet_name="${computeSubnet_prefix}"
+        fi
         cat >> "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
-    - name: ${computeSubnet_prefix}-${i}
+    - name: ${computeSubnet_name}
       role: node
 EOF
     done
@@ -286,6 +301,6 @@ platform:
     networkResourceGroupName: ${RESOURCE_GROUP}
     virtualNetwork: ${vnet_name}
     controlPlaneSubnet: ${controlPlaneSubnet}
-    computeSubnet: ${computeSubnet_prefix}-0
+    computeSubnet: ${computeSubnet_prefix}
 EOF
 fi

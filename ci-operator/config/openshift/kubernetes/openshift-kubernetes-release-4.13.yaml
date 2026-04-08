@@ -36,46 +36,47 @@ build_root:
   from_repository: true
 canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
-  to: hyperkube
-- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
-  to: kubernetes-tests
-- context_dir: openshift-hack/images/os/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - centos:stream9
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-  to: machine-os-content
-- dockerfile_literal: |
-    # This uses the new rhel-coreos base image
-    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
-    FROM quay.io/centos/centos:stream9 as build
-    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
-    # in a container https://github.com/coreos/rpm-ostree/issues/4034
-    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
-    # See also https://issues.redhat.com/browse/ART-4352
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
-    COPY --from=build /*.rpm /
-    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
-    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - quay.io/centos/centos:stream9
-    rhel-coreos-base:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
-  to: rhel-coreos
-- context_dir: build/pause
-  dockerfile_path: Dockerfile.Rhel
-  from: base
-  to: pod
+  items:
+  - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+    from: base
+    to: hyperkube
+  - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+    from: tools
+    to: kubernetes-tests
+  - context_dir: openshift-hack/images/os/
+    from: base
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - centos:stream9
+      machine-os-content-base:
+        as:
+        - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+    to: machine-os-content
+  - dockerfile_literal: |
+      # This uses the new rhel-coreos base image
+      # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+      FROM quay.io/centos/centos:stream9 as build
+      # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+      # in a container https://github.com/coreos/rpm-ostree/issues/4034
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+      # See also https://issues.redhat.com/browse/ART-4352
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      COPY --from=build /*.rpm /
+      # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+  - context_dir: build/pause
+    dockerfile_path: Dockerfile.Rhel
+    from: base
+    to: pod
 promotion:
   to:
   - additional_images:

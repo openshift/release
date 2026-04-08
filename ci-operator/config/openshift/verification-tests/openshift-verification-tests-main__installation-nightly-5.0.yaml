@@ -311,6 +311,22 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-blocklist-arm-f28-ota
+  cron: 38 4 8 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PROXY_BLOCKLIST: api.openshift.com
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-blocklist
 - as: aws-ipi-proxy-reboot-nodes-arm-f28
   cron: 56 23 7 * *
   steps:
@@ -729,8 +745,8 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-azure-cases-multi-clusters-same-subnets
-- as: azure-ipi-oidc-managed-identity-system-f14
-  cron: 43 9 3,17 * *
+- as: azure-ipi-oidc-identity-system-f14
+  cron: 41 18 7,21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -741,12 +757,13 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-managed-identity
-- as: azure-ipi-oidc-managed-identity-user-defined-mini-perm-f14
-  cron: 16 9 2,18 * *
+- as: azure-ipi-oidc-identity-user-sharedkeyaccess-mini-perm-f14
+  cron: 13 2 7,23 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
+      AZURE_ALLOW_SHARED_KEY_ACCESS: "false"
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       AZURE_MANAGED_IDENTITY_TYPE: user-defined
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
@@ -1055,19 +1072,67 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
-- as: gcp-ipi-all-regions-f1
-  cron: 44 17 * * *
+- as: gcp-ipi-all-regions-f3
+  cron: 32 7 2,5,8,11,14,17,20,23,26,29 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "OverallResult", "value": "", "operator": "equals"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ],
+          [
+              {"column": "OverallResult", "value": "FAIL", "operator": "equals"},
+              {"column": "CreatedDate", "value": "7", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ],
+          [
+              {"column": "CreatedDate", "value": "30", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A2|A3|C2|C2D|E2|G2|H3|M1|M2|M3|N1|N2|N2D|T2A|T2D|Z3)$", "operator": "regex"}
+          ]
+        ]
       TEST_FILTERS: "57148"
       TEST_OBJECT: Regions
     test:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
+- as: gcp-ipi-all-regions-without-storage-test-f3
+  cron: 50 10 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "OverallResult", "value": "", "operator": "equals"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ],
+          [
+              {"column": "OverallResult", "value": "FAIL", "operator": "equals"},
+              {"column": "CreatedDate", "value": "7", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ],
+          [
+              {"column": "CreatedDate", "value": "30", "operator": "days_before"},
+              {"column": "CPFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"},
+              {"column": "CFamily", "value": "^(A3Ultra|A4|A4X|C3|C3D|C4|C4A|C4D|G4|H4D|M4|N4|N4A|N4D|X4)$", "operator": "regex"}
+          ]
+        ]
+      TEST_OBJECT: Regions
     workflow: cucushift-installer-rehearse-gcp-cases-clusters
 - as: gcp-ipi-confidential-mini-perm-f14
   cron: 5 16 9,23 * *

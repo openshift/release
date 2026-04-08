@@ -6,17 +6,27 @@ set -euo pipefail
 GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
 gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
 
-# Check if provision completed - if not, nothing to clean up
-if [[ ! -f "${SHARED_DIR}/control-plane-project-id" ]]; then
-    echo "No control-plane-project-id file found - provision may not have completed"
-    echo "Nothing to deprovision, exiting successfully"
-    exit 0
+# Load cluster info from SHARED_DIR (written by provision step).
+# If SHARED_DIR files are missing (provision was aborted before the Secret was synced),
+# reconstruct resource names from env vars since they are deterministic.
+if [[ -f "${SHARED_DIR}/control-plane-project-id" ]]; then
+    CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
+    CP_CLUSTER_NAME="$(<"${SHARED_DIR}/control-plane-cluster-name")"
+    GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+else
+    # SHARED_DIR is backed by a Kubernetes Secret that is updated after the step exits.
+    # If the provision step is aborted (SIGTERM), the Secret update may not complete,
+    # leaving SHARED_DIR empty for post steps. Reconstruct from env vars.
+    RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
+    INFRA_ID="${RESOURCE_NAME_PREFIX}"
+    CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
+    CP_CLUSTER_NAME="${RESOURCE_NAME_PREFIX}-gke"
+    GCP_REGION="${GKE_REGION}"
+    echo "WARNING: SHARED_DIR files missing - reconstructed resource names from env vars"
+    echo "  CP_PROJECT_ID=${CP_PROJECT_ID}"
+    echo "  CP_CLUSTER_NAME=${CP_CLUSTER_NAME}"
+    echo "  GCP_REGION=${GCP_REGION}"
 fi
-
-# Load cluster info from provision and hosted-cluster-setup steps
-CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
-CP_CLUSTER_NAME="$(<"${SHARED_DIR}/control-plane-cluster-name")"
-GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
 
 # hosted-cluster-name may not exist if job was aborted before hosted-cluster-setup ran
 if [[ -f "${SHARED_DIR}/hosted-cluster-name" ]]; then
@@ -27,12 +37,13 @@ else
     echo "Will skip DNS cleanup but still deprovision GKE cluster and projects"
 fi
 
-# Hosted Cluster project file path (may not exist if provision failed early)
-HC_PROJECT_FILE="${SHARED_DIR}/hosted-cluster-project-id"
-if [[ -f "${HC_PROJECT_FILE}" ]]; then
-    HC_PROJECT_ID="$(<"${HC_PROJECT_FILE}")"
+# Hosted Cluster project - read from SHARED_DIR or reconstruct
+if [[ -f "${SHARED_DIR}/hosted-cluster-project-id" ]]; then
+    HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
 else
-    HC_PROJECT_ID=""
+    INFRA_ID="${INFRA_ID:-${NAMESPACE}-${UNIQUE_HASH}}"
+    HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
+    echo "WARNING: Reconstructed HC_PROJECT_ID=${HC_PROJECT_ID}"
 fi
 
 set -x
@@ -98,23 +109,31 @@ gcloud projects delete "${CP_PROJECT_ID}" --quiet || true
 EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.com"
 
 # Clean up DNS records from the CI zone (DNS records use the hosted cluster name)
+DNS_CLEANUP_FAILED=false
 if [[ -n "${HC_CLUSTER_NAME}" ]]; then
   echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
   DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
-  DNS_RECORDS=$(gcloud dns record-sets list \
+  if ! DNS_RECORDS=$(gcloud dns record-sets list \
     --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
     --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
     --filter="name ~ ${DNS_SUFFIX}" \
-    --format="csv[no-heading](name,type)" 2>/dev/null || true)
+    --format="csv[no-heading](name,type)"); then
+    echo "ERROR: Failed to list DNS records - check service account permissions"
+    DNS_CLEANUP_FAILED=true
+    DNS_RECORDS=""
+  fi
 
   if [[ -n "${DNS_RECORDS}" ]]; then
     while IFS=, read -r name type; do
       [[ -z "${name}" ]] && continue
       echo "Deleting DNS record: ${name} ${type}"
-      gcloud dns record-sets delete "${name}" \
+      if ! gcloud dns record-sets delete "${name}" \
         --type="${type}" \
         --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet || true
+        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet; then
+        echo "ERROR: Failed to delete DNS record ${name} ${type}"
+        DNS_CLEANUP_FAILED=true
+      fi
     done <<< "${DNS_RECORDS}"
   else
     echo "No DNS records found matching ${DNS_SUFFIX}"
@@ -136,5 +155,10 @@ gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --member="${WIF_MEMBER}" \
   --project="${HYPERSHIFT_GCP_CI_PROJECT}" || true
 set -x
+
+if [[ "${DNS_CLEANUP_FAILED}" == "true" ]]; then
+  echo "Cleanup complete but DNS cleanup failed - orphaned DNS records may remain"
+  exit 1
+fi
 
 echo "Cleanup complete"

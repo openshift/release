@@ -13,12 +13,13 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
-- context_dir: .
-  dockerfile_path: build/Dockerfile
-  to: observability-operator
-- context_dir: .
-  dockerfile_path: test/Dockerfile
-  to: observability-operator-test-harness
+  items:
+  - context_dir: .
+    dockerfile_path: build/Dockerfile
+    to: observability-operator
+  - context_dir: .
+    dockerfile_path: test/Dockerfile
+    to: observability-operator-test-harness
 operator:
   bundles:
   - as: observability-bundle
@@ -29,7 +30,9 @@ operator:
     with: pipeline:observability-operator
 promotion:
   to:
-  - excluded_images:
+  - additional_images:
+      observability-bundle: observability-bundle
+    excluded_images:
     - observability-operator
     namespace: ci
     tag: latest

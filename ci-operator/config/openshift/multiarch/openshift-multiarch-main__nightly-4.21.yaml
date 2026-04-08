@@ -430,10 +430,10 @@ tests:
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 4 * * 6
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -442,7 +442,8 @@ tests:
       ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
   - sshd-bastion
@@ -458,10 +459,10 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 5 * * 0
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.21"
@@ -469,8 +470,9 @@ tests:
       INSTALLER_TYPE: agent
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
       VOLUME_CAPACITY: 120G
-    workflow: openshift-e2e-libvirt-upi
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
   capabilities:
   - sshd-bastion
@@ -624,7 +626,7 @@ tests:
   capabilities:
   - intranet
   - power-s2s-dns
-  cron: 0 1 * * *
+  cron: 0 0 * * *
   restrict_network_access: false
   steps:
     cluster_profile: powervc-1
