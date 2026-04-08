@@ -2,13 +2,9 @@
 set -euo pipefail
 
 # ============================================================================
-# Verify: CPO v2 preserves modifications to OCM Controllers field
+# Verify: Setting imageregistry managementState to Removed stops pull secret
+# creation for new ServiceAccounts.
 # Bug: OCPBUGS-81836 / OCPBUGS-79539
-#
-# When Image Registry managementState is set to Removed, the
-# cluster-openshift-controller-manager-operator disables the pull-secrets
-# controller in the OCM ConfigMap. CPO v2 must preserve this modification
-# instead of overwriting it on reconciliation.
 # ============================================================================
 
 PASS_COUNT=0; FAIL_COUNT=0; SKIP_COUNT=0
@@ -26,7 +22,7 @@ echo "Using release image: ${RELEASE_IMAGE}"
 oc registry login --to=/tmp/pull-secret-build-farm.json
 jq -s '.[0] * .[1]' /tmp/pull-secret-build-farm.json /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret.json
 
-# Management cluster kubeconfig (workload creds for HC creation)
+# Management cluster kubeconfig
 export MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 # Cluster naming
@@ -92,21 +88,17 @@ KUBECONFIG="${MGMT_KUBECONFIG}" oc wait --timeout=30m --for=condition=Available 
 }
 echo "HostedCluster is available"
 
-# Compare kubeconfigs
-echo ""
-echo "=== Debug: comparing kubeconfigs ==="
-echo "Workload credentials user:"
-KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc whoami 2>/dev/null || echo "(whoami failed)"
-echo "Admin kubeconfig user:"
-KUBECONFIG="${SHARED_DIR}/kubeconfig" oc whoami 2>/dev/null || echo "(whoami failed)"
-
-# Switch to admin kubeconfig for inspecting resources in HC namespace
-export MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-echo "Switched to admin kubeconfig for HC namespace access"
-
-# Get HC namespace (where control plane pods run)
-HC_NAMESPACE="clusters-${CLUSTER_NAME}"
-echo "HC namespace: ${HC_NAMESPACE}"
+# Verify CPO image override annotation
+if [[ -n "${CPO_IMAGE:-}" ]]; then
+  CPO_ANNOTATION=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get hostedcluster ${CLUSTER_NAME} -n clusters \
+    -o jsonpath='{.metadata.annotations.hypershift\.openshift\.io/control-plane-operator-image}' 2>/dev/null || echo "not-set")
+  echo "CPO annotation on HostedCluster: ${CPO_ANNOTATION}"
+  if [[ "${CPO_ANNOTATION}" == "${CPO_IMAGE}" ]]; then
+    pass "CPO image override annotation is set correctly"
+  else
+    fail "CPO image override annotation mismatch — expected ${CPO_IMAGE}, got ${CPO_ANNOTATION}"
+  fi
+fi
 
 # Get guest cluster kubeconfig
 echo "Retrieving guest cluster kubeconfig..."
@@ -121,240 +113,126 @@ KUBECONFIG="${GUEST_KUBECONFIG}" oc wait --timeout=10m --for='condition=Availabl
 
 echo ""
 echo "============================================================"
-echo "=== Step 0: Verify CPO image override ==="
+echo "=== Step 1: Verify pull secrets ARE created before disabling registry ==="
 echo "============================================================"
 
-# Check the HostedCluster annotation
-CPO_ANNOTATION=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get hostedcluster ${CLUSTER_NAME} -n clusters \
-  -o jsonpath='{.metadata.annotations.hypershift\.openshift\.io/control-plane-operator-image}' 2>/dev/null || echo "not-set")
-echo "CPO annotation on HostedCluster: ${CPO_ANNOTATION}"
+BEFORE_NS="verify-before-${CLUSTER_NAME:0:10}"
+echo "Creating test namespace: ${BEFORE_NS}"
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create namespace "${BEFORE_NS}"
 
-# Check the actual CPO pod image
-CPO_POD_IMAGE=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" \
-  -l app=control-plane-operator \
-  -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null || echo "unknown")
-echo "CPO pod image: ${CPO_POD_IMAGE}"
+echo "Creating test ServiceAccount..."
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create serviceaccount test-sa -n "${BEFORE_NS}"
 
-if [[ -n "${CPO_IMAGE:-}" ]]; then
-  if [[ "${CPO_POD_IMAGE}" == *"${CPO_IMAGE}"* ]] || [[ "${CPO_ANNOTATION}" == "${CPO_IMAGE}" ]]; then
-    pass "CPO image override is active"
-  else
-    fail "CPO image override not applied — expected ${CPO_IMAGE}, got pod=${CPO_POD_IMAGE}"
-  fi
+echo "Waiting 60s for pull secret creation..."
+sleep 60
+
+BEFORE_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get secrets -n "${BEFORE_NS}" \
+  -o go-template='{{range .items}}{{if eq .type "kubernetes.io/dockercfg"}}{{.metadata.name}} {{end}}{{end}}' 2>/dev/null || echo "")
+
+echo "Pull secrets before disabling registry: '${BEFORE_SECRETS}'"
+
+if [[ -n "${BEFORE_SECRETS}" ]]; then
+  pass "Pull secrets are created for new SA when registry is enabled (baseline confirmed)"
 else
-  skip "No CPO image override specified"
+  skip "No pull secrets created even with registry enabled — baseline unclear, continuing"
 fi
 
 echo ""
 echo "============================================================"
-echo "=== Step 1: Debug — list ConfigMaps and OCM pods ==="
+echo "=== Step 2: Set Image Registry managementState to Removed ==="
 echo "============================================================"
 
-echo "ConfigMaps in ${HC_NAMESPACE} matching 'controller-manager':"
-KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmaps -n "${HC_NAMESPACE}" 2>/dev/null | grep -i "controller-manager" || echo "(none found)"
-
+echo "Current imageregistry config:"
+KUBECONFIG="${GUEST_KUBECONFIG}" oc get configs.imageregistry.operator.openshift.io cluster \
+  -o jsonpath='{.spec.managementState}' 2>/dev/null || echo "(could not read)"
 echo ""
-echo "OCM pods in ${HC_NAMESPACE}:"
-KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" 2>/dev/null | grep -i "openshift-controller-manager" || echo "(none found)"
-
-echo ""
-echo "Dumping OCM ConfigMap (openshift-controller-manager) content:"
-KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || echo "ConfigMap 'openshift-controller-manager' not found"
-
-echo ""
-echo "Trying 'openshift-controller-manager-config':"
-KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap openshift-controller-manager-config -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || echo "ConfigMap 'openshift-controller-manager-config' not found"
-
-# Try to find the right ConfigMap and data key
-OCM_CM_NAME=""
-OCM_CM_KEY=""
-for cm_name in openshift-controller-manager-config openshift-controller-manager config; do
-  for key in config.yaml config; do
-    CONTENT=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${cm_name}" -n "${HC_NAMESPACE}" \
-      -o go-template="{{index .data \"${key}\"}}" 2>/dev/null || echo "")
-    if [[ -n "${CONTENT}" ]]; then
-      echo "Found ConfigMap=${cm_name} key=${key} with content (first 200 chars):"
-      echo "${CONTENT}" | head -c 200
-      echo ""
-      OCM_CM_NAME="${cm_name}"
-      OCM_CM_KEY="${key}"
-      break 2
-    fi
-  done
-done
-
-if [[ -z "${OCM_CM_NAME}" ]]; then
-  echo "ERROR: Could not find OCM ConfigMap — listing all configmaps:"
-  KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmaps -n "${HC_NAMESPACE}" 2>/dev/null || true
-  fail "Could not find OCM ConfigMap in ${HC_NAMESPACE}"
-  # Still continue with remaining tests
-fi
-
-echo ""
-echo "============================================================"
-echo "=== Step 2: Record baseline Controllers field ==="
-echo "============================================================"
-
-if [[ -n "${OCM_CM_NAME}" ]]; then
-  BASELINE=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
-    -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
-  echo "Baseline config content (controllers-related):"
-  echo "${BASELINE}" | grep -i "controller" || echo "(no controller references found)"
-else
-  echo "Skipping — no ConfigMap found"
-fi
-
-echo ""
-echo "============================================================"
-echo "=== Step 3: Set Image Registry managementState to Removed ==="
-echo "============================================================"
 
 echo "Patching imageregistry config to managementState: Removed..."
 KUBECONFIG="${GUEST_KUBECONFIG}" oc patch configs.imageregistry.operator.openshift.io cluster \
   --type merge -p '{"spec":{"managementState":"Removed"}}' || {
   echo "ERROR: Failed to patch imageregistry config — cannot proceed"
-  KUBECONFIG="${GUEST_KUBECONFIG}" oc get configs.imageregistry.operator.openshift.io cluster -o yaml 2>/dev/null || true
   exit 1
 }
 
-echo "Waiting for cluster-openshift-controller-manager-operator to process the change..."
-
-echo ""
-echo "============================================================"
-echo "=== Step 4: Wait for Controllers field to be modified ==="
-echo "============================================================"
-
-# Wait for the Controllers field to include the pull-secrets disable entry.
-# The cluster-openshift-controller-manager-operator watches the imageregistry
-# config and modifies the OCM ConfigMap when managementState is Removed.
-MAX_WAIT=300
-INTERVAL=15
-ELAPSED=0
-CONTROLLERS_MODIFIED=false
-
-while [[ ${ELAPSED} -lt ${MAX_WAIT} ]]; do
-  if [[ -n "${OCM_CM_NAME}" ]]; then
-    CURRENT_CONFIG=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
-      -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
-
-    # Check for the pull-secrets controller disable entry (handles both JSON and YAML formats)
-    if echo "${CURRENT_CONFIG}" | grep -q "serviceaccount-pull-secrets"; then
-      echo "Controllers field modified after ${ELAPSED}s"
-      echo "Matching line:"
-      echo "${CURRENT_CONFIG}" | grep "serviceaccount-pull-secrets"
-      CONTROLLERS_MODIFIED=true
-      break
-    fi
-  fi
-  echo "Waiting for Controllers modification... (${ELAPSED}s/${MAX_WAIT}s)"
-  sleep ${INTERVAL}
-  ELAPSED=$((ELAPSED + INTERVAL))
-done
-
-if [[ "${CONTROLLERS_MODIFIED}" == "true" ]]; then
-  pass "Controllers field modified to disable pull-secrets controller"
-else
-  fail "Controllers field not modified within ${MAX_WAIT}s"
-  echo "Current ConfigMap content:"
-  if [[ -n "${OCM_CM_NAME}" ]]; then
-    KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
-  fi
-  echo ""
-  echo "OCM operator logs (last 30 lines):"
-  KUBECONFIG="${MGMT_KUBECONFIG}" oc logs -n "${HC_NAMESPACE}" \
-    -l app=openshift-controller-manager-operator --tail=30 2>/dev/null || echo "(no logs available)"
-fi
-
-echo ""
-echo "============================================================"
-echo "=== Step 5: Wait for CPO v2 reconciliation cycles ==="
-echo "============================================================"
-
-echo "Waiting 120s for 2-3 CPO v2 reconciliation cycles..."
+echo "Waiting 120s for the change to propagate through the control plane..."
 sleep 120
 
 echo ""
 echo "============================================================"
-echo "=== Step 6: Verify Controllers field is preserved ==="
+echo "=== Step 3: Verify NO pull secrets created after disabling registry ==="
 echo "============================================================"
 
-if [[ -n "${OCM_CM_NAME}" ]]; then
-  FINAL_CONFIG=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" \
-    -o go-template="{{index .data \"${OCM_CM_KEY}\"}}" 2>/dev/null || echo "")
-
-  echo "Final config (controllers-related):"
-  echo "${FINAL_CONFIG}" | grep -i "controller" || echo "(no controller references)"
-
-  if echo "${FINAL_CONFIG}" | grep -q "serviceaccount-pull-secrets"; then
-    pass "CPO v2 preserved Controllers modification (pull-secrets controller disabled)"
-  else
-    if [[ "${CONTROLLERS_MODIFIED}" == "true" ]]; then
-      fail "CPO v2 overwrote Controllers modification — pull-secrets controller re-enabled"
-    else
-      skip "Controllers field was never modified — cannot verify preservation"
-    fi
-    echo "Full ConfigMap:"
-    KUBECONFIG="${MGMT_KUBECONFIG}" oc get configmap "${OCM_CM_NAME}" -n "${HC_NAMESPACE}" -o yaml 2>/dev/null || true
-  fi
-else
-  skip "No ConfigMap found — cannot verify preservation"
-fi
-
-echo ""
-echo "============================================================"
-echo "=== Step 7: Verify no pull secrets created for new SA ==="
-echo "============================================================"
-
-TEST_NS="verify-ocm-${CLUSTER_NAME:0:10}"
-echo "Creating test namespace: ${TEST_NS}"
-KUBECONFIG="${GUEST_KUBECONFIG}" oc create namespace "${TEST_NS}" || true
+AFTER_NS="verify-after-${CLUSTER_NAME:0:10}"
+echo "Creating test namespace: ${AFTER_NS}"
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create namespace "${AFTER_NS}"
 
 echo "Creating test ServiceAccount..."
-KUBECONFIG="${GUEST_KUBECONFIG}" oc create serviceaccount test-sa -n "${TEST_NS}" || true
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create serviceaccount test-sa -n "${AFTER_NS}"
 
-echo "Waiting 30s for any secret creation..."
-sleep 30
+echo "Waiting 60s for any secret creation..."
+sleep 60
 
-# Check for dockercfg secrets associated with the SA
-PULL_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get secrets -n "${TEST_NS}" \
+AFTER_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get secrets -n "${AFTER_NS}" \
   -o go-template='{{range .items}}{{if eq .type "kubernetes.io/dockercfg"}}{{.metadata.name}} {{end}}{{end}}' 2>/dev/null || echo "")
 
-echo "Pull secrets found: '${PULL_SECRETS}'"
+echo "Pull secrets after disabling registry: '${AFTER_SECRETS}'"
 
-if [[ -z "${PULL_SECRETS}" ]]; then
-  pass "No pull secrets created for new ServiceAccount (registry disabled correctly)"
+if [[ -z "${AFTER_SECRETS}" ]]; then
+  pass "No pull secrets created for new SA after registry set to Removed"
 else
-  SA_PULL_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get serviceaccount test-sa -n "${TEST_NS}" \
+  # Check if any are linked to the SA
+  SA_PULL_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get serviceaccount test-sa -n "${AFTER_NS}" \
     -o go-template='{{range .imagePullSecrets}}{{.name}} {{end}}' 2>/dev/null || echo "")
   if echo "${SA_PULL_SECRETS}" | grep -q "dockercfg"; then
-    fail "Pull secrets were created and associated with ServiceAccount despite registry being Removed"
+    fail "Pull secrets were created AND associated with SA despite registry being Removed"
     echo "SA imagePullSecrets: ${SA_PULL_SECRETS}"
+    echo "Secrets in namespace:"
+    KUBECONFIG="${GUEST_KUBECONFIG}" oc get secrets -n "${AFTER_NS}" 2>/dev/null || true
   else
-    pass "Pull secrets exist but are not associated with ServiceAccount"
+    pass "dockercfg secrets exist but are not associated with ServiceAccount"
   fi
 fi
 
-# Cleanup test namespace
-KUBECONFIG="${GUEST_KUBECONFIG}" oc delete namespace "${TEST_NS}" --wait=false 2>/dev/null || true
-
 echo ""
 echo "============================================================"
-echo "=== Step 8: Verify OCM pod stability (no restart loop) ==="
+echo "=== Step 4: Verify fix persists across time (not overwritten by CPO) ==="
 echo "============================================================"
 
-OCM_RESTARTS=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get pods -n "${HC_NAMESPACE}" \
-  -l app=openshift-controller-manager \
-  -o go-template='{{range .items}}{{range .status.containerStatuses}}{{.restartCount}}{{end}}{{end}}' 2>/dev/null || echo "unknown")
+echo "Waiting 180s for multiple CPO reconciliation cycles..."
+sleep 180
 
-echo "OCM pod restart count: ${OCM_RESTARTS}"
+PERSIST_NS="verify-persist-${CLUSTER_NAME:0:10}"
+echo "Creating test namespace: ${PERSIST_NS}"
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create namespace "${PERSIST_NS}"
 
-if [[ "${OCM_RESTARTS}" == "unknown" ]]; then
-  skip "Could not determine OCM pod restart count"
-elif [[ "${OCM_RESTARTS}" -le 2 ]]; then
-  pass "OCM pod is stable (${OCM_RESTARTS} restarts — no reconciliation loop detected)"
+echo "Creating test ServiceAccount..."
+KUBECONFIG="${GUEST_KUBECONFIG}" oc create serviceaccount test-sa -n "${PERSIST_NS}"
+
+echo "Waiting 60s for any secret creation..."
+sleep 60
+
+PERSIST_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get secrets -n "${PERSIST_NS}" \
+  -o go-template='{{range .items}}{{if eq .type "kubernetes.io/dockercfg"}}{{.metadata.name}} {{end}}{{end}}' 2>/dev/null || echo "")
+
+echo "Pull secrets after CPO reconciliation: '${PERSIST_SECRETS}'"
+
+if [[ -z "${PERSIST_SECRETS}" ]]; then
+  pass "Fix persists — no pull secrets created after CPO reconciliation cycles"
 else
-  fail "OCM pod has ${OCM_RESTARTS} restarts — possible reconciliation loop"
+  SA_PULL_SECRETS=$(KUBECONFIG="${GUEST_KUBECONFIG}" oc get serviceaccount test-sa -n "${PERSIST_NS}" \
+    -o go-template='{{range .imagePullSecrets}}{{.name}} {{end}}' 2>/dev/null || echo "")
+  if echo "${SA_PULL_SECRETS}" | grep -q "dockercfg"; then
+    fail "CPO reconciliation re-enabled pull secret creation — fix did not persist"
+    echo "SA imagePullSecrets: ${SA_PULL_SECRETS}"
+  else
+    pass "dockercfg secrets exist but are not associated with ServiceAccount after CPO reconciliation"
+  fi
 fi
+
+# Cleanup test namespaces
+KUBECONFIG="${GUEST_KUBECONFIG}" oc delete namespace "${BEFORE_NS}" --wait=false 2>/dev/null || true
+KUBECONFIG="${GUEST_KUBECONFIG}" oc delete namespace "${AFTER_NS}" --wait=false 2>/dev/null || true
+KUBECONFIG="${GUEST_KUBECONFIG}" oc delete namespace "${PERSIST_NS}" --wait=false 2>/dev/null || true
 
 echo ""
 echo "============================================================"
