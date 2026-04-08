@@ -80,14 +80,6 @@ platform:
   ibmcloud:
      region: ${REGION}
 publish: External
-networking:
-  clusterNetwork:
-  - cidr: 10.128.0.0/14
-    hostPrefix: 23
-  serviceNetwork:
-  - 172.30.0.0/16
-  machineNetwork:
-  - cidr: 10.0.0.0/16
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
