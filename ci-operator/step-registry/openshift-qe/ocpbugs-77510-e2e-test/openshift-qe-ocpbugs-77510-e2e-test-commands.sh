@@ -78,6 +78,12 @@ log_error() {
 
 # Cleanup function
 cleanup() {
+    # Prevent recursive cleanup calls
+    if [[ "${CLEANUP_RUNNING:-}" == "true" ]]; then
+        return 0
+    fi
+    export CLEANUP_RUNNING=true
+    
     local exit_code=$?
     log "🧹 Cleaning up test resources..."
     
@@ -85,9 +91,9 @@ cleanup() {
     jobs -p | xargs -r kill 2>/dev/null || true
     pkill -f "ocpbugs-77510" 2>/dev/null || true
     
-    # Clean up namespace
-    if oc get namespace "$NAMESPACE" >/dev/null 2>&1; then
-        oc delete namespace "$NAMESPACE" --timeout=30s --ignore-not-found=true || true
+    # Clean up namespace (with timeout to prevent hanging)
+    if [[ -n "${NAMESPACE:-}" ]] && oc get namespace "$NAMESPACE" >/dev/null 2>&1; then
+        timeout 120s oc delete namespace "$NAMESPACE" --grace-period=30 --ignore-not-found=true || true
     fi
     
     # Preserve artifacts
@@ -97,7 +103,8 @@ cleanup() {
         [[ -f "/tmp/ocpbugs-77510-test.log" ]] && cp "/tmp/ocpbugs-77510-test.log" "$ARTIFACT_DIR/" || true
     fi
     
-    exit $exit_code
+    # Don't call exit in cleanup to prevent signal loops
+    unset CLEANUP_RUNNING
 }
 
 trap cleanup EXIT INT TERM
@@ -410,6 +417,8 @@ analyze_results() {
         rst_count=$(grep -c "RST:" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
         # Clean up any newlines that might cause parsing issues
         rst_count=$(echo "$rst_count" | tr -d '\n\r' | head -1)
+        # Convert to integer to prevent parsing errors
+        rst_count=$((rst_count + 0))
         
         log "🔢 Raw RST count: '$rst_count'"
     else
@@ -461,6 +470,8 @@ analyze_results() {
 create_test_report() {
     local rst_count
     rst_count=$(grep -c "RST:" "/tmp/ocpbugs-77510-rst.log" 2>/dev/null || echo "0")
+    # Convert to integer to prevent parsing errors
+    rst_count=$((rst_count + 0))
     
     # Save to test log
     cat > "/tmp/ocpbugs-77510-test.log" << EOF
