@@ -36,26 +36,13 @@ fi
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 
-# Extract Bearer token: Docker config has .auths["quay.io"].auth = base64(user:token)
+# Extract Basic auth credentials from Docker config (same format podman push uses).
+# .auths["quay.io"].auth is base64(user:password) — usable directly as Basic auth.
 QUAY_AUTH=$(jq -r '.auths["quay.io"].auth // empty' "${AUTH_FILE}")
 if [[ -z "${QUAY_AUTH}" ]]; then
  echo "No quay.io auth in config; skipping image delete."
  exit 0
 fi
-
-# Decode and take the token (part after colon). Robot format is "org+robot" or "user:token".
-DECODED=$(echo "${QUAY_AUTH}" | base64 -d 2>/dev/null || true)
-if [[ -z "${DECODED}" ]]; then
- echo "Failed to decode quay auth; skipping image delete."
- exit 0
-fi
-
-TOKEN="${DECODED#*:}"
-if [[ -z "${TOKEN}" ]] || [[ "${TOKEN}" == "${DECODED}" ]]; then
- echo "Could not extract token from auth; skipping image delete."
- exit 0
-fi
-unset QUAY_AUTH DECODED
 
 $WAS_TRACING && set -x
 
@@ -87,7 +74,7 @@ delete_tag() {
  local repo="$2"
  local tag="$3"
  local url="https://quay.io/api/v1/repository/${ns}/${repo}/tag/${tag}"
- if curl -sf -X DELETE -H "Authorization: Bearer ${TOKEN}" "${url}"; then
+ if curl -sf -X DELETE -H "Authorization: Basic ${QUAY_AUTH}" "${url}"; then
   echo "Deleted ${ns}/${repo}:${tag}"
  else
   echo "Could not delete ${ns}/${repo}:${tag} (may lack permission or tag missing)"
@@ -116,7 +103,7 @@ list_and_delete_stale_tags() {
  local page=1
  local tag_count resp has_additional
  while true; do
-  resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
+  resp=$(curl -sf -H "Authorization: Basic ${QUAY_AUTH}" \
    "https://quay.io/api/v1/repository/${ns}/${repo}/tag/?limit=100&page=${page}" 2>/dev/null || true)
   if [[ -z "${resp}" ]]; then
    break

@@ -212,3 +212,11 @@ if ! oc wait machineconfigpool/master --for=condition=Updated --timeout=30m; the
  exit 1
 fi
 echo "Rollout complete."
+
+# Report the resource-agents version now running on a cluster node (Best-effort) .
+NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}') || true
+if [[ -n "${NODE}" ]]; then
+ oc debug --request-timeout=60s "node/${NODE}" -- chroot /host rpm -q resource-agents 2>/dev/null || echo "Could not verify resource-agents version on node (timeout or error)."
+else
+ echo "No ready node found; skipping post-rollout version check."
+fi
