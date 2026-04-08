@@ -78,6 +78,20 @@ tests:
     - ref: gcp-deprovision-public-dns-zone-record-sets
     - ref: send-results-to-reportportal
     workflow: cucushift-installer-rehearse-aws-ipi-custom-dns
+- as: installer-rehearse-aws-tp
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      SLEEP_DURATION: 10h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - ref: send-results-to-reportportal
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: installer-rehearse-vsphere-dis
   cron: '@yearly'
   steps:
