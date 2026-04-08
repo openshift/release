@@ -34,19 +34,12 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Cluster name: ${CLUSTER_NAME}, Infra ID: ${INFRA_ID}"
 
-# Base domain — read from env or cluster profile
-DOMAIN=""
-[[ -n "${HYPERSHIFT_BASE_DOMAIN:-}" ]] && DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
-if [[ -z "${DOMAIN}" ]] && [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
-  DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
-fi
-if [[ -z "${DOMAIN}" ]]; then
-  echo "ERROR: Failed to determine the base domain."
-  exit 1
-fi
+# Base domain
+DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-ci.hypershift.devcluster.openshift.com}"
 echo "Using base domain: ${DOMAIN}"
 
-AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+# Use hypershift-pool-aws-credentials (has Route53 access to ci.hypershift.devcluster.openshift.com)
+AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 
 # The shared root management cluster runs on arm64; always use --multi-arch
