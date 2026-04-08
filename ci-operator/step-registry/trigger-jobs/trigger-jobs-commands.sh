@@ -8,6 +8,7 @@ typeset jobList='' jobType='' jobName='' stepName=''
 typeset postTask='' postTaskStep='' postTaskPars=''
 typeset rsp=''
 typeset -i trigCondFlgs=0 postTaskFlgs=0 jobExecType=0
+typeset -i skipJobTriggers=0
 typeset -i dryRun=0 tryLeft=0 retryWait=60
 typeset -a failedJobs=()
 #   https://github.com/kubernetes-sigs/prow/blob/95b2a34128de51a4f618c8d6bb9d0c6b587fd29c/pkg/gangway/gangway.proto#L108
@@ -94,8 +95,8 @@ cmd1EOF
   ((rsp == 200)) || { echo "Endpoint is still not available after 60 retries. Aborting." 1>&2; exit 1; }
 fi
 
-while IFS=$'\t' read -r trigCond jobList postTask; do
-    : "Processing: ${trigCond@Q} ${jobList@Q} ${postTask@Q}"
+while IFS=$'\t' read -r trigCond jobList postTask skipJobTriggers; do
+    : "Processing: ${trigCond@Q} ${jobList@Q} ${postTask@Q} skipJobTriggers=${skipJobTriggers@Q}"
     # Trigger Conditions Check.
     while IFS=$'\t' read -r trigCondFlgs trigCondStep trigCondPars; do
         : "Processing: ${trigCondFlgs@Q} ${trigCondStep@Q} ${trigCondPars@Q}"
@@ -181,7 +182,14 @@ cmd1EOF
         done
         ((rsp == 200)) || failedJobs+=("${jobName}")
     done 0< <(
-        ((JT__SKIP_TRIG_MAIN_JOBS)) && exit
+        ((JT__SKIP_TRIG_MAIN_JOBS)) && {
+            echo 'Skipping job list: JT__SKIP_TRIG_MAIN_JOBS is non-zero in this run.' >&2
+            exit
+        }
+        ((skipJobTriggers)) && {
+            echo 'Skipping job list: skipJobTriggers is true for this JSON element.' >&2
+            exit
+        }
         jq -cr '
             .[] |
             select(.active == true) |
@@ -243,7 +251,12 @@ done 0< <(jq -cr '
         else
             .
         end
-    ) | [(.trigCond//[] | @json), (.jobList//[] | @json), (.postTask//[] | @json)] | @tsv
+    ) | [
+        (.trigCond//[] | @json),
+        (.jobList//[] | @json),
+        (.postTask//[] | @json),
+        (if (.skipJobTriggers // false) then 1 else 0 end | tostring)
+    ] | @tsv
 ' "${jobDescFile}")
 
 # Print the list of failed jobs after the loop completes.

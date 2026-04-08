@@ -19,6 +19,7 @@ The two sources of data are:
       ```json
       [
         {
+          "skipJobTriggers": false,
           "trigCond": [
             {
               "trigCondFlgs": 1,
@@ -285,7 +286,8 @@ This Step will do the following:
     the bitwise mask `(trigCondFlgs & JT__TRIG_COND_EXEC_FLGS)` evaluates to non-0. If any checked trigger condition is not met, the rest
     of the processing is skipped.
  4. **(If applicable)** Loop through the jobs-to-trigger JSON and trigger each Job that has `active: true` and matches the set trigger condition, if any.
-    This Step is skipped if `JT__SKIP_TRIG_MAIN_JOBS` is non-zero.
+    For each JSON list object, its `jobList` block is skipped when `skipJobTriggers` key is set to true.
+    If the step env `JT__SKIP_TRIG_MAIN_JOBS` is non-zero (set in the `ci-operator` config), every `jobList` item is skipped the same way.
  5. **(If applicable)** Set execution markers so the downstream processes can determine whether to execute post-Steps. Markers are only set when
     the bitwise mask `(postTaskFlgs & JT__POST_TASK_EXEC_FLGS)` evaluates to non-0.
  6. Continue processing until all Jobs have been processed.
