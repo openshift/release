@@ -34,15 +34,15 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Cluster name: ${CLUSTER_NAME}, Infra ID: ${INFRA_ID}"
 
-# Base domain — default matches the shared root management cluster DNS zone
-DEFAULT_BASE_DOMAIN="ci.hypershift.devcluster.openshift.com"
+# Base domain — read from env or cluster profile
 DOMAIN=""
-if [[ -n "${HYPERSHIFT_BASE_DOMAIN:-}" ]]; then
-  DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
-elif [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+[[ -n "${HYPERSHIFT_BASE_DOMAIN:-}" ]] && DOMAIN="${HYPERSHIFT_BASE_DOMAIN}"
+if [[ -z "${DOMAIN}" ]] && [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
-else
-  DOMAIN="${DEFAULT_BASE_DOMAIN}"
+fi
+if [[ -z "${DOMAIN}" ]]; then
+  echo "ERROR: Failed to determine the base domain."
+  exit 1
 fi
 echo "Using base domain: ${DOMAIN}"
 
