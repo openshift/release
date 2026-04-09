@@ -42,6 +42,11 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
   : Overriding step defaults by sourcing clusterbot settings
   # shellcheck disable=SC1090
   source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+  # Always assemble CLONEREFS for cloning when using clusterbot.
+  # The only sitation it would have JOB_SPEC with clonerefs is for rehearsal which is not the main usecase.
+  # When running via cluster bot, it's always empty and the decision "what to clone" is made based on the sourced
+  # `microshift-clusterbot-settings` file (envs like MICROSHIFT_PR, MICROSHIFT_GIT, MICROSHIFT_NIGHTLY, *AND* OCP_VERSION).
+  SRC_FROM_GIT=true
 fi
 
 # All graviton instances have a lower case g in the family part. Using
