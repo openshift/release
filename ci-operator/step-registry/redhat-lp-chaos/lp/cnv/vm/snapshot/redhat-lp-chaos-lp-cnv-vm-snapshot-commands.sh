@@ -1,27 +1,29 @@
 #!/bin/bash
-# JUnit Support Start
-JUNIT_REPORT="${ARTIFACT_DIR}/junit_cnv_vm_snapshot.xml"
+
+# Junit report
+typeset step_id
+step_id=$(basename "${ARTIFACT_DIR}")
+JUNIT_REPORT="${ARTIFACT_DIR}/junit_${step_id}.xml"
 START_TIME=$(date +%s)
 
 function finalize_junit() {
     local exit_code=$?
     local duration=$(( $(date +%s) - START_TIME ))
-    if [[ ${exit_code} -eq 0 ]]; then
-        cat <<EOF > "${JUNIT_REPORT}"
-<testsuite name="lp-cnv-chaos" tests="1" failures="0" time="${duration}">
-  <testcase name="vm-snapshot-verification" classname="cnv-chaos-snapshot" time="${duration}" />
-</testsuite>
+    
+    local failures=0
+    [[ ${exit_code} -ne 0 ]] && failures=1
+    cat <<EOF > "${JUNIT_REPORT}"
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="lp-cnv-chaos-suite" tests="1" failures="${failures}" errors="0" skipped="0" time="${duration}">
+    <testcase name="chaos-test-${step_id}" classname="cnv-chaos-matrix" time="${duration}">
+      $([[ ${exit_code} -ne 0 ]] && echo "<failure message='Step failed with exit code ${exit_code}'>Detailed logs can be found in build-log.txt within the artifacts tab.</failure>")
+    </testcase>
+  </testsuite>
+</testsuites>
 EOF
-    else
-        cat <<EOF > "${JUNIT_REPORT}"
-<testsuite name="lp-cnv-chaos" tests="1" failures="1" time="${duration}">
-  <testcase name="vm-snapshot-verification" classname="cnv-chaos-snapshot" time="${duration}">
-    <failure message="Step failed">Exit code: ${exit_code}. Check build-log.txt for details.</failure>
-  </testcase>
-</testsuite>
-EOF
-    fi
 }
+
 trap finalize_junit EXIT
 
 set -euxo pipefail; shopt -s inherit_errexit
