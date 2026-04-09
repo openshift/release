@@ -156,7 +156,7 @@ then
 
   echo "Destroy the terraform"
   # Fetch the ocp4-upi-compute-powervs repo to perform deprovisioning
-  cd "${IBMCLOUD_HOME}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/main.tar.gz" -o "${IBMCLOUD_HOME}/ocp-${OCP_VERSION}.tar.gz" \
+  cd "${IBMCLOUD_HOME}" && curl -L "https://github.com/raja-0940/ocp4-upi-compute-powervs/archive/refs/heads/main.tar.gz" -o "${IBMCLOUD_HOME}/ocp-${OCP_VERSION}.tar.gz" \
       && tar -xzf "${IBMCLOUD_HOME}/ocp-${OCP_VERSION}.tar.gz" \
       && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-main" "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs"
   # copy the var.tfvars file from ${SHARED_DIR}

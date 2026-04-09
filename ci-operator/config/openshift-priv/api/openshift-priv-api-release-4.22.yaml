@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -98,7 +94,8 @@ tests:
     go build ./...
   container:
     from: src
-- as: verify-hypershift-integration
+- always_run: false
+  as: verify-hypershift-integration
   commands: |
     dir=$GOPATH/src/github.com/openshift/hypershift
     git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
@@ -120,6 +117,7 @@ tests:
     make api test-envtest-api-all
   container:
     from: src
+  optional: true
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$

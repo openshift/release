@@ -114,8 +114,8 @@ echo "No control-plane component revision triggers logged."
 
 # Remove non OpenShift workloads after the upgrade
 echo "Removing the OADP operator..."
-oc delete -f oadp-operator.yaml --ignore-not-found || true
-oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io --ignore-not-found || true
+oc delete -f oadp-operator.yaml
+oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io
 
 echo "Removing Lifecycle Agent operator..."
 make -C lifecycle-agent bundle-clean

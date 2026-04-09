@@ -108,7 +108,6 @@ export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
 export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
 export IP_STACK="${IP_STACK}"
-export OADP_FBC_IMAGE="${OADP_FBC_IMAGE}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
 # pending, both during installation and e2e tests.
 export DISK_GB=200

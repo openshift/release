@@ -76,8 +76,8 @@ function gather_console_and_bootstrap() {
     infra_id=$(jq -r '.infraID' "${installer_dir}/metadata.json")
 
     # Arrays to collect IPs across all vCenters
-    all_bootstrap_ips=()
-    all_control_plane_ips=()
+    declare -a all_bootstrap_ips
+    declare -a all_control_plane_ips
 
     # Track if we found any VMs
     found_vms=false
@@ -324,11 +324,6 @@ function gather_console_and_bootstrap() {
     done
 
     echo "$(date -u --rfc-3339=seconds) - Running gather bootstrap with ${#all_bootstrap_ips[@]} bootstrap node(s) and ${#all_control_plane_ips[@]} control plane node(s)"
-
-    if [[ ${#GATHER_BOOTSTRAP_ARGS[@]} -eq 0 ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Warning: No bootstrap or control plane IPs collected, skipping gather bootstrap"
-      return 1
-    fi
 
     # 4.5 and prior used the terraform.tfstate for gather bootstrap. This causes an error with:
     # state snapshot was created by Terraform v0.12.24, which is newer than current v0.12.20; upgrade to Terraform v0.12.24 or greater to work with this state"

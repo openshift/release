@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 
-import argparse
-import json
 import yaml
 
-parser = argparse.ArgumentParser(description="Boskos config generator")
-parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
-args = parser.parse_args()
 
 CONFIG = {
     'aws-quota-slice': {
@@ -321,7 +316,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 45,
+        'us-central1': 30,
     },
     'gcp-observability-quota-slice': {
         'us-central1': 30,
@@ -806,6 +801,29 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     },
 }
 
+config = {
+    'resources': [],
+}
+
+for typeName, data in sorted(CONFIG.items()):
+    resource = {
+        'type': typeName,
+        'state': 'free',
+    }
+    if set(data.keys()) == {'default'}:
+        resource['min-count'] = resource['max-count'] = data['default']
+    else:
+        resource['names'] = []
+        for name, count in sorted(data.items()):
+            if '--' in name:
+                raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
+            if count > 1:
+                width = len(str(count-1))
+                resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
+            else:
+                resource['names'].append(name)
+    config['resources'].append(resource)
+
 def cluster_profile_set_resources(clusterProfileSets):
     def profile_set_resource(profileSet, profileSetData):
         cps_resource = {
@@ -847,47 +865,9 @@ def cluster_profile_set_resources(clusterProfileSets):
 
     return resources
 
-def generate_config():
-    config = {
-        'resources': [],
-    }
+config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
 
-    for typeName, data in sorted(CONFIG.items()):
-        resource = {
-            'type': typeName,
-            'state': 'free',
-        }
-        if set(data.keys()) == {'default'}:
-            resource['min-count'] = resource['max-count'] = data['default']
-        else:
-            resource['names'] = []
-            for name, count in sorted(data.items()):
-                if '--' in name:
-                    raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
-                if count > 1:
-                    width = len(str(count-1))
-                    resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
-                else:
-                    resource['names'].append(name)
-        config['resources'].append(resource)
+with open('_boskos.yaml', 'w') as f:
+    f.write('# generated with generate-boskos.py; do not edit directly\n')
+    yaml.dump(config, f, default_flow_style=False)
 
-    config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
-
-    with open('_boskos.yaml', 'w') as f:
-        f.write('# generated with generate-boskos.py; do not edit directly\n')
-        yaml.dump(config, f, default_flow_style=False)
-
-def print_cluster_profile_set_details():
-    # Do not dump the following cps. Useful when a new profile is about to be introduced
-    # and it is not fully defined yet.
-    ignore_list = ["openshift-org-gcp"]
-    cps = {}
-    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
-        if not cps_name in ignore_list:
-            cps[cps_name] = list(cps_data.keys())
-    print(json.dumps(cps, indent=2))
-
-if args.print_cps:
-    print_cluster_profile_set_details()
-else:
-    generate_config()

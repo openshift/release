@@ -156,8 +156,8 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser" || echo "NA")
-BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass" || echo "NA")
+BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser")
+BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass")
 
 if [ -e "$CIRFILE" ] ; then
     # Get Extra data from CIR
