@@ -33,11 +33,6 @@ images:
     to: hypershift
   - dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
-  - dockerfile_literal: |
-      FROM base
-      RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
-    from: src
-    to: docs-build-src
 promotion:
   to:
   - excluded_images:
@@ -131,13 +126,6 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-agentic-qe-aws
-- as: docs-preview
-  optional: true
-  run_if_changed: ^docs/
-  steps:
-    test:
-    - ref: hypershift-docs-build-and-deploy
-    - ref: hypershift-docs-preview-comment
 - always_run: false
   as: e2e-aks
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
@@ -231,7 +219,7 @@ tests:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
-      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology)$
+      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology|TestAzureOAuthLoadBalancer)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     post:

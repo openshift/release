@@ -34,7 +34,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation
     decorate: true
     labels:
@@ -101,7 +101,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/check-gh-automation-tide
     decorate: true
     labels:
@@ -883,16 +883,17 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-dir
-        - ./ci-operator/config/
-        - --registry
-        - ./ci-operator/step-registry/
-        - --cluster-profiles-config
-        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
-        - --cluster-claim-owners-config
-        - ./core-services/cluster-pools/_config.yaml
+        - -c
+        - |
+          core-services/prow/02_config/generate-boskos.py --print-cluster-profile-sets >/tmp/cps.json
+          ci-operator-checkconfig \
+            --config-dir=./ci-operator/config/ \
+            --registry=./ci-operator/step-registry/ \
+            --cluster-profiles-config=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml \
+            --cluster-claim-owners-config=./core-services/cluster-pools/_config.yaml \
+            --cluster-profile-set-details=/tmp/cps.json
         command:
-        - ci-operator-checkconfig
+        - /bin/sh
         image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
         name: ""
@@ -992,7 +993,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -1031,7 +1032,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260325-947fd1958
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260408-3bbc91829
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1906,7 +1907,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: app.ci
+    cluster: core-ci
     context: ci/prow/rover-groups-config-validation
     decorate: true
     labels:

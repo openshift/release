@@ -202,6 +202,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
       TEST_SUITE: openshift/conformance/serial
@@ -763,6 +764,7 @@ tests:
   capabilities:
   - intranet
   cron: 7 2,12 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -861,6 +863,34 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-ovn-installer-dualstack-ipv4-primary-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv4Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-installer-dualstack-ipv6-primary-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      IP_FAMILY: DualStackIPv6Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws
 - as: e2e-vsphere-ovn-techpreview
   cron: 10 8 * * 1
   steps:
@@ -1103,8 +1133,9 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
-- as: e2e-aws-ovn-dedicated-techpreview
-  cron: '@yearly'
+- as: e2e-aws-ovn-dedicated-serial-techpreview
+  cron: '@daily'
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1121,7 +1152,7 @@ tests:
     - chain: gather-core-dump
     - chain: ipi-deprovision
     - ref: ipi-deprovision-aws-dedicated-hosts
-    workflow: openshift-e2e-aws-ovn
+    workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -2370,7 +2401,7 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OS_IMAGE_STREAM: rhel-10
+      OSSTREAM: rhel-10
     observers:
       enable:
       - observers-resource-watch
@@ -2380,6 +2411,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
     observers:

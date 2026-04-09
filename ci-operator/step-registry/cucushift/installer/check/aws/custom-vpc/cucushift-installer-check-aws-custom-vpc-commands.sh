@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -236,14 +243,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 if [ -f "${SHARED_DIR}/unset-proxy.sh" ] ; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
 
-if ( ((ocp_major_version == 4 && ocp_minor_version >= 19)) || ((ocp_major_version > 4)) ) && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+if version_ge "${ocp_version}" "4.19" && [[ ! "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
 
   echo "Check if instances match CPMS spec ... "
 
@@ -317,7 +323,7 @@ if ( ((ocp_major_version == 4 && ocp_minor_version >= 19)) || ((ocp_major_versio
   done
 
 else
-  echo "Skip instances-CPMS checking for ${ocp_major_version}.${ocp_minor_version}"
+  echo "Skip instances-CPMS checking for ${ocp_version}"
 fi
 
 

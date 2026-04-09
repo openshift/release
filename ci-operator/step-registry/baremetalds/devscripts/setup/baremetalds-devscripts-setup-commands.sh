@@ -80,18 +80,18 @@ done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.
 
 # Get env values from cir extradata
 function getExtraVal(){
-    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s $EXTRAFILE)" -lt 2 ] ; then
-        echo $2
+    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s "$EXTRAFILE")" -lt 2 ] ; then
+        echo "$2"
         return
     fi
-    jq -r --arg default "$2" ".$1 // \$default" $EXTRAFILE
+    jq -r --arg default "$2" ".$1 // \$default" "$EXTRAFILE"
 }
 
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
     # Get BM nodes list from extra data
-    jq .nodes < $EXTRAFILE > $NODESFILE
+    jq .nodes < "$EXTRAFILE" > "$NODESFILE"
 
     # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
     # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
@@ -99,18 +99,18 @@ function prepare_bmcluster() {
     n=0
     _IFS=$IFS
     IFS=$'\n'
-    for DATA in $(cat $NODESFILE |jq '.[] | "\(.bmcip) \(.mac) \(.driver) \(.system) \(.name)"' -rc) ; do
-        IFS=" " read BMCIP MAC DRIVER SYSTEM NAME<<< "$(echo $DATA)"
+    for DATA in $(cat "$NODESFILE" |jq '.[] | "\(.bmcip) \(.mac) \(.driver) \(.system) \(.name)"' -rc) ; do
+        IFS=" " read -r BMCIP MAC DRIVER SYSTEM NAME<<< "$DATA"
         if [ "$DRIVER" == "redfish" ] ; then
             NODES="$NODES{\"name\":\"$NAME\",\"driver\":\"redfish\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"admin\",\"password\":\"password\",\"address\":\"redfish+http://$BMCIP:8000/redfish/v1/Systems/$SYSTEM\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
         else
-            NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"root\",\"password\":\"calvin\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+            NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"$BMCUSER\",\"password\":\"$BMCPASS\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
         fi
         n=$((n+1))
     done
     IFS=$_IFS
 
-    cat - <<EOF > $BMJSON
+    cat - <<EOF > "$BMJSON"
 {
   "nodes": [
     ${NODES%,}
@@ -125,7 +125,7 @@ EOF
     cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
 # On lab baremetal clusters DNS has been setup so that the clustername is part of the provision host long name
 # i.e. hostname == host1.clusterXX.ocpci.eng.rdu2.redhat.com
-export LOCAL_REGISTRY_DNS_NAME="$(getExtraVal LOCAL_REGISTRY_DNS_NAME '$(hostname -f)')"
+export LOCAL_REGISTRY_DNS_NAME="$(getExtraVal LOCAL_REGISTRY_DNS_NAME "\$(hostname -f)")"
 export "BASE_DOMAIN=\$(echo \$LOCAL_REGISTRY_DNS_NAME | cut -d . -f 3-)"
 export "CLUSTER_NAME=\$(echo \$LOCAL_REGISTRY_DNS_NAME | cut -d . -f 2)"
 export NODES_FILE="/root/dev-scripts/bm.json"
@@ -138,15 +138,15 @@ export MANAGE_INT_BRIDGE=n
 export ROOT_DISK_NAME="/dev/sda"
 export EXTERNAL_SUBNET_V4="$(getExtraVal EXTERNAL_SUBNET_V4 10.10.129.0/24)"
 export ADDN_DNS="$(getExtraVal ADDN_DNS '')"
-export PROVISIONING_HOST_EXTERNAL_IP="$(getExtraVal PROVISIONING_HOST_EXTERNAL_IP $IP)"
+export PROVISIONING_HOST_EXTERNAL_IP="$(getExtraVal PROVISIONING_HOST_EXTERNAL_IP "$IP")"
 export EXTERNAL_BOOTSTRAP_MAC="$(getExtraVal EXTERNAL_BOOTSTRAP_MAC '')"
 export NUM_WORKERS=2
 
 export PROV_BM_MAC=$(getExtraVal PROV_BM_MAC '')
 EOF
 
-    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" $NODESFILE "root@${IP}:"
-    if [ "$(cat $CIRFILE | jq -r .type)" == "cluster_moc" ] ; then
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "$NODESFILE" "root@${IP}:"
+    if [ "$(cat "$CIRFILE" | jq -r .type)" == "cluster_moc" ] ; then
         scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/esi_cloud_yaml" "root@${IP}:esi_cloud_yaml"
     fi
 }
@@ -156,11 +156,13 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
+BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser" || echo "NA")
+BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass" || echo "NA")
 
 if [ -e "$CIRFILE" ] ; then
     # Get Extra data from CIR
-    jq -r ".extra | select( . != \"\") // {}" < $CIRFILE > $EXTRAFILE
-    if [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
+    jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" > "$EXTRAFILE"
+    if [[ "$(cat "$CIRFILE" | jq -r .type)" =~ cluster.* ]] ; then
         prepare_bmcluster
     fi
 fi
