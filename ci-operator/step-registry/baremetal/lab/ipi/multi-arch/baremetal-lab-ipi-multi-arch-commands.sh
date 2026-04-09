@@ -43,6 +43,7 @@ check_prov_vmedia() {
 }
 
 echo "[INFO] Preparing the baremetalhost resource file to add multi-arch worker node..."
+check_prov_vmedia && vmedia_cluster="true" || vmedia_cluster="false"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -50,11 +51,20 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   if [[ "${name}" == *-a-* ]]; then
     echo "Prepare yaml files for ${name}"
     bmhlist+=("${name}")
-    if check_prov_vmedia; then
+    if ${vmedia_cluster}; then
       prov_address="${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-    else
+      username=$(echo -n "${redfish_user}" | base64)
+      password=$(echo -n "${redfish_password}" | base64)
+    elif [[ "${name}" == *-a-01* ]]; then
       prov_address="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+      username=$(echo -n "${bmc_user}" | base64)
+      password=$(echo -n "${bmc_pass}" | base64)
+    else
+      prov_address="redfish+https://${bmc_address}${redfish_base_uri}"
+      username=$(echo -n "${redfish_user}" | base64)
+      password=$(echo -n "${redfish_password}" | base64)
     fi
+
     cat > "${DIR}/${name}.yaml" <<EOF
 ---
 apiVersion: v1
@@ -64,8 +74,8 @@ metadata:
   namespace: "${bm_namespace}"
 type: Opaque
 data:
-  username: $(echo -n "${bmc_user}" | base64)
-  password: $(echo -n "${bmc_pass}" | base64)
+  username: ${username}
+  password: ${password}
 ---
 apiVersion: metal3.io/v1alpha1
 kind: BareMetalHost
