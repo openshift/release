@@ -1,0 +1,26 @@
+ref:
+  as: rosa-e2e-ci-status
+  from_image:
+    namespace: ocp
+    name: "4.17"
+    tag: cli
+  commands: rosa-e2e-ci-status-commands.sh
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 50Mi
+  env:
+  - name: SLACK_CHANNEL
+    default: "C0ADGRNAT8U"
+    documentation: Slack channel ID to post the CI status summary to.
+  credentials:
+    - namespace: test-credentials
+      name: rosa-ci-slack-bot-token
+      mount_path: /tmp/secrets
+  documentation: |-
+    Posts a daily ROSA CI status summary to the #wg-rosa-ci-enhancement Slack
+    channel. Checks the latest Prow run for each tracked ROSA periodic job
+    (rosa-e2e nightly, OCM FVT, HCP conformance, Classic STS conformance) and
+    reports pass/fail with links. Uses the Slack chat.postMessage API with a
+    bot token mounted from /tmp/secrets/slack-bot-token.
