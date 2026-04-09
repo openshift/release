@@ -159,14 +159,14 @@ RUN dnf download -y --arch x86_64 --destdir /output libqb 2>/dev/null && \
 
 # --- Final stage: overlay RPMs onto RHCOS ---
 FROM ${OS_REF}
+LABEL quay.expires-after=24h
 COPY --from=builder /output/*.rpm /tmp/rpms/
 RUN rpm-ostree -C override replace /tmp/rpms/*.rpm && rm -rf /tmp/rpms
 DOCKERFILE_EOF
 
 # Unique tag per job so multiple jobs can push/pull concurrently.
-# Delete step uses this to remove our image and runs 24h cleanup.
+# Tags auto-expire after 24h via the quay.expires-after image label.
 IMAGE_TAG="ts-$(date -u +%s)"
-echo "${IMAGE_TAG}" > "${SHARED_DIR}/custom-rhcos-image-tag"
 
 CUSTOM_OS_IMAGE="${CUSTOM_OS_MIRROR_REGISTRY}/${CUSTOM_OS_IMAGE_REPO}:${IMAGE_TAG}"
 
@@ -183,10 +183,11 @@ podman push --authfile "${PUSH_AUTHFILE}" --digestfile /tmp/custom-os-digest.txt
 CUSTOM_OS_DIGEST=$(cat /tmp/custom-os-digest.txt)
 CUSTOM_OS_REF="${CUSTOM_OS_IMAGE%:*}@${CUSTOM_OS_DIGEST}"
 
-# Extensions image to mirror (same tag for correlation)
+# Extensions image to mirror (same tag for correlation).
+# Add quay.expires-after label so Quay auto-expires the tag.
 CUSTOM_EXTENSIONS_IMAGE="${CUSTOM_OS_MIRROR_REGISTRY}/${CUSTOM_OS_EXTENSIONS_REPO:-${CUSTOM_OS_IMAGE_REPO}-extensions}:${IMAGE_TAG}"
 podman pull --authfile "${PULL_SECRET}" "${EXTENSIONS_REF}"
-podman tag "${EXTENSIONS_REF}" "${CUSTOM_EXTENSIONS_IMAGE}"
+podman commit --change 'LABEL quay.expires-after=24h' "$(podman create "${EXTENSIONS_REF}")" "${CUSTOM_EXTENSIONS_IMAGE}"
 podman push --authfile "${PUSH_AUTHFILE}" --digestfile /tmp/custom-extensions-digest.txt "${CUSTOM_EXTENSIONS_IMAGE}"
 CUSTOM_EXTENSIONS_DIGEST=$(cat /tmp/custom-extensions-digest.txt)
 CUSTOM_EXTENSIONS_REF="${CUSTOM_EXTENSIONS_IMAGE%:*}@${CUSTOM_EXTENSIONS_DIGEST}"
