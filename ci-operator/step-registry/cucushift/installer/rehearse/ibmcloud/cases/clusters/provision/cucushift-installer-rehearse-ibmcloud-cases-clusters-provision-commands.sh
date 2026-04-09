@@ -192,6 +192,11 @@ if [ $install_ret -ne 0 ]; then
   echo "$(date -u --rfc-3339=seconds) - Failed to create clusters ($install_ret)"
   INSTALL_RESULT="FAIL"
 else
+
+  touch  "${SHARED_DIR}/success"
+  # Save console URL in `console.url` file so that ci-chat-bot could report success
+  echo "https://$(env KUBECONFIG=${INSTALL_DIR}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+
   echo "$(date -u --rfc-3339=seconds) - Created cluster."
   INSTALL_RESULT="PASS"
 fi
