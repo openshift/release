@@ -3,16 +3,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-9-base-openshift-4.17:
+  ocp_4.22_base-rhel9:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.17
+    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile.openshift
-    from: ocp_builder_rhel-9-base-openshift-4.17
+    from: ocp_builder_rhel-9-base-openshift-4.22
     to: metallb-frr
 promotion:
   to:
@@ -22,6 +22,12 @@ promotion:
   - disabled: true
     name: "4.22"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-4-22-rhel98.ocp.svc > /etc/yum.repos.art/ci/base-4-22-rhel-98-appstream.repo
+    from: ocp_4.22_base-rhel9
+    to: ocp_builder_rhel-9-base-openshift-4.22
 releases:
   initial:
     integration:
