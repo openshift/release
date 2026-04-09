@@ -78,35 +78,18 @@ tests:
     pre:
     - chain: ipi-aws-pre
     test:
-    - as: test-setup
-      cli: latest
-      commands: make e2e-test-openshift-setup
-      dependencies:
-      - env: IMAGE_CONTROLLER
-        name: custom-metrics-autoscaler
-      - env: IMAGE_ADAPTER
-        name: custom-metrics-autoscaler-adapter
-      - env: IMAGE_WEBHOOKS
-        name: custom-metrics-autoscaler-webhooks
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-run
-      cli: latest
-      commands: make e2e-test-openshift
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-clean
-      cli: latest
-      commands: make e2e-test-openshift-clean
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
+    - chain: keda-e2e
     workflow: ipi-aws
+- as: keda-e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    env:
+      E2E_TEST_CONFIG: openshift-e2e-gcp.yaml
+    pre:
+    - chain: ipi-gcp-pre
+    test:
+    - chain: keda-e2e
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

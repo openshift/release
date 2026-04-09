@@ -273,11 +273,40 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-ovn-pki-default-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: ECDSA
+      EXPECTED_KEY_PARAM: secp384r1
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-pki-rsa-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: RSA
+      EXPECTED_KEY_PARAM: "4096"
+      FEATURE_SET: TechPreviewNoUpgrade
+      PKI_ALGORITHM: RSA
+      PKI_RSA_KEY_SIZE: "4096"
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-aws-ovn-dualstack-ipv4-primary-techpreview
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
     workflow: openshift-e2e-aws
@@ -287,6 +316,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
     workflow: openshift-e2e-aws
@@ -608,7 +638,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv4-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
@@ -617,7 +647,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv6-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
@@ -930,9 +960,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
 - always_run: false
   as: e2e-vsphere-static-ovn
@@ -947,9 +974,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-multi-disk

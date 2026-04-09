@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -55,9 +66,8 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ocp_major_version == 4 && ocp_minor_version < 14 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+if version_lt "${ocp_version}" "4.14"; then
     echo "CPMS failureDomain check is only available on 4.14+ cluster, skip the check!"
     exit 0
 fi
@@ -97,7 +107,7 @@ fi
 
 check_result=0
 echo "Check CPMS failureDomain contains expected plaform and zone setting"
-echo -e "ocp_minor_version:${ocp_minor_version}\nregion:${REGION}\nexpected_platform: ${expected_platform}\nexpected_zones: ${expected_zones}"
+echo -e "ocp_version:${ocp_version}\nregion:${REGION}\nexpected_platform: ${expected_platform}\nexpected_zones: ${expected_zones}"
 #check platform
 echo "cpms spec:"
 oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io"'
@@ -111,7 +121,7 @@ if [[ "${platform_value}" != "null" ]]; then
     fi
 else
     # On 4.15+, no failureDomain object is set when installing on singel zone or region without avaiable zone support.
-    if (( ocp_major_version == 4 && ocp_minor_version > 14 )) || (( ocp_major_version > 4 )); then
+    if version_gt "${ocp_version}" "4.14"; then
         failure_domain_value=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".failureDomains')
         if [[ "${failure_domain_value}" == "null" ]] && [[ -z "${expected_platform}" ]]; then
             echo "INFO: detect single zone or region without avaiable zone support on 4.15+, get expected behavior that no failureDomain object is set in cpms spec!"

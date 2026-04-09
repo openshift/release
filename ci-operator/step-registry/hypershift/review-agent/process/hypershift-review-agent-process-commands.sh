@@ -829,7 +829,7 @@ ${SUBAGENT_PROMPT}"
     # the CI job while it is still posting review replies.
     if ! git diff --quiet HEAD "origin/$BRANCH_NAME" 2>/dev/null; then
       echo "Pushing code changes for PR #$PR_NUMBER..."
-      git push origin "$BRANCH_NAME"
+      git push --force-with-lease origin "$BRANCH_NAME"
       echo "Push completed for PR #$PR_NUMBER"
     else
       echo "No code changes to push for PR #$PR_NUMBER"

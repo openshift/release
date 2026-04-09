@@ -2,21 +2,40 @@
 set -euo pipefail
 
 # =============================================================================
-# RHDH Plugin Export Overlays - E2E Test Runner
-# Runs e2e tests for a single workspace changed in a PR.
+# RHDH Plugin Export Overlays - E2E Test Runner (OpenShift CI)
+#
+# Job modes (nightly / pr-check) determine:
+#   - Whether GIT_PR_NUMBER is exported (controls PR vs released OCI image resolution)
+#   - Which workspaces to test (all vs changed)
+#
+# Job flows:
+#
+#   Scenario                                | JOB_TYPE  | JOB_NAME         | Mode     | GIT_PR_NUMBER | Code tested | OCI images | Tests
+#   ----------------------------------------|-----------|------------------|----------|---------------|-------------|------------|------
+#   Overlay PR (pr-check)                   | presubmit | pull-ci-*        | pr-check | PR number     | PR branch   | PR-built   | changed workspace
+#   Overlay PR (nightly)                    | presubmit | pull-ci-*nightly | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Rehearse pr-check                       | presubmit | rehearse-*       | pr-check | empty         | main        | —          | skips (no changes)
+#   Rehearse pr-check + REHEARSE_PR_NUMBER  | presubmit | rehearse-*       | pr-check | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
+#   Rehearse nightly                        | presubmit | rehearse-*night  | nightly  | not exported  | main        | released   | all workspaces
+#   Rehearse nightly  + REHEARSE_PR_NUMBER  | presubmit | rehearse-*night  | nightly  | not exported  | PR branch   | released   | all workspaces
+#   Periodic cron                           | periodic  | periodic-*       | nightly  | not exported  | main        | released   | all workspaces
+#
 # =============================================================================
 
-# Configuration
+# ── Configuration ────────────────────────────────────────────────────────────
+
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
-REHEARSE_PR_NUMBER=""  # for rehearse testing give overlay repo PR number.
+OVERLAY_BRANCH=""
+REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
 
-# Environment setup
+# ── Environment ──────────────────────────────────────────────────────────────
+
 export HOME=/tmp
 export CI=true
 cd /tmp
 
-# Export VAULT_ secrets
+# Load VAULT_ secrets
 for file in /tmp/secrets/*; do
     [[ -f "$file" ]] || continue
     filename=$(basename "$file")
@@ -25,14 +44,39 @@ for file in /tmp/secrets/*; do
     export "$filename"="$(cat "$file")"
 done
 
-# Parse job spec
-RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER
-echo "Repository: ${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}"
-echo "Branch: ${RELEASE_BRANCH_NAME}, PR: ${GIT_PR_NUMBER}"
+# ── Parse job spec & determine mode ──────────────────────────────────────────
 
-# Cluster authentication
+RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+
+# Determine job mode
+if [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
+    JOB_MODE="nightly"
+else
+    JOB_MODE="pr-check"
+fi
+
+# Parse PR number for presubmit jobs (needed for checkout)
+# Rehearse jobs get PR number from release repo (not overlay), so use REHEARSE_PR_NUMBER override
+GIT_PR_NUMBER=""
+if [[ "$JOB_TYPE" == "presubmit" ]]; then
+    if [[ "$JOB_NAME" == rehearse-* ]]; then
+        GIT_PR_NUMBER="${REHEARSE_PR_NUMBER:-}"
+    else
+        GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number // empty')
+    fi
+fi
+
+# Only export GIT_PR_NUMBER in pr-check mode (nightly uses released OCI images)
+if [[ "$JOB_MODE" == "pr-check" ]]; then
+    export GIT_PR_NUMBER
+fi
+
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME JOB_MODE
+echo "Repository: ${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}"
+echo "Branch: ${RELEASE_BRANCH_NAME}, Mode: ${JOB_MODE}, PR: ${GIT_PR_NUMBER:-none}"
+
+# ── Cluster authentication ───────────────────────────────────────────────────
+
 export OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
 OPENSHIFT_USERNAME="kubeadmin"
@@ -57,52 +101,72 @@ if ! timeout --foreground 5m bash -c '
     exit 1
 fi
 
-# Service account setup
+# ── Service account & platform info ──────────────────────────────────────────
+
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
 
-# Platform environment
 export IS_OPENSHIFT="true"
-export CI="true"
 export CONTAINER_PLATFORM="ocp"
 export CONTAINER_PLATFORM_VERSION
 CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 echo "Platform: ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION}"
 
-# Clone repository
+# ── Clone & checkout ─────────────────────────────────────────────────────────
+
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}"
-git checkout "$RELEASE_BRANCH_NAME"
+git checkout "${OVERLAY_BRANCH:-$RELEASE_BRANCH_NAME}"
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
-# PR checkout
-if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    git fetch origin "pull/${GIT_PR_NUMBER}/head:PR${GIT_PR_NUMBER}"
-    git checkout "PR${GIT_PR_NUMBER}"
-    git merge "origin/${RELEASE_BRANCH_NAME}" --no-edit
-elif [[ "$JOB_NAME" == rehearse-* ]] && [ -n "$REHEARSE_PR_NUMBER" ]; then
-    echo "Rehearsal mode: testing against PR #${REHEARSE_PR_NUMBER}"
-    GIT_PR_NUMBER="$REHEARSE_PR_NUMBER"
+# Checkout PR branch for presubmit jobs
+# Rehearse jobs only checkout if REHEARSE_PR_NUMBER is explicitly set (JOB_SPEC PR is from the release repo)
+if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$GIT_PR_NUMBER" ]] && { [[ "$JOB_NAME" != rehearse-* ]] || [[ -n "${REHEARSE_PR_NUMBER:-}" ]]; }; then
     git fetch origin "pull/${GIT_PR_NUMBER}/head:PR${GIT_PR_NUMBER}"
     git checkout "PR${GIT_PR_NUMBER}"
     git merge "origin/${RELEASE_BRANCH_NAME}" --no-edit
 fi
 
-# RHDH environment
+# ── RHDH version ─────────────────────────────────────────────────────────────
+
 export RHDH_VERSION INSTALLATION_METHOD
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     RHDH_VERSION="$(echo "$RELEASE_BRANCH_NAME" | cut -d'-' -f2)"
 else
-    RHDH_VERSION="1.10" # TODO: Change to next when RHIDP-12071 is fixed.
+    RHDH_VERSION="1.10" # TODO: Change to "next" when RHIDP-12071 is fixed
 fi
 INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
-# Workspace detection
+# ── Artifact collection ──────────────────────────────────────────────────────
+
+collect_artifacts() {
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        echo "[INFO] Copying artifacts to ${ARTIFACT_DIR}"
+        cp -a playwright-report "${ARTIFACT_DIR}/" 2>/dev/null || true
+        cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>/dev/null || true
+    fi
+}
+
+# ── Run tests ────────────────────────────────────────────────────────────────
+
+TEST_EXIT_CODE=0
+
+if [[ "$JOB_MODE" == "nightly" ]]; then
+    echo "Nightly mode: running selected workspace E2E tests..."
+    export E2E_NIGHTLY_MODE="true"
+
+    bash ./run-e2e.sh --workers=4 || TEST_EXIT_CODE=$?
+    collect_artifacts
+    exit $TEST_EXIT_CODE
+fi
+
+# ── PR check ─────────────────────────────────────────────────────────────────
+
 PR_CHANGESET=$(git diff --name-only "$RELEASE_BRANCH_NAME")
 echo "Changeset: ${PR_CHANGESET}"
 
@@ -114,7 +178,6 @@ else
 fi
 echo "Changed workspaces: ${CHANGED_WORKSPACES:-none} (count: ${WORKSPACE_COUNT})"
 
-# Test execution
 if [ "$WORKSPACE_COUNT" -eq 0 ]; then
     echo "No workspace changes detected. Skipping tests."
     exit 0
@@ -123,29 +186,26 @@ elif [ "$WORKSPACE_COUNT" -gt 1 ]; then
     exit 1
 fi
 
+if [[ ! -f "workspaces/${CHANGED_WORKSPACES}/e2e-tests/package.json" ]]; then
+    echo "Workspace '${CHANGED_WORKSPACES}' has no e2e-tests. Skipping."
+    exit 0
+fi
+
 echo "Running tests for workspace: ${CHANGED_WORKSPACES}"
-cd "workspaces/${CHANGED_WORKSPACES}/e2e-tests"
-yarn install --immutable
-yarn playwright install chromium
+bash ./run-e2e.sh -w "${CHANGED_WORKSPACES}" || TEST_EXIT_CODE=$?
+collect_artifacts
 
-TEST_EXIT_CODE=0
-yarn test || TEST_EXIT_CODE=$?
+# ── Post GitHub comment ──────────────────────────────────────────────────────
 
-# Copy test artifacts regardless of test result
-echo "Copying test artifacts to ${ARTIFACT_DIR}"
-cp -a playwright-report "${ARTIFACT_DIR}/" 2>/dev/null || true
-cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>/dev/null || true
-
-# Post GitHub comment with test results
 post_github_comment() {
-    set +ex  # Disable exit-on-error and tracing for token handling
-    [[ "$JOB_TYPE" != "presubmit" ]] && [[ -z "${REHEARSE_PR_NUMBER:-}" ]] && return 0
+    set +ex
+    [[ -z "${GIT_PR_NUMBER:-}" ]] && return 0
     [[ -z "${VAULT_GITHUB_TEST_REPORTER_TOKEN:-}" ]] && { echo "WARNING: VAULT_GITHUB_TEST_REPORTER_TOKEN not set"; return 1; }
 
     local gcs_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull"
     local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-ocp-helm/redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
-    local stats status comment
 
+    local stats counts status comment
     stats=$(jq -r '(.stats.duration // 0) / 1000 | floor | "\(. / 60 | floor)m \(. % 60)s"' playwright-report/results.json 2>/dev/null || echo "N/A")
     counts=$(jq -r '"Passed: \(.stats.expected // 0) | Failed: \(.stats.unexpected // 0) | Flaky: \(.stats.flaky // 0) | Skipped: \(.stats.skipped // 0)"' playwright-report/results.json 2>/dev/null || echo "N/A")
     [[ "$TEST_EXIT_CODE" -eq 0 ]] && status="✅ Passed" || status="❌ Failed"

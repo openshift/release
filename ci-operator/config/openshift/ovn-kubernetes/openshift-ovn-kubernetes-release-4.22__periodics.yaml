@@ -20,10 +20,7 @@ base_images:
     namespace: ocp
     tag: upi-installer
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.20
+  from_repository: true
 releases:
   initial:
     candidate:
@@ -71,6 +68,18 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FRR_IMAGE: quay.io/frrouting/frr:10.4.1
+      TEST_SKIPS: Prometheus \[apigroup:image.openshift.io\] when installed on the
+        cluster should provide named network metrics
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview-frr-next
+  capabilities:
+  - intranet
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FRR_IMAGE: quay.io/frrouting/frr:10.4.3
       TEST_SKIPS: Prometheus \[apigroup:image.openshift.io\] when installed on the
         cluster should provide named network metrics
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
