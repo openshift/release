@@ -41,6 +41,11 @@ images:
           source_path: /usr/bin/oc
     to: src-with-oc-and-kubectl
 releases:
+  4-21-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
   arm64-4-20-latest:
     candidate:
       architecture: arm64
@@ -388,6 +393,25 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+- as: test-e2e-dra-gpu-4-21
+  cron: '@daily'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
+      NVIDIA_DRA_DRIVER_VERSION: 25.12.0
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - ref: nvidia-cleanup
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-dra
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
