@@ -67,7 +67,8 @@ spec:
             - --config-path=/etc/config/config.yaml
             - --supplemental-prow-config-dir=/etc/config
             - --job-config-path=/var/repo/release/ci-operator/jobs
-            - --github-token-path=/etc/oauth/oauth
+            - --github-app-id=$(GITHUB_APP_ID)
+            - --github-app-private-key-path=/etc/github/cert
             - --github-endpoint=http://ghproxy
             - --github-endpoint=https://api.github.com
             - --github-graphql-endpoint=http://ghproxy/graphql
@@ -75,6 +76,12 @@ spec:
             - --lgtm-config-file=/var/repo/release/core-services/pipeline-controller/lgtm-config.yaml
             - --hmac-secret-file=/etc/webhook/hmac.yaml
             - --endpoint=/
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-merge-bot
+                key: appid
           resources:
             requests:
               memory: "7.5Gi"
@@ -83,8 +90,8 @@ spec:
             - name: http
               containerPort: 8888
           volumeMounts:
-            - name: github-token
-              mountPath: /etc/oauth
+            - name: github-app-credentials
+              mountPath: /etc/github
               readOnly: true
             - name: config
               mountPath: /etc/config
@@ -116,9 +123,9 @@ spec:
         - name: hmac
           secret:
             secretName: github-webhook-credentials
-        - name: github-token
+        - name: github-app-credentials
           secret:
-            secretName: github-credentials-openshift-ci-robot
+            secretName: openshift-merge-bot
         - name: config
           configMap:
             name: config
