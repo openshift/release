@@ -1,6 +1,8 @@
 workflow:
   as: openshift-e2e-libvirt-vpn-ipi
   steps:
+    env:
+      IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
     allow_best_effort_post_steps: true
     pre:
     - ref: upi-libvirt-cleanup-pre
@@ -20,6 +22,7 @@ workflow:
     s390x note: If terraform apply fails with "machine type 's390-ccw-virtio-rhel9.*' does not support
     ACPI", that is from openshift-install's bundled terraform-provider-libvirt (it always requests
     ACPI) combined with newer QEMU defaults on the hypervisor. It is not specific to VPN naming.
-    Resolve by aligning VPN host QEMU/libvirt defaults with pools where IPI still works, by a
-    libvirt/qemu hook that drops ACPI for s390x domains, or by fixing openshift/terraform-provider-libvirt
-    to omit ACPI for s390x and shipping a new openshift-install.
+    This workflow sets IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH so the libvirt install step injects an
+    XSLT workaround when unpacking Terraform (see ipi-install-libvirt-install). Alternatively:
+    align VPN host QEMU/libvirt with older pools, use a libvirt hook, or fix openshift/terraform-provider-libvirt
+    and ship a new openshift-install.

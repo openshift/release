@@ -17,6 +17,11 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
+  if [[ -n "${IPI_ACPI_PATCHER_PID:-}" ]]; then
+    kill "${IPI_ACPI_PATCHER_PID}" 2>/dev/null || true
+    wait "${IPI_ACPI_PATCHER_PID}" 2>/dev/null || true
+    unset IPI_ACPI_PATCHER_PID
+  fi
   #Save exit code for must-gather to generate junit
   echo "$?" > "${SHARED_DIR}/install-status.txt"
   set +e
@@ -158,9 +163,10 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
 # s390x + newer QEMU (e.g. default machine s390-ccw-virtio-rhel9.6.0): libvirt rejects domains that
 # request ACPI, but openshift-install's terraform-provider-libvirt always enables ACPI in the
-# default domain XML. Symptom: terraform fails at libvirt_domain.master with "does not support ACPI";
-# subsequent API EOF/timeouts are because VMs never started. Not fixable from this script; see
-# openshift/terraform-provider-libvirt (newDomainDef / newDomainDefForConnection) or hypervisor alignment.
+# default domain XML (domain_def.go), not in .tf. The provider applies optional XSLT after building
+# XML (resource_libvirt_domain). When IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true and ARCH=s390x, a
+# background loop injects xml { xslt = file(...) } into each libvirt_domain resource under
+# ${dir}/terraform after openshift-install unpacks each stage (fragile across installer versions).
 
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
@@ -204,6 +210,54 @@ fi
 if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
 	pattern="$(echo "$LEASED_RESOURCE" | sed 's/-[^-]*$/-/')[a-zA-Z0-9]{5}"
 	find "$dir" -type f -exec sed -i -E "s/${pattern}/${LEASED_RESOURCE}/g" {} +
+fi
+
+# CI workaround: strip <acpi/> from generated domain XML via provider XSLT (see comment above).
+if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
+	(
+		set +o errexit
+		tfroot="${dir}/terraform"
+		xsl="${tfroot}/s390x-strip-acpi.xsl"
+		while true; do
+			if [[ -d "${tfroot}" ]]; then
+				if [[ ! -f "${xsl}" ]]; then
+					cat > "${xsl}" <<'XSL_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+  <xsl:template match="acpi"/>
+</xsl:stylesheet>
+XSL_EOF
+				fi
+				while IFS= read -r -d '' tf; do
+					if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
+						continue
+					fi
+					if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
+						continue
+					fi
+					awk -v xsl="${xsl}" '
+						/resource "libvirt_domain"/ {
+							print
+							print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
+							print "  xml {"
+							print "    xslt = file(\"" xsl "\")"
+							print "  }"
+							next
+						}
+						{ print }
+					' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
+				done < <(find "${tfroot}" -name '*.tf' -print0 2>/dev/null)
+			fi
+			sleep 0.2
+		done
+	) &
+	IPI_ACPI_PATCHER_PID=$!
 fi
 
 RCFILE=$(mktemp)
