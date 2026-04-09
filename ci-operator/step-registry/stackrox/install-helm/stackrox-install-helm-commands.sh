@@ -275,6 +275,11 @@ wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
 
+# Save admin password for use by later steps (e.g., diagnostics collection)
+if [[ -n "${SHARED_DIR:-}" ]]; then
+  echo "${ROX_PASSWORD}" > "${SHARED_DIR}/rox_admin_password"
+fi
+
 retry oc get pods --namespace stackrox
 
 nohup oc port-forward --namespace "stackrox" svc/central "8443:443" 1>/dev/null 2>&1 &
