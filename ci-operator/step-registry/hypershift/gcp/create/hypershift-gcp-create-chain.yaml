@@ -9,7 +9,7 @@ chain:
       documentation: "Number of nodes for the hosted cluster NodePool."
     - name: HYPERSHIFT_GCP_BOOT_IMAGE
       default: ""
-      documentation: "GCP boot image for hosted cluster nodes (RHCOS image path). If empty, uses the default from the release image."
+      documentation: "GCP boot image for hosted cluster nodes (RHCOS image path). If empty, falls back to a pinned default (see TODO GCP-440)."
     - name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
       default: ""
       documentation: "DNS domain for HyperShift CI hosted clusters"
@@ -100,7 +100,7 @@ chain:
       '
 
       if [[ $? -ne 0 ]]; then
-        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+        cat << EOF > "${ARTIFACT_DIR}/junit_hosted_cluster.xml"
       <?xml version="1.0" encoding="UTF-8"?>
       <testsuite name="hypershift install" tests="1" failures="1">
         <testcase name="hosted cluster version rollout succeeds">
@@ -116,7 +116,7 @@ chain:
       EOF
         exit 1
       else
-        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+        cat << EOF > "${ARTIFACT_DIR}/junit_hosted_cluster.xml"
       <?xml version="1.0" encoding="UTF-8"?>
       <testsuite name="hypershift install" tests="1" failures="0">
         <testcase name="hosted cluster version rollout succeeds">
@@ -148,8 +148,7 @@ chain:
     the cluster version rollout to complete.
 
     Reads infrastructure configuration from SHARED_DIR files created by
-    hypershift-gcp-gke-provision, hypershift-gcp-hosted-cluster-setup,
-    and hypershift-gcp-control-plane-setup.
+    hypershift-gcp-gke-provision and hypershift-gcp-hosted-cluster-setup.
 
     Saves the HostedCluster CR name to SHARED_DIR/cluster-name for the
     e2e-v2 test chain and destroy chain.

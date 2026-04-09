@@ -6,7 +6,12 @@ chain:
     commands: |-
       set -exuo pipefail
 
-      CLUSTER_NAME="$(cat ${SHARED_DIR}/cluster-name)"
+      if [[ ! -f "${SHARED_DIR}/cluster-name" ]]; then
+          echo "WARNING: cluster-name not found — create step may not have completed. Skipping destroy."
+          exit 0
+      fi
+
+      CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
       echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster gcp \
         --name "${CLUSTER_NAME}" \
