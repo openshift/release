@@ -1,0 +1,68 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  test-bin:
+    name: "4.22"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - hypershift-operator
+    - hypershift-tests
+    name: "4.22"
+    namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
+  capabilities:
+  - intranet
+  cron: 0 2 * * 0
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      KONFLUX_TARGET_FBC_TAGS: ocp__4.22__metallb-rhel9-operator,oadp-operator-fbc-1.6.0-20260327171703
+      KONFLUX_TARGET_OPERATORS: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      MCE_VERSION: "2.17"
+      METALLB_OPERATOR_SUB_SOURCE: ocp--4.22--metallb-rhel9-operator-konflux
+      OADP_OPERATOR_SUB_SOURCE: oadp-operator-fbc-1.6.0-20260327171703-konflux
+    workflow: hypershift-mce-agent-metal3-backuprestore
+zz_generated_metadata:
+  branch: backup_restore_agent_pause
+  org: mgencur
+  repo: hypershift
