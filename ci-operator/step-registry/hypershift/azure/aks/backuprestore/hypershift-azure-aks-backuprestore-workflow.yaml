@@ -1,0 +1,58 @@
+workflow:
+  as: hypershift-azure-aks-backuprestore
+  documentation: |-
+    The HyperShift Azure AKS backup/restore workflow executes backup and restore
+    E2E tests against a new ephemeral HyperShift cluster on AKS using OADP with
+    Azure Blob Storage.
+
+    It provisions an AKS management cluster, installs HyperShift, creates a hosted
+    cluster, installs OLM and the OADP operator with Azure-specific configuration,
+    runs backup/restore E2E tests, and then runs a minimal conformance suite.
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-provision
+    - ref: hypershift-azure-aks-attach-kv
+    - ref: azure-provision-vnet-hypershift
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-role-assignment-hypershift
+    - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+    - chain: hypershift-azure-create
+    - ref: hypershift-azure-aks-oadp-setup
+    test:
+    - chain: hypershift-e2e-backuprestore
+    post:
+    - chain: hypershift-dump
+    - ref: hypershift-azure-aks-oadp-destroy
+    - chain: hypershift-azure-destroy
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    env:
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_AZURE_LOCATION: "eastus2"
+      CLOUD_PROVIDER: "Azure"
+      AKS: "true"
+      HYPERSHIFT_NODE_COUNT: "3"
+      AKS_NODE_COUNT: "9"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "service.hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_MANAGED_SERVICE: "ARO-HCP"
+      AKS_CLUSTER_AUTOSCALER_MIN_NODES: "3"
+      AKS_CLUSTER_AUTOSCALER_MAX_NODES: "6"
+      AKS_NODE_VM_SIZE: "Standard_D16_v3"
+      AKS_ZONES: "1 2 3"
+      ENABLE_CLUSTER_AUTOSCALER: "true"
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        In-tree Volumes \[Driver: azure-disk\]
+      AUTH_THROUGH_CERTS: "true"
+      AKS_USE_HYPERSHIFT_MI: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: "aro4"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: "azureopenshift"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: "419.6.20250523"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: "aro_419"
+      HYPERSHIFT_CUSTOM_NSG: "true"
+      HYPERSHIFT_CUSTOM_RESOURCE_GROUP: "true"
+      HYPERSHIFT_CUSTOM_SUBNET: "true"
+      HYPERSHIFT_CUSTOM_VNET: "true"
+      AKS_ADDONS: "azure-keyvault-secrets-provider"
+      HYPERSHIFT_AZURE_CP_MI: "true"

@@ -23,6 +23,10 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
   use_build_cache: true
@@ -363,6 +367,14 @@ tests:
   steps:
     cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
+- always_run: false
+  as: e2e-azure-aks-backuprestore
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-azure-aks-backuprestore
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
