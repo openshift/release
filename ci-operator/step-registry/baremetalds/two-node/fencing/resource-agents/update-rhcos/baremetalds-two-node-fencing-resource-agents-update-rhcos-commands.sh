@@ -6,6 +6,26 @@ RESOURCE_AGENT_SOURCE="${RESOURCE_AGENT_SOURCE:-RHCOS}"
 RESOURCE_AGENTS_REPO="${RESOURCE_AGENTS_REPO:-https://github.com/ClusterLabs/resource-agents}"
 RESOURCE_AGENTS_REF="${RESOURCE_AGENTS_REF:-main}"
 
+# Retry wrapper for oc debug commands. Debug containers on baremetal nodes
+# are notoriously slow to start (image pull + scheduling). Retries with a
+# generous timeout avoid transient failures.
+oc_debug_with_retry() {
+ local node="$1" ; shift
+ local retries="${OC_DEBUG_RETRIES:-3}"
+ local timeout="${OC_DEBUG_TIMEOUT:-90s}"
+ for attempt in $(seq 1 "${retries}"); do
+  echo "oc debug attempt ${attempt}/${retries} on node/${node} (timeout ${timeout})..."
+  if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@" 2>/dev/null; then
+   return 0
+  fi
+  echo "Attempt ${attempt} failed."
+  if [[ "${attempt}" -lt "${retries}" ]]; then
+   sleep 5
+  fi
+ done
+ return 1
+}
+
 if [[ "${RESOURCE_AGENT_SOURCE}" == "RHCOS" ]]; then
  # Report installed resource-agents version on first healthy schedulable node. Must not fail.
  NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}')
@@ -13,8 +33,8 @@ if [[ "${RESOURCE_AGENT_SOURCE}" == "RHCOS" ]]; then
   echo "No ready node found; skipping version report."
   exit 0
  fi
- if ! oc debug "node/${NODE}" -- chroot /host rpm -q resource-agents 2>/dev/null; then
-  echo "Could not get resource-agents version (timeout or error); skipping."
+ if ! oc_debug_with_retry "${NODE}" chroot /host rpm -q resource-agents; then
+  echo "Could not get resource-agents version after retries; skipping."
  fi
  exit 0
 fi
@@ -217,7 +237,7 @@ echo "Rollout complete."
 # Report the resource-agents version now running on a cluster node (Best-effort) .
 NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}') || true
 if [[ -n "${NODE}" ]]; then
- oc debug --request-timeout=60s "node/${NODE}" -- chroot /host rpm -q resource-agents 2>/dev/null || echo "Could not verify resource-agents version on node (timeout or error)."
+ oc_debug_with_retry "${NODE}" chroot /host rpm -q resource-agents || echo "Could not verify resource-agents version on node after retries."
 else
  echo "No ready node found; skipping post-rollout version check."
 fi
