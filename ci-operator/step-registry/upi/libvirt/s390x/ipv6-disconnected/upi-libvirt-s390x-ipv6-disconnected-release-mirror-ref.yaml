@@ -1,0 +1,33 @@
+ref:
+  as: upi-libvirt-s390x-ipv6-disconnected-release-mirror
+  from: cli
+  grace_period: 10m
+  timeout: 3h0m0s
+  commands: upi-libvirt-s390x-ipv6-disconnected-release-mirror-commands.sh
+  env:
+  - name: ENABLE_RELEASE_MIRROR
+    default: "false"
+    documentation: |-
+      When "true", run oc adm release mirror into MIRROR_RELEASE_IMAGE_REPO (must be reachable from
+      this step). When "false", skip mirroring so jobs can run lab-only phases once implemented.
+  - name: MIRROR_RELEASE_IMAGE_REPO
+    default: ""
+    documentation: |-
+      Destination image repository prefix (no tag), e.g. registry.example:5000/openshift/release-images.
+      Required when ENABLE_RELEASE_MIRROR is true.
+  - name: MIRROR_INSECURE
+    default: "true"
+    documentation: Use --insecure=true for the mirror registry (typical for lab registries with self-signed TLS).
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    Optionally mirrors the payload referenced by release:latest into a disconnected registry using
+    oc adm release mirror, and saves imageContentSources / upgrade hints under ${SHARED_DIR} for
+    install-config (imageContentSources, additionalTrustBundle from operator output when available).
+    Full IBM Z IPv6 UPI also requires mirroring RHCOS and serving artifacts from the bastion; that
+    belongs in follow-on steps.
