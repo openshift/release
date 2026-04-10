@@ -336,9 +336,8 @@ function suite() {
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
 function check_clusteroperators_status() {
-    local co_timeout="${CLUSTEROPERATOR_WAIT_TIMEOUT:-15m}"
-    echo "$(date) - waiting for clusteroperators to finish progressing (timeout=${co_timeout})..."
-    oc wait clusteroperators --all --for=condition=Progressing=false --timeout="${co_timeout}"
+    echo "$(date) - waiting for clusteroperators to finish progressing..."
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     echo "$(date) - all clusteroperators are done progressing."
 }
 

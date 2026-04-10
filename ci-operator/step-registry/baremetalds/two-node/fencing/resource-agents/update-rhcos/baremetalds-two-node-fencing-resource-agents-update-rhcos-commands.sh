@@ -226,8 +226,16 @@ spec:
  baseOSExtensionsContainerImage: "${CUSTOM_EXTENSIONS_REF}"
 EOF
 
-# Wait for rollout; fail if it does not complete so cluster is cleaned up
-echo "Waiting for master MachineConfigPool to complete rollout..."
+# Wait for MCO to start processing the new MachineConfig before waiting for
+# completion. Without this gate the MCP may still show Updated=True from its
+# prior state (MCO hasn't reconciled yet), causing the Updated wait to succeed
+# immediately and the actual rolling reboot to happen during the next CI step.
+echo "Waiting for MCO to begin processing the new MachineConfig..."
+if ! oc wait machineconfigpool/master --for=condition=Updating=True --timeout=7m; then
+ echo "MCO did not start processing within 7m; failing so cluster is cleaned up."
+ exit 1
+fi
+echo "MCO is processing. Waiting for master MachineConfigPool to complete rollout..."
 if ! oc wait machineconfigpool/master --for=condition=Updated --timeout=30m; then
  echo "MachineConfig rollout did not complete; failing so cluster is cleaned up."
  exit 1
