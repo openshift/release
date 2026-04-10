@@ -7,14 +7,38 @@ if [ "${RUN_ORION}" == "false" ]; then
   exit 0
 fi
 
-# Check for deferred JSON results
+# Fetch deferred JSON results from previous steps' GCS artifacts
+GCS_BUCKET="gs://test-platform-results"
+GCS_BASE=""
+
+case "${JOB_TYPE:-}" in
+    presubmit)
+        if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            GCS_BASE="${GCS_BUCKET}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts"
+        fi
+        ;;
+    periodic)
+        if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            GCS_BASE="${GCS_BUCKET}/logs/${JOB_NAME}/${BUILD_ID}/artifacts"
+        fi
+        ;;
+esac
+
+if [[ -z "$GCS_BASE" ]]; then
+    echo "Could not determine GCS artifacts path. Skipping report."
+    exit 0
+fi
+
+echo "Fetching deferred orion JSONs from GCS: ${GCS_BASE}"
+mkdir -p /tmp/orion-jsons
+gsutil -m cp "${GCS_BASE}/*/openshift-qe-orion-*/artifacts/junit_*.json" /tmp/orion-jsons/ 2>/dev/null || true
+
 shopt -s nullglob
-json_files=("${SHARED_DIR}"/junit*.json)
+json_files=(/tmp/orion-jsons/junit*.json)
 shopt -u nullglob
 
 if [ ${#json_files[@]} -eq 0 ]; then
-  echo "No deferred orion JSON results found in SHARED_DIR."
-  echo "This is expected when RUN_ORION is not set to deferred."
+  echo "No deferred orion JSON results found in GCS."
   exit 0
 fi
 
