@@ -37,7 +37,7 @@ else
   exit 1
 fi
 
-BASTION_IP=$(cat /var/host_variables/kni-qe-99/bastion/ansible_host)
+BASTION_IP=$(cat /var/host_variables/${REPORT_BASTION}/bastion/ansible_host)
 BASTION_USER=$(cat /var/group_variables/common/all/ansible_user)
 
 cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
