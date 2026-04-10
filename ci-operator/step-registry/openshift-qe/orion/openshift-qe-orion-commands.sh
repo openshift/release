@@ -89,8 +89,7 @@ if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
     echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
 fi
 
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-export VERSION
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
 
 # Unset proxy so we can pip install, reach sippy, etc.
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
