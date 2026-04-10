@@ -166,7 +166,8 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 # default domain XML (domain_def.go), not in .tf. The provider applies optional XSLT after building
 # XML (resource_libvirt_domain). When IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true and ARCH=s390x, a
 # background loop injects xml { xslt = file(...) } into each libvirt_domain resource under
-# ${dir}/terraform after openshift-install unpacks each stage (fragile across installer versions).
+# /tmp/openshift-install-* (Terraform's real working dir per applyStage); ${dir}/terraform only
+# holds the terraform binary and provider plugins (fragile across installer versions).
 
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
@@ -216,12 +217,11 @@ fi
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
 	(
 		set +o errexit
-		tfroot="${dir}/terraform"
-		xsl="${tfroot}/s390x-strip-acpi.xsl"
+		# XSL must live outside openshift-install's TempDir trees (they are removed per stage).
+		xsl="${dir}/s390x-strip-acpi.xsl"
 		while true; do
-			if [[ -d "${tfroot}" ]]; then
-				if [[ ! -f "${xsl}" ]]; then
-					cat > "${xsl}" <<'XSL_EOF'
+			if [[ ! -f "${xsl}" ]]; then
+				cat > "${xsl}" <<'XSL_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
@@ -233,7 +233,10 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
   <xsl:template match="acpi"/>
 </xsl:stylesheet>
 XSL_EOF
-				fi
+			fi
+			# Modules are unpacked under /tmp/openshift-install-<stage>-* (see pkg/terraform applyStage), not ${dir}/terraform.
+			for work in /tmp/openshift-install-*; do
+				[[ -d "${work}" ]] || continue
 				while IFS= read -r -d '' tf; do
 					if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
 						continue
@@ -252,8 +255,8 @@ XSL_EOF
 						}
 						{ print }
 					' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
-				done < <(find "${tfroot}" -name '*.tf' -print0 2>/dev/null)
-			fi
+				done < <(find "${work}" -name '*.tf' -print0 2>/dev/null)
+			done
 			sleep 0.2
 		done
 	) &
