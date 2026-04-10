@@ -84,7 +84,28 @@ function ibmcloud_login {
 
 # Gather load-balancer resources
 function gather_lb_resources {
-    mapfile -t LBS < <("${IBMCLOUD_CLI}" is lbs -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}')
+    local lb_ids
+
+    # Skip load balancers in "delete_pending" state. These can be fully
+    # deleted between the initial listing and the sub-resource queries
+    # (lb-ls, lb-ps, etc.), causing "load_balancer_not_found" errors that
+    # fail the gather step under "set -o errexit". Other transitional states
+    # are safe to query. Deleted LBs have nothing useful left to gather.
+    # Assigned to a variable rather than read through process substitution so
+    # that a failure of the listing or of jq is caught by "set -o errexit"
+    # instead of silently yielding an empty list.
+    lb_ids=$("${IBMCLOUD_CLI}" is lbs --output JSON \
+        | jq -r --arg f "${CLUSTER_FILTER}" '.[]
+            | select(((.name // "") | contains($f)) or ((.resource_group.name // "") | contains($f)))
+            | select(.provisioning_status != "delete_pending")
+            | .id')
+
+    if [[ -z "${lb_ids}" ]]; then
+        echo "No load balancers to gather for ${CLUSTER_FILTER}"
+        return 0
+    fi
+    mapfile -t LBS <<< "${lb_ids}"
+
     for lb in "${LBS[@]}"; do
         {
             echo -e "# ibmcloud is lb-ls ${lb}\n"
@@ -191,7 +212,12 @@ function gather_resources {
             fi
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
             echo -e "\n\n\n# ibmcloud is ${resource} <item>\n"
-            "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} % -q"
+            # A resource can be deleted between the listing above and these
+            # per-item queries; an incomplete dump is acceptable, failing the
+            # gather step is not. The error itself is left on stderr, and a
+            # failure of the listing still surfaces on the unguarded line above.
+            "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} % -q" \
+                || echo "WARNING: per-item ${resource} query failed, the dump may be incomplete" >&2
         } > "${RESOURCE_DUMP_DIR}/${resource}s.txt"
         
         if [ "$hasSetTarget" = true ];  then
