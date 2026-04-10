@@ -137,6 +137,7 @@ echo "export NO_MINIKUBE=true" >> /root/config
 echo "export WORKER_DISK=40000000000" >> /root/config
 
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE:-${RELEASE_IMAGE_LATEST}}" >> /root/config
+echo "export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true" >> /root/config
 
 set -x
 
