@@ -163,11 +163,10 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
 # s390x + newer QEMU (e.g. default machine s390-ccw-virtio-rhel9.6.0): libvirt rejects domains that
 # request ACPI, but openshift-install's terraform-provider-libvirt always enables ACPI in the
-# default domain XML (domain_def.go), not in .tf. The provider applies optional XSLT after building
-# XML (resource_libvirt_domain). When IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true and ARCH=s390x, a
-# background loop injects xml { xslt = file(...) } into each libvirt_domain resource under
-# /tmp/openshift-install-* (Terraform's real working dir per applyStage); ${dir}/terraform only
-# holds the terraform binary and provider plugins (fragile across installer versions).
+# default domain XML (domain_def.go). The provider supports xml.xslt on libvirt_domain.
+# unpackAndInit() writes modules and runs terraform init in the same Go routine with no gap, so a
+# parallel poller cannot patch .tf in time. We wrap ${dir}/terraform/bin/terraform (after UnpackTerraform
+# drops the real binary, before the first init) to patch $(pwd) before each init/apply (fragile).
 
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
@@ -213,15 +212,10 @@ if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
 	find "$dir" -type f -exec sed -i -E "s/${pattern}/${LEASED_RESOURCE}/g" {} +
 fi
 
-# CI workaround: strip <acpi/> from generated domain XML via provider XSLT (see comment above).
+# CI workaround: inject xml.xslt before terraform init (see comment above).
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
-	(
-		set +o errexit
-		# XSL must live outside openshift-install's TempDir trees (they are removed per stage).
-		xsl="${dir}/s390x-strip-acpi.xsl"
-		while true; do
-			if [[ ! -f "${xsl}" ]]; then
-				cat > "${xsl}" <<'XSL_EOF'
+	xsl="${dir}/s390x-strip-acpi.xsl"
+	cat > "${xsl}" <<'XSL_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
@@ -233,32 +227,67 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
   <xsl:template match="acpi"/>
 </xsl:stylesheet>
 XSL_EOF
-			fi
-			# Modules are unpacked under /tmp/openshift-install-<stage>-* (see pkg/terraform applyStage), not ${dir}/terraform.
-			for work in /tmp/openshift-install-*; do
-				[[ -d "${work}" ]] || continue
-				while IFS= read -r -d '' tf; do
-					if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
-						continue
-					fi
-					if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
-						continue
-					fi
-					awk -v xsl="${xsl}" '
-						/resource "libvirt_domain"/ {
-							print
-							print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
-							print "  xml {"
-							print "    xslt = file(\"" xsl "\")"
-							print "  }"
-							next
-						}
-						{ print }
-					' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
-				done < <(find "${work}" -name '*.tf' -print0 2>/dev/null)
-			done
-			sleep 0.2
+	patch_tf="${dir}/ipi-libvirt-s390x-patch-libvirt-domain-tf.sh"
+	cat > "${patch_tf}" <<'PATCH_EOF'
+#!/bin/bash
+set -euo pipefail
+work="${1:?}"
+xsl="${2:?}"
+[[ -d "${work}" ]] || exit 0
+while IFS= read -r -d '' tf; do
+	if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
+		continue
+	fi
+	if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
+		continue
+	fi
+	awk -v xsl="${xsl}" '
+		/resource "libvirt_domain"/ {
+			print
+			print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
+			print "  xml {"
+			print "    xslt = file(\"" xsl "\")"
+			print "  }"
+			next
+		}
+		{ print }
+	' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
+done < <(find "${work}" -name '*.tf' -print0 2>/dev/null)
+PATCH_EOF
+	chmod +x "${patch_tf}"
+	(
+		set +o errexit
+		tfbin="${dir}/terraform/bin/terraform"
+		deadline=$((SECONDS + 7200))
+		# Wait for installer to create terraform bundle, then wrap before the first terraform init.
+		while [[ ! -d "${dir}/terraform/bin" ]]; do
+			if (( SECONDS >= deadline )); then exit 0; fi
+			sleep 0.05
 		done
+		while [[ ! -f "${tfbin}" || ! -s "${tfbin}" ]]; do
+			if (( SECONDS >= deadline )); then exit 0; fi
+			sleep 0.001 2>/dev/null || sleep 0
+		done
+		if [[ -f "${tfbin}.real" ]]; then
+			exit 0
+		fi
+		if ! mv "${tfbin}" "${tfbin}.real" 2>/dev/null; then
+			exit 0
+		fi
+		cat >"${tfbin}" <<EOF
+#!/bin/bash
+set -euo pipefail
+REAL="${tfbin}.real"
+PATCH="${patch_tf}"
+XSL="${xsl}"
+if [[ "\${ARCH:-}" == "s390x" && "\${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
+	if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
+		bash "\${PATCH}" "\$(pwd)" "\${XSL}"
+	fi
+fi
+exec "\${REAL}" "\$@"
+EOF
+		chmod +x "${tfbin}"
 	) &
 	IPI_ACPI_PATCHER_PID=$!
 fi
