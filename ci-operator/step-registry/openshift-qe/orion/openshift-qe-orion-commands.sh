@@ -304,4 +304,9 @@ if [ $orion_exit_status -eq 3 ]; then
   exit 0
 fi
 
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
+  exit 0
+fi
+
 exit $orion_exit_status
