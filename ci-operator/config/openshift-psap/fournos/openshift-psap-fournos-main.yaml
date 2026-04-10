@@ -1,0 +1,50 @@
+base_images:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      cpu: 2000m
+    requests:
+      cpu: 500m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: fournos
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: fournos
+      commands: |
+        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
+        export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+
+        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        git -C $HOME reset --hard FETCH_HEAD
+
+        exec ./bin/run_ci fournos ci submit
+      credentials:
+      - mount_path: /var/run/psap-forge-ci
+        name: psap-forge-ci
+        namespace: test-credentials
+      - mount_path: /var/run/psap-forge-notifications
+        name: psap-forge-notifications
+        namespace: test-credentials
+      from_image:
+        name: forge-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 23h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-psap
+  repo: fournos
