@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+
 export AZURE_TOKEN_CREDENTIALS=prod
 SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
 
