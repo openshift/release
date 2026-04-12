@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set +o xtrace
 
+export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+
 # Azure login
 export AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_CLIENT_SECRET
 AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
