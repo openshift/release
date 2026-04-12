@@ -13,11 +13,12 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.22
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22: {}
-  to: tls-scanner-tool
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      ocp_builder_rhel-9-golang-1.24-openshift-4.22: {}
+    to: tls-scanner-tool
 promotion:
   to:
   - name: "5.0"
@@ -45,10 +46,14 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
 - as: default-tls
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
     test:
@@ -57,7 +62,7 @@ tests:
 - as: tls13-conformance
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
     test:

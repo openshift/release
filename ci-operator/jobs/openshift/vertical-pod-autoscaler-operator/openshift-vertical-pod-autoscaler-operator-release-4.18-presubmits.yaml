@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/ci-bundle-vertical-pod-autoscaler-operator-bundle
     decorate: true
     labels:
@@ -58,12 +58,12 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-olm
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-vertical-pod-autoscaler-operator-release-4.18-e2e-aws-olm
@@ -139,12 +139,12 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-operator
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-vertical-pod-autoscaler-operator-release-4.18-e2e-aws-operator
@@ -220,12 +220,12 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-vertical-pod-autoscaler-operator-release-4.18-e2e-aws-upgrade
@@ -301,7 +301,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -363,7 +363,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/govet
     decorate: true
     labels:
@@ -425,7 +425,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
@@ -480,7 +480,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/lint
     decorate: true
     labels:
@@ -542,7 +542,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/manifest-diff
     decorate: true
     labels:
@@ -604,12 +604,12 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build06
+    cluster: build11
     context: ci/prow/scorecard
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-vertical-pod-autoscaler-operator-release-4.18-scorecard
@@ -685,7 +685,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/security
     decorate: true
     labels:
@@ -700,6 +700,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -720,6 +721,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -737,6 +741,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -755,7 +765,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     labels:
@@ -817,7 +827,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build07
+    cluster: build11
     context: ci/prow/yamllint
     decorate: true
     labels:

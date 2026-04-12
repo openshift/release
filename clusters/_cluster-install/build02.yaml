@@ -6,12 +6,8 @@ onboard:
   hosted: false
   unmanaged: false
   useTokenFileInKubeconfig: true
-  quayioPullThroughCache:
-    patches:
-    - type: json-patch
-      matches:
-      - kind: ImageContentSourcePolicy
-      inline: [{"op": "add", "path": "/spec/repositoryDigestMirrors/0/mirrors", "value": ["quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"]}]
+  multiarchBuilderController:
+    skip: true
   certificate:
     patches:
     - type: json-patch
@@ -42,14 +38,11 @@ onboard:
       ]
   ciSchedulingWebhook:
     skip: true
-  multiarchBuilderController:
-    skip: true
   machineSet:
     skip: true
   passthrough:
     exclude:
     - "**/supplemental-ci-images/**"
-    - "**/upgrader-sa.yaml"
   openshiftMonitoring:
     patches:
     - matches:
@@ -59,19 +52,116 @@ onboard:
       inline:
         data:
           config.yaml: |
-            prometheusK8s:
-              volumeClaimTemplate:
-                spec:
-                  storageClassName: standard
-                  resources:
-                    requests:
-                      storage: 400Gi
             alertmanagerMain:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
               volumeClaimTemplate:
                 spec:
-                  storageClassName: standard
+                  storageClassName: gp2
                   resources:
                     requests:
                       storage: 10Gi
+            prometheusK8s:
+              externalLabels:
+                clusterName: build02
+              remoteWrite:
+                - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+                  queueConfig:
+                    sampleAgeLimit: 10m
+                  tlsConfig:
+                    ca:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: ca.crt
+                    cert:
+                      secret:
+                        name: thanos-remote-write-tls
+                        key: client.crt
+                    keySecret:
+                      name: thanos-remote-write-tls
+                      key: client.key
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp2
+                  resources:
+                    requests:
+                      storage: 400Gi
+            prometheusOperator:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            metricsServer:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            kubeStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            telemeterClient:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            openshiftStateMetrics:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
+            thanosQuerier:
+              nodeSelector:
+                node-role.kubernetes.io/infra: ""
+              tolerations:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+                effect: NoExecute
   multiarchTuningOperator:
     skip: true
+

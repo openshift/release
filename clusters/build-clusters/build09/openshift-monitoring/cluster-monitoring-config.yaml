@@ -18,6 +18,25 @@ data:
         operator: Exists
         effect: NoExecute
     prometheusK8s:
+      externalLabels:
+        clusterName: build09
+      remoteWrite:
+        - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+          queueConfig:
+            maxShards: 200
+            sampleAgeLimit: 10m
+          tlsConfig:
+            ca:
+              secret:
+                name: thanos-remote-write-tls
+                key: ca.crt
+            cert:
+              secret:
+                name: thanos-remote-write-tls
+                key: client.crt
+            keySecret:
+              name: thanos-remote-write-tls
+              key: client.key
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:

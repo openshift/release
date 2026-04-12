@@ -7,8 +7,9 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-autoscaler-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-autoscaler-operator
 promotion:
   to:
   - name: "4.23"
@@ -52,16 +53,16 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -70,7 +71,7 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-nutanix-operator
@@ -81,7 +82,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -91,11 +92,11 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -109,7 +110,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -123,7 +124,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -137,7 +138,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -151,7 +152,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:

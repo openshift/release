@@ -10,8 +10,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: nutanix-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile
+    to: nutanix-machine-controllers
 promotion:
   to:
   - name: "4.20"
@@ -37,7 +38,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-nutanix
@@ -62,13 +63,14 @@ tests:
           cpu: 100m
     workflow: ipi-nutanix
 - as: regression-clusterinfra-nutanix-ipi-mapi
+  cluster: build01
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
     cluster_profile: nutanix
     env:
       E2E_RUN_TAGS: '@mapi'
-      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!connected-only&&mapi
       TEST_SCENARIOS: Cluster_Infrastructure MAPI
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression

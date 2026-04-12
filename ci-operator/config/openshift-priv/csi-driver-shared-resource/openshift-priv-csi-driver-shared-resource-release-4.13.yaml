@@ -12,14 +12,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/csi-driver-shared-resource
 images:
-- from: base
-  to: csi-driver-shared-resource
-- dockerfile_path: Dockerfile.mustgather
-  from: must_gather
-  to: csi-driver-shared-resource-mustgather
-- dockerfile_path: Dockerfile.webhook
-  from: base
-  to: csi-driver-shared-resource-webhook
+  items:
+  - from: base
+    to: csi-driver-shared-resource
+  - dockerfile_path: Dockerfile.mustgather
+    from: must_gather
+    to: csi-driver-shared-resource-mustgather
+  - dockerfile_path: Dockerfile.webhook
+    from: base
+    to: csi-driver-shared-resource-webhook
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - additional_images:
@@ -57,7 +59,7 @@ tests:
 - as: e2e-aws-csi-driver
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -72,7 +74,7 @@ tests:
 - as: e2e-aws-csi-driver-no-refreshresource
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -87,7 +89,7 @@ tests:
 - as: e2e-aws-csi-driver-disruptive
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -102,7 +104,7 @@ tests:
 - as: e2e-aws-csi-driver-slow
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

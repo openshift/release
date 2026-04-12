@@ -1,23 +1,18 @@
-base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.21
-images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: managed-cluster-validating-webhooks
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-check
+  commands: hack/prow_pr_check.sh
+  container:
+    from: src
 - as: e2e-binary-build-success
   commands: |
     make e2e-binary-build

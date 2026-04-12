@@ -811,6 +811,17 @@ EOF
   get_storage_class_name
   setup-pre-ga-catalog-access
 
+  echo "************ telcov10n Create assisted-installer-config-override ConfigMap ************"
+  cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assisted-installer-config-override
+  namespace: multicluster-engine
+data:
+  OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
+EOF
+
   agent_serv_conf=$(oc get AgentServiceConfig agent 2>/dev/null || echo)
 
   if [ -z "${agent_serv_conf}" ]; then
@@ -882,6 +893,11 @@ spec:
 EO-mirror-patch
     fi
   fi
+
+  echo "************ telcov10n Add assisted-service-configmap annotation to AgentServiceConfig ************"
+  oc annotate agentserviceconfig agent \
+    "unsupported.agent-install.openshift.io/assisted-service-configmap=assisted-installer-config-override" \
+    --overwrite 2>/dev/null || true
 
   set -x
   oc get AgentServiceConfig agent -oyaml

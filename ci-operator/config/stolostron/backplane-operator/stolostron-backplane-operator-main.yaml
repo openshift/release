@@ -14,14 +14,17 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  to: backplane-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  to: backplane-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: backplane-operator
+  - dockerfile_path: build/Dockerfile.test.prow
+    to: backplane-operator-test
 promotion:
   to:
   - name: "2.17"
+    namespace: stolostron
+  - name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -89,6 +92,12 @@ tests:
   steps:
     env:
       DESTINATION_BRANCH: backplane-2.17
+    workflow: ocm-ci-fastforward
+- as: backplane-fast-forward-5-0
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-5.0
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

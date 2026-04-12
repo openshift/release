@@ -4,7 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -16,12 +15,7 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-oc config view
-oc projects
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")

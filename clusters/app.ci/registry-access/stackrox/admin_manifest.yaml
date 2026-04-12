@@ -14,9 +14,8 @@ metadata:
   name: image-puller
   namespace: stackrox
 ---
-# this grants your ServiceAccount rights to pull images
-kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
   name: stackrox-image-puller-binding
   # the namespace from which you will pull images
@@ -26,9 +25,15 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: system:image-puller
 subjects:
+  # this grants your ServiceAccount rights to pull images
   - kind: ServiceAccount
     namespace: stackrox
     name: image-puller
+  # this grants all authenticated users rights to pull images
+  # this is the set of all authenticated users
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
 ---
 # this adds the admins to the project.
 kind: RoleBinding
@@ -62,19 +67,3 @@ subjects:
     apiGroup: rbac.authorization.k8s.io
     name: stackrox-admins
     namespace: stackrox
----
-# this grants all authenticated users rights to pull images
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: stackrox-image-puller-binding
-  namespace: stackrox
-roleRef:
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-  name: system:image-puller
-subjects:
-# this is the set of all authenticated users
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: system:authenticated

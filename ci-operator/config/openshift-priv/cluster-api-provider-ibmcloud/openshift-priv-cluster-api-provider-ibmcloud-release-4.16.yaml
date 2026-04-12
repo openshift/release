@@ -3,8 +3,9 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-ibmcloud
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  to: ibmcloud-cluster-api-controllers
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    to: ibmcloud-cluster-api-controllers
 promotion:
   to:
   - name: 4.16-priv
@@ -37,6 +38,12 @@ tests:
   commands: make generate
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

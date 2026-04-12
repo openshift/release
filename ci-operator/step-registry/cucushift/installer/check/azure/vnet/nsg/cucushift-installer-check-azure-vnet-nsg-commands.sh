@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -64,8 +70,8 @@ fi
 
 no_critical_check_result=0
 #nsg rule 'apiserver_in' check
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} > 12 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+if version_gt "${ocp_version}" "4.12"; then
     echo "Checking that nsg rule 'apiserver_in' is not created when cluster is installed in existing vnet"
     nsg_rule_name="apiserver_in"
     nsg_name=$(az network nsg list -g ${RESOURCE_GROUP} --query "[].name" -otsv)

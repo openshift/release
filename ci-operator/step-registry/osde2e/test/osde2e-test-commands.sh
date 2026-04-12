@@ -21,7 +21,19 @@ then
    export TEST_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
+TEST_PARAMETERS="--configs ${CONFIGS} \
+--secret-locations ${SECRET_LOCATIONS}"
+
+if [[ "${SKIP_MUST_GATHER}" == "true" ]]
+then
+  TEST_PARAMETERS="${TEST_PARAMETERS} --skip-must-gather"
+fi
+
+if [[ "${SKIP_DESTROY_CLUSTER}" == "true" ]]
+then
+  TEST_PARAMETERS="${TEST_PARAMETERS} --skip-destroy-cluster"
+fi
+
 export REPORT_DIR="${ARTIFACT_DIR}"
 
-/osde2e test --configs "${CONFIGS}" \
---secret-locations "${SECRET_LOCATIONS}"
+/osde2e test ${TEST_PARAMETERS}

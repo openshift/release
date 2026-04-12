@@ -9,9 +9,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: ci/Dockerfile
-  from: ocp_4.13_cli
-  to: ansible-test-runner
+  items:
+  - dockerfile_path: ci/Dockerfile
+    from: ocp_4.13_cli
+    to: ansible-test-runner
 promotion:
   to:
   - name: "4.13"
@@ -46,7 +47,7 @@ tests:
     from: ansible-test-runner
 - as: migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test-migration
       cli: latest
@@ -61,7 +62,7 @@ tests:
     workflow: ipi-aws-sdn
 - as: rollback
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test-rollback
       cli: latest

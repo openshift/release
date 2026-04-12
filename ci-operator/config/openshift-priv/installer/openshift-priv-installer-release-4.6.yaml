@@ -18,27 +18,28 @@ build_root:
     tag: rhel-8-release-golang-1.14-openshift-4.6
 canonical_go_repository: github.com/openshift/installer
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: installer
-- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
-  to: installer-artifacts
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
-  to: baremetal-installer
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: ovirt-installer
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: installer
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    from: base
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: rhel-7
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: base
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    from: base
+    to: baremetal-installer
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: ovirt-installer
 promotion:
   to:
   - name: 4.6-priv
@@ -123,19 +124,19 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-proxy
 - always_run: false
   as: e2e-aws-shared-vpc
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sharednetwork
 - always_run: false
   as: e2e-gcp
@@ -165,14 +166,8 @@ tests:
   as: e2e-aws-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-latestinstaller
-- always_run: false
-  as: e2e-aws-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
-    cluster_profile: aws
-  optional: true
 - always_run: false
   as: e2e-gcp-upi
   optional: true
@@ -186,16 +181,10 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
-  as: e2e-azure-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
-    cluster_profile: openshift-org-azure
-  optional: true
-- always_run: false
   as: e2e-aws-workers-rhel7
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "7.9"
     workflow: openshift-e2e-aws-workers-rhel
@@ -203,7 +192,7 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-gcp-upgrade
@@ -243,7 +232,7 @@ tests:
   as: e2e-aws-fips
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel

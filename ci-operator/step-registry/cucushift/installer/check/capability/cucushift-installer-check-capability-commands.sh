@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 baselinecaps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.baselineCapabilitySet")
 if [[ "${baselinecaps_from_config}" == "" ]]; then
     echo "Field capabilities.baselineCapabilitySet in install-config is not set, skip the check!"
@@ -59,6 +66,7 @@ fi
 
 ocp_major_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version="${ocp_major_version}.${ocp_minor_version}"
 
 # Mapping between optional capability and operators
 # Need to be updated when new operator marks as optional
@@ -102,7 +110,6 @@ always_default="${!latest_defined}"
 #always_enabled_caps[416]="Ingress"
 
 # Determine vCurrent
-declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
 
 if [[ ${!v_current_version:-} == "" ]]; then
@@ -120,15 +127,21 @@ case ${baselinecaps_from_config} in
   ;;
 "v4.11")
   enabled_capability_set="${v411}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if version_ge "${ocp_version}" "4.14"; then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.12")
   enabled_capability_set="${v412}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if version_ge "${ocp_version}" "4.14"; then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.13")
   enabled_capability_set="${v413}"
-  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
+  if version_ge "${ocp_version}" "4.14"; then
+    enabled_capability_set="${enabled_capability_set} MachineAPI"
+  fi
   ;;
 "v4.14")
   enabled_capability_set="${v414}"

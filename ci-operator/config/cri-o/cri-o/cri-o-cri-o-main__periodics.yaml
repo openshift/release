@@ -9,21 +9,23 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y jq git openssl python3.11 && \
-        ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
-        dnf clean all
-    RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
-    RUN python3 --version
-    RUN mkdir -p /usr/local/gcloud \
-      && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
-      && rm -f /tmp/google-cloud-sdk.tar.gz
-    ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
-    WORKDIR /workdir
-    COPY . .
-  from: base
-  to: crio-crio-base-src
+  items:
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y jq git openssl python3.11 && \
+          ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+          dnf clean all
+      RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
+      RUN python3 --version
+      RUN mkdir -p /usr/local/gcloud \
+        && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
+        && rm -f /tmp/google-cloud-sdk.tar.gz
+      ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+      WORKDIR /workdir
+      COPY . .
+    from: base
+    to: crio-crio-base-src
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
 releases:
   initial:
     integration:

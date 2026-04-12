@@ -56,6 +56,14 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Get Pull request info - Pull request
+PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
+PR_BODY=$(curl -s -X GET \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
+  jq -r '.body')
+DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "(depends-on).*(install_yamls)" || true)
 # Build tag
 BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
@@ -125,6 +133,17 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   fi
 
   cd ${HOME}/install_yamls
+  # Depends-On syntax detected in the PR description: get the PR ID
+  pr_num=""
+  if [[ -n $DEPENDS_ON_INSTALL_YAMLS ]]; then
+    pr_num=$(echo "$DEPENDS_ON_INSTALL_YAMLS" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
+  fi
+  # make sure the PR ID we parse is a number
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    # checkout pr $pr_num
+    git fetch origin pull/"$pr_num"/head:PR"$pr_num"
+    git checkout PR"$pr_num"
+  fi
   # set slow etcd profile
   make set_slower_etcd_profile
   # Create/enable openstack namespace

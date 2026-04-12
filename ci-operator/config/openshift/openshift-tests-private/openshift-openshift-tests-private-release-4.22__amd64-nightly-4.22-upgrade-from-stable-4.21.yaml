@@ -77,8 +77,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-disconnected-pin-mco-f60
-  cron: 47 5 14 2,4,6,8,10,12 *
+- as: aws-ipi-disconnected-pin-mco-f14
+  cron: 26 1 3,17 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -200,6 +200,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      HC_DISABLED_CAPS: Insights,openshift-samples
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
     - chain: openshift-upgrade-qe-test-hypershift
@@ -431,6 +432,7 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       MIRROR_BIN: oc-mirror
       MIRROR_GRAPH_DATA: "true"
+      USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "true"
     test:
     - ref: cucushift-upgrade-mirror-images-by-oc-mirror
     - ref: cucushift-upgrade-prehealthcheck
@@ -500,7 +502,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-stack-upi
-- as: baremetal-compact-agent-ipv4-static-connected-f28
+- as: metal-compact-agent-ipv4-static-connected-f28
   capabilities:
   - intranet
   cron: 13 18 5 * *
@@ -517,7 +519,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-ha-agent-platform-none-ipv4-static-f28
+- as: metal-ha-agent-platform-none-ipv4-static-f28
   capabilities:
   - intranet
   cron: 8 15 10 * *
@@ -536,7 +538,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-upi-ovn-ipv4-f28
+- as: metal-upi-ovn-ipv4-f28
   capabilities:
   - intranet
   cron: 33 13 15 * *
@@ -550,7 +552,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+- as: metal-ds-ipi-ovn-dualstack-primaryv6-f999
   capabilities:
   - intranet
   cron: 8 8 29 2 *
@@ -565,7 +567,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv4-fips-canary-f28
+- as: metal-ds-ipi-ovn-ipv4-fips-canary-f28
   capabilities:
   - intranet
   cron: 4 16 22 * *
@@ -579,7 +581,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv6-fips-f999
+- as: metal-ds-ipi-ovn-ipv6-fips-f999
   capabilities:
   - intranet
   cron: 8 8 29 2 *
@@ -595,7 +597,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-lvms-f28
+- as: metal-ds-ipi-ovn-lvms-f28
   capabilities:
   - intranet
   cron: 6 15 7 * *
@@ -608,7 +610,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
-- as: baremetal-sno-agent-ipv4-static-connected-fips-f28
+- as: metal-sno-agent-ipv4-static-connected-fips-f28
   capabilities:
   - intranet
   cron: 21 14 27 * *
@@ -930,10 +932,9 @@ tests:
 - as: vsphere-ipi-remote-worker-f28
   cron: 12 22 27 * *
   steps:
-    cluster_profile: vsphere-connected-2
-    leases:
-    - env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
+    cluster_profile: vsphere-elastic
+    env:
+      RESERVE_EXTRA_NETWORK: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker

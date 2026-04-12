@@ -19,33 +19,34 @@ build_root:
     tag: rhel-8-golang-1.18-openshift-4.11
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
-- dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.11
-  to: tests-private
-- dockerfile_literal: |
-    FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.11
-    RUN mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    src:
-      as:
-      - src
-  to: tests-private-ui
-- dockerfile_literal: |
-    FROM bin AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.11
-    RUN mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
-        rm -rf /usr/bin/oc /usr/bin/kubectl
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    bin:
-      as:
-      - bin
-  to: tests-private-pr
+  items:
+  - dockerfile_path: images/Dockerfile.golang
+    from: ci_tests-private-base_4.11
+    to: tests-private
+  - dockerfile_literal: |
+      FROM src AS builder
+      FROM registry.ci.openshift.org/ci/tests-private-baseui:4.11
+      RUN mkdir -p /go/src/github.com/openshift
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    inputs:
+      src:
+        as:
+        - src
+    to: tests-private-ui
+  - dockerfile_literal: |
+      FROM bin AS builder
+      FROM registry.ci.openshift.org/ci/tests-private-base:4.11
+      RUN mkdir -p /go/src/github.com/openshift
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+          rm -rf /usr/bin/oc /usr/bin/kubectl
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    inputs:
+      bin:
+        as:
+        - bin
+    to: tests-private-pr
 promotion:
   to:
   - excluded_images:
@@ -92,7 +93,7 @@ tests:
   optional: true
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test

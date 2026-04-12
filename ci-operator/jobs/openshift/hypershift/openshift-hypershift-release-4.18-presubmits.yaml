@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -86,7 +86,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-aws-metrics
     decorate: true
     labels:
@@ -167,7 +167,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-conformance
     decorate: true
     labels:
@@ -252,7 +252,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-release-4.18-e2e-kubevirt-aws-ovn
@@ -328,7 +328,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-kubevirt-aws-ovn-reduced
     decorate: true
     labels:
@@ -409,7 +409,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-kubevirt-azure-ovn
     decorate: true
     labels:
@@ -572,7 +572,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-aws
     decorate: true
     labels:
@@ -653,7 +653,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-aws-conformance
     decorate: true
     labels:
@@ -734,7 +734,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-aws-csi-cinder
     decorate: true
     labels:
@@ -815,7 +815,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-aws-csi-manila
     decorate: true
     labels:
@@ -896,7 +896,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/e2e-openstack-aws-nfv
     decorate: true
     labels:
@@ -977,7 +977,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -1031,7 +1031,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/mce-images
     decorate: true
     decoration_config:
@@ -1088,7 +1088,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/security
     decorate: true
     labels:
@@ -1102,6 +1102,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -1122,6 +1123,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1139,6 +1143,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1157,7 +1167,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1219,7 +1229,7 @@ presubmits:
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
-    cluster: build02
+    cluster: build05
     context: ci/prow/verify
     decorate: true
     labels:

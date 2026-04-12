@@ -352,10 +352,15 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260310-6097a43c8
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260310-6097a43c8
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260310-6097a43c8
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260310-6097a43c8
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260408-3bbc91829
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260408-3bbc91829
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260408-3bbc91829
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260408-3bbc91829
+  - config:
+      censoring_options:
+        exclude_directories:
+        - '**/aro-hcp-gather-custom-link-tools/**/*.html'
+    repo: Azure/ARO-HCP
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -494,6 +499,9 @@ plank:
   - config:
       timeout: 24h0m0s
     repo: openshift/machine-config-operator
+  - config:
+      timeout: 24h0m0s
+    repo: redhat-performance/backstage-performance
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -576,18 +584,6 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
-presets:
-- env: null
-  labels:
-    presets.ci.openshift.io/registry-pull: "true"
-  volumeMounts:
-  - mountPath: /etc/pull-secret
-    name: pull-secret
-    readOnly: true
-  volumes:
-  - name: pull-secret
-    secret:
-      secretName: registry-pull-credentials
 prowjob_default_entries:
 - cluster: '*'
   config:
@@ -721,6 +717,18 @@ tide:
           jenkins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
+          operator-lifecycle-manager:
+            branches:
+              master:
+                skip-unknown-contexts: true
+          operator-marketplace:
+            branches:
+              master:
+                skip-unknown-contexts: true
+          operator-registry:
+            branches:
+              master:
+                skip-unknown-contexts: true
       operator-framework:
         repos:
           api:

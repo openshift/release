@@ -11,8 +11,9 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: cluster-config-api
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: cluster-config-api
 promotion:
   to:
   - name: "4.23"
@@ -95,17 +96,39 @@ tests:
     go build ./...
   container:
     from: src
+- as: verify-hypershift-integration
+  commands: |
+    dir=$GOPATH/src/github.com/openshift/hypershift
+    git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
+     git clone https://github.com/openshift/client-go --branch master --single-branch $dir/openshift-client-go
+    rm -rf $dir/vendor/github.com/openshift/api/*
+    rm -rf $dir/vendor/github.com/openshift/client-go/*
+    cp -Rf ./ $dir/openshift-api/
+    rm -rf $dir/openshift-api/vendor
+    rm -rf $dir/openshift-client-go/vendor
+    cd $dir
+    echo "replace github.com/openshift/api => ./openshift-api" >> go.mod
+    echo "replace github.com/openshift/client-go => ./openshift-client-go" >> go.mod
+    echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
+    echo "# github.com/openshift/client-go => ./openshift-client-go" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
+    sed -i "/github.com\/openshift\/client-go v0.0.0/ s/$/ => \.\/openshift-client-go/" vendor/modules.txt
+    go mod tidy
+    go mod vendor
+    make api test-envtest-api-all
+  container:
+    from: src
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -114,14 +137,14 @@ tests:
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-serial-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -142,13 +165,13 @@ tests:
   as: e2e-upgrade
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-upgrade-out-of-change
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial

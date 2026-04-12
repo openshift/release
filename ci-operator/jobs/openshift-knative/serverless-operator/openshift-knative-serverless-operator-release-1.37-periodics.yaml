@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build03
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -12,11 +12,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: ocp-4.22-lp-interop-cr
+    ci-operator.openshift.io/variant: ocp-4.22-lp-interop
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.22-lp-interop-cr-operator-e2e-interop-aws-ocp422
+  name: periodic-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.22-lp-interop-aws-fips
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -36,8 +36,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-e2e-interop-aws-ocp422
-      - --variant=ocp-4.22-lp-interop-cr
+      - --target=aws-fips
+      - --variant=ocp-4.22-lp-interop
       command:
       - ci-operator
       env:
@@ -106,11 +106,22 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: ocp-4.23-lp-interop-cr
+    ci-operator.openshift.io/variant: ocp-4.22-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "4.23"
+    job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.23-lp-interop-cr-operator-e2e-interop-aws-ocp422
+  name: periodic-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.22-lp-interop-cr-operator-e2e-aws
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -119,8 +130,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-e2e-interop-aws-ocp422
-      - --variant=ocp-4.23-lp-interop-cr
+      - --target=cr-operator-e2e-aws
+      - --variant=ocp-4.22-lp-interop
       command:
       - ci-operator
       env:

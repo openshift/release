@@ -4,13 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
-EXIT_CODE=100
-trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -31,10 +38,8 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_minor_version <= 11&& ocp_major_version == 4 )); then
+if version_le "${ocp_version}" "4.11"; then
   echo "CPMS support for AWS was added in 4.12, the following step is not applicable for this OCP version, quit now."
   exit 1
 fi

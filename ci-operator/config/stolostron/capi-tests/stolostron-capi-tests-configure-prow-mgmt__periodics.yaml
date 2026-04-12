@@ -1,0 +1,44 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.prow
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: capz-e2e
+  cron: 0 6 * * 1-5
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      DEPLOY_CHARTS: "true"
+      SIZE_VARIANT: compact
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    post:
+    - ref: capz-test-summary
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-azure-pre
+    - ref: capz-test-check-dependencies
+    - ref: capz-test-setup
+    test:
+    - ref: capz-test-management-cluster
+    - ref: capz-test-generate-yamls
+    workflow: openshift-e2e-azure
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: configure-prow-mgmt
+  org: stolostron
+  repo: capi-tests
+  variant: periodics

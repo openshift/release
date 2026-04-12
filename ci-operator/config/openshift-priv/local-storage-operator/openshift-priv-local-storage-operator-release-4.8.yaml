@@ -14,15 +14,16 @@ build_root:
     tag: rhel-8-release-golang-1.16-openshift-4.8
 canonical_go_repository: github.com/openshift/local-storage-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: local-storage-operator
-- dockerfile_path: Dockerfile.diskmaker.rhel7
-  from: base
-  to: local-storage-diskmaker
-- dockerfile_path: Dockerfile.mustgather
-  from: must_gather
-  to: local-storage-mustgather
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: local-storage-operator
+  - dockerfile_path: Dockerfile.diskmaker.rhel7
+    from: base
+    to: local-storage-diskmaker
+  - dockerfile_path: Dockerfile.mustgather
+    from: must_gather
+    to: local-storage-mustgather
 promotion:
   to:
   - name: 4.8-priv
@@ -49,7 +50,7 @@ tests:
     from: src
 - as: e2e-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^backplane-2\.10$
     - ^backplane-2\.10-
-    cluster: build11
+    cluster: build06
     context: ci/prow/check
     decorate: true
     decoration_config:
@@ -68,7 +68,7 @@ presubmits:
     branches:
     - ^backplane-2\.10$
     - ^backplane-2\.10-
-    cluster: build11
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -123,7 +123,7 @@ presubmits:
     branches:
     - ^backplane-2\.10$
     - ^backplane-2\.10-
-    cluster: build11
+    cluster: build06
     context: ci/prow/pr-image-mirror-mce
     decorate: true
     decoration_config:
@@ -138,6 +138,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror-mce
         command:
@@ -157,6 +158,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -171,6 +175,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -186,7 +196,7 @@ presubmits:
     branches:
     - ^backplane-2\.10$
     - ^backplane-2\.10-
-    cluster: build11
+    cluster: build06
     context: ci/prow/unit-tests-sonarcloud
     decorate: true
     decoration_config:

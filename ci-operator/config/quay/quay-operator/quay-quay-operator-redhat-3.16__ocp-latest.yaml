@@ -14,19 +14,20 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: ubi
-  to: quay-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi
+    to: quay-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
 operator:
   bundles:
   - as: quay
@@ -60,7 +61,7 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
     post:
