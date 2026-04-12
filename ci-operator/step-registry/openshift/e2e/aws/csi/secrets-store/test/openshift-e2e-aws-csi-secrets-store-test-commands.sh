@@ -21,5 +21,8 @@ fi
 aws_region=${REGION:-$LEASED_RESOURCE}
 export REGION=$aws_region
 
+# audience needed to be added for token to be retrieved by the aws provider
+oc patch csidriver secrets-store.csi.k8s.io --type='merge' -p '{"spec":{"tokenRequests":[{"audience": "sts.amazonaws.com"}]}}'
+
 # Run aws end-to-end tests
 make e2e-aws
