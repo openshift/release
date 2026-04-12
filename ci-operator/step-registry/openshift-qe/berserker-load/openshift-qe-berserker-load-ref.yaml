@@ -1,0 +1,95 @@
+ref:
+  as: openshift-qe-berserker-load
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-berserker-load-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: BERSERKER_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Extra flags for berserker-load workload
+  - name: KB_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags for the kube-burner command. Reused across other kube-burner based workloads
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: JOB_ITERATIONS
+    default: "5"
+    documentation: |-
+      Number of namespaces to create
+  - name: PROCESS_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of process-load DaemonSets
+  - name: ENDPOINT_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of endpoint-load DaemonSets
+  - name: CONNECTION_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of connection-load DaemonSets
+  - name: CHURN_DURATION
+    default: "1000h"
+    documentation: |-
+      Churn duration (0 disables churn)
+  - name: CHURN_DELAY
+    default: "10m"
+    documentation: |-
+      Time to wait between each churn
+  - name: CHURN_PERCENT
+    default: "80"
+    documentation: |-
+      Percentage of job iterations to churn each round
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: BERSERKER_GC
+    default: "true"
+    documentation: |-
+      Garbage collection
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additional metadata to the fingerprint
+  - name: DOCKER_CONFIG_JSON
+    default: ""
+    documentation: |-
+      Docker config JSON for image pull secret (base64 encoded or plain JSON)
+  documentation: >-
+    This step runs the berserker-load workload for StackRox/RHACS performance testing in the deployed cluster
+  timeout: 6h
