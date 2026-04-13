@@ -103,8 +103,9 @@ cleanup() {
         [[ -f "/tmp/ocpbugs-77510-test.log" ]] && cp "/tmp/ocpbugs-77510-test.log" "$ARTIFACT_DIR/" || true
     fi
     
-    # Don't call exit in cleanup to prevent signal loops
+    # Don't call exit in cleanup to prevent signal loops, but preserve exit code
     unset CLEANUP_RUNNING
+    return $exit_code
 }
 
 trap cleanup EXIT INT TERM
