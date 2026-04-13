@@ -175,6 +175,7 @@ export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 DEPLOY_ARGS=(
     --namespace "${NAMESPACE}"
     --verbose
+    --save-versions
 )
 
 # Add S4 storage flags if enabled
@@ -258,4 +259,25 @@ if [ -d "./tests/reports" ]; then
     echo "Artifacts collected to ${ARTIFACT_DIR}"
 else
     echo "No test reports directory found"
+fi
+
+# Copy version_info.json for ReportPortal metadata
+if [ -f "./version_info.json" ]; then
+    cp ./version_info.json "${ARTIFACT_DIR}/version_info.json"
+    echo "  - version_info.json (component version metadata)"
+else
+    echo "No version_info.json found, skipping"
+fi
+
+# Capture IQE listener pod logs if IQE was run
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "Collecting IQE listener pod logs..."
+    IQE_LISTENER_POD=$(oc get pods -n "${NAMESPACE}" -l app=iqe-listener --no-headers -o name 2>/dev/null | head -1)
+    if [ -n "${IQE_LISTENER_POD}" ]; then
+        oc logs -n "${NAMESPACE}" "${IQE_LISTENER_POD}" \
+            > "${ARTIFACT_DIR}/iqe_listener.log" 2>/dev/null || true
+        echo "  - iqe_listener.log (IQE data listener output)"
+    else
+        echo "No IQE listener pod found, skipping log collection"
+    fi
 fi

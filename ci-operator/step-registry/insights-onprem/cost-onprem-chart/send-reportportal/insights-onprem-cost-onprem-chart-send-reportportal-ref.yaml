@@ -1,0 +1,39 @@
+ref:
+  as: insights-onprem-cost-onprem-chart-send-reportportal
+  from_image:
+    namespace: dno
+    name: droute
+    tag: latest
+  commands: insights-onprem-cost-onprem-chart-send-reportportal-commands.sh
+  grace_period: 1m
+  timeout: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: datarouter
+    mount_path: /var/run/datarouter
+  env:
+  - name: REPORTPORTAL_HOSTNAME
+    default: "reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com"
+    documentation: "ReportPortal server hostname"
+  - name: REPORTPORTAL_PROJECT
+    default: "ecosystem-qe"
+    documentation: "ReportPortal project name"
+  - name: LAUNCH_NAME
+    default: "insights-onprem-e2e"
+    documentation: "ReportPortal launch name (matches Jenkins naming convention)"
+  - name: DISABLE_REPORTPORTAL
+    default: "false"
+    documentation: "Set to 'true' to skip upload for debugging"
+  documentation: |-
+    Upload cost-onprem-chart E2E test results to ReportPortal via DataRouter.
+
+    This step runs in the post phase and executes even if tests fail.
+    Upload failures are non-fatal and will not fail the overall CI job.
+
+    Uploads all junit_*.xml files from ARTIFACT_DIR (junit_chart.xml and
+    junit_iqe.xml when IQE is enabled). Dynamically extracts component version
+    attributes from version_info.json if present.
