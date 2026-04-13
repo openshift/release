@@ -53,9 +53,13 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
     fi
 fi
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+REPO_URL="${E2E_REPO:-https://github.com/cloud-bulldozer/e2e-benchmarking}";
+if [ "$E2E_VERSION" == "default" ]; then
+  LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+  TAG_OPTION="--branch ${LATEST_TAG}"
+else
+  TAG_OPTION="--branch ${E2E_VERSION}"
+fi
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
