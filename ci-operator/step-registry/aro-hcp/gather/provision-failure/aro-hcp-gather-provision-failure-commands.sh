@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+
 # Load resource group names from config.yaml
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
   echo "ERROR: config.yaml not found at ${SHARED_DIR}/config.yaml"

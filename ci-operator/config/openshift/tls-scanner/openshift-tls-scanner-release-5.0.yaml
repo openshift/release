@@ -21,7 +21,8 @@ images:
     to: tls-scanner-tool
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -61,6 +62,25 @@ tests:
     workflow: ipi-aws
 - as: tls13-conformance
   optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - ref: tls-scanner-run
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-tls-13
+- as: periodic-default-tls
+  interval: 72h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: periodic-tls13-conformance
+  interval: 72h
   steps:
     cluster_profile: openshift-org-aws
     env:
