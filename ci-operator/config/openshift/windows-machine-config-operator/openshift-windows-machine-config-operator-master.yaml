@@ -19,6 +19,7 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -200,6 +201,16 @@ tests:
     env:
       FIPS_ENABLED: "true"
       VM_TEMPLATE: windows-golden-images/windows-server-2022-template-ipv6-disabled-fips
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: vsphere-e2e-operator-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      WINDOWS_SERVER_VERSION: "2025"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
