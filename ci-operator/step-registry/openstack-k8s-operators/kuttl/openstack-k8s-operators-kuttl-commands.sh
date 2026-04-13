@@ -130,6 +130,9 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   # Create/enable openstack namespace
   make namespace
 
+  # Clean up storage before creating PVs to avoid stale data from a
+  # previous CI job (e.g. RabbitMQ mnesia from a different version)
+  storage_cleanup
   storage_create
 
   # perform a minor update if it is the openstack-operator
