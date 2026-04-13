@@ -68,11 +68,9 @@ EXTRA_FLAGS+=" --connection-load-replicas=${CONNECTION_LOAD_REPLICAS}"
 EXTRA_FLAGS+=" --churn-duration=${CHURN_DURATION}"
 EXTRA_FLAGS+=" --churn-delay=${CHURN_DELAY}"
 EXTRA_FLAGS+=" --churn-percent=${CHURN_PERCENT}"
-
-# Add docker config if provided
-if [[ -n "${DOCKER_CONFIG_JSON}" ]]; then
-  EXTRA_FLAGS+=" --docker-config-json=${DOCKER_CONFIG_JSON}"
-fi
+EXTRA_FLAGS+=" --process-load-image=${PROCESS_LOAD_IMAGE}"
+EXTRA_FLAGS+=" --endpoint-load-image=${ENDPOINT_LOAD_IMAGE}"
+EXTRA_FLAGS+=" --connection-load-image=${CONNECTION_LOAD_IMAGE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
