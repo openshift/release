@@ -880,7 +880,7 @@ def generate_config():
 def print_cluster_profile_set_details():
     # Do not dump the following cps. Useful when a new profile is about to be introduced
     # and it is not fully defined yet.
-    ignore_list = ["openshift-org-gcp"]
+    ignore_list = []
     cps = {}
     for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
         if not cps_name in ignore_list:
