@@ -66,6 +66,7 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=berserker-load
 EXTRA_FLAGS="${BERSERKER_EXTRA_FLAGS} ${KB_FLAGS} --gc=${BERSERKER_GC} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 EXTRA_FLAGS+=" --job-iterations=${JOB_ITERATIONS}"
+EXTRA_FLAGS+=" --job-pause=${JOB_PAUSE}"
 EXTRA_FLAGS+=" --process-load-replicas=${PROCESS_LOAD_REPLICAS}"
 EXTRA_FLAGS+=" --endpoint-load-replicas=${ENDPOINT_LOAD_REPLICAS}"
 EXTRA_FLAGS+=" --connection-load-replicas=${CONNECTION_LOAD_REPLICAS}"
