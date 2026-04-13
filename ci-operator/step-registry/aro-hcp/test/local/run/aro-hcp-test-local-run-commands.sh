@@ -9,8 +9,14 @@ export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cl
 export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
 export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-subscription-id")
-export AZURE_TOKEN_CREDENTIALS=prod
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+az account set --subscription "${SUBSCRIPTION_ID}"
+
+# TODO: Remove kubeconfig setup once exporter_metrics.go no longer requires direct svc cluster access.
+unset GOFLAGS
+make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+export KUBECONFIG=kubeconfig
+export AZURE_TOKEN_CREDENTIALS=prod
 
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 make frontend-grant-ingress DEPLOY_ENV=prow
