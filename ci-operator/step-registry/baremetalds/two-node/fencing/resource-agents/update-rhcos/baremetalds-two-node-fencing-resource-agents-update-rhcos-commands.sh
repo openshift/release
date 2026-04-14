@@ -13,15 +13,20 @@ oc_debug_with_retry() {
  local node="$1" ; shift
  local retries=5
  local timeout="90s"
+ # ci-operator sets the kubeconfig context namespace to its ephemeral build
+ # namespace (ci-op-*). That namespace only exists on the build cluster, not
+ # on the test cluster. oc debug validates the context namespace before
+ # honouring --namespace, so reset it to avoid "namespace not found" errors.
+ oc config set-context --current --namespace=default 2>/dev/null || true
  for attempt in $(seq 1 "${retries}"); do
   echo "oc debug attempt ${attempt}/${retries} on node/${node} (timeout ${timeout})..."
   if [[ "${attempt}" -eq "${retries}" ]]; then
    # Show stderr on the last attempt for diagnostics
-   if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@"; then
+   if oc debug --namespace=default --request-timeout="${timeout}" "node/${node}" -- "$@"; then
     return 0
    fi
   else
-   if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@" 2>/dev/null; then
+   if oc debug --namespace=default --request-timeout="${timeout}" "node/${node}" -- "$@" 2>/dev/null; then
     return 0
    fi
   fi
