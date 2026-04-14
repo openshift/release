@@ -23,13 +23,14 @@ validate_prerequisites() {
 
     local errors=0
 
-    if ! ls "${ARTIFACT_DIR}"/junit_*.xml &>/dev/null; then
-        echo "ERROR: No junit_*.xml files found in ${ARTIFACT_DIR}"
+    # JUnit files are passed via SHARED_DIR (not ARTIFACT_DIR which is step-specific)
+    if ! ls "${SHARED_DIR}"/junit_*.xml &>/dev/null; then
+        echo "ERROR: No junit_*.xml files found in ${SHARED_DIR}"
         echo "  Tests may not have run or artifact collection failed"
         errors=$((errors + 1))
     else
         echo "Found JUnit files:"
-        ls "${ARTIFACT_DIR}"/junit_*.xml | sed 's/^/  - /'
+        ls "${SHARED_DIR}"/junit_*.xml | sed 's/^/  - /'
     fi
 
     if [[ ! -f "/var/run/datarouter/username" ]] || [[ ! -f "/var/run/datarouter/password" ]]; then
@@ -62,8 +63,9 @@ extract_version_info() {
     echo ""
     echo "Extracting version information..."
 
-    if [[ ! -f "${ARTIFACT_DIR}/version_info.json" ]]; then
-        echo "version_info.json not found in artifacts, skipping metadata extraction"
+    # version_info.json is passed via SHARED_DIR from the e2e step
+    if [[ ! -f "${SHARED_DIR}/version_info.json" ]]; then
+        echo "version_info.json not found in SHARED_DIR, skipping metadata extraction"
         echo '[]' > "${ARTIFACT_DIR}/version_attributes.json"
         return 0
     fi
@@ -82,7 +84,7 @@ extract_version_info() {
                 end
             )
           })
-    ' "${ARTIFACT_DIR}/version_info.json")
+    ' "${SHARED_DIR}/version_info.json")
 
     # Flatten components.NAME.tag into NAME_version attributes
     local component_attributes
@@ -93,7 +95,7 @@ extract_version_info() {
             key: (.key | gsub("-"; "_") + "_version"),
             value: (.value.tag // "unknown")
           })
-    ' "${ARTIFACT_DIR}/version_info.json")
+    ' "${SHARED_DIR}/version_info.json")
 
     # Merge both sets
     jq -s '.[0] + .[1]' \
@@ -238,7 +240,7 @@ upload_to_datarouter() {
     $WAS_TRACING && set -x
 
     echo "DataRouter URL: ${datarouter_url}"
-    echo "Results: ${ARTIFACT_DIR}/junit_*.xml"
+    echo "Results: ${SHARED_DIR}/junit_*.xml"
 
     local max_attempts=10
     local wait_seconds=10
@@ -255,7 +257,7 @@ upload_to_datarouter() {
             --url "${datarouter_url}" \
             --username "${username}" \
             --password "${password}" \
-            --results "${ARTIFACT_DIR}/junit_*.xml" \
+            --results "${SHARED_DIR}/junit_*.xml" \
             --verbose --wirelog 2>&1); then
             $WAS_TRACING && set -x
             echo "Upload successful"

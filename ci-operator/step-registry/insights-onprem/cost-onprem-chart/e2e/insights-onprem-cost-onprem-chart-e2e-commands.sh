@@ -261,9 +261,17 @@ else
     echo "No test reports directory found"
 fi
 
+# Copy JUnit files to SHARED_DIR for ReportPortal post step
+# (ARTIFACT_DIR is step-specific; SHARED_DIR persists across steps)
+echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
+cp "${ARTIFACT_DIR}"/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || true
+ls "${SHARED_DIR}"/junit_*.xml 2>/dev/null | sed 's/^/  - /' || echo "  (no junit files to copy)"
+
 # Copy version_info.json for ReportPortal metadata
 if [ -f "./version_info.json" ]; then
     cp ./version_info.json "${ARTIFACT_DIR}/version_info.json"
+    # Also copy to SHARED_DIR for ReportPortal step
+    cp ./version_info.json "${SHARED_DIR}/version_info.json"
     echo "  - version_info.json (component version metadata)"
 else
     echo "No version_info.json found, skipping"
