@@ -1,0 +1,44 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: mirror-gui
+promotion:
+  to:
+  - name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./container-run.sh --build-only
+tests:
+- as: lint
+  commands: npm ci && npm run lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: unit
+  commands: npm ci && npm run build && npm run test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: mirror-gui
