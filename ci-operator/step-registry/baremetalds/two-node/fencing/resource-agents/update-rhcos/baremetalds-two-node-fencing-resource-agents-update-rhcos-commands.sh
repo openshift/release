@@ -73,14 +73,18 @@ if [[ -z "${PULL_SECRET}" ]] || [[ ! -f "${PULL_SECRET}" ]]; then
  echo "Pull secret file required (set PULL_SECRET or use CLUSTER_PROFILE_DIR/pull-secret)."
  exit 1
 fi
+OCP_MAJOR=$(echo "${OCP_VERSION}" | cut -d. -f1)
 OCP_MINOR=$(echo "${OCP_VERSION}" | cut -d. -f2)
+if [[ -z "${OCP_MAJOR}" ]] || ! [[ "${OCP_MAJOR}" =~ ^[0-9]+$ ]]; then
+ OCP_MAJOR=4
+fi
 if [[ -z "${OCP_MINOR}" ]] || ! [[ "${OCP_MINOR}" =~ ^[0-9]+$ ]]; then
  OCP_MINOR=0
 fi
-if [[ "${OCP_MINOR}" -le 22 ]]; then
- STREAM=9
-else
+if [[ "${OCP_MAJOR}" -ge 5 ]] || [[ "${OCP_MINOR}" -gt 22 ]]; then
  STREAM=10
+else
+ STREAM=9
 fi
 
 if [[ -z "${CUSTOM_OS_MIRROR_REGISTRY:-}" ]] || [[ -z "${CUSTOM_OS_IMAGE_REPO:-}" ]]; then
