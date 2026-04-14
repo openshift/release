@@ -47,6 +47,11 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+CLUSTER_SWITCH="--classic"
+if [[ "$HOSTED_CP" == "true" ]]; then
+   CLUSTER_SWITCH="--hosted-cp"
+fi
+
 # Support to create the account-roles with the higher version
 VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
@@ -80,11 +85,6 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   fi
 
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-fi
-
-CLUSTER_SWITCH="--classic"
-if [[ "$HOSTED_CP" == "true" ]]; then
-   CLUSTER_SWITCH="--hosted-cp"
 fi
 
 ARN_PATH_SWITCH=""
