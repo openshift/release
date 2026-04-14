@@ -148,6 +148,12 @@ configure_claude() {
 #
 echo "Starting MicroShift Claude CI Doctor"
 
+# CI Doctor should only run from the main branch
+if [[ "${JOB_NAME}" != *-main-ci-doctor ]]; then
+    echo "ERROR: CI Doctor should only run from the main branch job (JOB_NAME=${JOB_NAME})"
+    exit 1
+fi
+
 # Ensure reports and session logs are copied to artifacts
 trap copy_reports EXIT TERM INT
 
