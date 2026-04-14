@@ -20,8 +20,6 @@ timeout -s 9 60m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - << EOF|& se
 
 CLUSTER_KUBECONFIG=\$(find \${KUBECONFIG} -type f -print -quit)
 
-oc annotate sc lvms-vg1 storageclass.kubernetes.io/is-default-class=true
-
 podman run --authfile /root/pull-secret --rm --network=host \
 -v \${CLUSTER_KUBECONFIG}:/root/.kube/config:z \
 -v /root/pull-secret:/installer/overlays/${E2E_KUSTOMIZE_OVERLAY}/files/quay-pull-secret.json:z \
