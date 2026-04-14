@@ -113,7 +113,7 @@ while IFS= read -r line; do
   # Debug: verify token files exist and jq is available
   echo "Processing issue $ISSUE_KEY (status=$STATUS)"
   echo "  Token files check:"
-  for phase in solve review fix pr; do
+  for phase in solve review fix restructure pr; do
     tf="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-tokens.json"
     if [ -f "$tf" ]; then
       echo "    ${phase}: $(cat "$tf" | tr -d '\n' | cut -c1-120)"
@@ -141,16 +141,19 @@ while IFS= read -r line; do
   SOLVE_TEXT=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-output-text.txt" | html_escape)
   REVIEW_TEXT=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" | html_escape)
   FIX_TEXT=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-text.txt" | html_escape)
+  RESTRUCTURE_TEXT=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-text.txt" | html_escape)
   PR_TEXT=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-text.txt" | html_escape)
 
   SOLVE_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-output-tools.txt" | html_escape)
   REVIEW_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tools.txt" | html_escape)
   FIX_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tools.txt" | html_escape)
+  RESTRUCTURE_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-tools.txt" | html_escape)
   PR_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" | html_escape)
 
   SOLVE_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-output-errors.txt" | html_escape)
   REVIEW_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-review-errors.txt" | html_escape)
   FIX_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-errors.txt" | html_escape)
+  RESTRUCTURE_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-errors.txt" | html_escape)
   PR_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" | html_escape)
 
   # Read token usage per phase
@@ -164,7 +167,7 @@ while IFS= read -r line; do
 
   ISSUE_TOTAL_DURATION=0
 
-  for phase_info in "solve:Phase 1: Solve" "review:Phase 2: Review" "fix:Phase 3: Fix" "pr:Phase 4: PR"; do
+  for phase_info in "solve:Phase 1: Solve" "review:Phase 2: Review" "fix:Phase 3: Fix" "restructure:Phase 4: Restructure" "pr:Phase 5: PR"; do
     PHASE_KEY="${phase_info%%:*}"
     PHASE_LABEL="${phase_info#*:}"
     TOKEN_FILE="${SHARED_DIR}/claude-${ISSUE_KEY}-${PHASE_KEY}-tokens.json"
@@ -200,7 +203,7 @@ while IFS= read -r line; do
   # Build per-model breakdown rows from aggregated model_usage across phases
   MODEL_BREAKDOWN_ROWS=""
   MODEL_FILES=""
-  for phase_key in solve review fix pr; do
+  for phase_key in solve review fix restructure pr; do
     tf="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase_key}-tokens.json"
     if [ -f "$tf" ]; then
       MODEL_FILES="$MODEL_FILES $tf"
@@ -278,7 +281,12 @@ while IFS= read -r line; do
   <details><summary>Tool calls</summary><pre>${FIX_TOOLS}</pre></details>
   <details><summary>Tool errors</summary><pre class=\"error-pre\">${FIX_ERRORS}</pre></details>
 
-  <h3>Phase 4: PR Creation</h3>
+  <h3>Phase 4: Restructure Commits</h3>
+  <div class=\"phase-output\"><pre>${RESTRUCTURE_TEXT}</pre></div>
+  <details><summary>Tool calls</summary><pre>${RESTRUCTURE_TOOLS}</pre></details>
+  <details><summary>Tool errors</summary><pre class=\"error-pre\">${RESTRUCTURE_ERRORS}</pre></details>
+
+  <h3>Phase 5: PR Creation</h3>
   <div class=\"phase-output\"><pre>${PR_TEXT}</pre></div>
   <details><summary>Tool calls</summary><pre>${PR_TOOLS}</pre></details>
   <details><summary>Tool errors</summary><pre class=\"error-pre\">${PR_ERRORS}</pre></details>

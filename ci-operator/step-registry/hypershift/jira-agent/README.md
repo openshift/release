@@ -7,7 +7,12 @@ Automated periodic job that processes Jira issues labeled with `issue-for-agent`
 This workflow implements a fully automated system for processing HyperShift Jira issues:
 
 1. **Query**: Searches Jira for unresolved issues in OCPBUGS and CNTRLPLANE projects with label `issue-for-agent` (excluding those with `agent-processed`)
-2. **Process**: For each issue, runs the `/jira-solve` command from the HyperShift repository non-interactively
+2. **Process**: For each issue, runs a five-phase pipeline:
+   - Phase 1: Solve (implement changes via `/jira-solve`)
+   - Phase 2: Pre-commit quality review
+   - Phase 3: Address review findings
+   - Phase 4: Restructure commits into component groups
+   - Phase 5: Create pull request
 3. **Track**: Adds `agent-processed` label to successfully processed issues to prevent reprocessing
 
 ## Data Flow Diagram
@@ -107,8 +112,12 @@ flowchart TD
 - Copies jira-solve command to `.claude/commands/`
 - Configures git and generates GitHub App tokens (JWT auth)
 - Queries Jira API for labeled issues (excluding those with `agent-processed`)
-- Runs jira-solve for each issue using Claude Code CLI with `--system-prompt`
-- Pushes branches to fork, creates PRs to upstream openshift/hypershift
+- For each issue, runs a five-phase pipeline:
+  1. **Solve**: Runs jira-solve to implement changes and push the branch
+  2. **Review**: Pre-commit code quality review (read-only)
+  3. **Fix**: Addresses review findings by editing code, committing, and pushing
+  4. **Restructure**: Reorganizes commits into component-based groups (API, Vendor, CLI, HO, CPO, E2E, Docs)
+  5. **PR**: Creates a pull request to upstream openshift/hypershift
 - Implements rate limiting (60s between issues)
 - Adds `agent-processed` label to successfully processed issues
 

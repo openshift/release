@@ -309,6 +309,7 @@ while IFS= read -r line; do
     BRANCH_NAME=$(git branch --show-current)
     HAS_CODE_CHANGES=false
     PR_URL=""
+    ISSUE_FAILED=false
 
     if [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ] && [ -n "$BRANCH_NAME" ]; then
       DIFF_FILES=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
@@ -453,10 +454,10 @@ IMPORTANT:
       echo "Phase 3 duration: ${PHASE3_DURATION}s"
       echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
 
-      # Regenerate GitHub App tokens before push/PR operations.
+      # Regenerate GitHub App tokens before restructure/PR operations.
       # Installation tokens expire after 1 hour, and phases 1-3 can
-      # easily exceed that. Refreshing here ensures push and PR
-      # creation use a valid token.
+      # easily exceed that. Refreshing here ensures subsequent phases
+      # use a valid token.
       echo "Refreshing GitHub App tokens before push/PR..."
       GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
       if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
@@ -474,13 +475,105 @@ IMPORTANT:
         echo "Upstream token refreshed"
       fi
 
-      # === Phase 4: Create Pull Request ===
+      # === Phase 4: Restructure Commits ===
       echo ""
       echo "=========================================="
-      echo "Phase 4: Creating Pull Request for $ISSUE_KEY"
+      echo "Phase 4: Restructure Commits for $ISSUE_KEY"
       echo "=========================================="
 
       PHASE4_START=$(date +%s)
+
+      # Load the restructure-commits command from the hypershift repo
+      RESTRUCTURE_CMD_FILE="/tmp/hypershift/.claude/commands/restructure-commits.md"
+      if [ -f "$RESTRUCTURE_CMD_FILE" ]; then
+        RESTRUCTURE_CONTENT=$(cat "$RESTRUCTURE_CMD_FILE")
+
+        RESTRUCTURE_PROMPT="Restructure the commits on the current branch following the instructions below. The base branch is 'main'.
+
+After restructuring:
+- Verify git status is clean
+- Force push to origin with --force-with-lease (do NOT ask for confirmation — this is an automated CI pipeline)
+
+IMPORTANT:
+- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
+- ${SUBAGENT_PROMPT}
+
+RESTRUCTURE INSTRUCTIONS:
+${RESTRUCTURE_CONTENT}"
+
+        set +e
+        claude -p "$RESTRUCTURE_PROMPT" \
+          --allowedTools "Bash Read Write Edit Grep Glob" \
+          --max-turns 50 \
+          --model "$CLAUDE_MODEL" \
+          --verbose \
+          --output-format stream-json \
+          2> "/tmp/claude-${ISSUE_KEY}-restructure.log" \
+          | tee "/tmp/claude-${ISSUE_KEY}-restructure.json"
+        RESTRUCTURE_EXIT_CODE=$?
+        set -e
+
+        jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-restructure.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-text.txt" 2>/dev/null || true
+        jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-restructure.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-tools.txt" 2>/dev/null || true
+        jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-restructure.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-errors.txt" 2>/dev/null || true
+        # Extract token usage for Phase 4
+        grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-restructure.json" \
+          | head -1 \
+          | jq '{
+              total_cost_usd: (.total_cost_usd // 0),
+              duration_ms: (.duration_ms // 0),
+              num_turns: (.num_turns // 0),
+              input_tokens: (.usage.input_tokens // 0),
+              output_tokens: (.usage.output_tokens // 0),
+              cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+              cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+              model_usage: (.modelUsage // {}),
+              model: ((.modelUsage // {} | keys | first) // "unknown")
+            }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-tokens.json" 2>/dev/null \
+          || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-tokens.json"
+        echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-tokens.json")"
+
+        if [ $RESTRUCTURE_EXIT_CODE -eq 0 ]; then
+          echo "✅ Phase 4 (restructure commits) completed for $ISSUE_KEY"
+        else
+          echo "⚠️ Phase 4 (restructure commits) failed (exit code: $RESTRUCTURE_EXIT_CODE)"
+          echo "Continuing with PR creation..."
+        fi
+      else
+        echo "Skipping Phase 4: restructure-commits command not found at $RESTRUCTURE_CMD_FILE"
+      fi
+
+      PHASE4_END=$(date +%s)
+      PHASE4_DURATION=$((PHASE4_END - PHASE4_START))
+      echo "Phase 4 duration: ${PHASE4_DURATION}s"
+      echo "$PHASE4_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-restructure-duration.txt"
+
+      # Refresh GitHub App tokens before PR creation
+      # Phase 4 may have consumed additional time, causing token expiration
+      echo "Refreshing GitHub App tokens before PR creation..."
+      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for fork"
+      else
+        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+        echo "Fork token refreshed"
+      fi
+
+      GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
+      if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for upstream"
+      else
+        export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+        echo "Upstream token refreshed"
+      fi
+
+      # === Phase 5: Create Pull Request ===
+      echo ""
+      echo "=========================================="
+      echo "Phase 5: Creating Pull Request for $ISSUE_KEY"
+      echo "=========================================="
+
+      PHASE5_START=$(date +%s)
 
       PR_PROMPT="Create a pull request for the changes on branch '${BRANCH_NAME}'. Details:
 - Jira issue: ${ISSUE_KEY}
@@ -511,7 +604,7 @@ IMPORTANT:
       jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-pr.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-text.txt" 2>/dev/null || true
       jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" 2>/dev/null || true
       jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" 2>/dev/null || true
-      # Extract token usage for Phase 4
+      # Extract token usage for Phase 5
       grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-pr.json" \
         | head -1 \
         | jq '{
@@ -526,23 +619,25 @@ IMPORTANT:
             model: ((.modelUsage // {} | keys | first) // "unknown")
           }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json" 2>/dev/null \
         || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
-      echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
+      echo "Phase 5 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
 
-      PHASE4_END=$(date +%s)
-      PHASE4_DURATION=$((PHASE4_END - PHASE4_START))
-      echo "Phase 4 duration: ${PHASE4_DURATION}s"
-      echo "$PHASE4_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-duration.txt"
+      PHASE5_END=$(date +%s)
+      PHASE5_DURATION=$((PHASE5_END - PHASE5_START))
+      echo "Phase 5 duration: ${PHASE5_DURATION}s"
+      echo "$PHASE5_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-duration.txt"
 
+      PR_URL=""
       if [ $PR_EXIT_CODE -eq 0 ]; then
         PR_URL=$(grep -o 'https://github.com/openshift/hypershift/pull/[0-9]*' "/tmp/claude-${ISSUE_KEY}-pr.json" | head -1 || echo "")
         if [ -n "$PR_URL" ]; then
           echo "✅ PR created: $PR_URL"
         else
-          echo "⚠️ Phase 4 completed but no PR URL found in output"
+          echo "⚠️ Phase 5 completed but no PR URL found in output"
+          ISSUE_FAILED=true
         fi
       else
-        echo "❌ Phase 4 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
-        PR_URL=""
+        echo "❌ Phase 5 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
+        ISSUE_FAILED=true
       fi
 
       # Append report link to PR description
@@ -575,60 +670,66 @@ ${REPORT_SECTION}"
       echo "No code changes detected for $ISSUE_KEY, skipping review and PR creation"
     fi
 
-    # Add 'agent-processed' label to mark issue as handled
-    if [ -n "$JIRA_AUTH" ]; then
-      echo "Adding 'agent-processed' label to $ISSUE_KEY..."
-      LABEL_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
-        "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY" \
-        -H "Authorization: Basic $JIRA_AUTH" \
-        -H "Content-Type: application/json" \
-        -d '{"update":{"labels":[{"add":"agent-processed"}]}}')
-      HTTP_CODE=$(echo "$LABEL_RESPONSE" | tail -1)
-      if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
-        echo "   Label added successfully"
-      else
-        echo "   Warning: Failed to add label (HTTP $HTTP_CODE)"
-      fi
+    if [ "$ISSUE_FAILED" = true ]; then
+      echo "⚠️ PR creation failed for $ISSUE_KEY — skipping post-processing (will retry next run)"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      echo "$ISSUE_KEY $TIMESTAMP ${PR_URL:--} FAILED" >> "$STATE_FILE"
+    else
+      # Add 'agent-processed' label to mark issue as handled
+      if [ -n "$JIRA_AUTH" ]; then
+        echo "Adding 'agent-processed' label to $ISSUE_KEY..."
+        LABEL_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+          "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY" \
+          -H "Authorization: Basic $JIRA_AUTH" \
+          -H "Content-Type: application/json" \
+          -d '{"update":{"labels":[{"add":"agent-processed"}]}}')
+        HTTP_CODE=$(echo "$LABEL_RESPONSE" | tail -1)
+        if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+          echo "   Label added successfully"
+        else
+          echo "   Warning: Failed to add label (HTTP $HTTP_CODE)"
+        fi
 
-      # Transition issue to appropriate status based on project
-      if [[ "$ISSUE_KEY" == OCPBUGS-* ]]; then
-        TARGET_STATUS="ASSIGNED"
-      else
-        TARGET_STATUS="Code Review"
-      fi
+        # Transition issue to appropriate status based on project
+        if [[ "$ISSUE_KEY" == OCPBUGS-* ]]; then
+          TARGET_STATUS="ASSIGNED"
+        else
+          TARGET_STATUS="Code Review"
+        fi
 
-      echo "Transitioning $ISSUE_KEY to '$TARGET_STATUS'..."
-      if transition_issue "$ISSUE_KEY" "$TARGET_STATUS"; then
-        echo "   Transition successful"
-      else
-        echo "   Transition failed or not available"
-      fi
+        echo "Transitioning $ISSUE_KEY to '$TARGET_STATUS'..."
+        if transition_issue "$ISSUE_KEY" "$TARGET_STATUS"; then
+          echo "   Transition successful"
+        else
+          echo "   Transition failed or not available"
+        fi
 
-      # Set assignee to hypershift-team automation (Cloud requires accountId, look it up by display name)
-      echo "Looking up accountId for 'hypershift-team automation'..."
-      ASSIGNEE_ACCOUNT_ID=$(curl -s -G \
-        "https://redhat.atlassian.net/rest/api/3/user/search" \
-        -H "Authorization: Basic $JIRA_AUTH" \
-        --data-urlencode "query=hypershift-automation" \
-        | jq -r '[.[] | select(.displayName == "hypershift-team automation")] | .[0].accountId // empty')
-      if [ -n "$ASSIGNEE_ACCOUNT_ID" ]; then
-        echo "Setting assignee to account ID '${ASSIGNEE_ACCOUNT_ID}'..."
-        ASSIGNEE_RESPONSE=$(set_assignee "$ISSUE_KEY" "$ASSIGNEE_ACCOUNT_ID")
-      else
-        echo "   Warning: Could not find accountId for 'hypershift-team automation', skipping assignee"
-        ASSIGNEE_RESPONSE="skipped
+        # Set assignee to hypershift-team automation (Cloud requires accountId, look it up by display name)
+        echo "Looking up accountId for 'hypershift-team automation'..."
+        ASSIGNEE_ACCOUNT_ID=$(curl -s -G \
+          "https://redhat.atlassian.net/rest/api/3/user/search" \
+          -H "Authorization: Basic $JIRA_AUTH" \
+          --data-urlencode "query=hypershift-automation" \
+          | jq -r '[.[] | select(.displayName == "hypershift-team automation")] | .[0].accountId // empty')
+        if [ -n "$ASSIGNEE_ACCOUNT_ID" ]; then
+          echo "Setting assignee to account ID '${ASSIGNEE_ACCOUNT_ID}'..."
+          ASSIGNEE_RESPONSE=$(set_assignee "$ISSUE_KEY" "$ASSIGNEE_ACCOUNT_ID")
+        else
+          echo "   Warning: Could not find accountId for 'hypershift-team automation', skipping assignee"
+          ASSIGNEE_RESPONSE="skipped
 200"
+        fi
+        HTTP_CODE=$(echo "$ASSIGNEE_RESPONSE" | tail -1)
+        if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+          echo "   Assignee set successfully"
+        else
+          echo "   Warning: Failed to set assignee (HTTP $HTTP_CODE)"
+        fi
       fi
-      HTTP_CODE=$(echo "$ASSIGNEE_RESPONSE" | tail -1)
-      if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
-        echo "   Assignee set successfully"
-      else
-        echo "   Warning: Failed to set assignee (HTTP $HTTP_CODE)"
-      fi
-    fi
 
-    PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
-    echo "$ISSUE_KEY $TIMESTAMP $PR_URL SUCCESS" >> "$STATE_FILE"
+      PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
+      echo "$ISSUE_KEY $TIMESTAMP $PR_URL SUCCESS" >> "$STATE_FILE"
+    fi
   else
     # Log failure but don't mark as processed (will be retried next run)
     echo "❌ Failed to process $ISSUE_KEY"
