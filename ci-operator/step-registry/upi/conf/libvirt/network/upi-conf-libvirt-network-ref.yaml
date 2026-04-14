@@ -8,6 +8,11 @@ ref:
     default: 'default'
   - name: USE_EXTERNAL_DNS
     default: 'false'
+  - name: IPV6_SINGLESTACK
+    default: 'false'
+    documentation: |-
+      When "true", emit IPv6-only libvirt network.xml (DHCP/DNS for IPv6). Requires ipv6.* and
+      node IPv6 addresses in the lease file. Ignored for INSTALLER_TYPE=agent (unsupported).
   resources:
     requests:
       cpu: 10m
@@ -15,3 +20,7 @@ ref:
   documentation: |-
     This step prepares a network.xml to be created in a later install step. This is passed
     along to future steps by storing it in the ${SHARED_DIRECTORY} for future consumption.
+    When IPV6_SINGLESTACK is true (non-agent installs), the lease for LEASED_RESOURCE must include
+    ipv6.gateway, ipv6.prefix, ipv6.dhcp_start, ipv6.dhcp_end, ipv6.machine_network_cidr,
+    ipv6.cluster_network_cidr, ipv6.service_network_cidr, and IPv6 addresses on bootstrap,
+    control-plane, and compute nodes (e.g. "bootstrap"[0].ipv6).

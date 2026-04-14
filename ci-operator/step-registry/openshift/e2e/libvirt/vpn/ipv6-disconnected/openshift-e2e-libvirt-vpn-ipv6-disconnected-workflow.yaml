@@ -1,0 +1,35 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-ipv6-disconnected
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      TEST_TYPE: image-ecosystem
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - ref: upi-libvirt-s390x-ipv6-disconnected
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    IBM Z libvirt UPI in a disconnected / air-gapped style: same install path as
+    openshift-e2e-libvirt-vpn, with an optional release mirror step before install-config.
+
+    **Pre (order):** upi-libvirt-cleanup-pre; optional oc adm release mirror
+    (upi-libvirt-s390x-ipv6-disconnected when ENABLE_RELEASE_MIRROR=true and
+    MIRROR_RELEASE_IMAGE_REPO is set); then the shared libvirt install chain — upi-conf-libvirt,
+    ipi-debug-missing-static-pod-controller-degraded, ipi-conf-etcd-on-ramfs, upi-install-libvirt.
+
+    **DNS:** same as openshift-e2e-libvirt-vpn — no workflow-level dnsConfig; jobs should set
+    USE_EXTERNAL_DNS=true for orange zone / phc-cicd. For IPv6 single-stack install-config and
+    network.xml from leases, set IPV6_SINGLESTACK=true when the cluster profile lease defines the
+    required ipv6.* keys (see upi-conf-libvirt-network).
+
+    **Test / post:** openshift-e2e-libvirt-test (default TEST_TYPE image-ecosystem); post matches VPN
+    (kdump gather, gather, cleanup).
