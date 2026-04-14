@@ -260,4 +260,14 @@ EOF
 
 oc wait hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" --for=condition=Available --timeout=15m
 
+# Enable KubeVirt RebootPolicy feature gate (interop e2e exercises reboot policy specs).
+oc annotate hyperconverged kubevirt-hyperconverged \
+  --namespace="${CNV_INSTALL_NAMESPACE}" \
+  --overwrite \
+  kubevirt.kubevirt.io/jsonpatch='[
+    {"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "RebootPolicy"}
+  ]'
+
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+
 echo "CNV is deployed successfully"
