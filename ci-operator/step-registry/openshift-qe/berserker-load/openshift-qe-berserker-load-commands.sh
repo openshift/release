@@ -60,7 +60,7 @@ if [ "$E2E_VERSION" == "default" ]; then
 else
   TAG_OPTION="--branch ${E2E_VERSION}"
 fi
-git clone $REPO_URL $TAG_OPTION --depth 1
+git clone $REPO_URL $TAG_OPTION --depth 1 e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export WORKLOAD=berserker-load
