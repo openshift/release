@@ -65,11 +65,7 @@ export EXTRA_FLAGS
 # Pre-load egressip test image on all worker nodes sequentially
 for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
   echo "Pre-loading image on node ${node}..."
-  oc run "preload-${node}" --image=quay.io/cloud-bulldozer/eipvalidator:latest \
-    --overrides="{\"spec\":{\"nodeName\":\"${node}\",\"terminationGracePeriodSeconds\":0}}" \
-    --command -- sleep 1
-  oc wait pod "preload-${node}" --for=condition=Ready --timeout=2m
-  oc delete pod "preload-${node}"
+  oc debug "node/${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/eipvalidator:latest
 done
 
 # Run workload immediately
