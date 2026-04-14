@@ -33,9 +33,15 @@ images:
     to: hypershift
   - dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
+  - dockerfile_literal: |
+      FROM hypershift-operator
+      RUN yum install -y jq && yum clean all
+    from: hypershift-operator
+    to: hypershift-cli
 promotion:
   to:
   - excluded_images:
+    - hypershift-cli
     - hypershift-operator
     - hypershift-tests
     name: "5.0"
@@ -46,6 +52,12 @@ promotion:
     excluded_images:
     - '*'
     namespace: hypershift
+    tag: latest
+  - additional_images:
+      hypershift-cli: hypershift-cli
+    excluded_images:
+    - '*'
+    namespace: ci
     tag: latest
 releases:
   initial:
