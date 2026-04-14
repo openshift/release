@@ -21,16 +21,19 @@ tests:
     test:
     - as: fournos
       commands: |
-        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
+        export PSAP_FORGE_FOURNOS_DEPLOY_SECRET_PATH=/var/run/psap-forge-fournos-deploy
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
 
-        git -C $HOME fetch --quiet origin $PULL_PULL_SHA
+        export PSAP_FORGE_FOREIGN_TESTING=openshift-psap/fournos
+
+        TMP_MAIN_BRANCH=fournos-testing
+        git -C $HOME fetch --quiet origin $TMP_MAIN_BRANCH
         git -C $HOME reset --hard FETCH_HEAD
 
-        exec ./bin/run_ci fournos ci submit
+        exec ./bin/run_ci foreign_testing ci submit
       credentials:
-      - mount_path: /var/run/psap-forge-ci
-        name: psap-forge-ci
+      - mount_path: /var/run/psap-forge-fournos-deploy
+        name: psap-forge-fournos-deploy
         namespace: test-credentials
       - mount_path: /var/run/psap-forge-notifications
         name: psap-forge-notifications

@@ -35,8 +35,7 @@ images:
     to: hypershift-tests
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: "4.22"
@@ -53,7 +52,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.22"
+      version: "4.21"
   latest:
     integration:
       include_built_images: true
@@ -63,47 +62,47 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.17"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   latest-420:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   n3minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   n4minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -470,6 +469,23 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- as: dependabot-triage
+  cron: 0 12 * * 5
+  steps:
+    workflow: hypershift-dependabot-triage
+- as: periodic-jira-agent
+  cron: 30 8 * * 1
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: hypershift-jira-agent
+- as: periodic-review-agent
+  cron: 0 8-23/3 * * 1-5
+  steps:
+    env:
+      REVIEW_AGENT_BATCH_ONLY: "true"
+      REVIEW_AGENT_MAX_PRS: "10"
+    workflow: hypershift-review-agent
 - always_run: false
   as: address-review-comments
   optional: true
