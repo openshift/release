@@ -4,7 +4,7 @@ set -euo pipefail
 echo "=== HyperShift E2E Failure Analyzer ==="
 
 # ---------------------------------------------------------------------------
-# 1. Construct GCS base path and detect test failures
+# 1. Construct GCS base path and wait for test step artifacts
 # ---------------------------------------------------------------------------
 JOB_NAME="${JOB_NAME:-unknown}"
 BUILD_ID="${BUILD_ID:-unknown}"
@@ -22,50 +22,44 @@ fi
 
 GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
 PROW_JOB_URL="${GCSWEB_BASE}/${GCS_BUCKET_PATH}"
-
-# Extract the test target name (e.g., e2e-aws from pull-ci-openshift-hypershift-main-e2e-aws)
 JOB_NAME_SHORT="${JOB_NAME##*-main-}"
-
-# Check for test failures by fetching finished.json from test step artifacts in GCS.
-# Each CI step uploads its own finished.json with {"passed":true/false} upon completion.
-# By the time post-steps run, test step artifacts are already in GCS.
-echo "Checking for test failures in GCS..."
-
-FAILURE_DETECTED=false
 ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_BUCKET_PATH}/artifacts/${JOB_NAME_SHORT}"
 
-# List step directories and check each finished.json for failures
-STEP_LIST_URL="${ARTIFACTS_BASE}/"
-STEP_DIRS=$(curl -sL "$STEP_LIST_URL" | grep -oP 'href="[^"]*/"' | grep -oP '/[^/"]+/$' | tr -d '/' | grep -v '^$' || true)
+# The test step's sidecar uploads artifacts to GCS asynchronously.
+# Artifacts may not be available yet when this post-step starts,
+# so we need to poll until they appear.
 
-if [[ -z "$STEP_DIRS" ]]; then
-  echo "Warning: Could not list step directories from GCS — checking build-log directly"
-  # Fallback: try to fetch the build-log from the most common test step names
-  for STEP_NAME in hypershift-aws-run-e2e-external hypershift-azure-run-e2e hypershift-aws-run-e2e; do
-    FINISHED_URL="${ARTIFACTS_BASE}/${STEP_NAME}/finished.json"
-    FINISHED_JSON=$(curl -sL "$FINISHED_URL" 2>/dev/null || true)
+# Known test step names used by workflows that include this analyzer.
+TEST_STEPS="hypershift-aws-run-e2e-nested hypershift-azure-run-e2e hypershift-azure-run-e2e-self-managed"
+
+echo "Waiting for test step artifacts in GCS..."
+FAILURE_DETECTED=false
+FAILED_STEP=""
+MAX_WAIT=600  # 10 minutes max wait for sidecar to upload finished.json
+POLL_INTERVAL=15
+WAITED=0
+
+while [[ $WAITED -lt $MAX_WAIT ]]; do
+  for STEP_NAME in $TEST_STEPS; do
+    FINISHED_JSON=$(curl -sL "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
     if echo "$FINISHED_JSON" | jq -e '.passed == false' &>/dev/null; then
-      echo "Detected test failure in ${STEP_NAME}/finished.json"
+      echo "Detected test failure in ${STEP_NAME}/finished.json (waited ${WAITED}s)"
       FAILURE_DETECTED=true
-      break
+      FAILED_STEP="$STEP_NAME"
+      break 2
+    elif echo "$FINISHED_JSON" | jq -e '.passed == true' &>/dev/null; then
+      echo "Test step ${STEP_NAME} passed — skipping analysis."
+      exit 0
     fi
   done
-else
-  for STEP_DIR in $STEP_DIRS; do
-    # Skip our own step and gather/cleanup steps
-    [[ "$STEP_DIR" == "hypershift-analyze-e2e-failure" ]] && continue
-    FINISHED_URL="${ARTIFACTS_BASE}/${STEP_DIR}/finished.json"
-    FINISHED_JSON=$(curl -sL "$FINISHED_URL" 2>/dev/null || true)
-    if echo "$FINISHED_JSON" | jq -e '.passed == false' &>/dev/null; then
-      echo "Detected test failure in ${STEP_DIR}/finished.json"
-      FAILURE_DETECTED=true
-      break
-    fi
-  done
-fi
+
+  echo "  Waiting for artifacts... (${WAITED}s/${MAX_WAIT}s)"
+  sleep "$POLL_INTERVAL"
+  WAITED=$((WAITED + POLL_INTERVAL))
+done
 
 if [[ "$FAILURE_DETECTED" == "false" ]]; then
-  echo "No test failures detected — skipping analysis."
+  echo "Timed out waiting for test step artifacts after ${WAITED}s — skipping analysis."
   exit 0
 fi
 
@@ -105,37 +99,10 @@ fi
 echo "Skill files loaded."
 
 # ---------------------------------------------------------------------------
-# 4. Extract failed test names from GCS build-log
+# 4. Run Claude with the skill
 # ---------------------------------------------------------------------------
 echo "Prow job URL: $PROW_JOB_URL"
-
-# Download test step build-log from GCS to extract failed test names
-FAILED_TESTS=""
-for STEP_NAME in hypershift-aws-run-e2e-external hypershift-azure-run-e2e hypershift-aws-run-e2e; do
-  BUILD_LOG_URL="${ARTIFACTS_BASE}/${STEP_NAME}/build-log.txt"
-  BUILD_LOG_CONTENT=$(curl -sL "$BUILD_LOG_URL" 2>/dev/null | tail -200 || true)
-  if [[ -n "$BUILD_LOG_CONTENT" ]]; then
-    FAILED_TESTS=$(echo "$BUILD_LOG_CONTENT" | grep -oP '(?<=--- FAIL: )\S+' 2>/dev/null | head -10 || true)
-    if [[ -n "$FAILED_TESTS" ]]; then
-      echo "Extracted failed tests from ${STEP_NAME}/build-log.txt"
-      break
-    fi
-  fi
-done
-
-if [[ -z "$FAILED_TESTS" ]]; then
-  FAILED_TESTS="unknown-test-failure"
-fi
-
-echo "Failed tests found:"
-echo "$FAILED_TESTS" | head -5 | sed 's/^/  - /'
-
-# Pick the first failed test for the primary analysis
-FIRST_FAILED_TEST=$(echo "$FAILED_TESTS" | head -1)
-
-# ---------------------------------------------------------------------------
-# 5. Run Claude with the real skill
-# ---------------------------------------------------------------------------
+echo "Failed step: $FAILED_STEP"
 
 # Build the system prompt from skill content
 SYSTEM_PROMPT="You are analyzing a CI test failure using the Prow Job Analyze Test Failure skill.
@@ -155,21 +122,10 @@ ${SKILL_CONTENT}
 DEPENDENT SKILL - Fetch ProwJob JSON:
 ${FETCH_PROWJOB_CONTENT}"
 
-# Build the user prompt with the job URL and test name
-USER_PROMPT="${PROW_JOB_URL} ${FIRST_FAILED_TEST} --fast"
-
-# If multiple tests failed, add them as additional context
-ADDITIONAL_TESTS=$(echo "$FAILED_TESTS" | tail -n +2 | head -9)
-if [[ -n "$ADDITIONAL_TESTS" ]]; then
-  USER_PROMPT="${USER_PROMPT}
-
-Additional failed tests in this job (analyze the primary test above, but mention these):
-${ADDITIONAL_TESTS}"
-fi
+USER_PROMPT="${PROW_JOB_URL} --fast"
 
 echo ""
 echo "Running Claude with /ci:prow-job-analyze-test-failure skill..."
-echo "Primary test: $FIRST_FAILED_TEST"
 echo ""
 
 set +e
@@ -186,7 +142,7 @@ CLAUDE_EXIT=$?
 set -e
 
 # ---------------------------------------------------------------------------
-# 6. Extract token usage and generate HTML report
+# 5. Extract token usage and generate HTML report
 # ---------------------------------------------------------------------------
 
 # Extract token usage
@@ -284,7 +240,7 @@ cat >> "${ARTIFACT_DIR}/failure-analysis-report.html" <<EOF
 EOF
 
 # ---------------------------------------------------------------------------
-# 7. Post PR comment with link to report (presubmit jobs only)
+# 6. Post PR comment with link to report (presubmit jobs only)
 # ---------------------------------------------------------------------------
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$PULL_NUMBER" ]] && [[ -n "${REPO_OWNER}" ]] && [[ -n "${REPO_NAME}" ]]; then
   echo "Posting failure analysis comment to PR #${PULL_NUMBER}..."
@@ -328,18 +284,10 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ -n "$PULL_NUMBER" ]] && [[ -n "${REPO_
       REPORT_URL="${ARTIFACTS_BASE}/hypershift-analyze-e2e-failure/artifacts/failure-analysis-report.html"
 
       # Build a concise summary for the PR comment
-      FAILED_TEST_LIST=$(echo "$FAILED_TESTS" | head -5 | sed 's/^/- `/' | sed 's/$/`/')
       COMMENT_BODY="$(cat <<COMMENTEOF
 ### AI Test Failure Analysis
 
-**Job**: \`${JOB_NAME}\` | **Build**: \`${BUILD_ID}\` | **Cost**: \$${COST}
-
-<details>
-<summary>Failed tests</summary>
-
-${FAILED_TEST_LIST}
-
-</details>
+**Job**: \`${JOB_NAME}\` | **Build**: \`${BUILD_ID}\` | **Cost**: \$${COST} | **Failed step**: \`${FAILED_STEP}\`
 
 [View full analysis report](${REPORT_URL})
 
