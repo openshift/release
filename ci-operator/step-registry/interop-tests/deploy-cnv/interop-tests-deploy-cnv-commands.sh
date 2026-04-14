@@ -261,13 +261,23 @@ EOF
 oc wait hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" --for=condition=Available --timeout=15m
 
 # Enable KubeVirt RebootPolicy feature gate (interop e2e exercises reboot policy specs).
-oc annotate hyperconverged kubevirt-hyperconverged \
+oc annotate hyperconverged "${CNV_HYPERCONVERGED_NAME}" \
   --namespace="${CNV_INSTALL_NAMESPACE}" \
   --overwrite \
   kubevirt.kubevirt.io/jsonpatch='[
     {"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "RebootPolicy"}
   ]'
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+# Wait until HCO reconciles the annotation (Available alone can return before spec is fully applied).
+for _ in {1..90}; do
+  gen=$(oc get hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" -o jsonpath='{.metadata.generation}' 2>/dev/null || true)
+  obs=$(oc get hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" -o jsonpath='{.status.observedGeneration}' 2>/dev/null || true)
+  if [[ -n "${gen}" && -n "${obs}" && "${obs}" -ge "${gen}" ]]; then
+    break
+  fi
+  sleep 10
+done
+
+oc wait hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" --for=condition=Available --timeout=15m
 
 echo "CNV is deployed successfully"
