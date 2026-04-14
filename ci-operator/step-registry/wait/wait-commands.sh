@@ -9,6 +9,7 @@ function pr_debug_mode_waiting {
   echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
   echo "################################################################################"
 
+  TIMEOUT="8 hours"
   TZ=UTC
   END_TIME=$(date -d "${TIMEOUT}" +%s)
   debug_done=/tmp/debug.done
