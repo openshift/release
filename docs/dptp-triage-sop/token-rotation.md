@@ -112,7 +112,7 @@ oc --context=app.ci --as system:admin -n ephemeral-cluster delete secret/$active
 
 Recreate the old secret:
 ```sh
-oc --context=app.ci --as system:admin apply -f clusters/app.ci/ephemeral-cluster/01_bound-secrets.yaml
+oc --context=app.ci --as system:admin apply -f clusters/app.ci/ephemeral-cluster/01_bound-secret.yaml
 ```
 
 Mark the new active secret:
