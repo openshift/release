@@ -529,6 +529,5 @@ generate-hypershift-deployment:
 
 build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
 build-hypershift-deployment:
-	echo Building HyperShift operator with tag $(TAG)
-	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	echo "Tagging ci/hypershift-cli snapshot as $(TAG) (built by branch-ci-openshift-hypershift-main-images)."
 	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)
