@@ -29,8 +29,10 @@ export AWS_DEFAULT_REGION=$aws_region
 source scripts/netobserv.sh
 
 if [[ ${LOKI_OPERATOR:-} != "None" ]] && [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
-    deploy_lokistack
+    deploy_lokistack || true
 fi
+
+sleep 1800
 
 if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
     deploy_kafka
