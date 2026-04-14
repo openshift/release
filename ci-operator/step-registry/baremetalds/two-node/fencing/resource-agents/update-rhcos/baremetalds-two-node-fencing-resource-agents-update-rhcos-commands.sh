@@ -11,8 +11,8 @@ RESOURCE_AGENTS_REF="${RESOURCE_AGENTS_REF:-main}"
 # generous timeout avoid transient failures.
 oc_debug_with_retry() {
  local node="$1" ; shift
- local retries="${OC_DEBUG_RETRIES:-3}"
- local timeout="${OC_DEBUG_TIMEOUT:-90s}"
+ local retries=5
+ local timeout="90s"
  for attempt in $(seq 1 "${retries}"); do
   echo "oc debug attempt ${attempt}/${retries} on node/${node} (timeout ${timeout})..."
   if [[ "${attempt}" -eq "${retries}" ]]; then
@@ -35,7 +35,7 @@ oc_debug_with_retry() {
 
 if [[ "${RESOURCE_AGENT_SOURCE}" == "RHCOS" ]]; then
  # Report installed resource-agents version on first healthy schedulable node. Must not fail.
- NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}')
+ NODE=$(oc get nodes --no-headers | awk 'tolower($2) == "ready" {print $1; exit}')
  if [[ -z "${NODE}" ]]; then
   echo "No ready node found; skipping version report."
   exit 0
@@ -247,7 +247,7 @@ if ! oc wait machineconfigpool/master --for=condition=Updating=True --timeout=7m
  exit 1
 fi
 echo "MCO is processing. Waiting for master MachineConfigPool to complete rollout..."
-if ! oc wait machineconfigpool/master --for=condition=Updated --timeout=30m; then
+if ! oc wait machineconfigpool/master --for=condition=Updated --timeout=40m; then
  echo "MachineConfig rollout did not complete; failing so cluster is cleaned up."
  exit 1
 fi
@@ -259,7 +259,7 @@ echo "Waiting for nodes to be Ready after reboot..."
 oc wait nodes --all --for=condition=Ready --timeout=5m || true
 
 # Report the resource-agents version now running on a cluster node (Best-effort).
-NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}') || true
+NODE=$(oc get nodes --no-headers | awk 'tolower($2) == "ready" {print $1; exit}') || true
 if [[ -n "${NODE}" ]]; then
  oc_debug_with_retry "${NODE}" chroot /host rpm -q resource-agents || echo "Could not verify resource-agents version on node after retries."
 else
