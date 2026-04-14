@@ -62,32 +62,15 @@ fi
 
 export EXTRA_FLAGS
 
-# Pre-load egressip test image on all worker nodes via DaemonSet
-oc apply -f - <<'EOF'
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: preload-egressip
-  namespace: default
-spec:
-  selector:
-    matchLabels:
-      app: preload-egressip
-  template:
-    metadata:
-      labels:
-        app: preload-egressip
-    spec:
-      terminationGracePeriodSeconds: 0
-      containers:
-      - name: pull
-        image: quay.io/cloud-bulldozer/eipvalidator:latest
-        command: ["sleep", "infinity"]
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
-EOF
-oc rollout status daemonset/preload-egressip -n default --timeout=5m
-oc delete daemonset preload-egressip -n default
+# Pre-load egressip test image on all worker nodes sequentially
+for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+  echo "Pre-loading image on node ${node}..."
+  oc run "preload-${node}" --image=quay.io/cloud-bulldozer/eipvalidator:latest \
+    --overrides="{\"spec\":{\"nodeName\":\"${node}\",\"terminationGracePeriodSeconds\":0}}" \
+    --command -- sleep 1
+  oc wait pod "preload-${node}" --for=condition=Ready --timeout=2m
+  oc delete pod "preload-${node}"
+done
 
 # Run workload immediately
 ./run.sh
