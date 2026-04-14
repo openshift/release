@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Source resolved CATALOG_SOURCE_IMAGE from env-cm step if available
+if [[ -f "${SHARED_DIR}/catalog-source-image.env" ]]; then
+    source "${SHARED_DIR}/catalog-source-image.env"
+    echo "Loaded resolved CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}"
+fi
 
 # Verify ARTIFACT_DIR is set and exists
 if [[ -z "${ARTIFACT_DIR:-}" ]]; then

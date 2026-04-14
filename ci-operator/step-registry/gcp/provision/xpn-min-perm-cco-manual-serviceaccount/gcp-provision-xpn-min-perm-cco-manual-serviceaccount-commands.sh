@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -19,7 +26,7 @@ fi
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
 # release:initial image, once that, use 'oc get istag release:inital' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
@@ -29,8 +36,8 @@ elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
   tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
   echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
-# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -40,44 +47,22 @@ else
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
-# check if OCP version will be equal to or greater than the minimum version
-# $1 - the minimum version to be compared with
-# return 0 if OCP version >= the minimum version, otherwise 1
-function meet_minimum_version_requirement() {
-  local -r minimum_version="$1"
-  local ret
+dir=$(mktemp -d)
+pushd "${dir}"
 
-  dir=$(mktemp -d)
-  pushd "${dir}"
+cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+KUBECONFIG="" oc registry login --to pull-secret
+ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+rm pull-secret
 
-  cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
-  KUBECONFIG="" oc registry login --to pull-secret
-  ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-  rm pull-secret
+echo "[DEBUG] current OCP version: '${ocp_version}'"
 
-  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
-  echo "[DEBUG] current OCP version: '${ocp_version}'"
-  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
-  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
-  min_x=$(echo "${minimum_version}" | cut -d. -f1)
-  min_y=$(echo "${minimum_version}" | cut -d. -f2)
-
-  if [ ${curr_x} -gt ${min_x} ] || ( [ ${curr_x} -eq ${min_x} ] && [ ${curr_y} -ge ${min_y} ] ); then
-    echo "[DEBUG] meet_minimum_version_requirement result: ${ocp_version} >= ${minimum_version}"
-    ret=0
-  else
-    echo "[DEBUG] meet_minimum_version_requirement result: ${ocp_version} < ${minimum_version}"
-    ret=1
-  fi
-
-  popd
-  return ${ret}
-}
+popd
 
 # the OCP version supports compute.platform.gcp.serviceAccount
 EXPECTED_OCP_VERSION="4.17"
 
-if meet_minimum_version_requirement "${EXPECTED_OCP_VERSION}"; then
+if version_ge "${ocp_version}" "${EXPECTED_OCP_VERSION}"; then
   echo "$(date -u --rfc-3339=seconds) - INFO: Enabling the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC with CCO in Manual mode..."
   cp "${CLUSTER_PROFILE_DIR}/ipi-xpn-cco-manual-permissions.json" "${SHARED_DIR}/xpn_min_perm_cco_manual.json"
 else

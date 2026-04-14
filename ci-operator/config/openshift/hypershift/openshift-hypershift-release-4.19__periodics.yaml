@@ -92,7 +92,7 @@ tests:
 - as: e2e-aws-multi-x-ax
   cron: 11 4 * * 0
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_LATEST: release:multi-latest
       OCP_IMAGE_N1: release:multi-n1minor
@@ -106,15 +106,14 @@ tests:
 - as: e2e-aks
   cron: 17 0,12 * * *
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-multi-x-ax
   cron: 22 14 * * 0
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:multi-latest
       OCP_IMAGE_N1: release:multi-n1minor
@@ -125,52 +124,50 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       AZURE_MULTI_ARCH: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
   - build-tmpfs
   cron: 25 11 * * 6
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
   cron: 44 16 * * 6
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 6 14 * * 6
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 10 18 * * 0
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-aws-upgrade
   cron: 21 12 * * 6
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_PREVIOUS: release:latest-4-18
     env:
       CI_TESTS_RUN: ^TestUpgradeControlPlane.*
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-conformance-cilium
   minimum_interval: 336h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance-cilium
 - as: e2e-aws-conformance-cilium-private
   minimum_interval: 336h
@@ -202,7 +199,7 @@ tests:
 - as: e2e-aws-conformance-calico
   minimum_interval: 336h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance-calico
 - as: e2e-aws-conformance-calico-private
   minimum_interval: 336h
@@ -230,7 +227,7 @@ tests:
 - as: e2e-kubevirt-metal-conformance-calico
   capabilities:
   - intranet
-  minimum_interval: 336h
+  cron: 0 12 22-28 * 5
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -271,7 +268,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       ODF_OPERATOR_SUB_CHANNEL: stable-4.17
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-17
@@ -280,7 +276,7 @@ tests:
 - as: e2e-kubevirt-metal-conformance-cilium
   capabilities:
   - intranet
-  minimum_interval: 336h
+  cron: 0 18 22-28 * 5
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -298,7 +294,6 @@ tests:
     env:
       CCS_OPERATOR_CHANNELS: stable-4.15,stable-4.15,stable-4.15,stable-4.15
       CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
-      HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
       ODF_OPERATOR_SUB_CHANNEL: stable-4.15
@@ -306,20 +301,19 @@ tests:
 - as: e2e-kubevirt-aws-ovn-csi
   cron: 7 6 * * 0
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
   cron: 45 15 * * 6
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-kubevirt-ovn
   cron: 47 6 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
-      HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_CHANNEL: stable-4.19
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
@@ -327,11 +321,10 @@ tests:
 - as: e2e-kubevirt-aws-ovn
   cron: 0 0,6,12,18 * * *
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
@@ -339,14 +332,12 @@ tests:
 - as: e2e-kubevirt-azure
   cron: 42 14 * * 6
   steps:
-    cluster_profile: azure4
-    env:
-      HYPERSHIFT_NODE_COUNT: "2"
+    cluster_profile: openshift-org-azure
     workflow: hypershift-kubevirt-azure-conformance
 - as: e2e-openstack-aws
   cron: 42 12 * * 0
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -355,11 +346,11 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-openstack-aws-nfv
   minimum_interval: 96h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-nfv
       NFV_NODEPOOLS: "true"
@@ -371,7 +362,7 @@ tests:
 - as: e2e-openstack-aws-conformance
   minimum_interval: 72h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -383,7 +374,7 @@ tests:
 - as: e2e-openstack-aws-csi-cinder
   minimum_interval: 72h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -396,7 +387,7 @@ tests:
 - as: e2e-openstack-aws-csi-manila
   minimum_interval: 72h
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"

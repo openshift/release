@@ -3,10 +3,6 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
   operand:
     name: 4.15-priv
     namespace: ocp-private
@@ -34,18 +30,16 @@ build_root:
     tag: rhel-8-release-golang-1.20-openshift-4.15
 canonical_go_repository: github.com/kedacore/keda-olm-operator
 images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    cli:
-      as:
-      - registry.redhat.io/openshift4/ose-cli:latest
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-    ubi-minimal:
-      as:
-      - registry.redhat.io/ubi8/ubi-minimal:latest
-  to: custom-metrics-autoscaler-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    inputs:
+      cli:
+        as:
+        - registry.redhat.io/openshift4/ose-cli:latest
+      ubi-minimal:
+        as:
+        - registry.redhat.io/ubi8/ubi-minimal:latest
+    to: custom-metrics-autoscaler-operator
 operator:
   bundles:
   - as: custom-metrics-autoscaler-operator-bundle
@@ -111,7 +105,7 @@ tests:
 - as: cma-e2e-aws-ovn
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     pre:
     - chain: ipi-aws-pre
     test:

@@ -1,12 +1,4 @@
 base_images:
-  ocp_4.17_base-rhel9:
-    name: "4.17"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   openstack-installer:
     name: "4.17"
     namespace: ocp
@@ -14,15 +6,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cluster-control-plane-machine-set-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
     candidate:
@@ -46,7 +32,7 @@ tests:
 - as: e2e-aws
   cron: 58 7 8 9 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       commands: |
@@ -60,7 +46,7 @@ tests:
 - as: e2e-aws-arm
   cron: 35 23 21 10 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -78,7 +64,7 @@ tests:
 - as: e2e-azure
   cron: 3 5 8 8 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       commands: |
@@ -92,7 +78,7 @@ tests:
 - as: e2e-gcp
   cron: 48 20 24 3 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       commands: |

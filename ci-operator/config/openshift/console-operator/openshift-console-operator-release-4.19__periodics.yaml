@@ -1,25 +1,10 @@
-base_images:
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: console-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: console-operator
 releases:
   latest:
     candidate:
@@ -36,7 +21,7 @@ tests:
 - as: e2e-aws-techpreview
   cron: 56 20 * * 0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -52,7 +37,7 @@ tests:
 - as: e2e-azure-techpreview
   cron: 0 20 * * 6
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -67,7 +52,7 @@ tests:
 - as: e2e-gcp-techpreview
   cron: 19 10 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

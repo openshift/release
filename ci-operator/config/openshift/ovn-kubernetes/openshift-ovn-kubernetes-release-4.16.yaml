@@ -7,51 +7,22 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   tests-private:
     name: tests-private
     namespace: ci
     tag: "4.16"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: ovn-kubernetes-microshift
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: "4.16"
@@ -76,7 +47,7 @@ tests:
   as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cidr-expansion
 - always_run: false
   as: e2e-agent-compact-ipv4
@@ -88,13 +59,13 @@ tests:
     workflow: agent-e2e-compact-ipv4
 - as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-fdp-qe
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PARALLEL: "1"
       TEST_TIMEOUT: "60"
@@ -142,15 +113,15 @@ tests:
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -166,24 +137,24 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -193,7 +164,7 @@ tests:
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-vsphere-windows
@@ -221,23 +192,23 @@ tests:
     workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
   cron: 29 17 17 4 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
   cron: 28 9 9 7 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -259,7 +230,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-ovn-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
@@ -285,13 +256,13 @@ tests:
     from: src
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: false
   as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - as: security
   optional: true
@@ -304,7 +275,7 @@ tests:
   as: e2e-aws-ovn-network-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
@@ -322,7 +293,7 @@ tests:
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
@@ -338,7 +309,7 @@ tests:
   as: e2e-aws-live-migration-sdn-ovn-rollback
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
@@ -358,9 +329,9 @@ tests:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
@@ -392,9 +363,9 @@ tests:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_TYPE: m5.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: both
       WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
@@ -415,7 +386,7 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      ND_CNI_EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: both
       WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
@@ -434,12 +405,12 @@ tests:
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
+      CDV2_ITERATION_MULTIPLIER: "6"
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       GC: "false"
       GC_METRICS: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
       OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
       PPROF: "false"
@@ -464,7 +435,6 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       GC: "false"
       GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
@@ -489,13 +459,13 @@ tests:
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=8h
+      CDV2_ITERATION_MULTIPLIER: "6"
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=8h
       GC: "false"
       GC_METRICS: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
       OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
       PPROF: "false"
@@ -525,9 +495,9 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       GC: "false"
       GC_METRICS: "false"
+      ND_CNI_EXTRA_FLAGS: --timeout=8h
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
       OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
       PPROF: "false"

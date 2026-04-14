@@ -7,23 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: metallb
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: metallb
 promotion:
   to:
   - name: "4.10"
@@ -48,7 +41,7 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: metallb-e2e-metal-ipi
   capabilities:

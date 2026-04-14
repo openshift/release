@@ -3,14 +3,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cluster-control-plane-machine-set-tests
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   openstack-installer:
     name: "4.20"
     namespace: ocp
@@ -18,15 +10,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cluster-control-plane-machine-set-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
     candidate:
@@ -50,7 +36,7 @@ tests:
 - as: e2e-aws
   interval: 24h
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -67,7 +53,7 @@ tests:
 - as: e2e-aws-arm
   interval: 24h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -85,7 +71,7 @@ tests:
 - as: e2e-azure
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -102,7 +88,7 @@ tests:
 - as: e2e-gcp
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -134,7 +120,7 @@ tests:
 - as: e2e-aws-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -150,7 +136,7 @@ tests:
 - as: e2e-aws-arm-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -169,7 +155,7 @@ tests:
 - as: e2e-azure-techpreview
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -185,7 +171,7 @@ tests:
 - as: e2e-gcp-techpreview
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

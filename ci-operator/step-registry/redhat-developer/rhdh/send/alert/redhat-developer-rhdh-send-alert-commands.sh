@@ -3,14 +3,32 @@
 set -o errexit
 set +o nounset
 
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_SKIP_SEND_ALERT}" == "true" ]]; then
+  echo "SKIP_SEND_ALERT override is set to true, skipping alert."
+  exit 0
+fi
+
 if [[ "$JOB_TYPE" != "periodic" ]]; then
   echo "This job is not a nightly job, skipping alert."
   exit 0
 fi
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
-SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
-export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
+export RELEASE_BRANCH_NAME
+
+SLACK_ALERTS_WEBHOOK_URL_FILE="/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL"
+if [[ "${JOB_NAME}" =~ release-([0-9]+\.[0-9]+) ]]; then
+  RELEASE_VERSION="${BASH_REMATCH[1]}"
+  VERSIONED_FILE="/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL_${RELEASE_VERSION//./_}"
+  if [[ -f "${VERSIONED_FILE}" ]]; then
+    echo "Using release-specific webhook URL from ${VERSIONED_FILE}"
+    SLACK_ALERTS_WEBHOOK_URL_FILE="${VERSIONED_FILE}"
+  else
+    echo "Versioned webhook file ${VERSIONED_FILE} not found, falling back to default."
+  fi
+fi
+SLACK_ALERTS_WEBHOOK_URL=$(cat "${SLACK_ALERTS_WEBHOOK_URL_FILE}")
+export SLACK_ALERTS_WEBHOOK_URL
 
 get_artifacts_url() {
   local namespace=$1
@@ -170,7 +188,7 @@ main() {
     echo "No fine-grained results available, sending default message."
     curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\":failed: \`$JOB_NAME\`, 📜 <$URL_CI_RESULTS|logs>, 📦 <$URL_ARTIFACTS_TOP|artifacts>, <!subteam^S07BMJ56R8S> <@U08UP0REWG1>.\"}" \
-      "$SLACK_NIGHTLY_WEBHOOK_URL"
+      "$SLACK_ALERTS_WEBHOOK_URL"
     exit 1
   else
     echo "Sending Slack notification with the following text:"
@@ -179,7 +197,7 @@ main() {
     echo "==================================================="
     if ! curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\"${SLACK_ALERT_MESSAGE}\"}" \
-      "$SLACK_NIGHTLY_WEBHOOK_URL"; then
+      "$SLACK_ALERTS_WEBHOOK_URL"; then
       echo "Failed to send alert message to Slack, error: $?"
       exit 1
     else

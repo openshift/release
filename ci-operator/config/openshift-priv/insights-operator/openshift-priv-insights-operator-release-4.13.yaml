@@ -11,20 +11,13 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: "4.13"
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
   to:
   - name: 4.13-priv
@@ -57,17 +50,17 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -76,8 +69,7 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - collection: ""
-        mount_path: /secrets
+      - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests

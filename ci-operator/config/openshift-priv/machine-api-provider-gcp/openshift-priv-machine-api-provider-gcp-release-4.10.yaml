@@ -3,22 +3,15 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-api-provider-gcp
 images:
-- dockerfile_path: Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: gcp-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    from: base
+    to: gcp-machine-controllers
 promotion:
   to:
   - name: 4.10-priv
@@ -53,7 +46,7 @@ tests:
     from: src
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -65,7 +58,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: release-4.10

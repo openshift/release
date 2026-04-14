@@ -4,6 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
@@ -24,32 +39,36 @@ fi
 # be active savings plans targeting this machine class.
 master_type=""
 control_plane_arch="${CONTROL_ARCH:-${OCP_ARCH}}"
-case "${SIZE_VARIANT}" in
-  "xlarge")
-    master_type_suffix="standard-32"
-  ;;
-  "large")
-    master_type_suffix="standard-16"
-  ;;
-  "compact")
-    master_type_suffix="standard-8"
-  ;;
-  *)
-    if [[ "${control_plane_arch}" == "arm64" ]]; then
-      master_type_suffix="standard-4"
-    else
-      # Temporary test to see if this helps the consistent high CPU alerts and random test failures
-      master_type_suffix="custom-6-16384"
-      # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
-      # custom sizes are not supported by arm64 VMs
-    fi
-  ;;
-esac
+if [[ -n "${CONTROL_PLANE_NODE_TYPE}" ]]; then
+  master_type="${CONTROL_PLANE_NODE_TYPE}"
+else
+  case "${SIZE_VARIANT}" in
+    "xlarge")
+      master_type_suffix="standard-32"
+    ;;
+    "large")
+      master_type_suffix="standard-16"
+    ;;
+    "compact")
+      master_type_suffix="standard-8"
+    ;;
+    *)
+      if [[ "${control_plane_arch}" == "arm64" ]]; then
+        master_type_suffix="standard-4"
+      else
+        # Temporary test to see if this helps the consistent high CPU alerts and random test failures
+        master_type_suffix="custom-6-16384"
+        # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+        # custom sizes are not supported by arm64 VMs
+      fi
+    ;;
+  esac
 
-if [[ "${control_plane_arch}" == "amd64" ]]; then
-  master_type="e2-${master_type_suffix}"
-elif [[ "${control_plane_arch}" == "arm64" ]]; then
-  master_type="t2a-${master_type_suffix}"
+  if [[ "${control_plane_arch}" == "amd64" ]]; then
+    master_type="e2-${master_type_suffix}"
+  elif [[ "${control_plane_arch}" == "arm64" ]]; then
+    master_type="t2a-${master_type_suffix}"
+  fi
 fi
 
 compute_arch="${COMPUTE_ARCH:-${OCP_ARCH}}"
@@ -60,7 +79,6 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
     COMPUTE_NODE_TYPE="e2-custom-6-16384"
   fi
 fi
-
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -107,11 +125,9 @@ fi
 # cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 # oc registry login --to /tmp/pull-secret
 # ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 # rm /tmp/pull-secret
 
-# if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+# if version_ge "${ocp_version}" "4.11"; then
 #   SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
 #   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
 #   cat > "${PATCH}" << EOF

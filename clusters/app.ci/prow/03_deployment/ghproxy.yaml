@@ -1,6 +1,6 @@
 ---
-kind: PersistentVolumeClaim
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   labels:
     app: prow
@@ -13,6 +13,9 @@ spec:
   resources:
     requests:
       storage: 30Gi
+  storageClassName: gp2
+  volumeMode: Filesystem
+  volumeName: pvc-1ca14d89-cd6b-45c2-a0f9-f23d8aadab87
 ---
 apiVersion: v1
 kind: Service
@@ -61,15 +64,15 @@ spec:
     spec:
       containers:
       - name: ghproxy
-        image: us-docker.pkg.dev/k8s-infra-prow/images/ghproxy:v20260119-643bbf68a
+        image: us-docker.pkg.dev/k8s-infra-prow/images/ghproxy:v20260408-3bbc91829
         imagePullPolicy: IfNotPresent
         args:
         - --cache-dir=/cache
         - --cache-sizeGB=19
         - --legacy-disable-disk-cache-partitions-by-auth-header=false
-        - --get-throttling-time-ms=200
-        - --throttling-time-ms=450
-        - --throttling-time-v4-ms=600
+        - --get-throttling-time-ms=150
+        - --throttling-time-ms=400
+        - --throttling-time-v4-ms=550
         - --throttling-max-delay-duration-seconds=51
         - --throttling-max-delay-duration-v4-seconds=150
         - --request-timeout=151

@@ -3,25 +3,18 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: 'make '
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/azure-file-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: azure-file-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-file-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: azure-file-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-file-csi-driver-operator-test
 promotion:
   to:
   - name: 4.13-priv
@@ -54,11 +47,11 @@ tests:
     from: src
 - as: e2e-azure-file-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file
 - as: e2e-azure-file-nfs-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file-nfs
 - as: verify-deps
   steps:

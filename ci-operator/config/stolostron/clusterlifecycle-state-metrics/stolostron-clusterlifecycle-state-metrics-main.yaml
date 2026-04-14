@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
 binary_build_commands: |-
   GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
   GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/stolostron/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
@@ -16,30 +12,27 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.25-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-  to: clusterlifecycle-state-metrics
-- dockerfile_path: build/Dockerfile.coverage.prow
-  from: clusterlifecycle-state-metrics
-  to: clusterlifecycle-state-metrics-coverage
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: clusterlifecycle-state-metrics
+  - dockerfile_path: build/Dockerfile.coverage.prow
+    from: clusterlifecycle-state-metrics
+    to: clusterlifecycle-state-metrics-coverage
 promotion:
   to:
   - disabled: true
-    name: "2.11"
+    name: "2.17"
     namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -110,7 +103,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.11
+      DESTINATION_BRANCH: backplane-2.17
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

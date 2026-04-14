@@ -3,23 +3,16 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: build/Dockerfile.e2etest
-  from: base
-  inputs:
-    stolostron_builder_go1.25-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-  optional: true
-  to: grc-policy-framework-tests
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: build/Dockerfile.e2etest
+    from: base
+    optional: true
+    to: grc-policy-framework-tests
 resources:
   '*':
     requests:
@@ -32,7 +25,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: grc-policy-framework-tests
     env:
-      ACM_RELEASE_VERSION: release-2.16
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_GROUP_NAME: policy-grc
       CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
@@ -40,7 +33,7 @@ tests:
       CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
       CLUSTERPOOL_MANAGED_COUNT: "1"
-      PIPELINE_STAGE: integration
+      PIPELINE_STAGE: dev
       SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e

@@ -30,15 +30,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
-  to: assisted-installer-agent
-- dockerfile_path: Dockerfile.assisted_installer_agent-build
-  to: assisted-installer-agent-build
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-installer-agent-src
+  items:
+  - dockerfile_path: Dockerfile.assisted_installer_agent
+    to: assisted-installer-agent
+  - dockerfile_path: Dockerfile.assisted_installer_agent-build
+    to: assisted-installer-agent-build
+  - dockerfile_literal: |
+      FROM base
+      COPY . .
+    from: src
+    to: assisted-installer-agent-src
 promotion:
   to:
   - name: ocm-2.13
@@ -127,11 +128,10 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-agent
-- always_run: false
-  as: e2e-ai-operator-ztp
+- as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

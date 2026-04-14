@@ -23,14 +23,6 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
   tools:
     name: "4.9"
     namespace: ocp
@@ -43,41 +35,27 @@ build_root:
     tag: rhel-8-release-golang-1.16-openshift-4.8
 canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: hyperkube
-- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-  to: kubernetes-tests
-- context_dir: openshift-hack/images/os/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-  to: machine-os-content
-- context_dir: build/pause
-  dockerfile_path: Dockerfile.Rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: pod
+  items:
+  - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+    from: base
+    to: hyperkube
+  - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+    from: tools
+    to: kubernetes-tests
+  - context_dir: openshift-hack/images/os/
+    from: base
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - fedora:29
+      machine-os-content-base:
+        as:
+        - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+    to: machine-os-content
+  - context_dir: build/pause
+    dockerfile_path: Dockerfile.Rhel
+    from: base
+    to: pod
 promotion:
   to:
   - additional_images:
@@ -210,53 +188,53 @@ tests:
     from: src
 - as: k8s-e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-kubernetes-e2e-gcp
 - as: k8s-e2e-gcp-five-control-plane-replicas
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CONTROL_PLANE_REPLICAS: "5"
     workflow: openshift-kubernetes-e2e-gcp
 - as: k8s-e2e-gcp-serial
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: k8s-e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws
 - as: k8s-e2e-aws-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws-serial
 - always_run: false
   as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-cmd
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
@@ -264,44 +242,44 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-aws-jenkins
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-upgrade
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - as: e2e-aws-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-azure-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-aws-downgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-csi
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - always_run: false
   as: e2e-vsphere
@@ -313,7 +291,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -326,7 +304,7 @@ tests:
 - as: k8s-conformance
   cron: 51 8 13 5 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -340,7 +318,7 @@ tests:
   as: e2e-aws-multitenant
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn-multi
 - always_run: false
   as: e2e-metal-ipi
@@ -381,11 +359,11 @@ tests:
 - always_run: false
   as: configmap-scale
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-fips
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -399,13 +377,13 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-aws-csi-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi-migration
 - always_run: false
   as: e2e-openstack
@@ -428,7 +406,11 @@ tests:
   as: e2e-openstack-csi-manila
   optional: true
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
 zz_generated_metadata:
   branch: release-4.9

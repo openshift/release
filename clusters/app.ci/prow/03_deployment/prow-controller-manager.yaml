@@ -45,7 +45,7 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
@@ -55,32 +55,15 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=master
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: prow-controller-manager
-        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260119-643bbf68a
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260408-3bbc91829
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --dry-run=false
         - --job-config-path=/var/repo/release/ci-operator/jobs
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -89,13 +72,19 @@ spec:
         - --kubeconfig-suffix=config
         - --enable-controller=plank
         - --enable-controller=scheduler
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
         ports:
         - name: metrics
           containerPort: 9090
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
         - name: config
@@ -110,15 +99,33 @@ spec:
           requests:
             memory: "8Gi"
             cpu: "600m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:
           sources:
           - serviceAccountToken:
               path: token
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-prow-github-app
       - name: config
         configMap:
           name: config

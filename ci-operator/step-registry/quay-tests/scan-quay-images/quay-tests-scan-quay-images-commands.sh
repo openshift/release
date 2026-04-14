@@ -98,6 +98,7 @@ fi
 cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder && echo "" >>quaybuilder || true
 
 QUAY_KONFLUX_BASE_PATH="quay.io/redhat-user-workloads/quay-eng-tenant"
+#QUAY_KONFLUX_BASE_PATH="image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant"
 
 quay_operator_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_OPERATOR_IMAGE}"
 quay_app_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_IMAGE}"

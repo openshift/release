@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build10
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -18,17 +18,29 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -43,6 +55,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -58,7 +76,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build10
+    cluster: build06
     context: ci/prow/v4.17-ci-index-gitops-operator-bundle
     decorate: true
     labels:
@@ -113,7 +131,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-e2e
     decorate: true
     labels:
@@ -137,9 +155,17 @@ presubmits:
         - --variant=v4.17
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -188,7 +214,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build10
+    cluster: build06
     context: ci/prow/v4.17-images
     decorate: true
     labels:
@@ -243,7 +269,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-kuttl-parallel
     decorate: true
     labels:
@@ -267,9 +293,17 @@ presubmits:
         - --variant=v4.17
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -318,7 +352,7 @@ presubmits:
     branches:
     - ^v1\.17$
     - ^v1\.17-
-    cluster: build11
+    cluster: build10
     context: ci/prow/v4.17-kuttl-sequential
     decorate: true
     labels:
@@ -342,9 +376,17 @@ presubmits:
         - --variant=v4.17
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

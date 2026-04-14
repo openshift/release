@@ -1,26 +1,11 @@
-base_images:
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-provider-libvirt
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: libvirt-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: libvirt-machine-controllers
 promotion:
   to:
   - name: 4.21-priv
@@ -66,12 +51,13 @@ tests:
   as: e2e-libvirt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-libvirt
 - as: verify-deps
   steps:
     env:
       CHECK_MOD_LIST: "false"
+      COMPAT: -compat=1.17
     test:
     - ref: go-verify-deps
 zz_generated_metadata:

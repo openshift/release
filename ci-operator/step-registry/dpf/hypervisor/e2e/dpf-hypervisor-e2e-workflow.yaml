@@ -1,0 +1,31 @@
+workflow:
+  as: dpf-hypervisor-e2e
+  steps:
+    pre:
+    - chain: dpf-hypervisor-provision
+    test:
+    - ref: dpf-hypervisor-test-full-suite
+    post:
+    - chain: dpf-hypervisor-deprovision
+  documentation: |-
+    Complete DPF end-to-end testing workflow that provisions OpenShift cluster 
+    with DPF on nvd-srv-45 hypervisor, runs full test suite including DPU 
+    services deployment and comprehensive validation, then cleans up all resources.
+    
+    This workflow:
+    1. Sets up SSH access to the hypervisor
+    2. Prepares the environment with secrets and configuration
+    3. Deploys OpenShift cluster using DPF automation (make all)
+    4. Runs comprehensive DPF test suite with full validation
+    5. Cleans up cluster and temporary files
+    
+    Expected duration: 6-8 hours total
+    - Provisioning: 4-6 hours
+    - Testing: 1.5-2 hours  
+    - Cleanup: 30-45 minutes
+    
+    Required secrets in Vault (/var/run/dpf-ci/):
+    - private-key: SSH private key for nvd-srv-45
+    - openshift-pull-secret: OpenShift pull secret
+    - dpf-pull-secret: NVIDIA DPF pull secret  
+    - env: Base64 encoded .env file

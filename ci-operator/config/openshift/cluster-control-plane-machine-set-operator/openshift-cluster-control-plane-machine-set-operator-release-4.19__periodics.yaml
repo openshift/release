@@ -3,14 +3,6 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: cluster-control-plane-machine-set-tests
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   openstack-installer:
     name: "4.19"
     namespace: ocp
@@ -22,15 +14,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: cluster-control-plane-machine-set-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
     candidate:
@@ -54,7 +40,7 @@ tests:
 - as: e2e-aws
   cron: 5 17 * * 0
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -71,7 +57,7 @@ tests:
 - as: e2e-aws-arm
   cron: 53 22 * * 6
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -89,7 +75,7 @@ tests:
 - as: e2e-azure
   cron: 34 1 * * 6
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -106,7 +92,7 @@ tests:
 - as: e2e-gcp
   cron: 8 21 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -138,7 +124,7 @@ tests:
 - as: e2e-aws-techpreview
   cron: 39 20 * * 0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -154,7 +140,7 @@ tests:
 - as: e2e-aws-arm-techpreview
   cron: 41 8 * * 6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -173,7 +159,7 @@ tests:
 - as: e2e-azure-techpreview
   cron: 32 9 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -189,7 +175,7 @@ tests:
 - as: e2e-gcp-techpreview
   cron: 11 3 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -220,7 +206,7 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-vsphere-periodic
-  cron: 10 16 * * 0
+  cron: 26 12 * * 2
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -234,7 +220,7 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-periodic-techpreview
-  cron: 28 3 * * 6
+  cron: 54 3 * * 3
   steps:
     cluster_profile: vsphere-elastic
     env:

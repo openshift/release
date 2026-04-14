@@ -3,18 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -22,18 +10,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: machine-config-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: machine-config-operator
 releases:
   initial:
     candidate:
@@ -60,26 +39,26 @@ tests:
 - as: e2e-aws-mco-disruptive
   cron: 14 14 * * 6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-aws
 - as: e2e-azure-mco-disruptive
   cron: 6 8 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-azure
 - as: e2e-gcp-mco-disruptive
   cron: 1 15 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-mco-disruptive
-  cron: 13 15 * * 6
+  cron: 6 13 * * 5
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -115,7 +94,7 @@ tests:
 - as: e2e-aws-mco-disruptive-techpreview
   cron: 14 14 * * 6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/disruptive
@@ -123,7 +102,7 @@ tests:
 - as: e2e-azure-mco-disruptive-techpreview
   cron: 6 8 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/disruptive
@@ -131,13 +110,13 @@ tests:
 - as: e2e-gcp-mco-disruptive-techpreview
   cron: 1 15 * * 6
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-mco-disruptive-techpreview
-  cron: 13 15 * * 6
+  cron: 34 18 * * 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -183,7 +162,7 @@ tests:
 - as: e2e-aws-ovn-ocl
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       MCO_CONF_DAY2_OCL_POOLS: master worker
     test:
@@ -194,7 +173,7 @@ tests:
 - as: e2e-aws-ovn-upgrade-ocl
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       MCO_CONF_DAY2_OCL_POOLS: master worker
       TEST_TYPE: upgrade-conformance

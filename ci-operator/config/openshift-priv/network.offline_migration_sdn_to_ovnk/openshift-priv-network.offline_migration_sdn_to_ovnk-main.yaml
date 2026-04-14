@@ -3,24 +3,17 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/network.offline_migration_sdn_to_ovnk
 images:
-- dockerfile_path: ci/Dockerfile
-  from: ocp_4.13_cli
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: ansible-test-runner
+  items:
+  - dockerfile_path: ci/Dockerfile
+    from: ocp_4.13_cli
+    to: ansible-test-runner
 promotion:
   to:
   - name: 4.13-priv
@@ -55,7 +48,7 @@ tests:
     from: ansible-test-runner
 - as: migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test-migration
       cli: latest
@@ -70,7 +63,7 @@ tests:
     workflow: ipi-aws-sdn
 - as: rollback
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test-rollback
       cli: latest

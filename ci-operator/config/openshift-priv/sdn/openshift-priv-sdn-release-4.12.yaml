@@ -3,29 +3,18 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sdn
 images:
-- dockerfile_path: images/sdn/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: sdn
-- dockerfile_path: images/kube-proxy/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: kube-proxy
+  items:
+  - dockerfile_path: images/sdn/Dockerfile.rhel
+    from: base
+    to: sdn
+  - dockerfile_path: images/kube-proxy/Dockerfile.rhel
+    from: base
+    to: kube-proxy
 promotion:
   to:
   - name: 4.12-priv
@@ -65,24 +54,24 @@ tests:
     from: test-bin
 - as: e2e-aws-sdn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-sdn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-sdn
 - always_run: false
   as: e2e-aws-sdn-multitenant
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-sdn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn-serial
 zz_generated_metadata:
   branch: release-4.12

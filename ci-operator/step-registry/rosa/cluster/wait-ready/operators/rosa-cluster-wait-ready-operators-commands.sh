@@ -77,5 +77,5 @@ then
   done
 
   echo "Waiting for job/osd-cluster-ready to complete..."
-  oc wait --for=condition=complete job/osd-cluster-ready -n openshift-monitoring --timeout=60m
+  oc wait --for=condition=complete job/osd-cluster-ready -n openshift-monitoring --timeout=120m
 fi

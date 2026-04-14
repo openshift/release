@@ -7,20 +7,21 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ofcir
 images:
-- dockerfile_path: Dockerfile
-  to: ofcir
-- dockerfile_literal: |
-    FROM base-build
-    COPY . .
-  inputs:
-    dev-scripts:
-      as:
-      - base-build
-    src:
-      paths:
-      - destination_dir: ./ofcir
-        source_path: /go/src/github.com/openshift/ofcir/.
-  to: ofcir-tests-base
+  items:
+  - dockerfile_path: Dockerfile
+    to: ofcir
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      dev-scripts:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./ofcir
+          source_path: /go/src/github.com/openshift/ofcir/.
+    to: ofcir-tests-base
 promotion:
   to:
   - excluded_images:
@@ -54,8 +55,6 @@ tests:
   - intranet
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: lab-small
     post:
     - ref: ofcir-release
     pre:

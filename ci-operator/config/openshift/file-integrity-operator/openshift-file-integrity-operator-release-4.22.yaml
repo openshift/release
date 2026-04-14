@@ -3,10 +3,6 @@ base_images:
     name: ocm-cli
     namespace: ci
     tag: latest
-  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
   operator-sdk:
     name: "4.22"
     namespace: origin
@@ -21,12 +17,9 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
-  to: file-integrity-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: file-integrity-operator
 operator:
   bundles:
   - as: file-integrity-operator-bundle
@@ -39,8 +32,7 @@ operator:
     with: pipeline:file-integrity-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.22"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -73,7 +65,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -117,7 +109,7 @@ tests:
   optional: true
   run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest
@@ -149,7 +141,7 @@ tests:
   optional: true
   run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest

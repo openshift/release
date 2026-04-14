@@ -7,21 +7,22 @@ build_root:
   project_image:
     dockerfile_path: ci-builder/Dockerfile
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY prom-metrics-linter /usr/bin/prom-metrics-linter
-    RUN dnf install -y jq && dnf clean all
-  from: src
-  inputs:
-    metrics-linter:
-      paths:
-      - destination_dir: .
-        source_path: /prom-metrics-linter
-  to: ssp-metrics-linter
-- dockerfile_path: Dockerfile
-  to: ssp-operator-container
-- dockerfile_path: validator.Dockerfile
-  to: template-validator-container
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY prom-metrics-linter /usr/bin/prom-metrics-linter
+      RUN dnf install -y jq && dnf clean all
+    from: src
+    inputs:
+      metrics-linter:
+        paths:
+        - destination_dir: .
+          source_path: /prom-metrics-linter
+    to: ssp-metrics-linter
+  - dockerfile_path: Dockerfile
+    to: ssp-operator-container
+  - dockerfile_path: validator.Dockerfile
+    to: template-validator-container
 releases:
   initial:
     integration:
@@ -146,8 +147,7 @@ tests:
     - as: win10-pipeline-example-test
       commands: export TARGET=windows10 && ./automation/e2e-tekton/example-pipelines-test.sh
       credentials:
-      - collection: ""
-        mount_path: /tmp/secrets
+      - mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       dependencies:
@@ -171,8 +171,7 @@ tests:
     - as: win11-pipeline-example-test
       commands: export TARGET=windows11 && ./automation/e2e-tekton/example-pipelines-test.sh
       credentials:
-      - collection: ""
-        mount_path: /tmp/secrets
+      - mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       dependencies:
@@ -196,8 +195,7 @@ tests:
     - as: win11-pipeline-example-test
       commands: export TARGET=windows2k22 && ./automation/e2e-tekton/example-pipelines-test.sh
       credentials:
-      - collection: ""
-        mount_path: /tmp/secrets
+      - mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
         namespace: test-credentials
       dependencies:

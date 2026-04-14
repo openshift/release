@@ -3,58 +3,30 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_4.17_installer-etcd-artifacts:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: installer-etcd-artifacts
-  ocp_4.17_installer-kube-apiserver-artifacts:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
 images:
-- build_args:
-  - name: OPENSHIFT_INSTALL_CLUSTER_API
-    value: "true"
-  dockerfile_path: images/installer-altinfra/Dockerfile.ci
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_4.17_installer-etcd-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
-    ocp_4.17_installer-kube-apiserver-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: installer
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
-    # Cache dir must be accessible when running the integration tests
-    RUN mkdir /.cache -m 0777
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - build_args:
+    - name: OPENSHIFT_INSTALL_CLUSTER_API
+      value: "true"
+    dockerfile_path: images/installer-altinfra/Dockerfile.ci
+    to: installer
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y nmstate
+      # Cache dir must be accessible when running the integration tests
+      RUN mkdir /.cache -m 0777
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
 promotion:
   to:
   - additional_images:
@@ -88,7 +60,7 @@ tests:
   as: e2e-aws-custom-security-groups
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -98,7 +70,7 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -111,7 +83,7 @@ tests:
   as: e2e-aws-ovn-fips
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -127,7 +99,7 @@ tests:
   as: e2e-aws-ovn-imdsv2
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -137,7 +109,7 @@ tests:
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -146,7 +118,7 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -162,7 +134,7 @@ tests:
   as: e2e-aws-ovn-shared-vpc
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -171,7 +143,7 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -180,7 +152,7 @@ tests:
   as: e2e-aws-ovn-localzones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -190,7 +162,7 @@ tests:
   as: e2e-aws-ovn-wavelengthzones
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -200,7 +172,7 @@ tests:
   as: e2e-aws-ovn-shared-vpc-local-zones
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -210,7 +182,7 @@ tests:
   as: e2e-aws-ovn-shared-vpc-wavelength-zones
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
@@ -220,7 +192,7 @@ tests:
   as: e2e-azure-capi-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -229,7 +201,7 @@ tests:
   as: e2e-azure-ovn-shared-vpc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -238,7 +210,7 @@ tests:
   as: e2e-gcp-capi-ovn
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -247,7 +219,7 @@ tests:
   as: e2e-gcp-ovn-byo-network-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -256,7 +228,7 @@ tests:
   as: e2e-gcp-ovn-xpn-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -265,7 +237,7 @@ tests:
   as: e2e-gcp-ovn-secureboot-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade

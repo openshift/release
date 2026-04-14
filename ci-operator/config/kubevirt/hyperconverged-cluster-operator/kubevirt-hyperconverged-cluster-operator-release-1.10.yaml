@@ -19,10 +19,6 @@ base_images:
     name: hyperconverged-cluster-bundle
     namespace: ci
     tag: 1.9.0-unstable
-  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -30,72 +26,69 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: build/Dockerfile.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-operator
-  to: hyperconverged-cluster-operator
-- dockerfile_path: build/Dockerfile.wh.okd
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/hyperconverged-cluster-webhook
-  to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.artifacts
-  optional: true
-  to: virt-artifacts-server
-- dockerfile_path: build/Dockerfile.functest.ci
-  inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
-  to: hyperconverged-cluster-functest
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y jq && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    COPY operator-sdk /usr/local/bin/operator-sdk
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y jq && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    cli-operator-sdk:
-      paths:
-      - destination_dir: .
-        source_path: /usr/local/bin/operator-sdk
-  to: hco-oc-bin-operator-sdk-image
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y graphviz jq && dnf clean all
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: hco-oc-bin-image-nightly
+  items:
+  - dockerfile_path: build/Dockerfile.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-operator
+    to: hyperconverged-cluster-operator
+  - dockerfile_path: build/Dockerfile.wh.okd
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/hyperconverged-cluster-webhook
+    to: hyperconverged-cluster-webhook
+  - dockerfile_path: build/Dockerfile.artifacts
+    optional: true
+    to: virt-artifacts-server
+  - dockerfile_path: build/Dockerfile.functest.ci
+    to: hyperconverged-cluster-functest
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y jq && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      COPY operator-sdk /usr/local/bin/operator-sdk
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y jq && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      cli-operator-sdk:
+        paths:
+        - destination_dir: .
+          source_path: /usr/local/bin/operator-sdk
+    to: hco-oc-bin-operator-sdk-image
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y graphviz jq && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: hco-oc-bin-image-nightly
 operator:
   bundles:
   - as: hco-bundle

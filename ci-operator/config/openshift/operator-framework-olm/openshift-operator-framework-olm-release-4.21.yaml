@@ -1,52 +1,16 @@
-base_images:
-  ocp_4.21_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: operator-registry
-- dockerfile_path: operator-framework-tools.Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: operator-framework-tools
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    to: operator-registry
+  - dockerfile_path: operator-framework-tools.Dockerfile
+    to: operator-framework-tools
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
   to:
   - excluded_images:
@@ -76,7 +40,7 @@ tests:
 - as: e2e-gcp-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: unit-olm
   commands: |
@@ -103,7 +67,7 @@ tests:
 - as: e2e-gcp-olm
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -133,7 +97,7 @@ tests:
   as: e2e-gcp-olm-flaky
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -146,7 +110,7 @@ tests:
 - as: e2e-gcp-console-olm
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -159,7 +123,7 @@ tests:
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: verify-deps
   steps:
@@ -183,7 +147,7 @@ tests:
           cpu: 100m
 - as: e2e-aws-olmv0-ext
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv0/all

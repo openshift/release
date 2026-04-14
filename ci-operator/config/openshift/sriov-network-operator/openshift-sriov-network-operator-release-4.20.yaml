@@ -1,12 +1,4 @@
 base_images:
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   openstack-installer:
     name: "4.20"
     namespace: ocp
@@ -42,35 +34,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.ocp
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: sriov-network-webhook
-- dockerfile_path: bundleci.Dockerfile
-  to: sriov-network-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.ocp
+    to: sriov-network-webhook
+  - dockerfile_path: bundleci.Dockerfile
+    to: sriov-network-operator-bundle
 operator:
   bundles:
   - as: operator-bundle
@@ -136,7 +108,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-operator-bundle
     env:

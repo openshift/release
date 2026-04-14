@@ -1,57 +1,36 @@
 base_images:
-  ocp_4.21_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-base-nodejs-openshift-4.20:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.20
-  ocp_builder_rhel-9-base-nodejs-openshift-4.21:
+    tag: rhel-9-base-nodejs-openshift-4.22
+  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.22
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-base-nodejs-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.21
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.20
-  to: console-plugin-demo
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    to: console-plugin-demo
 promotion:
   to:
   - additional_images:
       console-tests: src
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -64,11 +43,11 @@ resources:
       memory: 14Gi
   console:
     requests:
-      cpu: "1"
-      memory: 8Gi
+      cpu: "2"
+      memory: 10Gi
   frontend:
     requests:
-      cpu: "1"
+      cpu: "2"
       memory: 10Gi
   test-bin:
     requests:
@@ -85,7 +64,7 @@ tests:
     go install -mod= github.com/jstemmer/go-junit-report@latest
     /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: ocp_builder_rhel-9-golang-1.24-openshift-4.20
+    from: ocp_builder_rhel-9-golang-1.25-openshift-4.22
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
@@ -102,18 +81,25 @@ tests:
 - as: e2e-gcp-console
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
       dependencies:
       - env: CYPRESS_PLUGIN_PULL_SPEC
         name: console-plugin-demo
       from: src
       resources:
         requests:
-          cpu: 100m
+          cpu: "4"
+          memory: 10Gi
       timeout: 6h0m0s
     workflow: ipi-gcp
 zz_generated_metadata:

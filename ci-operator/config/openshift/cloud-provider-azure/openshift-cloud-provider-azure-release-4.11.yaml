@@ -3,29 +3,18 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 binary_build_commands: make binaries
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-sigs/cloud-provider-azure
 images:
-- dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: azure-cloud-controller-manager
-- dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: azure-cloud-node-manager
+  items:
+  - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
+    from: base
+    to: azure-cloud-controller-manager
+  - dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
+    from: base
+    to: azure-cloud-node-manager
 promotion:
   to:
   - name: "4.11"
@@ -65,23 +54,23 @@ tests:
     from: src
 - as: e2e-azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azure-ccm
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-ccm
 - always_run: false
   as: openshift-e2e-azure-ccm-install
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-ccm-install
 zz_generated_metadata:
   branch: release-4.11

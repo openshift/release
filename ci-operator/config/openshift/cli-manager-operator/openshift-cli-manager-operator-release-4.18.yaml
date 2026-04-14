@@ -1,24 +1,9 @@
-base_images:
-  ocp_4.18_base-rhel9:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: cli-manager-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cli-manager-operator
 promotion:
   to:
   - name: "4.18"
@@ -50,7 +35,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     test:

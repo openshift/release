@@ -1,16 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
-  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -28,18 +16,10 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: build/Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
-  to: windows-machine-config-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.ci
+    to: windows-machine-config-operator-test
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -101,7 +81,7 @@ tests:
   as: aws-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -127,7 +107,7 @@ tests:
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -139,7 +119,7 @@ tests:
   as: gcp-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -156,7 +136,7 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-ccm-install
-  cron: 46 8 * * 0
+  cron: 10 10 * * 2
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -166,7 +146,7 @@ tests:
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: install
       cli: latest

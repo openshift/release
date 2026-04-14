@@ -21,20 +21,21 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-419-up
-- dockerfile_literal: |-
-    FROM prow-scripts.prow
-    RUN ls
-  from: prow-scripts.prow
-  to: prow-scripts-418-up
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-419-up
+  - dockerfile_literal: |-
+      FROM prow-scripts.prow
+      RUN ls
+    from: prow-scripts.prow
+    to: prow-scripts-418-up
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   latest:
     release:
@@ -64,8 +65,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: chaos-aws-loaded-upgrade-418to419-pod-scenarios
-  cron: 0 12 11 * *
+- always_run: false
+  as: chaos-aws-loaded-upgrade-418to419-pod-scenarios
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
@@ -90,8 +91,8 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-- as: chaos-aws-loaded-upgrade-418to419-node-scenarios
-  cron: 0 1 11 * *
+- always_run: false
+  as: chaos-aws-loaded-upgrade-418to419-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
@@ -119,8 +120,8 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-- as: chaos-aws-ipsec-loaded-upgrade-418to419-pod-scenarios
-  cron: 0 12 11 * *
+- always_run: false
+  as: chaos-aws-ipsec-loaded-upgrade-418to419-pod-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -149,8 +150,8 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-- as: chaos-aws-ipsec-loaded-upgrade-418to419-node-scenarios
-  cron: 0 1 11 * *
+- always_run: false
+  as: chaos-aws-ipsec-loaded-upgrade-418to419-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -182,8 +183,8 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-- as: chaos-gcp-loaded-upgrade-418to419-node-scenarios
-  cron: 0 12 5 * *
+- always_run: false
+  as: chaos-gcp-loaded-upgrade-418to419-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -204,8 +205,8 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp
-- as: chaos-gcp-loaded-upgrade-418to419-pod-scenarios
-  cron: 0 12 5 * *
+- always_run: false
+  as: chaos-gcp-loaded-upgrade-418to419-pod-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -226,8 +227,8 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp
-- as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-node-scenarios
-  cron: 0 12 5 * *
+- always_run: false
+  as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-node-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -235,10 +236,10 @@ tests:
     dependencies:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
     env:
+      CDV2_ITERATION_MULTIPLIER: "9"
       COMPUTE_NODE_REPLICAS: "24"
       ENABLE_FORCE: "true"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "3"
       PROFILE_TYPE: reporting
     observers:
@@ -250,8 +251,8 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-- as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-pod-scenarios
-  cron: 0 12 5 * *
+- always_run: false
+  as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-pod-scenarios
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -259,10 +260,10 @@ tests:
     dependencies:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
     env:
+      CDV2_ITERATION_MULTIPLIER: "9"
       COMPUTE_NODE_REPLICAS: "24"
       ENABLE_FORCE: "true"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "3"
       PROFILE_TYPE: reporting
     observers:
@@ -288,13 +289,13 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "9"
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: eastus
       ENABLE_FORCE: "true"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "1"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
@@ -323,13 +324,13 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "9"
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: eastus
       ENABLE_FORCE: "true"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "9"
       MAX_UNAVAILABLE: "1"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3

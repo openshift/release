@@ -11,10 +11,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -39,20 +35,13 @@ binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: aws-efs-csi-operator-create-efs
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    from: base
+    to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -107,7 +96,7 @@ tests:
   as: operator-e2e
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
@@ -128,7 +117,7 @@ tests:
 - as: nightly-operator-e2e
   cron: 22 19 6 2 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:

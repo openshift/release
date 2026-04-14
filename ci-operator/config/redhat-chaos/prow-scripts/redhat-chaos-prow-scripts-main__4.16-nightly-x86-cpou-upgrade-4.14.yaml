@@ -21,20 +21,21 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-416-up
-- dockerfile_literal: |-
-    FROM prow-scripts.prow
-    RUN ls
-  from: prow-scripts.prow
-  to: prow-scripts-416-up
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-416-up
+  - dockerfile_literal: |-
+      FROM prow-scripts.prow
+      RUN ls
+    from: prow-scripts.prow
+    to: prow-scripts-416-up
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   intermediate:
     candidate:
@@ -67,9 +68,9 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "10"
       CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "10"
       MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
       PAUSED_MCP_NAME: worker infra
       USER_TAGS: |
@@ -94,6 +95,7 @@ tests:
           memory: 200Mi
     - chain: openshift-qe-upgrade-max-unavailable
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - ref: redhat-chaos-start-krkn
     - chain: openshift-upgrade-qe-sanity-cpou
     workflow: redhat-chaos-installer-aws

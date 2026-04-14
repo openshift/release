@@ -1,26 +1,11 @@
-base_images:
-  ocp_4.15_base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
-- dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: cloud-network-config-controller
+  items:
+  - dockerfile_path: Dockerfile
+    to: cloud-network-config-controller
 promotion:
   to:
   - name: "4.15"
@@ -46,15 +31,15 @@ test_binary_build_commands: make test
 tests:
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-azure-ovn
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: unit
   commands: make test
@@ -62,7 +47,7 @@ tests:
     from: src
 - as: e2e-aws-sdn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-serial
@@ -70,7 +55,7 @@ tests:
   as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: false
   as: e2e-openstack-sdn-serial-e2e-only

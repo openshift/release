@@ -1,33 +1,15 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.18_base-rhel9:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
-- dockerfile_path: Dockerfile.rhel9
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
-  to: cluster-node-tuning-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel9
+    to: cluster-node-tuning-operator
 promotion:
   to:
   - name: 4.18-priv
@@ -66,17 +48,18 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-hypershift-pao
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
     - as: e2e-hypershift-pao
       cli: latest
       commands: |-
+        export CLUSTER_TYPE=hypershift
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -92,13 +75,14 @@ tests:
 - always_run: false
   as: e2e-pao-updating-profile-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
     - as: e2e-pao-updating-profile-hypershift
       cli: latest
       commands: |-
+        export CLUSTER_TYPE=hypershift
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE="$(${CLI_DIR}/oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -113,11 +97,11 @@ tests:
     workflow: hypershift-aws-e2e-cluster
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -133,7 +117,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -147,7 +131,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -163,7 +147,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -179,7 +163,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -193,7 +177,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local

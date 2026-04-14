@@ -121,6 +121,16 @@ esac
 export ES_SERVER
 
 pip install .
+
+# Print Orion version
+orion_version=$(orion --version 2>&1)
+orion_version_exit=$?
+if [ "$orion_version_exit" -ne 0 ]; then
+  echo "orion version prior to v0.1.7"
+else
+  echo "Orion version: $orion_version"
+fi
+
 export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [[ ! -z "$UUID" ]]; then
@@ -151,10 +161,14 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
-if [[ ! -z "$ACK_FILE" ]]; then
-    # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-    export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
+if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
+    ackFilePath="/tmp/$(basename ${ACK_FILE})"
+    if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+        echo "Error: Failed to download $ACK_FILE" >&2
+        exit 1
+    fi
+    export EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
 
 if [ ${COLLAPSE} == "true" ]; then

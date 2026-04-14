@@ -5,37 +5,38 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi9/ubi:latest
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
 
-    RUN cat /etc/os-release
-    ARG OPERATOR_SDK_VERSION=1.40.0
-    ARG ARCH=amd64
+      RUN cat /etc/os-release
+      ARG OPERATOR_SDK_VERSION=1.40.0
+      ARG ARCH=amd64
 
-    ADD openshift-preflight /src
-    ADD preflight /src/preflight
+      ADD openshift-preflight /src
+      ADD preflight /src/preflight
 
-    RUN dnf install -y make \
-      jq \
-      bzip2 \
-      gzip \
-      iptables \
-      findutils \
-      git \
-      && dnf clean all
+      RUN dnf install -y make \
+        jq \
+        bzip2 \
+        gzip \
+        iptables \
+        findutils \
+        git \
+        && dnf clean all
 
-    RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} \
-      && chmod 755 /usr/local/bin/operator-sdk
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight/preflight
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight
-  to: preflight-bin
+      RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} \
+        && chmod 755 /usr/local/bin/operator-sdk
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight/preflight
+        - destination_dir: .
+          source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight
+    to: preflight-bin
 releases:
   latest:
     release:

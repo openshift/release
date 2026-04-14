@@ -3,37 +3,22 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.7
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-  to: cluster-autoscaler
-- context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    openshift_release_golang-1.14:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
-  to: vertical-pod-autoscaler
+  items:
+  - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+    from: base
+    to: cluster-autoscaler
+  - context_dir: vertical-pod-autoscaler
+    dockerfile_path: Dockerfile.openshift
+    from: base
+    to: vertical-pod-autoscaler
 promotion:
   to:
   - name: 4.7-priv
@@ -94,7 +79,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -108,7 +93,7 @@ tests:
   as: e2e-azure-operator
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -122,7 +107,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

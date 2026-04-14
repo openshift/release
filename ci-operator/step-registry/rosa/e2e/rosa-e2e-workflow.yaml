@@ -1,0 +1,24 @@
+workflow:
+  as: rosa-e2e
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+    pre:
+      - chain: rosa-aws-sts-hcp-provision
+      - ref: rosa-cluster-wait-ready-nodes
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA HCP cluster and runs the rosa-e2e
+    managed service validation suite, then tears down the cluster.

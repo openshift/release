@@ -1,24 +1,24 @@
 base_images:
   cli:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: cli
   upi-installer:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.21-openshift-4.18
 releases:
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -30,13 +30,13 @@ tests:
 - as: quay-e2e-tests-quay313-api-testing
   cron: 0 12 * * 6
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:950387
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-13-v4-21@sha256:d72c8d8779cb0dd607e72aab5efab7461fb60067593cce99f9b43fb0129036d9
       QUAY_OPERATOR_CHANNEL: stable-3.13
-      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-enable-quay-catalogsource
@@ -46,13 +46,13 @@ tests:
 - as: quay-e2e-tests-quay314-api-testing
   cron: 0 12 * * 3
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:940263
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-21@sha256:eedb0e6ffdeccbfd7053cde733627e5af81d4c8ea9c478c9c77f7049a54766a9
       QUAY_OPERATOR_CHANNEL: stable-3.14
-      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.14"
     test:
     - ref: quay-tests-enable-quay-catalogsource
@@ -66,7 +66,7 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.19
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.19
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_VERSION: "3.15"
@@ -82,9 +82,9 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1021992
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-20@sha256:20cbf11279f90e36cf4d0b0876f5448b05e188f52f45ce19950e815b85dc3f15
       QUAY_OPERATOR_CHANNEL: stable-3.15
-      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.15"
     test:
     - ref: quay-tests-enable-quay-catalogsource
@@ -98,10 +98,26 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:c65899a2049774cdf09ba4929fe87a41890d9ddbe6d8c5d8a7e0e2a427bf892c
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:c65899a2049774cdf09ba4929fe87a41890d9ddbe6d8c5d8a7e0e2a427bf892c
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay317-api-testing
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:be7ba8a18c423975e3c840984e9f89bdb6f988996ca8e0ad6287f92301ad45c7
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-deploy-quay-aws-s3

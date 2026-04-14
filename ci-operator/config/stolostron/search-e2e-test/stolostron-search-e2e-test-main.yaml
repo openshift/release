@@ -5,11 +5,12 @@ build_root:
     namespace: stolostron
     tag: nodejs20-linux
 images:
-- dockerfile_path: Dockerfile
-  to: search-e2e
+  items:
+  - dockerfile_path: Dockerfile
+    to: search-e2e
 promotion:
   to:
-  - name: "2.16"
+  - name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -21,7 +22,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.16
+      DESTINATION_BRANCH: release-2.17
     workflow: ocm-ci-fastforward
 - as: deploy-and-run-e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|^tests/(api|cypress)/.*$|^Jenkins.*$
@@ -29,7 +30,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: search-e2e
     env:
-      ACM_RELEASE_VERSION: release-2.15
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
       CLUSTERPOOL_GROUP_NAME: Search
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
@@ -52,8 +53,7 @@ tests:
       commands: |
         SKIP_UI_TEST=false SKIP_API_TEST=false ./run-prow-e2e.sh
       credentials:
-      - collection: ""
-        mount_path: /etc/secret
+      - mount_path: /etc/secret
         name: ocm-obs-usa-acmcreds
         namespace: test-credentials
       from: search-e2e
@@ -68,7 +68,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: search-e2e
     env:
-      ACM_RELEASE_VERSION: release-2.15
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
       CLUSTERPOOL_GROUP_NAME: Search
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
@@ -91,8 +91,7 @@ tests:
       commands: |
         SKIP_UI_TEST=true SKIP_API_TEST=false ./run-prow-e2e.sh
       credentials:
-      - collection: ""
-        mount_path: /etc/secret
+      - mount_path: /etc/secret
         name: ocm-obs-usa-acmcreds
         namespace: test-credentials
       from: search-e2e
@@ -107,7 +106,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: search-e2e
     env:
-      ACM_RELEASE_VERSION: release-2.15
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
       CLUSTERPOOL_GROUP_NAME: Search
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
@@ -130,8 +129,7 @@ tests:
       commands: |
         SKIP_UI_TEST=false SKIP_API_TEST=true ./run-prow-e2e.sh
       credentials:
-      - collection: ""
-        mount_path: /etc/secret
+      - mount_path: /etc/secret
         name: ocm-obs-usa-acmcreds
         namespace: test-credentials
       from: search-e2e

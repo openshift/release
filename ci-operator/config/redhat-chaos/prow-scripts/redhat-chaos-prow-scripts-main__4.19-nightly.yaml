@@ -22,18 +22,19 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-419
-- dockerfile_path: Dockerfile
-  from: krkn.prow
-  to: prow-scripts-419
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-419
+  - dockerfile_path: Dockerfile
+    from: krkn.prow
+    to: prow-scripts-419
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -60,8 +61,8 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
       USER_TAGS: |
@@ -78,8 +79,8 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
       USER_TAGS: |
@@ -102,6 +103,7 @@ tests:
       SIZE_VARIANT: xlarge
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
+      VD_EXTRA_FLAGS: ""
       VMI_READY_THRESHOLD: "30"
       VMS_PER_NODE: "2"
     test:
@@ -109,57 +111,65 @@ tests:
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
     workflow: ipi-gcp
-- as: krkn-hub-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "3"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
+      UDN_ITERATION_MULTIPLIER: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: openshift-qe-udn-density-pods
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "False"
-      ITERATION_MULTIPLIER_ENV: "3"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
+      UDN_ITERATION_MULTIPLIER: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: openshift-qe-udn-density-pods
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-cluster-disruption
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-tests-aws-ipsec
-  cron: 0 4 5 * *
+- always_run: false
+  as: krkn-hub-tests-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
       USER_TAGS: |
@@ -170,14 +180,14 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-aws-ipsec
-  cron: 0 4 29 * *
+- always_run: false
+  as: krkn-hub-node-tests-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
       USER_TAGS: |
@@ -188,56 +198,64 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "3"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
+      UDN_ITERATION_MULTIPLIER: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: openshift-qe-udn-density-pods
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-etcd-tests
     - chain: redhat-chaos-krkn-hub-console-tests
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn-aws-ipsec
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "False"
-      ITERATION_MULTIPLIER_ENV: "3"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
+      UDN_ITERATION_MULTIPLIER: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: openshift-qe-udn-density-pods
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-cluster-disruption
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: gcp-fipsetcd-krkn-hub-tests
-  cron: 0 4 28 * *
+- always_run: false
+  as: gcp-fipsetcd-krkn-hub-tests
   steps:
     cluster_profile: gcp-chaos
     env:
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
     observers:
@@ -251,8 +269,8 @@ tests:
   steps:
     cluster_profile: gcp-chaos
     env:
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
     observers:
@@ -268,8 +286,8 @@ tests:
     cluster_profile: vsphere-connected-2
     env:
       ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       WORKER_REPLICA_COUNT: "10"
     observers:
       enable:
@@ -285,9 +303,10 @@ tests:
     cluster_profile: vsphere-connected-2
     env:
       ALERTS_PATH: ./node-disruptions/etcd_warning_slos
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       CLOUD_TYPE: vsphere
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       WAIT_DURATION: "1000"
       WORKER_REPLICA_COUNT: "10"
     observers:
@@ -296,19 +315,20 @@ tests:
     test:
     - chain: workers-scale
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-vsphere-ipi-ovn
-- as: krkn-hub-tests-13nodes
-  cron: 0 4 1,15 * 1
+- always_run: false
+  as: krkn-hub-tests-13nodes
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_REPLICAS: "13"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       SPOT_INSTANCES: "false"
@@ -319,15 +339,15 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-13nodes
-  cron: 0 4 3,17 * 1
+- always_run: false
+  as: krkn-hub-node-tests-13nodes
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_REPLICAS: "13"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       SPOT_INSTANCES: "false"
@@ -344,8 +364,8 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       SPOT_INSTANCES: "false"
@@ -364,8 +384,8 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       SPOT_INSTANCES: "false"
@@ -384,14 +404,16 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
     test:
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-syn-flood
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-azure-multiarch
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-node-tests-azure-multiarch
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -402,12 +424,13 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: eastus
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E16s_v3
       PROFILE_TYPE: reporting
@@ -421,12 +444,13 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: workers-scale
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-multiarch
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure-multiarch
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -437,12 +461,12 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D8s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
       CUSTOM_AZURE_REGION: eastus
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
       OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
@@ -458,14 +482,14 @@ tests:
     - chain: workers-scale
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-node
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-tests-azure-node
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       PROFILE_TYPE: reporting
       TELEMETRY_GROUP: prow-ocp-azure-4.19
     observers:
@@ -477,14 +501,14 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-azure
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
       OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
       PROFILE_TYPE: reporting
@@ -495,14 +519,14 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-compact
-  cron: 0 4 2 * *
+- always_run: false
+  as: krkn-hub-tests-compact
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "true"
       TELEMETRY_GROUP: prow-ocp-4.19
     observers:
@@ -511,14 +535,14 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-compact
-  cron: 0 4 1 * *
+- always_run: false
+  as: krkn-hub-node-tests-compact
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SPOT_INSTANCES: "false"
       TELEMETRY_GROUP: prow-ocp-4.19
     observers:
@@ -533,9 +557,9 @@ tests:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_TYPE: bx2-4x16
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SET_ENV_BY_PLATFORM: custom
       SIZE_VARIANT: large
       TELEMETRY_GROUP: prow-ocp-4.19
@@ -553,10 +577,10 @@ tests:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
+      CDV2_ITERATION_MULTIPLIER: "11"
       COMPUTE_NODE_TYPE: bx2-4x16
       DISABLE_SSL_VERIFICATION: "True"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "11"
       SET_ENV_BY_PLATFORM: custom
       SIZE_VARIANT: large
       TELEMETRY_GROUP: prow-ocp-4.19

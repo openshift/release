@@ -11,19 +11,20 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: rhel-8-release-golang-1.16-openshift-4.10
 images:
-- dockerfile_path: Dockerfile
-  from: original_jenkins
-  inputs:
-    jenkins-agent-maven:
-      as:
-      - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins-sync-plugin/.
-  to: jenkins
+  items:
+  - dockerfile_path: Dockerfile
+    from: original_jenkins
+    inputs:
+      jenkins-agent-maven:
+        as:
+        - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/jenkins-sync-plugin/.
+    to: jenkins
 promotion:
   to:
   - additional_images:
@@ -51,7 +52,7 @@ tests:
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -64,7 +65,7 @@ tests:
 - as: e2e-aws-jenkins-sync-plugin-continuous
   cron: 23 17 13 1 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

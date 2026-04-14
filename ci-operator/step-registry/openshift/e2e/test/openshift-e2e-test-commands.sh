@@ -73,8 +73,8 @@ fi
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function cleanup() {
-    echo "Requesting risk analysis for test failures in this job run from sippy:"
-    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    #echo "Requesting risk analysis for test failures in this job run from sippy:"
+    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
     echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
 }
@@ -151,7 +151,7 @@ gcp|gcp-arm64)
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
-aws|aws-arm64)
+aws|aws-arm64|aws-eusc)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"

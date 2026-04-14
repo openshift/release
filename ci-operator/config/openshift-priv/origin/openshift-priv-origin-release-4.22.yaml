@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.64.8
+    tag: v2.10.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -24,16 +24,23 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools
-  to: tests
-- dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  to: hello-openshift
+  items:
+  - dockerfile_path: images/tests/Dockerfile.rhel
+    from: tools-openstack
+    to: tests
+  - dockerfile_path: images/hello-openshift/Dockerfile.rhel
+    to: hello-openshift
 promotion:
   to:
   - disabled: true
     name: 4.22-priv
     namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-22.ocp.svc > /etc/yum.repos.art/ci/base-openstack-4-22.repo
+    from: tools
+    to: tools-openstack
 releases:
   initial:
     integration:
@@ -94,7 +101,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -104,7 +111,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -119,7 +126,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -128,7 +135,7 @@ tests:
   as: e2e-aws-ovn-kube-apiserver-rollout
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -140,7 +147,7 @@ tests:
   as: e2e-gcp-ovn-kube-apiserver-rollout
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -152,7 +159,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -161,7 +168,7 @@ tests:
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -173,7 +180,7 @@ tests:
   as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/test-cmd
     observers:
@@ -184,13 +191,13 @@ tests:
   as: e2e-gcp-ovn-builds
   pipeline_run_if_changed: ^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-builds
 - always_run: false
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_REQUIRES_SSH: "yes"
       TEST_SUITE: openshift/disruptive
@@ -204,7 +211,7 @@ tests:
   as: e2e-gcp-disruptive
   optional: true
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -213,7 +220,7 @@ tests:
   as: e2e-aws-proxy
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -222,7 +229,7 @@ tests:
   as: e2e-aws-jenkins
   pipeline_run_if_changed: ^(test/extended/builds/pipeline_jenkins_e2e.go)|^(test/extended/testdata/jenkins-plugin)|^(examples/jenkins)
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/jenkins-e2e
     workflow: openshift-e2e-aws-jenkins
@@ -230,20 +237,20 @@ tests:
   as: e2e-gcp-ovn-image-ecosystem
   pipeline_run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-image-ecosystem
 - always_run: false
   as: e2e-aws-ovn-image-registry
   pipeline_run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/image-registry
     workflow: openshift-e2e-aws-image-registry
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -252,7 +259,7 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -260,7 +267,7 @@ tests:
 - always_run: false
   as: e2e-gcp-csi
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -269,7 +276,7 @@ tests:
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: ""
       TEST_TYPE: upgrade
@@ -282,7 +289,7 @@ tests:
   optional: true
   pipeline_run_if_changed: ^(test/e2e/upgrade)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       DELETE_MC: "false"
       TEST_SUITE: ""
@@ -296,7 +303,7 @@ tests:
   as: e2e-aws-ovn-serial-fast
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial/fast
     observers:
@@ -307,7 +314,7 @@ tests:
   as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -319,7 +326,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -352,12 +359,12 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - always_run: false
   as: e2e-aws-csi
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
       TEST_SUITE: openshift/csi
@@ -388,7 +395,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-fips
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
@@ -550,7 +557,7 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -559,7 +566,7 @@ tests:
   as: e2e-aws-ovn-single-node-serial
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -570,7 +577,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -581,7 +588,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -593,7 +600,7 @@ tests:
   as: e2e-aws-ovn-single-node-upgrade
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -630,7 +637,7 @@ tests:
   as: e2e-aws-ovn-cgroupsv2
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cgroupsv2
 - as: lint
   commands: |
@@ -642,23 +649,37 @@ tests:
     clone: true
     from: golangci-lint
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: verify-image-manifest-lists
+  commands: |
+    OPENSHIFT_SKIP_EXTERNAL_TESTS=1 openshift-tests images \
+      --to-repository=quay.io/openshift/e2e-verify-image-manifest-lists \
+      --verify-manifest-lists \
+      --allow-missing-architectures=e2e-19-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
+      --allow-missing-architectures=registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
+      --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
+      --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
+      --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
+      --log-level=debug
+  container:
+    from: tests
+  run_if_changed: ^test/extended/util/image/zz_generated\.txt$
 - always_run: false
   as: e2e-aws-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-etcd-scaling
 - always_run: false
   as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-etcd-scaling
 - always_run: false
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling
@@ -678,7 +699,7 @@ tests:
   as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
@@ -686,15 +707,13 @@ tests:
   as: e2e-aws-etcd-certrotation
   optional: true
   steps:
-    cluster_profile: aws-4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-etcd-certrotation
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -706,7 +725,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -718,7 +737,7 @@ tests:
   as: e2e-gcp-ovn-usernamespace
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace
@@ -731,7 +750,7 @@ tests:
   optional: true
   pipeline_run_if_changed: ^test/extended/kubevirt/.*
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: e2e-baremetalds-kubevirt
@@ -747,7 +766,7 @@ tests:
   as: e2e-aws-ovn-upi
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -756,13 +775,13 @@ tests:
   as: e2e-aws-ovn-edge-zones
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
 - always_run: false
   as: e2e-external-aws
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -771,7 +790,7 @@ tests:
   as: e2e-external-aws-ccm
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     observers:
@@ -790,7 +809,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-microshift
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MICROSHIFT_OS: rhel-9.6
       SRC_FROM_GIT: "true"
@@ -799,7 +818,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-microshift-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       MICROSHIFT_OS: rhel-9.6
       SRC_FROM_GIT: "true"
@@ -809,7 +828,7 @@ tests:
   as: e2e-hypershift-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.22

@@ -39,12 +39,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-baremetal-operator
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: cluster-baremetal-operator
+  items:
+  - from: base
+    to: cluster-baremetal-operator
 promotion:
   to:
   - name: 4.12-priv
@@ -95,7 +92,7 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-metal-ipi-sdn-bm
   capabilities:
@@ -174,8 +171,14 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

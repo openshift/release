@@ -25,15 +25,16 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-rosa-420
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-rosa-420
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -51,13 +52,14 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:420
       COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       GC: "false"
       INDEX_ENABLED: "true"
-      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.20"
       PROFILE_TYPE: reporting
@@ -78,13 +80,14 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:420
       COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       GC: "false"
       INDEX_ENABLED: "true"
-      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.20"
       PROFILE_TYPE: reporting
@@ -102,6 +105,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:420
       COMPUTE_MACHINE_TYPE: m5.xlarge
@@ -109,7 +114,6 @@ tests:
       ENABLE_AUTOSCALING: "false"
       GC: "false"
       HOSTED_CP: "true"
-      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.20"
       PROFILE_TYPE: reporting
@@ -121,6 +125,7 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - ref: redhat-chaos-pod-scenarios-prometheus-disruption
     - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     workflow: rosa-aws-sts-hcp
@@ -130,6 +135,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:420
       COMPUTE_MACHINE_TYPE: m5.xlarge
@@ -137,7 +144,6 @@ tests:
       ENABLE_AUTOSCALING: "false"
       GC: "false"
       HOSTED_CP: "true"
-      ITERATION_MULTIPLIER_ENV: "11"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.20"
       PROFILE_TYPE: reporting
@@ -149,6 +155,7 @@ tests:
       - redhat-chaos-cerberus
     test:
     - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-krkn-hub-cluster-disruption
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: rosa-aws-sts-hcp

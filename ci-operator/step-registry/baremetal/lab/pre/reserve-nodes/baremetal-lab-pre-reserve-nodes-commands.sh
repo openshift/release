@@ -47,7 +47,7 @@ scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.en
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
-  "${ADDITIONAL_WORKERS}" "${gnu_additional_arch}" "${VENDOR}" << 'EOF'
+  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -59,8 +59,8 @@ N_WORKERS="${3}"
 REQUEST_BOOTSTRAP_HOST="${4}"
 ARCH="${5}"
 JOB_URL="${6}"
-ADDITIONAL_WORKERS="${7:-}"
-ADDITIONAL_WORKER_ARCHITECTURE="${8:-}"
+ADDITIONAL_WORKERS="${7}"
+ADDITIONAL_WORKER_ARCHITECTURE="${8}"
 VENDOR="${9:-}"
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"

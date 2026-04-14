@@ -9,24 +9,26 @@ build_root:
     namespace: coreos
     tag: latest
 images:
-- build_args:
-  - name: OPENSHIFT_CI
-    value: "1"
-  dockerfile_path: Containerfile
-  inputs:
-    rhel-coreos-base:
-      as:
-      - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
-  to: rhel-coreos
-- build_args:
-  - name: OPENSHIFT_CI
-    value: "1"
-  dockerfile_path: extensions/Dockerfile
-  inputs:
-    rhel-coreos:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-  to: rhel-coreos-extensions
+  items:
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    dockerfile_path: Containerfile
+    inputs:
+      rhel-coreos-base:
+        as:
+        - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+    to: rhel-coreos
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    dockerfile_path: extensions/Containerfile
+    inputs:
+      rhel-coreos:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+    to: rhel-coreos-extensions
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - excluded_images:
@@ -54,7 +56,7 @@ tests:
   as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.23

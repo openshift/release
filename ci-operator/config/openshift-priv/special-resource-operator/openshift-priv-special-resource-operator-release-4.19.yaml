@@ -3,10 +3,6 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   image_stream_tag:
     name: builder-priv
@@ -14,37 +10,34 @@ build_root:
     tag: rhel-8-golang-1.17-openshift-4.10
 canonical_go_repository: github.com/openshift/special-resource-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: special-resource-rhel8-operator
-- dockerfile_literal: |
-    FROM src
-    RUN export VERSION="stable" && \
-        URL="https://github.com/koalaman/shellcheck/releases/download" && \
-        export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
-        wget -q -O - "${URL}" | tar -xJv && \
-        cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
-        rm -rf "shellcheck-${VERSION}"
-    RUN mkdir /tmp/helm && \
-        cd /tmp/helm && \
-        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
-        tar xvfpz helm.tar.gz && \
-        mv linux-amd64/helm /usr/local/bin && \
-        chmod +x /usr/local/bin/helm && \
-        rm -rf /tmp/helm
-    RUN mkdir /tmp/oc && \
-        cd /tmp/oc && \
-        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
-        tar xzvf oc.tar.gz && \
-        mv kubectl /usr/local/bin/ && \
-        cd - && \
-        rm -rf /tmp/oc
-  from: src
-  to: test-bin
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: special-resource-rhel8-operator
+  - dockerfile_literal: |
+      FROM src
+      RUN export VERSION="stable" && \
+          URL="https://github.com/koalaman/shellcheck/releases/download" && \
+          export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+          wget -q -O - "${URL}" | tar -xJv && \
+          cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+          rm -rf "shellcheck-${VERSION}"
+      RUN mkdir /tmp/helm && \
+          cd /tmp/helm && \
+          curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+          tar xvfpz helm.tar.gz && \
+          mv linux-amd64/helm /usr/local/bin && \
+          chmod +x /usr/local/bin/helm && \
+          rm -rf /tmp/helm
+      RUN mkdir /tmp/oc && \
+          cd /tmp/oc && \
+          curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+          tar xzvf oc.tar.gz && \
+          mv kubectl /usr/local/bin/ && \
+          cd - && \
+          rm -rf /tmp/oc
+    from: src
+    to: test-bin
 promotion:
   to:
   - excluded_images:

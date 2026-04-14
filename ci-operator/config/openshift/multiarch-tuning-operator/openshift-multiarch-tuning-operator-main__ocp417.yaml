@@ -7,23 +7,24 @@ binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile
-  from: base
-  to: multiarch-tuning-operator
-- additional_architectures:
-  - arm64
-  dockerfile_path: bundle.Dockerfile
-  to: multiarch-tuning-op-bundle
-- additional_architectures:
-  - arm64
-  dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.33.0 as osdk
-    FROM src
-    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-  from: src
-  to: operator-sdk-mto
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    from: base
+    to: multiarch-tuning-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: bundle.Dockerfile
+    to: multiarch-tuning-op-bundle
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.33.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-mto
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
@@ -69,17 +70,17 @@ resources:
       memory: 1Gi
   sast:
     limits:
-      memory: 8Gi
+      memory: 20Gi
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: "8"
+      memory: 10Gi
 tests:
 - as: e2e-gcp
   capabilities:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
@@ -98,9 +99,9 @@ tests:
   as: e2e-aws-ovn-proxy-mto-origin
   capabilities:
   - arm64
-  cron: 30 10 20 * *
+  cron: 30 10 5 * *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
@@ -138,7 +139,7 @@ tests:
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:

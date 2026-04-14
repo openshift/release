@@ -1,16 +1,8 @@
 base_images:
-  ocp_4.22_base-rhel9:
-    name: "4.23"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "4.22"
   virtctl:
     name: "4.23"
     namespace: ocp
@@ -18,18 +10,12 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: vsphere-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: vsphere-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: vsphere-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: vsphere-csi-driver-operator-test
 promotion:
   to:
   - name: "4.23"
@@ -118,7 +104,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
-      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      POOL_SELECTOR: vsphere-type=vcf9
     workflow: openshift-e2e-vsphere-csi
 - as: verify-deps
   steps:

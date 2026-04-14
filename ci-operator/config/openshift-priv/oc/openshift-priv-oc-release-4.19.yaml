@@ -11,18 +11,6 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   tests-base:
     name: 4.19-priv
     namespace: ocp-private
@@ -32,56 +20,28 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/oc
 images:
-- dockerfile_path: images/cli/Dockerfile.rhel
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: cli
-- dockerfile_path: images/tools/Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: tools
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: tests-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: tests
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: must-gather-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: must-gather
-- context_dir: images/deployer
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: deployer
-- dockerfile_path: images/cli-artifacts/Dockerfile.rhel
-  from: cli
-  inputs:
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-  to: cli-artifacts
-- context_dir: images/recycler/
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: recycler
+  items:
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    to: cli
+  - dockerfile_path: images/tools/Dockerfile
+    to: tools
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    from: tests-base
+    to: tests
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    from: must-gather-base
+    to: must-gather
+  - context_dir: images/deployer
+    dockerfile_path: Dockerfile.rhel
+    from: cli
+    to: deployer
+  - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+    from: cli
+    to: cli-artifacts
+  - context_dir: images/recycler/
+    dockerfile_path: Dockerfile.rhel
+    from: cli
+    to: recycler
 promotion:
   to:
   - additional_images:
@@ -152,28 +112,28 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-agnostic-ovn-cmd
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-aws-certrotation
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     test:
     - ref: openshift-oc-certrotation
     - ref: openshift-e2e-test
@@ -183,7 +143,7 @@ tests:
   optional: true
   run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-builds
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6

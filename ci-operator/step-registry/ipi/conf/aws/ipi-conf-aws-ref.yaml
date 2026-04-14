@@ -2,8 +2,9 @@ ref:
   as: ipi-conf-aws
   from_image:
     namespace: ocp
-    name: "4.14"
+    name: "4.18"
     tag: upi-installer
+  grace_period: 10m
   commands: ipi-conf-aws-commands.sh
   resources:
     requests:
@@ -27,7 +28,7 @@ ref:
   - name: CONTROL_PLANE_INSTANCE_TYPE
     default: ""
     documentation: |-
-      The instance type to use for control plane nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). 
+      The instance type to use for control plane nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/).
       When "" (default), the step uses m6a.${CONTROL_PLANE_INSTANCE_SIZE} if it's available in the region, otherwise uses m6i.${CONTROL_PLANE_INSTANCE_SIZE}.
   - name: COMPUTE_NODE_TYPE
     default: ""
@@ -69,6 +70,10 @@ ref:
     default: "yes"
     documentation: |-
       Add AZs to the install-config.yaml
+  - name: AWS_REGION_OVERWRITE
+    default: ""
+    documentation: |-
+      Overwrite the region used for the cluster.
   - name: BASE_DOMAIN
     default: "origin-ci-int-aws.dev.rhcloud.com"
     documentation: |-
@@ -80,9 +85,9 @@ ref:
       More info:
       https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/aws-imds-v2-support.md
       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
-      
+
       Valid values are:
-      * "" (default) - corresponds to "Optional" behaviour. 
+      * "" (default) - corresponds to "Optional" behaviour.
       * "Required" - sets IMDSv2 to Required for all machines in install-config, metadata service is not accessible without auth procedure.
       * "Optional" - auth procedure on metadata service is optional
   - name: COMPUTE_ARCH
@@ -117,5 +122,39 @@ ref:
     documentation: |-
       Allows users to enable configuration of dedicated hosts for compute nodes.  Valid options are "yes" and "no".  When "yes", the
       configuration will create a dedicated host for each zone the "worker" compute pool has configured.
+  - name: IP_FAMILY
+    default: ""
+    documentation: |-
+      IP family configuration for dual-stack. Valid values: DualStackIPv4Primary, DualStackIPv6Primary.
+      When set, configures both IPv4 and IPv6 network stacks for AWS clusters using the ipFamily field.
+      When "" (default), dual-stack is not configured.
+  - name: CONTROL_PLANE_AMI
+    default: ""
+    documentation: |-
+      Custom RHCOS AMI ID for control plane nodes.
+
+      Required for AWS partitions without public AMIs (e.g., EUSC, China).
+      For C2S/SC2S, auto-detected from GitHub if not provided.
+      When "" (default), uses installer's built-in AMI for the region.
+  - name: COMPUTE_AMI
+    default: ""
+    documentation: |-
+      Custom RHCOS AMI ID for compute nodes.
+
+      When "" (default), uses installer's built-in AMI for the region.
+  - name: PKI_ALGORITHM
+    default: ""
+    documentation: |-
+      Algorithm for PKI signer certificates when ConfigurablePKI feature gate is enabled.
+      Valid values: "RSA", "ECDSA". When "" (default), no pki section is added to install-config.yaml.
+  - name: PKI_RSA_KEY_SIZE
+    default: "4096"
+    documentation: |-
+      RSA key size in bits for PKI signer certificates. Only used when PKI_ALGORITHM=RSA.
+  - name: PKI_ECDSA_CURVE
+    default: "P-384"
+    documentation: |-
+      ECDSA curve name for PKI signer certificates. Only used when PKI_ALGORITHM=ECDSA.
+      Valid values: "P-256", "P-384".
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.

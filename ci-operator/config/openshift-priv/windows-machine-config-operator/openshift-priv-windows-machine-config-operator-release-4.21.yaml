@@ -1,12 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
-  openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -25,15 +17,10 @@ build_root:
   use_build_cache: true
 canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
-- dockerfile_path: build/Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
-  to: windows-machine-config-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.ci
+    to: windows-machine-config-operator-test
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -95,7 +82,7 @@ tests:
   as: aws-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -121,7 +108,7 @@ tests:
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -133,7 +120,7 @@ tests:
   as: gcp-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -153,7 +140,7 @@ tests:
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: install
       cli: latest

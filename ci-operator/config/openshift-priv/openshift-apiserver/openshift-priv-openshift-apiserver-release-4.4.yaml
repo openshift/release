@@ -3,25 +3,18 @@ base_images:
     name: 4.4-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_golang-1.13:
-    name: builder
-    namespace: ocp
-    tag: golang-1.13
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/openshift-apiserver
 images:
-- dockerfile_path: images/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
-  to: openshift-apiserver
+  items:
+  - dockerfile_path: images/Dockerfile.rhel
+    from: base
+    to: openshift-apiserver
 promotion:
   to:
   - name: 4.4-priv
@@ -58,22 +51,22 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-cmd
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cmd
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: release-4.4

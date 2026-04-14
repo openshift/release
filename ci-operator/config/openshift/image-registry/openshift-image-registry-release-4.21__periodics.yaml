@@ -3,14 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.21_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   upi-installer:
     name: "4.21"
     namespace: ocp
@@ -18,15 +10,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: docker-registry
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: docker-registry
 promotion:
   to:
   - disabled: true
@@ -53,7 +39,7 @@ tests:
 - as: e2e-aws-image-stream-import-mode-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -62,7 +48,7 @@ tests:
 - as: e2e-aws-sno-image-stream-import-mode-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-node-invariants,legacy-kube-apiserver-invariants,audit-log-analyzer
@@ -71,7 +57,7 @@ tests:
 - as: e2e-azure-image-stream-import-mode-techpreview
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -80,7 +66,7 @@ tests:
 - as: e2e-gcp-image-stream-import-mode-techpreview
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -102,7 +88,7 @@ tests:
     workflow: baremetalds-e2e
   timeout: 4h0m0s
 - as: e2e-vsphere-image-stream-import-mode-techpreview
-  interval: 24h
+  cron: 7 19 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:

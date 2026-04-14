@@ -3,27 +3,16 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  openshift_release_golang-1.18:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/vertical-pod-autoscaler-operator
 images:
-- from: base
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: vertical-pod-autoscaler-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  from: base
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: vpa-operator-registry
+  items:
+  - from: base
+    to: vertical-pod-autoscaler-operator
+  - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+    from: base
+    to: vpa-operator-registry
 promotion:
   to:
   - name: 4.12-priv
@@ -79,7 +68,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -99,7 +88,7 @@ tests:
 - as: e2e-aws-olm
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

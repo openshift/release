@@ -7,27 +7,17 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/router/base/Dockerfile.rhel
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  optional: true
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: haproxy-router-base
-  to: haproxy-router
-- dockerfile_path: images/router/f5/Dockerfile
-  from: haproxy-router-base
-  to: f5-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.rhel
+    from: base
+    optional: true
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
   - name: "4.13"
@@ -58,7 +48,7 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -86,7 +76,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router
@@ -145,7 +135,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: release-4.13

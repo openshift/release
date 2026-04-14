@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   origin_scos-4.21_base-stream9:
     name: scos-4.21
     namespace: origin
@@ -13,36 +9,25 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/manila-csi-plugin/Dockerfile
-  from: origin_scos-4.21_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: csi-driver-manila
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/cinder-csi-plugin/Dockerfile
-  from: origin_scos-4.21_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: openstack-cinder-csi-driver
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/cloud-controller-manager/Dockerfile
-  from: origin_scos-4.21_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: openstack-cloud-controller-manager
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/manila-csi-plugin/Dockerfile
+    from: origin_scos-4.21_base-stream9
+    to: csi-driver-manila
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/cinder-csi-plugin/Dockerfile
+    from: origin_scos-4.21_base-stream9
+    to: openstack-cinder-csi-driver
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/cloud-controller-manager/Dockerfile
+    from: origin_scos-4.21_base-stream9
+    to: openstack-cloud-controller-manager
 promotion:
   to:
   - name: scos-4.21
@@ -63,7 +48,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.21

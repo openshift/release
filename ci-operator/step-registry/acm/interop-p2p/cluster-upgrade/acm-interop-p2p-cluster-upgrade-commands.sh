@@ -2,111 +2,138 @@
 
 set -euxo pipefail; shopt -s inherit_errexit
 
-
+#=====================
+# Export environment variables
+#=====================
 export TARGET_CHANNEL
-export RC_STREAM
-export RC_HOST_AMD64
 
-TIMEOUT_SECONDS="7200"
-POLL_INTERVAL="30"
+#=====================
+# Configuration variables
+#=====================
+timeout_seconds="${ACM_UPGRADE_TIMEOUT_SECONDS:-7200}"  # Default: 2 hours
+poll_interval="${ACM_UPGRADE_POLL_INTERVAL:-30}"       # Default: 30 seconds
 
-url="${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"
-echo ${url}
+#=====================
+# Validate required files and variables
+#=====================
+if [[ -z "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
+    echo "[ERROR] ORIGINAL_RELEASE_IMAGE_LATEST environment variable is not set" >&2
+    exit 1
+fi
 
-# get latest version from release controller
-latest_rc_from_release_controller(){
-    local rc url
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+    echo "[ERROR] Hub kubeconfig not found: ${SHARED_DIR}/kubeconfig" >&2
+    exit 1
+fi
 
-    rc="$(curl -fsSL "${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"  \
-        | jq -r '.name' )"
-    [[ -n "$rc" ]] && { echo "$rc"; return 0; }
-    return 1
+if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+    echo "[ERROR] Spoke kubeconfig not found: ${SHARED_DIR}/managed-cluster-kubeconfig" >&2
+    exit 1
+fi
+
+#=====================
+# Helper functions
+#=====================
+now() {
+    date +%s
 }
 
-# get latest release image
-latest_release_image(){
+#=====================
+# Resolve target version and digest
+#=====================
+echo "[INFO] Resolving latest RC's from release Controller..."
+target_version="$(oc adm release info "${ORIGINAL_RELEASE_IMAGE_LATEST}" -o json | jq -r '.metadata.version')"
 
-    local rc
+if [[ -z "${target_version}" ]]; then
+    echo "[ERROR] Failed to get target version from release image" >&2
+    exit 1
+fi
 
-    rc="$(curl -fsSL "${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"  \
-        | jq -r '.pullSpec' )"
-    [[ -n "$rc" ]] && { echo "$rc"; return 0; }
-    return 1
-}
+# Get image digest, digest is required to safely upgrade the cluster using release image
+digest="$(oc adm release info "${ORIGINAL_RELEASE_IMAGE_LATEST}" -o json | jq -r .digest)"
 
-echo "Resolving latest RC's from release Controller (stream=${RC_STREAM})..."
-TARGET_VERSION="$(latest_rc_from_release_controller)"
+if [[ -z "${digest}" ]]; then
+    echo "[ERROR] Failed to get digest from release image" >&2
+    exit 1
+fi
 
+echo "[INFO] Target version: ${target_version}"
+echo "[INFO] Target digest: ${digest}"
 
-TARGET_IMAGE="$(latest_release_image)"
-echo "Release_image: ${TARGET_IMAGE}"
+#=====================
+# Set kubeconfig paths
+#=====================
+hub_kubeconfig="${SHARED_DIR}/kubeconfig"
+spoke_kubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
 
-# get image digest, digest is required to safely upgrade the cluster using release image
-DIGEST=$(oc adm release info "$TARGET_IMAGE" -o json | jq -r .digest)
-
-
-#==========================================
-
-HUB_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-SPOKE_KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
-need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 1; }; }
-need jq
-
-
-[ -f "${HUB_KUBECONFIG}" ]
-[ -f "${SPOKE_KUBECONFIG}" ]
-
-now() { date +%s; }
-
+#=====================
+# Upgrade functions
+#=====================
 upgrade_cluster() {
-   
-    local kfcg="$1" ctx="$2"
+    local kfcg="$1"
+    local ctx="$2"
+    local repo
 
-    echo "Upgrading ${ctx} to channel=${TARGET_CHANNEL} and upgrading to ${TARGET_VERSION} and Target image:${TARGET_IMAGE}"
+    echo "[INFO] Upgrading ${ctx} to channel=${TARGET_CHANNEL} and version=${target_version}"
+    echo "[INFO] Target image: ${ORIGINAL_RELEASE_IMAGE_LATEST}"
+    
+    # Update channel
     oc --kubeconfig="${kfcg}" patch clusterversion version --type merge -p "{\"spec\":{\"channel\":\"${TARGET_CHANNEL}\"}}"
-    repo="${TARGET_IMAGE%:*}"
-    echo "${repo}"
-    oc --kubeconfig="${kfcg}" adm upgrade --to-image="${repo}@${DIGEST}" --allow-explicit-upgrade --allow-upgrade-with-warnings --force
-
+    
+    # Extract repository from image reference
+    repo="${ORIGINAL_RELEASE_IMAGE_LATEST%:*}"
+    echo "[INFO] Repository: ${repo}"
+    
+    # Initiate upgrade
+    oc --kubeconfig="${kfcg}" adm upgrade --to-image="${repo}@${digest}" --allow-explicit-upgrade --allow-upgrade-with-warnings --force
 }
-
 
 wait_for_completed() {
-    local kfcg="$1" ctx="$2" target="$3" start;
-    start=$(now)
-    echo "waiting for ${ctx} to complete upgrade to ${target}"
-    while true; do
-      local js state ver
+    local kfcg="$1"
+    local ctx="$2"
+    local target="$3"
+    local start
+    local state
+    local ver
 
-      # query clusterversion and get state and version
-      js="$(oc --kubeconfig="${kfcg}" get clusterversion version -o json 2>/dev/null || true)"
-      state="$(jq -r '.status.history[0].state // empty' <<<"$js")"
-      ver="$(jq -r '.status.history[0].version // empty' <<<"$js")"
-      # if state is completed and ver is target version then upgrade finished
-      if [[ "$state" == "Completed" && "$ver" == "$target" ]]; then
-        echo "${ctx}: Completed && ${ver}"
-        break
-      fi
-      # if version and state did not reach desired values before timeout then exit
-      if (( $(now) - start > TIMEOUT_SECONDS )); then
-        echo "Timeout waiting for ${ctx} (state='${state:-?}' version='${ver:-?}' target='${target}')" >&2
-        exit 2
-      fi
-      echo " ${ctx}: state='${state:-?}', version='${ver:-?}', retry in ${POLL_INTERVAL}s"
-      sleep "${POLL_INTERVAL}"
+    start="$(now)"
+    echo "[INFO] Waiting for ${ctx} to complete upgrade to ${target}"
+    
+    while true; do
+        # Query clusterversion and get state and version
+        clusterversion_json="$(oc --kubeconfig="${kfcg}" get clusterversion version -o json 2>/dev/null || echo '{}')"
+        state="$(jq -r '.status.history[0].state // empty' <<<"${clusterversion_json}")"
+        ver="$(jq -r '.status.history[0].version // empty' <<<"${clusterversion_json}")"
+        
+        # If state is completed and ver is target version then upgrade finished
+        if [[ "${state}" == "Completed" && "${ver}" == "${target}" ]]; then
+            echo "[SUCCESS] ${ctx}: Upgrade completed to version ${ver}"
+            break
+        fi
+        
+        # If version and state did not reach desired values before timeout then exit
+        if (( $(now) - start > timeout_seconds )); then
+            echo "[ERROR] Timeout waiting for ${ctx} (state='${state:-?}' version='${ver:-?}' target='${target}')" >&2
+            exit 2
+        fi
+        
+        echo "[INFO] ${ctx}: state='${state:-?}', version='${ver:-?}', retry in ${poll_interval}s"
+        sleep "${poll_interval}"
     done
 }
 
+#=====================
+# Execute upgrades
+#=====================
+# Hub upgrade
+echo "[INFO] Starting hub cluster upgrade"
+upgrade_cluster "${hub_kubeconfig}" "hub"
+wait_for_completed "${hub_kubeconfig}" "hub" "${target_version}"
 
-echo "Target channel: ${TARGET_CHANNEL}"
-echo "TARGET version: ${TARGET_VERSION}"
+# Spoke upgrade
+echo "[INFO] Starting spoke cluster upgrade"
+upgrade_cluster "${spoke_kubeconfig}" "spoke"
+wait_for_completed "${spoke_kubeconfig}" "spoke" "${target_version}"
 
-#hub upgrade
-upgrade_cluster "${HUB_KUBECONFIG}" "hub"
-wait_for_completed "${HUB_KUBECONFIG}" "hub" "${TARGET_VERSION}"
-
-#spoke upgrade
-upgrade_cluster "${SPOKE_KUBECONFIG}" "spoke"
-wait_for_completed "${SPOKE_KUBECONFIG}" "spoke" "${TARGET_VERSION}"
-
-echo "All selected clusters are at latest RCs"
+echo "[SUCCESS] All selected clusters are at latest RCs"
+# Check cluster health for hub and spoke clusters after upgrade

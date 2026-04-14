@@ -41,6 +41,7 @@ export TARGET_LCA_REF="${TARGET_LCA_REF}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
 export SEED_VERSION="${SEED_VERSION}"
+export IP_STACK="${IP_STACK}"
 export UPGRADE_TIMEOUT="60m"
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
@@ -113,8 +114,8 @@ echo "No control-plane component revision triggers logged."
 
 # Remove non OpenShift workloads after the upgrade
 echo "Removing the OADP operator..."
-oc delete -f oadp-operator.yaml
-oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io
+oc delete -f oadp-operator.yaml --ignore-not-found || true
+oc delete crd cloudstorages.oadp.openshift.io dataprotectionapplications.oadp.openshift.io --ignore-not-found || true
 
 echo "Removing Lifecycle Agent operator..."
 make -C lifecycle-agent bundle-clean

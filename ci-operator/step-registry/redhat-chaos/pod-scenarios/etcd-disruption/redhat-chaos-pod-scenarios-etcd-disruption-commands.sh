@@ -1,15 +1,25 @@
 #!/bin/bash
 set -o errexit
 
-ES_PASSWORD=$(cat "/secret/es/password")
-ES_USERNAME=$(cat "/secret/es/username")
+typeset secretDir=/secret/es
+ES_PASSWORD=$(<"${secretDir}/es-password--${CHAOS_TEAM_NAME}")
+ES_USERNAME=$(<"${secretDir}/es-username--${CHAOS_TEAM_NAME}")
 
 export ES_PASSWORD
 export ES_USERNAME
 
-if [[ -n $ES_PASSWORD ]]; then
-    export ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-fi
+case "${CHAOS_TEAM_NAME}" in
+  chaos)
+    ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    ;;
+  lp-chaos)
+    ES_SERVER="https://open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com"
+    ;;
+  *)
+    ES_SERVER=""
+    ;;
+esac
+export ES_SERVER
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -23,8 +33,29 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password" || true)
 export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
-console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
-export HEALTH_CHECK_URL=https://$console_url
+
+# Check for health check configuration
+if [[ -f "$SHARED_DIR/health-check-url" ]]; then
+    HEALTH_CHECK_URL=$(cat "$SHARED_DIR/health-check-url" 2>/dev/null)
+    if [[ -n "$HEALTH_CHECK_URL" ]]; then
+        export HEALTH_CHECK_URL
+        echo "✅ Using external health check URL for chaos monitoring: $HEALTH_CHECK_URL"
+        
+        # Store expected external IP for post-chaos validation if available
+        if [[ -f "$SHARED_DIR/expected-external-ip" ]]; then
+            EXPECTED_EXTERNAL_IP=$(cat "$SHARED_DIR/expected-external-ip" 2>/dev/null)
+            export EXPECTED_EXTERNAL_IP
+            echo "✅ Expected external IP for validation: $EXPECTED_EXTERNAL_IP"
+        fi
+    else
+        console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+        export HEALTH_CHECK_URL=https://$console_url
+    fi
+else
+    console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+    export HEALTH_CHECK_URL=https://$console_url
+    echo "Using console health check URL: $HEALTH_CHECK_URL"
+fi
 set -o nounset
 set -o pipefail
 set -x
@@ -32,6 +63,7 @@ set -x
 ./pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
+oc get pods -n $TARGET_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' 
 
 cat /tmp/*.log 
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then

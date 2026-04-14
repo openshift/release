@@ -7,32 +7,34 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y jq git openssl python3.11 && \
-        ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
-        dnf clean all
-    RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
-    RUN python3 --version
-    RUN mkdir -p /usr/local/gcloud \
-      && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
-      && rm -f /tmp/google-cloud-sdk.tar.gz
-    ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
-    WORKDIR /workdir
-    COPY . .
-  from: base
-  to: crio-crio-base-src
+  items:
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y jq git openssl python3.11 && \
+          ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+          dnf clean all
+      RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
+      RUN python3 --version
+      RUN mkdir -p /usr/local/gcloud \
+        && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
+        && rm -f /tmp/google-cloud-sdk.tar.gz
+      ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+      WORKDIR /workdir
+      COPY . .
+    from: base
+    to: crio-crio-base-src
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.23"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.23"
       namespace: ocp
 resources:
   '*':
@@ -44,34 +46,34 @@ tests:
 - as: setup-periodic
   cron: 00 00 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-setup
 - as: evented-pleg-periodic
   cron: 00 */6 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     env:
       EVENTED_PLEG: "true"
     workflow: cri-o-e2e
 - as: crio-node-e2e-conformance-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-conformance
 - as: crio-node-e2e-nodefeature-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-nodefeature
 - as: crio-node-e2e-nodeconformance-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-nodeconformance
 - as: setup-fedora-periodic
   cron: 00 00 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-setup-fedora
 zz_generated_metadata:
   branch: main

@@ -1,0 +1,109 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt      
+  documentation: |-
+    The HyperShift mce ibmz conformance workflow executes tests against a new ephemeral Hypershift kubevirt cluster
+    created on ibmz Nodes to validate the cluster creation reaches completed state.
+  steps:
+    pre:
+      - ref: hypershift-mce-ibmz-create-s390xmgmt
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-ibmz-install-metallb
+      - ref: hypershift-mce-ibmz-install-secondarydisk
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-mce-ibmz-install-lso
+      - ref: hypershift-kubevirt-install-odf
+      - ref: hypershift-mce-ibmz-create-hcpvirt
+
+    test:
+      - chain: hypershift-mce-ibmz-test
+      - chain: hypershift-conformance
+
+    post:
+      - chain: hypershift-mce-kubevirt-destroy
+      - ref: hypershift-mce-ibmz-destroy-s390x-mgmt
+    env:
+      HYPERSHIFT_BASEDOMAIN: 'hcpci.com'
+      HYPERSHIFT_NODE_COUNT: 2
+      IC_CLI_VERSION: '2.36.0'
+      VSI_IMAGE_NAME: "ubuntu-s390x-image"
+      IC_REGION: 'eu-gb'
+      HC_NS: 'virt-ibmz'
+      CONTROL_NODE_COUNT: 3
+      COMPUTE_NODE_COUNT: 0
+      CONTROL_NODE_PROFILE: "bz2-16x64"
+      COMPUTE_NODE_PROFILE: "bz2-16x64"
+      REGION: 'London'
+      RESOURCE_GROUP: 'hypershift'
+      ENABLE_NESTED_VIRT: "true"
+      CREATE_STORAGE_CLASS: "false"
+      ODF_BACKEND_STORAGE_CLASS: 'local-block-ocs'
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      SKIP_MONITOR_TEST: "true"
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        Kubectl client Simple pod should support exec through an HTTP proxy\|
+        Managed cluster should have no crashlooping recycler pods over four minutes\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted\|
+        CSI Mock volume expansion CSI Volume expansion\|
+        Services should have session affinity timeout work for NodePort service\|
+        deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers\|
+        deploymentconfigs with multiple image change triggers should run a successful deployment with multiple triggers\|
+        deploymentconfigs when changing image change trigger should successfully trigger from an updated image\|
+        oc new-app should succeed with a --name of 58 characters\|
+        Image layer subresource should return layers from tagged images\|
+        deploymentconfigs won't deploy RC with unresolved images when patched with empty image\|
+        s2i build with a root user image should create a root build and pass with a privileged SCC\|
+        The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it\|
+        build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service\|
+        oc tag should change image reference for internal images\|
+        Services should be able to switch session affinity for NodePort service\|
+        Services should have session affinity work for NodePort service\|
+        Aggregator Should be able to support the 1.17 Sample API Server using the current Aggregator\|
+        builds installing subscription content \[apigroup:build.openshift.io\] should succeed for RHEL 7 base images\|
+        builds installing subscription content \[apigroup:build.openshift.io\] should succeed for RHEL 8 base images\|
+        builds installing subscription content \[apigroup:build.openshift.io\] should succeed for RHEL 9 base images\|
+        HTPasswd IDP should successfully configure htpasswd and be responsive\|
+        anonymous browsers should get a 403 from\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should adopt matching orphans and release non-matching pods\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should not deadlock when a pod's predecessor fails\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should perform rolling updates and roll backs of template modifications with PVCs\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should provide basic identity\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenDeleted)\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenScaled)\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a OnScaledown policy\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a WhenDeleted policy\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVC with OnScaledown policy if another controller owns the PVC\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVCs when there is another controller\|
+        LDAP IDP should authenticate against an ldap server \[apigroup:user.openshift.io\]\[apigroup:route.openshift.io\]\|
+        expected headers returned from the authorize URL\|
+        expected headers returned from the grant URL\|
+        expected headers returned from the login URL for the allow all IDP\|
+        expected headers returned from the login URL for the bootstrap IDP\|
+        expected headers returned from the login URL for when there is only one IDP\|
+        expected headers returned from the logout URL\|
+        expected headers returned from the root URL\|
+        expected headers returned from the token URL\|
+        expected headers returned from the token request URL\|
+        Using a OAuth client with a non-default token max age \[apigroup:oauth.openshift.io\] to generate tokens that do not expire works as expected when using a code authorization flow \[apigroup:user.openshift.io\]\|
+        Using a OAuth client with a non-default token max age \[apigroup:oauth.openshift.io\] to generate tokens that do not expire works as expected when using a token authorization flow \[apigroup:user.openshift.io\]\|
+        Using a OAuth client with a non-default token max age \[apigroup:oauth.openshift.io\] to generate tokens that expire shortly works as expected when using a code authorization flow \[apigroup:user.openshift.io\]\|
+        Using a OAuth client with a non-default token max age \[apigroup:oauth.openshift.io\] to generate tokens that expire shortly works as expected when using a token authorization flow \[apigroup:user.openshift.io\]\|
+        oc basics can get version information from API\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should have non-Pod host cAdvisor metrics\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should provide ingress metrics\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should provide named network metrics \[apigroup:project.openshift.io\]\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should start and expose a secured proxy and unsecured metrics \[apigroup:config.openshift.io\]\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster shouldn't have failing rules evaluation\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured \[Early\]\[apigroup:config.openshift.io\]\|
+        Alerts shouldn't exceed the series limit of total series sent via telemetry from each cluster\|
+        OpenShift alerting rules \[apigroup:image.openshift.io\] should have a runbook_url annotation if the alert is critical\|
+        OpenShift alerting rules \[apigroup:image.openshift.io\] should have a valid severity label\|
+        OpenShift alerting rules \[apigroup:image.openshift.io\] should have description and summary annotations\|
+        OpenShift alerting rules \[apigroup:image.openshift.io\] should link to a valid URL if the runbook_url annotation is defined\|
+        OpenShift alerting rules \[apigroup:image.openshift.io\] should link to an HTTP(S) location if the runbook_url annotation is defined\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via LoadBalancer service across different guest nodes\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via NodePort across different infra nodes\|
+        Managed cluster should report ready nodes the entire duration of the test run \[Late\]\[apigroup:monitoring.coreos.com\]\|
+        Metrics should report short attach times\|
+        Metrics should report short mount times

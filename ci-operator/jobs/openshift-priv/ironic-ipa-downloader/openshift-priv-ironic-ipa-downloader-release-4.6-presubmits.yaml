@@ -33,9 +33,17 @@ presubmits:
         - --target=e2e-metal-ipi
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -86,11 +94,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.6$
     - ^release-4\.6-
-    cluster: build06
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -102,6 +110,7 @@ presubmits:
     name: pull-ci-openshift-priv-ironic-ipa-downloader-release-4.6-images
     path_alias: github.com/openshift/ironic-ipa-downloader
     rerun_command: /test images
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
     spec:
       containers:
       - args:

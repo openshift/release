@@ -15,18 +15,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-golang-1.15-openshift-4.6
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_4.6_artifacts:
-      as:
-      - quay.io/openshift/origin-artifacts:4.6
-    ocp_4.6_mcd:
-      as:
-      - quay.io/openshift/origin-machine-config-operator:4.6
-  to: machine-os-content
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      ocp_4.6_artifacts:
+        as:
+        - quay.io/openshift/origin-artifacts:4.6
+      ocp_4.6_mcd:
+        as:
+        - quay.io/openshift/origin-machine-config-operator:4.6
+    to: machine-os-content
 promotion:
   to:
   - name: "4.6"
@@ -51,11 +52,11 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-ovirt
@@ -65,7 +66,7 @@ tests:
     workflow: openshift-e2e-ovirt-minimal-release-4.6-4.7
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.6

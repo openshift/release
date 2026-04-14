@@ -3,24 +3,17 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/azure-disk-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: azure-disk-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-disk-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: azure-disk-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-disk-csi-driver-operator-test
 promotion:
   to:
   - name: 4.11-priv
@@ -49,11 +42,11 @@ tests:
     from: src
 - as: e2e-azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
 - always_run: false
   as: e2e-azurestack-csi

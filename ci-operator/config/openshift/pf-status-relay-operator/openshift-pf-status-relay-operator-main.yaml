@@ -3,30 +3,16 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp_4.21_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   pf-status-relay:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: pf-status-relay
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: pf-status-relay-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: pf-status-relay-operator
 operator:
   bundles:
   - as: operator-bundle
@@ -38,19 +24,19 @@ operator:
     with: pipeline:pf-status-relay
 promotion:
   to:
-  - name: sriov-4.22
+  - name: sriov-5.0
     namespace: origin
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -74,7 +60,7 @@ tests:
     workflow: openshift-ci-security
 - as: e2e-validation
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: operator-bundle
     env:

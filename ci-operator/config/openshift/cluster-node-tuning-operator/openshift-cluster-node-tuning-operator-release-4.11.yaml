@@ -3,27 +3,13 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-base-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.11
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel8
-  from: base
-  inputs:
-    ocp_builder_rhel-8-base-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.11
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
-  to: cluster-node-tuning-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel8
+    from: base
+    to: cluster-node-tuning-operator
 promotion:
   to:
   - name: "4.11"
@@ -58,11 +44,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -74,7 +60,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-gcp-pao
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -88,7 +74,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local
@@ -97,7 +83,7 @@ tests:
 - as: e2e-nightly
   cron: 58 16 15 12 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: nightly
       cli: latest

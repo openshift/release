@@ -16,6 +16,78 @@ CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.ve
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
+if [[ "${LVM_CATALOG_SOURCE}" == "redhat-operators" ]]; then
+  if [[ -n "${REDHAT_OPERATORS_INDEX_TAG:-}" ]]; then
+    # Create a new CatalogSource with a different name to avoid conflicts with the marketplace-managed one
+    # Name format: redhat-operators-v4-20 (dots replaced with dashes)
+    CATALOG_SOURCE_NAME="redhat-operators-$(echo ${REDHAT_OPERATORS_INDEX_TAG} | sed 's/[.]/-/g')"
+    echo "Creating CatalogSource ${CATALOG_SOURCE_NAME} with production image registry.redhat.io/redhat/redhat-operator-index:${REDHAT_OPERATORS_INDEX_TAG}"
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  annotations:
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+  name: ${CATALOG_SOURCE_NAME}
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators
+  grpcPodConfig:
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-role.kubernetes.io/master: ""
+    priorityClassName: system-cluster-critical
+    securityContextConfig: restricted
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 120
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 120
+  icon:
+    base64data: ""
+    mediatype: ""
+  image: registry.redhat.io/redhat/redhat-operator-index:${REDHAT_OPERATORS_INDEX_TAG}
+  priority: -100
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+    # Wait for CatalogSource to be ready
+    for i in $(seq 1 120); do
+      echo "Check CatalogSource ${CATALOG_SOURCE_NAME} creating in $i attempts"
+      state=$(oc get catalogsources/${CATALOG_SOURCE_NAME} -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)
+      if [[ $? -ne 0 || -z "$state" ]]; then
+        echo "error: can't get CatalogSource ${CATALOG_SOURCE_NAME} status (retry the $i attempts)"
+        sleep 2
+        continue
+      fi
+      echo "CatalogSource state: $state"
+      if [ "$state" == "READY" ]; then
+        echo "CatalogSource ${CATALOG_SOURCE_NAME} created successfully after waiting $((5*i)) seconds"
+        # Write the catalog source name to SHARED_DIR so subsequent steps can use it
+        echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/redhat_operators_catalog_source_name"
+        exit 0
+      fi
+      sleep 5
+    done
+    echo "Error: CatalogSource ${CATALOG_SOURCE_NAME} failed to become ready"
+    oc get catalogsources/${CATALOG_SOURCE_NAME} -n openshift-marketplace -o yaml
+    exit 1
+  else
+    echo "Skipping creating LVM custom catalog source since production catalog is being used."
+    exit 0
+  fi
+fi
+
 # lvms-operator exists in Konflux catalogsource index image by default in all versions
 LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
 

@@ -51,28 +51,21 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: oauth-proxy
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: elasticsearch-operator
-- dockerfile_path: Dockerfile.src
-  from: src
-  to: elasticsearch-operator-src
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
-  to: elasticsearch-operator-registry
+  items:
+  - from: base
+    to: elasticsearch-operator
+  - dockerfile_path: Dockerfile.src
+    from: src
+    to: elasticsearch-operator-src
+  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+    from: base
+    to: elasticsearch-operator-registry
 operator:
   bundles:
   - as: elasticsearch-operator-bundle
@@ -117,7 +110,7 @@ tests:
     from: src
 - as: e2e-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
@@ -137,7 +130,7 @@ tests:
     workflow: optional-operators-ci-aws
 - as: cluster-logging-operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:

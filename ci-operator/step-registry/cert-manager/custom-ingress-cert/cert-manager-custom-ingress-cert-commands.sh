@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -32,16 +30,16 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
 function check_clusterissuer() {
-    echo "Checking the persence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
+    echo "Checking the presence of ClusterIssuer '$CLUSTERISSUER_NAME' as prerequisite..."
     if ! oc wait clusterissuer/$CLUSTERISSUER_NAME --for=condition=Ready --timeout=0; then
         echo "ClusterIssuer is not created or not ready to use. Skipping rest of steps..."
         exit 0
@@ -115,8 +113,7 @@ function update_kubeconfig_ca() {
 
     echo "Appending the CA data of KUBECONFIG with the new CA certificate..."
     CA_DATA=$(grep certificate-authority-data "$KUBECONFIG".old | awk '{print $2}' | base64 -d)
-    cat "$CA_FILE" >> <(echo "$CA_DATA")
-    NEW_CA_DATA=$(echo "$CA_DATA" | base64 -w0)
+    NEW_CA_DATA=$(echo "$CA_DATA" | cat "$CA_FILE" - | base64 -w0)
     sed -i "s/certificate-authority-data:.*$/certificate-authority-data: $NEW_CA_DATA/" "$KUBECONFIG"
 
     echo "Validating the updated KUBECONFIG using any of oc command..."

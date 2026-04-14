@@ -1,56 +1,27 @@
-base_images:
-  ocp_4.22_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/cloud-provider-openstack
 images:
-- dockerfile_path: images/manila-csi-plugin/Dockerfile
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: csi-driver-manila
-- dockerfile_path: images/cinder-csi-plugin/Dockerfile
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: openstack-cinder-csi-driver
-- dockerfile_path: images/cloud-controller-manager/Dockerfile
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: openstack-cloud-controller-manager
+  items:
+  - dockerfile_path: images/manila-csi-plugin/Dockerfile
+    to: csi-driver-manila
+  - dockerfile_path: images/cinder-csi-plugin/Dockerfile
+    to: openstack-cinder-csi-driver
+  - dockerfile_path: images/cloud-controller-manager/Dockerfile
+    to: openstack-cloud-controller-manager
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -92,7 +63,11 @@ tests:
 - as: e2e-openstack-csi-manila
   run_if_changed: (^pkg/csi/manila/)|(^images/manila-csi-plugin/)
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
 - as: security
   optional: true

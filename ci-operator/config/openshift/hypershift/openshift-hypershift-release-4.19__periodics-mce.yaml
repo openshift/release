@@ -54,7 +54,7 @@ tests:
 - as: e2e-aws-ovn-conformance
   minimum_interval: 72h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_ARGS: --multi-arch=false
       MCE_VERSION: "2.9"
@@ -62,7 +62,7 @@ tests:
 - as: e2e-agent-connected-ovn-ipv4-manual-conformance
   capabilities:
   - intranet
-  minimum_interval: 168h
+  cron: 0 0 22-28 * 3
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -72,32 +72,27 @@ tests:
 - as: e2e-agent-connected-ovn-ipv4-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 6 22-28 * 3
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-dualstack-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 12 22-28 * 3
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=4
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
@@ -111,7 +106,7 @@ tests:
 - as: e2e-agent-connected-ovn-ipv4-metal-compact-conformance
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 18 22-28 * 3
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -134,7 +129,7 @@ tests:
 - as: e2e-agent-disconnected-ovn-ipv6-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 22 22-28 * 3
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -146,6 +141,7 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
@@ -154,13 +150,14 @@ tests:
 - as: e2e-agent-disconnected-ovn-dualstack-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 0 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         MIRROR_IMAGES=true
+        NUM_WORKERS=4
         NETWORK_TYPE=OVNKubernetes
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
@@ -175,7 +172,7 @@ tests:
 - as: e2e-agent-connected-ovn-ipv4-metal-oadp
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 6 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -199,13 +196,12 @@ tests:
     - ref: hypershift-mce-agent-minio
     - ref: operatorhub-subscribe-oadp-operator
     - ref: hypershift-mce-agent-oadp-v2
-    - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-kubevirt-metal-ovn
   capabilities:
   - intranet
-  minimum_interval: 72h
+  cron: 0 12 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -219,7 +215,7 @@ tests:
 - as: e2e-kubevirt-azure-ovn
   minimum_interval: 72h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       CNV_SUBSCRIPTION_SOURCE: cnv-prerelease-catalog-source
       HYPERSHIFT_NODE_COUNT: "2"
@@ -232,7 +228,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn-multinet
   capabilities:
   - intranet
-  minimum_interval: 168h
+  cron: 0 18 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -247,7 +243,7 @@ tests:
 - as: e2e-agent-connected-cilium-ipv4-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 336h
+  cron: 0 22 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -257,7 +253,7 @@ tests:
 - as: e2e-agent-connected-calico-ipv4-metal-conformance
   capabilities:
   - intranet
-  minimum_interval: 336h
+  cron: 0 0 22-28 * 5
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -267,7 +263,7 @@ tests:
 - as: e2e-kubevirt-metal-ovn-multinet-default-net
   capabilities:
   - intranet
-  minimum_interval: 168h
+  cron: 0 6 22-28 * 5
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -294,21 +290,21 @@ tests:
 - as: e2e-ibmz-ovn-conformance
   minimum_interval: 168h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MCE_VERSION: "2.9"
     workflow: hypershift-mce-ibmz-conformance
 - as: e2e-power-ovn-conformance
   minimum_interval: 168h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MCE_VERSION: "2.9"
     workflow: hypershift-mce-power-conformance
 - as: e2e-x86-power-heterogeneous-conformance
   minimum_interval: 168h
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
         NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
@@ -321,12 +317,11 @@ tests:
       USE_GLB: "no"
     test:
     - chain: hypershift-mce-power-test
-    - ref: hypershift-mce-agent-info
     workflow: hypershift-mce-power-conformance
 - as: e2e-aws-critical
   cron: 24 19 * * 6
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     dependencies:
       HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:419-latest
     env:

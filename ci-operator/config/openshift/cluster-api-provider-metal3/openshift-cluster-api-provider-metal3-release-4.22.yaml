@@ -3,31 +3,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.22_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: baremetal-cluster-api-controllers
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: baremetal-cluster-api-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.22"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -73,8 +58,7 @@ tests:
   commands: make -C openshift verify
   container:
     from: src
-- always_run: false
-  as: e2e-metal3-capi-techpreview
+- as: e2e-metal3-capi-techpreview
   capabilities:
   - intranet
   steps:

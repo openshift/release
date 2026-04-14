@@ -4,10 +4,11 @@ build_root:
     namespace: konveyor
     tag: ubi9-v1.23
 images:
-- dockerfile_path: Dockerfile
-  to: oadp-operator-1.5
-- dockerfile_path: build/ci-Dockerfile
-  to: test-oadp-operator-1.5
+  items:
+  - dockerfile_path: Dockerfile
+    to: oadp-operator-1.5
+  - dockerfile_path: build/ci-Dockerfile
+    to: test-oadp-operator-1.5
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
@@ -32,7 +33,7 @@ tests:
   as: e2e-test-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -45,8 +46,7 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5
@@ -58,7 +58,7 @@ tests:
 - as: e2e-test-aws-periodic
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -71,8 +71,7 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5
@@ -85,7 +84,7 @@ tests:
   as: e2e-test-kubevirt-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -98,8 +97,7 @@ tests:
       cli: latest
       commands: make TEST_VIRT=true test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5
@@ -111,7 +109,7 @@ tests:
 - as: e2e-test-kubevirt-aws-periodic
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -124,8 +122,7 @@ tests:
       cli: latest
       commands: make TEST_VIRT=true test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5
@@ -138,7 +135,7 @@ tests:
   as: e2e-test-hcp-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -151,8 +148,7 @@ tests:
       cli: latest
       commands: make TEST_HCP=true test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5
@@ -164,7 +160,7 @@ tests:
 - as: e2e-test-hcp-aws-periodic
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -177,8 +173,7 @@ tests:
       cli: latest
       commands: make TEST_HCP=true test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/oadp-credentials
+      - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
       from: test-oadp-operator-1.5

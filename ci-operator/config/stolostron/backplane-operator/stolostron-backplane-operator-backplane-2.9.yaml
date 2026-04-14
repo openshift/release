@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.24-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.24-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -14,19 +10,12 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-  to: backplane-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-  to: backplane-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: backplane-operator
+  - dockerfile_path: build/Dockerfile.test.prow
+    to: backplane-operator-test
 promotion:
   to:
   - disabled: true
@@ -110,8 +99,7 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -138,8 +126,7 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

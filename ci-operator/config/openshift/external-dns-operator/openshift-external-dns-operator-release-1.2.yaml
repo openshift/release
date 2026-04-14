@@ -6,8 +6,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: external-dns-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: external-dns-operator
 operator:
   bundles:
   - as: external-dns-operator-bundle
@@ -45,8 +46,9 @@ tests:
   container:
     from: src
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -64,8 +66,9 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-aws
 - as: e2e-gcp-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -83,8 +86,9 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-gcp
 - as: e2e-azure-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -102,8 +106,9 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-azure
 - as: e2e-azure-infoblox-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -119,8 +124,7 @@ tests:
         export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
         make test-e2e
       credentials:
-      - collection: ""
-        mount_path: /var/run/infoblox-credentials
+      - mount_path: /var/run/infoblox-credentials
         name: infoblox-credentials
         namespace: test-credentials
       from: src
@@ -129,12 +133,13 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-azure
 - as: e2e-aws-shared-vpc-phz-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OO_CHANNEL: stable-v1.2
       OO_INSTALL_NAMESPACE: external-dns-operator
       OO_PACKAGE: external-dns-operator

@@ -1,25 +1,10 @@
-base_images:
-  ocp_4.15_base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/thanos
 images:
-- dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: thanos
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: thanos
 promotion:
   to:
   - name: 4.15-priv
@@ -71,15 +56,15 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-agnostic-cmo
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest

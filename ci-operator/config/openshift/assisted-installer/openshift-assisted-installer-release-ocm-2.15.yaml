@@ -26,12 +26,13 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted-installer
-  to: assisted-installer
-- dockerfile_path: Dockerfile.assisted-installer-controller
-  to: assisted-installer-controller
-- dockerfile_path: Dockerfile.assisted-installer-build
-  to: assisted-installer-build
+  items:
+  - dockerfile_path: Dockerfile.assisted-installer
+    to: assisted-installer
+  - dockerfile_path: Dockerfile.assisted-installer-controller
+    to: assisted-installer-controller
+  - dockerfile_path: Dockerfile.assisted-installer-build
+    to: assisted-installer-build
 promotion:
   to:
   - name: ocm-2.15
@@ -129,11 +130,10 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
-- always_run: false
-  as: e2e-ai-operator-ztp
+- as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  pipeline_run_if_changed: ^(deploy/.*|hack/.*|src/.*|vendor/.*|Dockerfile.*|Makefile|go\.mod|go\.sum|\.dockerignore)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

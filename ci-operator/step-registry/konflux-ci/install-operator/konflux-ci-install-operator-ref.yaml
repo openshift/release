@@ -1,0 +1,34 @@
+ref:
+  as: konflux-ci-install-operator
+  cli: latest
+  commands: konflux-ci-install-operator-commands.sh
+  from: src
+  timeout: 30m
+  grace_period: 1m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: KONFLUX_BRANCH
+    default: main
+    documentation: |-
+      The branch of konflux-ci/konflux-ci to deploy from.
+      For PR jobs, Prow may override this automatically.
+  - name: OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Full operator image to deploy (e.g., quay.io/konflux-ci/konflux-operator:v0.1.5).
+      If empty, deploy-konflux-on-ocp.sh uses its default fallback logic.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Gangway API override for OPERATOR_IMAGE. When set, the script maps this
+      to OPERATOR_IMAGE and derives KONFLUX_REF from the image tag to checkout
+      the matching git ref. Required for release gating.
+  documentation: |-
+    Installs Konflux on OpenShift by calling deploy-konflux-on-ocp.sh from konflux-ci/konflux-ci.
+  credentials:
+  - namespace: test-credentials
+    name: konflux-ci-konflux-ci-e2e-tests-credentials
+    mount_path: /usr/local/ci-secrets/konflux-ci-konflux-ci-e2e-tests-credentials

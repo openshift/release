@@ -3,14 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.22_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -19,15 +11,9 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: cluster-authentication-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: cluster-authentication-operator
 promotion:
   to:
   - disabled: true
@@ -52,7 +38,7 @@ tests:
 - as: e2e-aws-external-oidc-configure
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -63,7 +49,7 @@ tests:
 - as: e2e-azure-external-oidc-configure
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -74,7 +60,7 @@ tests:
 - as: e2e-gcp-external-oidc-configure
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -83,7 +69,7 @@ tests:
       TEST_SUITE: openshift/auth/external-oidc
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-external-oidc-configure
-  interval: 24h
+  cron: 27 16 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -141,7 +127,7 @@ tests:
 - as: e2e-aws-sno-external-oidc-configure
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-node-invariants,legacy-kube-apiserver-invariants,audit-log-analyzer
       TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
@@ -151,7 +137,7 @@ tests:
 - as: e2e-aws-external-oidc-revertoauth
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -162,7 +148,7 @@ tests:
 - as: e2e-azure-external-oidc-revertoauth
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -173,7 +159,7 @@ tests:
 - as: e2e-gcp-external-oidc-revertoauth
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -182,7 +168,7 @@ tests:
       TEST_SUITE: openshift/auth/external-oidc
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-external-oidc-revertoauth
-  interval: 24h
+  cron: 35 5 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -240,7 +226,7 @@ tests:
 - as: e2e-aws-external-oidc-uid-extra
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -250,7 +236,7 @@ tests:
 - as: e2e-aws-sno-external-oidc-revertoauth
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-node-invariants,legacy-kube-apiserver-invariants,audit-log-analyzer
       TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
@@ -260,7 +246,7 @@ tests:
 - as: e2e-azure-external-oidc-uid-extra
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -270,7 +256,7 @@ tests:
 - as: e2e-gcp-external-oidc-uid-extra
   interval: 24h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       OPENSHIFT_SKIP_EXTERNAL_TESTS: "True"
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
@@ -278,7 +264,7 @@ tests:
       TEST_SUITE: openshift/auth/external-oidc
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-external-oidc-uid-extra
-  interval: 24h
+  cron: 21 9 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -332,7 +318,7 @@ tests:
 - as: e2e-aws-sno-external-oidc-uid-extra
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-node-invariants,legacy-kube-apiserver-invariants,audit-log-analyzer
       TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]

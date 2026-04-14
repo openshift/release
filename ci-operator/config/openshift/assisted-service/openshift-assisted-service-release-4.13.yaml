@@ -7,27 +7,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.13_cli:
-    name: "4.13"
-    namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ./Dockerfile.assisted-service.ocp
-  from: base
-  inputs:
-    ocp_4.13_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.13:cli
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: agent-installer-api-server
+  items:
+  - dockerfile_path: ci-images/Dockerfile.base
+    to: assisted-service-base
+  - dockerfile_path: ci-images/Dockerfile.code-generation
+    from: assisted-service-base
+    to: assisted-service-generate
+  - dockerfile_path: ./Dockerfile.assisted-service.ocp
+    from: base
+    to: agent-installer-api-server
 promotion:
   to:
   - name: "4.13"
@@ -79,6 +70,11 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
+- as: verify-generated-code
+  skip_if_only_changed: ^openshift/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

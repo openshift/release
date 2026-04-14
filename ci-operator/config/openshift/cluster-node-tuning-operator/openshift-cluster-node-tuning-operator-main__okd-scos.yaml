@@ -3,10 +3,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.22
-  openshift_release_rhel-9-release-golang-1.24-openshift-4.22:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
   origin_scos-4.22_base-stream9:
     name: scos-4.22
     namespace: origin
@@ -17,19 +13,17 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile
-  from: origin_scos-4.22_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - builder
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.22
-  to: cluster-node-tuning-operator
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile
+    from: origin_scos-4.22_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+        as:
+        - builder
+    to: cluster-node-tuning-operator
 promotion:
   to:
   - name: scos-4.22
@@ -50,7 +44,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main

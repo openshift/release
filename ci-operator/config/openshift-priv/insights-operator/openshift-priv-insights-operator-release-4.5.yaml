@@ -3,24 +3,17 @@ base_images:
     name: 4.5-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_golang-1.13:
-    name: builder
-    namespace: ocp
-    tag: golang-1.13
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/insights-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
-  to: insights-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: insights-operator
 promotion:
   to:
   - name: 4.5-priv
@@ -47,15 +40,15 @@ tests:
     from: src
 - as: e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - as: insights-operator-e2e-tests
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live

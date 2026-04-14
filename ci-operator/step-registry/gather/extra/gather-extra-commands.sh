@@ -67,6 +67,8 @@ queue ${ARTIFACT_DIR}/oc_cmds/credentialsrequests oc --insecure-skip-tls-verify 
 queue ${ARTIFACT_DIR}/csr.json oc --insecure-skip-tls-verify --request-timeout=5s get csr -o json
 queue ${ARTIFACT_DIR}/endpoints.json oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/endpoints oc --insecure-skip-tls-verify --request-timeout=5s get endpoints --all-namespaces
+queue ${ARTIFACT_DIR}/endpointslices.json oc --insecure-skip-tls-verify --request-timeout=5s get endpointslices --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/endpointslices oc --insecure-skip-tls-verify --request-timeout=5s get endpointslices --all-namespaces
 FILTER=gzip queue ${ARTIFACT_DIR}/deployments.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/deployments oc --insecure-skip-tls-verify --request-timeout=5s get deployments --all-namespaces -o wide
 FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o json
@@ -102,6 +104,8 @@ queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.j
 queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/clusterapis.operator.openshift.io.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusterapis.operator.openshift.io oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
@@ -739,12 +743,20 @@ wait
 mkdir -p ${ARTIFACT_DIR}/junit/
 
 if openshift-tests e2e-analysis --help &>/dev/null; then
-    echo "Post e2e-analysis check for the cluster"
-    if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
-      echo "Found install-duration.log, it will be used for collecting install durations"
-      cat "${SHARED_DIR}/install-duration.log"
+    INSTALL_EXIT_CODE=0
+    if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
+        INSTALL_EXIT_CODE=$(tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}')
     fi
-    openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "Post e2e-analysis check for the cluster"
+        if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
+            echo "Found install-duration.log, it will be used for collecting install durations"
+            cat "${SHARED_DIR}/install-duration.log"
+        fi
+        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    else
+        echo "Install failed, skipping post e2e-analysis check"
+    fi
 else
     # C2S/SC2S proxy can not access internet
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then

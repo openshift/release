@@ -155,7 +155,7 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--ref=master",
+                                    "--ref=main",
                                     "--root=/tmp/git-sync",
                                     "--one-time=true",
                                     "--depth=1"
@@ -181,7 +181,7 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--ref=master",
+                                    "--ref=main",
                                     "--period=30s",
                                     "--root=/tmp/git-sync",
                                     "--max-failures=3"
@@ -285,8 +285,9 @@ def _add_origin_resources(gendoc):
                                     "--tools-image-stream-tag=release-controller-bootstrap:tools",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
-                                    "--jira-endpoint=https://issues.redhat.com",
-                                    "--jira-bearer-token-file=/etc/jira/api",
+                                    "--jira-endpoint=https://redhat.atlassian.net",
+                                    "--jira-username=brawilli@redhat.com",
+                                    "--jira-password-file=/etc/jira/password",
                                     "-v=4"
                                 ],
                                 'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',

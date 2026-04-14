@@ -11,14 +11,6 @@ base_images:
     name: 4.22-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_4.22_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -46,21 +38,15 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "4.22"
 binary_build_commands: make
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.openshift
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: gcp-filestore-csi-driver-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: gcp-filestore-csi-driver-operator
 operator:
   bundles:
   - as: gcp-filestore-csi-driver-operator-bundle
@@ -121,7 +107,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     env:
@@ -160,7 +146,7 @@ tests:
   as: e2e-gcp-manual-oidc-filestore
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity-filestore

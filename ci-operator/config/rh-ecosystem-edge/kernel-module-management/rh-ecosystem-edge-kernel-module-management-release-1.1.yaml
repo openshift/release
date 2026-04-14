@@ -16,36 +16,37 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-8-release-golang-1.19-openshift-4.13
 images:
-- build_args:
-  - name: TARGET
-    value: manager
-  dockerfile_path: Dockerfile
-  to: kernel-module-management-operator
-- build_args:
-  - name: TARGET
-    value: manager-hub
-  dockerfile_path: Dockerfile
-  to: kernel-module-management-operator-hub
-- dockerfile_path: Dockerfile.signimage
-  inputs:
-    ubi9-minimal-entitled:
-      as:
-      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
-  to: kernel-module-management-signimage
-- dockerfile_path: Dockerfile.must-gather
-  to: kernel-module-management-must-gather
-- dockerfile_literal: |
-    FROM ubi8-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
-  to: ubi8-minimal-entitled
-- dockerfile_literal: |
-    FROM ubi9-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
-  to: ubi9-minimal-entitled
+  items:
+  - build_args:
+    - name: TARGET
+      value: manager
+    dockerfile_path: Dockerfile
+    to: kernel-module-management-operator
+  - build_args:
+    - name: TARGET
+      value: manager-hub
+    dockerfile_path: Dockerfile
+    to: kernel-module-management-operator-hub
+  - dockerfile_path: Dockerfile.signimage
+    inputs:
+      ubi9-minimal-entitled:
+        as:
+        - registry.access.redhat.com/ubi9/ubi-minimal:9.2
+    to: kernel-module-management-signimage
+  - dockerfile_path: Dockerfile.must-gather
+    to: kernel-module-management-must-gather
+  - dockerfile_literal: |
+      FROM ubi8-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
+    to: ubi8-minimal-entitled
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+    to: ubi9-minimal-entitled
 operator:
   bundles:
   - as: operator-bundle
@@ -92,8 +93,7 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
       credentials:
-      - collection: ""
-        mount_path: /var/run/secrets
+      - mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src
@@ -111,8 +111,7 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
       credentials:
-      - collection: ""
-        mount_path: /var/run/secrets
+      - mount_path: /var/run/secrets
         name: codecov-token
         namespace: test-credentials
       from: src

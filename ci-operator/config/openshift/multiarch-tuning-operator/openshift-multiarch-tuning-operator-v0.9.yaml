@@ -14,21 +14,22 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    builder:
-      as:
-      - golang:1.21
-  to: multiarch-tuning-operator
-- dockerfile_path: bundle.Dockerfile
-  to: multiarch-tuning-op-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
-    FROM src
-    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-  from: src
-  to: operator-sdk-src
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      builder:
+        as:
+        - golang:1.21
+    to: multiarch-tuning-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: multiarch-tuning-op-bundle
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-src
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
@@ -146,7 +147,7 @@ tests:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
@@ -179,7 +180,7 @@ tests:
   optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
@@ -209,7 +210,7 @@ tests:
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator

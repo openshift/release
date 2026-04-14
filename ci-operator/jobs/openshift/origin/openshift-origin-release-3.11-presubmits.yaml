@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build08
+    cluster: build06
     context: ci/prow/artifacts
     decorate: true
     name: pull-ci-openshift-origin-release-3.11-artifacts
@@ -51,75 +51,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build08
-    context: ci/prow/e2e-gcp
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-release-3.11-e2e-gcp
-    rerun_command: /test e2e-gcp
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: TEST_COMMAND
-          value: TEST_FOCUS=Suite:openshift/conformance/parallel TEST_FOCUS_SERIAL=Suite:openshift/conformance/serial/minimal
-            run-tests
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp
-          name: job-definition
-          subPath: cluster-launch-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - configMap:
-          name: prow-job-cluster-launch-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-3\.11$
-    - ^release-3\.11-
-    cluster: build08
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -174,7 +106,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build08
+    cluster: build06
     context: ci/prow/integration
     decorate: true
     labels:
@@ -191,9 +123,17 @@ presubmits:
         - --target=integration
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -227,7 +167,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build08
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -244,9 +184,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -280,7 +228,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build08
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:
@@ -297,9 +245,17 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

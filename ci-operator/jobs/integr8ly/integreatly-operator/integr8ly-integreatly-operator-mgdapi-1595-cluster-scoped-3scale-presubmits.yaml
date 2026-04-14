@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/commits
     decorate: true
     decoration_config:
@@ -24,9 +24,17 @@ presubmits:
         - --target=commits
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -60,7 +68,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/coverage
     decorate: true
     decoration_config:
@@ -80,9 +88,17 @@ presubmits:
         - --target=coverage
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -122,7 +138,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/format
     decorate: true
     decoration_config:
@@ -141,9 +157,17 @@ presubmits:
         - --target=format
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -177,7 +201,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -232,7 +256,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/kubebuilder
     decorate: true
     decoration_config:
@@ -251,9 +275,17 @@ presubmits:
         - --target=kubebuilder
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -287,7 +319,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/manifest
     decorate: true
     decoration_config:
@@ -306,9 +338,17 @@ presubmits:
         - --target=manifest
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -342,7 +382,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/multitenant-rhoam-e2e
     decorate: true
     decoration_config:
@@ -358,18 +398,30 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=multitenant-rhoam-e2e
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -390,6 +442,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -411,7 +469,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/rhoam-e2e
     decorate: true
     decoration_config:
@@ -428,18 +486,30 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=rhoam-e2e
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -460,6 +530,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -481,7 +557,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/test-cases-lint
     decorate: true
     decoration_config:
@@ -501,9 +577,17 @@ presubmits:
         - --target=test-cases-lint
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -537,7 +621,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -556,9 +640,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -592,7 +684,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/vendor
     decorate: true
     decoration_config:
@@ -611,9 +703,17 @@ presubmits:
         - --target=vendor
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -647,7 +747,7 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build04
     context: ci/prow/versions
     decorate: true
     decoration_config:
@@ -667,9 +767,17 @@ presubmits:
         - --target=versions
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

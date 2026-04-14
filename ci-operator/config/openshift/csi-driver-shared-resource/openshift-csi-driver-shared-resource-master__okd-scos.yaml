@@ -3,10 +3,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.21
   origin_scos-4.18_base-stream9:
     name: scos-4.18
     namespace: origin
@@ -17,32 +13,27 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile.webhook
-  from: origin_scos-4.18_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - builder
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
-  to: csi-driver-shared-resource-webhook
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile
-  from: origin_scos-4.18_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - builder
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
-  to: csi-driver-shared-resource
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.webhook
+    from: origin_scos-4.18_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+        as:
+        - builder
+    to: csi-driver-shared-resource-webhook
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile
+    from: origin_scos-4.18_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+        as:
+        - builder
+    to: csi-driver-shared-resource
 promotion:
   to:
   - name: scos-4.18

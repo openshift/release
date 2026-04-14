@@ -10,6 +10,14 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 METADATA_FILE="${SHARED_DIR}/metadata.json"
 
+# IAM and Route53 are global services
+# For EUSC partition, explicitly set the region
+# For other partitions, rely on AWS SDK defaults (from config or environment)
+REGION_FLAG=""
+if [[ "${REGION}" == eusc-* ]]; then
+    REGION_FLAG="--region eusc-de-east-1"
+fi
+
 function run_command() {
     local cmd="$1"
     local var_name="$2"
@@ -57,8 +65,19 @@ function verify_arn_exists() {
                     return 0
                     ;;
                 volume)
-                    aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" &>/dev/null
-                    return $?
+                    local volumes
+                    volumes=$(aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" 2>/dev/null)
+                    local exit_code=$?
+                    if [[ $exit_code -ne 0 ]]; then
+                        return 1
+                    fi
+                    # Check if Volumes array is empty (happens when volume is deleted or in deleting state)
+                    local volume_count
+                    volume_count=$(echo "$volumes" | jq -r '.Volumes | length')
+                    if [[ "$volume_count" -eq 0 ]]; then
+                        return 1
+                    fi
+                    return 0
                     ;;
                 snapshot)
                     aws ec2 describe-snapshots --region "$check_region" --snapshot-ids "$resource_id" &>/dev/null
@@ -138,19 +157,19 @@ function verify_arn_exists() {
 
             case "$resource_type" in
                 user)
-                    aws iam get-user --user-name "$resource_name" &>/dev/null
+                    aws iam get-user $REGION_FLAG --user-name "$resource_name" &>/dev/null
                     return $?
                     ;;
                 role)
-                    aws iam get-role --role-name "$resource_name" &>/dev/null
+                    aws iam get-role $REGION_FLAG --role-name "$resource_name" &>/dev/null
                     return $?
                     ;;
                 policy)
-                    aws iam get-policy --policy-arn "$arn" &>/dev/null
+                    aws iam get-policy $REGION_FLAG --policy-arn "$arn" &>/dev/null
                     return $?
                     ;;
                 instance-profile)
-                    aws iam get-instance-profile --instance-profile-name "$resource_name" &>/dev/null
+                    aws iam get-instance-profile $REGION_FLAG --instance-profile-name "$resource_name" &>/dev/null
                     return $?
                     ;;
                 *)
@@ -181,10 +200,10 @@ function verify_arn_exists() {
             fi
             ;;
         route53)
-            # Route53 is global
+            # Route53 is global in standard AWS, but requires --region in EUSC partition
             local hosted_zone_id
             hosted_zone_id=$(echo "$resource_part" | cut -d/ -f2)
-            aws route53 get-hosted-zone --id "$hosted_zone_id" &>/dev/null
+            aws route53 get-hosted-zone $REGION_FLAG --id "$hosted_zone_id" &>/dev/null
             return $?
             ;;
         elasticfilesystem)
@@ -202,7 +221,21 @@ function verify_arn_exists() {
     esac
 }
 
+echo "Verifying all cluster resources were removed after deprovisioning ..."
+if [[ ! -s "${METADATA_FILE}" ]]; then
+  echo "Skipping: ${METADATA_FILE} not found."
+  exit
+fi
+
 echo "Using AWS region: $REGION"
+
+# for special regions, need to explict set the default region to work with some global API, e.g: iam
+if [[ "${CLUSTER_TYPE:-}" == "aws-usgov" ]]; then
+    export AWS_DEFAULT_REGION="$REGION"
+elif [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    SOURCE_REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+    export AWS_DEFAULT_REGION="${SOURCE_REGION}"
+fi
 
 # Get tag filters and cluster name from metadata.json in order to query for cluster resources
 # Extract each tag filter into an array
@@ -250,7 +283,7 @@ fi
 
 # To avoid iterating through all IAM users, we will rely on the convention that all IAM users begin with the cluster name.
 # Don't bother with other IAM resources (e.g. access keys, policies), as they depend on the user to exist. If the user is gone, so are they.
-run_command "aws iam list-users --query 'Users[?starts_with(UserName, \`$CLUSTER_NAME\`)].Arn'" "IAM_USERS"
+run_command "aws iam list-users $REGION_FLAG --query 'Users[?starts_with(UserName, \`$CLUSTER_NAME\`)].Arn'" "IAM_USERS"
 
 # Combine tagged resources and IAM users into a single array of ARNs
 LEAKED_ARNS=$(printf '%s\n' "$TAGGED_RESOURCES" "$IAM_USERS" | jq -s '((.[0].ResourceTagMappingList // []) | map(.ResourceARN)) + (.[1] // [])')
@@ -281,10 +314,10 @@ fi
 
 # DNS records are not tagged, but for this test we can depend on the fact that test clusters always use a unique name (so there will not be false-positive matches)
 # Find the public hosted zone using the base domain
-run_command "aws route53 list-hosted-zones-by-name --dns-name \"$AWS_BASE_DOMAIN\" --query \"HostedZones[?Name=='${AWS_BASE_DOMAIN}.' && Config.PrivateZone==\\\`false\\\`].Id\" --output text | cut -d'/' -f3" "HOSTED_ZONE_ID"
+run_command "aws route53 list-hosted-zones-by-name $REGION_FLAG --dns-name \"$AWS_BASE_DOMAIN\" --query \"HostedZones[?Name=='${AWS_BASE_DOMAIN}.' && Config.PrivateZone==\\\`false\\\`].Id\" --output text | cut -d'/' -f3" "HOSTED_ZONE_ID"
 
 if [[ -n "$HOSTED_ZONE_ID" ]]; then
-  run_command "aws route53 list-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --query \"ResourceRecordSets[?contains(Name, \\\`${CLUSTER_NAME}.${AWS_BASE_DOMAIN}\\\`)]\"" "DNS_RECORDS"
+  run_command "aws route53 list-resource-record-sets $REGION_FLAG --hosted-zone-id $HOSTED_ZONE_ID --query \"ResourceRecordSets[?contains(Name, \\\`${CLUSTER_NAME}.${AWS_BASE_DOMAIN}\\\`)]\"" "DNS_RECORDS"
 fi
 
 # Check if any resources were returned
