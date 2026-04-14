@@ -7,13 +7,15 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/cli/Dockerfile.ci
-  to: oc-mirror
-- dockerfile_path: images/cli/Dockerfile.test
-  to: oc-mirror-tests
+  items:
+  - dockerfile_path: images/cli/Dockerfile.ci
+    to: oc-mirror
+  - dockerfile_path: images/cli/Dockerfile.test
+    to: oc-mirror-tests
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - oc-mirror-tests
     name: "5.0"
     namespace: ocp
@@ -85,6 +87,7 @@ tests:
     - ref: go-verify-deps
 - as: integration
   commands: |
+    export OC_MIRROR_VERSION=5.0
     cd /artifacts && ./integration.test
   container:
     from: oc-mirror-tests

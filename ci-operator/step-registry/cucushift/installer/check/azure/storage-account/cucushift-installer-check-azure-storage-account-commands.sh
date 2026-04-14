@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -59,14 +65,13 @@ fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 no_critical_check_result=0
 echo "Checking if storage account is publicly accessible in ${RESOURCE_GROUP}"
 
 sa_access_output=$(mktemp)
-az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess,allowCrossTenantReplication]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
+az storage account list -g ${RESOURCE_GROUP} --query "[].[name,allowBlobPublicAccess,allowCrossTenantReplication,allowSharedKeyAccess]" -o tsv 1>${sa_access_output} || no_critical_check_result=1
 if [[ ${no_critical_check_result=} == 1 ]]; then
     echo "ERROR: fail to list storage account on cluster ${INFRA_ID}!"
     [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
@@ -85,13 +90,28 @@ do
         no_critical_check_result=1
     fi
 
-    if (( ocp_major_version == 4 && ocp_minor_version > 15 )) || (( ocp_major_version > 4 )); then
+    if version_gt "${ocp_version}" "4.15"; then
         cross_tenant_replication=$(echo $line | awk -F' ' '{print $3}')
         if [[ "${cross_tenant_replication}" == "False" ]]; then
             echo "INFO: property allowCrossTenantReplication is False, expected!"
         else
             echo "ERROR: property allowCrossTenantReplication is ${cross_tenant_replication}, expected value should be False!"
             no_critical_check_result=1
+        fi
+    fi
+
+    # check property allowSharedKeyAccess on the storage account created by installer
+    if [[ "${name}" == *"sa" ]]; then
+        ALLOW_SHARED_KEY_ACCESS=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.allowSharedKeyAccess')
+        if [[ -n "${ALLOW_SHARED_KEY_ACCESS}" ]]; then
+            allowsharedkeyaccess_value=$(echo $line | awk -F' ' '{print $4}')
+            if [[ "${allowsharedkeyaccess_value}" == "${ALLOW_SHARED_KEY_ACCESS}" ]]; then
+                echo "INFO: property allowSharedKeyAccess has expected value ${ALLOW_SHARED_KEY_ACCESS}!"
+            else
+                echo "ERROR: property allowSharedKeyAccess has unexpected value ${allowsharedkeyaccess_value}, expected value is ${ALLOW_SHARED_KEY_ACCESS}!"
+                no_critical_check_result=1
+            fi
+
         fi
     fi
 done

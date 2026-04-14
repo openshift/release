@@ -2,18 +2,19 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ocp-release-operator-sdk
 images:
-- dockerfile_path: ci/dockerfiles/builder.Dockerfile
-  from: root
-  to: osdk-builder
-- dockerfile_path: release/helm/Dockerfile
-  to: helm-operator
-- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
-  from: helm-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-helm-e2e
+  items:
+  - dockerfile_path: ci/dockerfiles/builder.Dockerfile
+    from: root
+    to: osdk-builder
+  - dockerfile_path: release/helm/Dockerfile
+    to: helm-operator
+  - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+    from: helm-operator
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-helm-e2e
 promotion:
   to:
   - disabled: true
@@ -63,7 +64,7 @@ tests:
     from: src
 - as: e2e-helm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -82,7 +83,7 @@ tests:
   as: e2e-helm-fips
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
     post:
@@ -105,7 +106,7 @@ tests:
   as: e2e-helm-rhcos10-fips
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -130,7 +131,7 @@ tests:
   as: e2e-helm-rhcos10
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OSSTREAM: rhel-10

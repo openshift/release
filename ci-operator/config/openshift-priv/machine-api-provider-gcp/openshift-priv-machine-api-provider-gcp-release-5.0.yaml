@@ -12,8 +12,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-api-provider-gcp
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: gcp-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: gcp-machine-controllers
 promotion:
   to:
   - name: 5.0-priv
@@ -49,7 +50,7 @@ tests:
 - as: e2e-gcp-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -63,13 +64,13 @@ tests:
 - as: e2e-gcp-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: regression-clusterinfra-gcp-ipi-mapi
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi

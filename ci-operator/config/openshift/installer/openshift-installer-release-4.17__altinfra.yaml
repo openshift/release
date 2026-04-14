@@ -6,25 +6,26 @@ base_images:
 build_root:
   from_repository: true
 images:
-- build_args:
-  - name: OPENSHIFT_INSTALL_CLUSTER_API
-    value: "true"
-  dockerfile_path: images/installer-altinfra/Dockerfile.ci
-  to: installer
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
-    # Cache dir must be accessible when running the integration tests
-    RUN mkdir /.cache -m 0777
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - build_args:
+    - name: OPENSHIFT_INSTALL_CLUSTER_API
+      value: "true"
+    dockerfile_path: images/installer-altinfra/Dockerfile.ci
+    to: installer
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y nmstate
+      # Cache dir must be accessible when running the integration tests
+      RUN mkdir /.cache -m 0777
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
 promotion:
   to:
   - additional_images:
@@ -208,7 +209,7 @@ tests:
   as: e2e-gcp-capi-ovn
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -217,7 +218,7 @@ tests:
   as: e2e-gcp-ovn-byo-network-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -226,7 +227,7 @@ tests:
   as: e2e-gcp-ovn-xpn-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -235,7 +236,7 @@ tests:
   as: e2e-gcp-ovn-secureboot-capi
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade

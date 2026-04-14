@@ -10,17 +10,19 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
-- dockerfile_literal: |
-    FROM ubi9-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
-  to: ubi9-minimal-entitled
-- build_args:
-  - name: DNF
-    value: microdnf
-  dockerfile_path: Dockerfile
-  from: ubi9-minimal-entitled
-  to: hive
+  items:
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
+    to: ubi9-minimal-entitled
+  - build_args:
+    - name: DNF
+      value: microdnf
+    dockerfile_path: Dockerfile
+    from: ubi9-minimal-entitled
+    to: hive
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 releases:
   latest:
     candidate:
@@ -132,7 +134,7 @@ tests:
 - as: e2e-gcp-weekly
   cron: 5 4 * * 3
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

@@ -19,30 +19,31 @@ build_root:
     tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/oc
 images:
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: base
-  to: cli
-- dockerfile_path: images/tools/Dockerfile
-  from: cli
-  to: tools
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: tests-base
-  to: tests
-- dockerfile_path: images/cli/Dockerfile.rhel
-  from: must-gather-base
-  to: must-gather
-- context_dir: images/deployer/
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: deployer
-- context_dir: .
-  dockerfile_path: images/cli-artifacts/Dockerfile.rhel
-  from: cli
-  to: cli-artifacts
-- context_dir: images/recycler/
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: recycler
+  items:
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    from: base
+    to: cli
+  - dockerfile_path: images/tools/Dockerfile
+    from: cli
+    to: tools
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    from: tests-base
+    to: tests
+  - dockerfile_path: images/cli/Dockerfile.rhel
+    from: must-gather-base
+    to: must-gather
+  - context_dir: images/deployer/
+    dockerfile_path: Dockerfile.rhel
+    from: cli
+    to: deployer
+  - context_dir: .
+    dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+    from: cli
+    to: cli-artifacts
+  - context_dir: images/recycler/
+    dockerfile_path: Dockerfile.rhel
+    from: cli
+    to: recycler
 promotion:
   to:
   - additional_images:
@@ -117,7 +118,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-cmd
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-cmd
 - as: e2e-aws-upgrade
   steps:

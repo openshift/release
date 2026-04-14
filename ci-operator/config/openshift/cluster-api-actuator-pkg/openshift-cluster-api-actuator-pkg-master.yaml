@@ -1,32 +1,33 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
-  to: cluster-api-actuator-pkg-test
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
     excluded_images:
     - cluster-api-actuator-pkg-test
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   multi-initial:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -123,7 +124,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -140,7 +141,7 @@ tests:
   optional: true
   run_if_changed: pkg/capi/gcp\.go
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -263,7 +264,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -277,7 +278,7 @@ tests:
 - as: e2e-gcp-operator-periodic
   interval: 72h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -291,7 +292,7 @@ tests:
 - as: e2e-gcp-multi-operator-periodic
   interval: 72h
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:

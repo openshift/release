@@ -9,22 +9,22 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-  inputs:
-    src:
-      as:
-      - src
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift
-  optional: true
-  to: microshift-test-rpm
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+    inputs:
+      src:
+        as:
+        - src
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/microshift
+    optional: true
+    to: microshift-test-rpm
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - microshift-test-rpm
     name: "4.22"
     namespace: ocp
@@ -92,6 +92,47 @@ tests:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
+- as: e2e-aws-tests-bootc-upstream-periodic
+  cron: 0 4 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-upstream
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-upstream-periodic-arm
+  cron: 0 4 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: m7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-upstream
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-cache-nightly
+  capabilities:
+  - intranet
+  cron: 30 0 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-cache
+  timeout: 4h0m0s
+- as: e2e-aws-tests-cache-nightly-arm
+  capabilities:
+  - intranet
+  cron: 30 0 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.6
+    workflow: openshift-microshift-e2e-metal-cache
+  timeout: 4h0m0s
 - as: e2e-aws-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
@@ -163,7 +204,7 @@ tests:
 - as: e2e-aws-tests-bootc-el10
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
@@ -181,7 +222,7 @@ tests:
 - as: e2e-aws-tests-bootc-arm-el10
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.6
@@ -200,7 +241,7 @@ tests:
 - as: e2e-aws-tests-bootc-periodic-el10
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
@@ -220,7 +261,7 @@ tests:
 - as: e2e-aws-tests-bootc-periodic-arm-el10
   run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.6
@@ -292,7 +333,7 @@ tests:
 - as: e2e-aws-tests-bootc-release-el10
   run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
@@ -312,7 +353,7 @@ tests:
 - as: e2e-aws-tests-bootc-release-arm-el10
   run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.6

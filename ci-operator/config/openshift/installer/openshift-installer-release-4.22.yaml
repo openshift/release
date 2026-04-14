@@ -63,60 +63,60 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  to: installer
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  from: openstack-base
-  inputs:
-    openstack-base:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  to: baremetal-installer
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
-    # Cache dir must be accessible when running the integration tests
-    RUN mkdir /.cache -m 0777
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    COPY virtctl /usr/bin/virtctl
-    COPY openshift-install /usr/bin/openshift-install
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    splat-ci-virtctl:
-      paths:
-      - destination_dir: .
-        source_path: /virtctl
-    upi-installer:
-      paths:
-      - destination_dir: .
-        source_path: /bin/openshift-install
-  to: virtctl
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    to: installer
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: openstack-base
+    inputs:
+      openstack-base:
+        as:
+        - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    to: baremetal-installer
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y nmstate
+      # Cache dir must be accessible when running the integration tests
+      RUN mkdir /.cache -m 0777
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      COPY virtctl /usr/bin/virtctl
+      COPY openshift-install /usr/bin/openshift-install
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      splat-ci-virtctl:
+        paths:
+        - destination_dir: .
+          source_path: /virtctl
+      upi-installer:
+        paths:
+        - destination_dir: .
+          source_path: /bin/openshift-install
+    to: virtctl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: "4.22"
     namespace: ocp
@@ -272,11 +272,40 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-ovn-pki-default-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: ECDSA
+      EXPECTED_KEY_PARAM: secp384r1
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-pki-rsa-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: RSA
+      EXPECTED_KEY_PARAM: "4096"
+      FEATURE_SET: TechPreviewNoUpgrade
+      PKI_ALGORITHM: RSA
+      PKI_RSA_KEY_SIZE: "4096"
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-aws-ovn-dualstack-ipv4-primary-techpreview
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
     workflow: openshift-e2e-aws
@@ -286,6 +315,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
     workflow: openshift-e2e-aws
@@ -493,14 +523,14 @@ tests:
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-default-config
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     post:
     - chain: ipi-gcp-post
     pre:
@@ -511,7 +541,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -519,7 +549,7 @@ tests:
   as: e2e-gcp-ovn-devpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -543,14 +573,14 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-byo-vpc
 - always_run: false
   as: e2e-azure-default-config
@@ -607,7 +637,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv4-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
@@ -616,7 +646,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv6-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
@@ -687,21 +717,21 @@ tests:
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - always_run: false
   as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
   as: e2e-gcp-xpn-dedicated-dns-project
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
 - always_run: false
   as: e2e-gcp-xpn-custom-dns
@@ -722,7 +752,7 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - always_run: false
   as: e2e-azure-ovn-upi
@@ -735,7 +765,7 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ovn-two-node-arbiter
@@ -929,9 +959,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-host-groups
 - always_run: false
   as: e2e-vsphere-static-ovn
@@ -946,9 +973,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-multi-disk
@@ -1026,7 +1050,7 @@ tests:
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-crc
 - always_run: false
   as: e2e-metal-assisted
@@ -1336,7 +1360,7 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       PUBLISH: Internal
     post:
@@ -1422,7 +1446,7 @@ tests:
   as: e2e-gcp-ovn-heterogeneous
   optional: true
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -1477,14 +1501,14 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-custom-endpoints
 - always_run: false
   as: gcp-custom-endpoints-proxy-wif
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WHITELIST_URLS: s3.us-east-1.amazonaws.com
       RESTRICTED_NETWORK: "yes"

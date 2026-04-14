@@ -14,14 +14,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.base
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes-microshift
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: "4.21"
@@ -229,7 +230,7 @@ tests:
 - as: e2e-gcp-ovn
   skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
@@ -461,7 +462,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -471,7 +472,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade

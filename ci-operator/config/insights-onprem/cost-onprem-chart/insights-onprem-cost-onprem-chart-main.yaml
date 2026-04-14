@@ -4,30 +4,31 @@ build_root:
       FROM registry.access.redhat.com/ubi9/ubi
       RUN dnf install -y git && dnf clean all
 images:
-- dockerfile_literal: |-
-    FROM src
-    USER root
-    # Install base packages and Python
-    RUN dnf install -y python3.11 python3.11-pip jq && dnf clean all && \
-        alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
-    # Install Playwright system dependencies (browser libraries)
-    RUN dnf install -y \
-        nspr nss nss-util atk at-spi2-atk cups-libs libdrm \
-        libX11 libXcomposite libXdamage libXext libXrandr \
-        libxcb libxkbcommon mesa-libgbm pango alsa-lib \
-        gtk3 ca-certificates && \
-        dnf clean all
-    # Install Python packages including playwright
-    RUN python3 -m pip install --no-cache-dir pytest pyyaml requests pytest-playwright && \
-        playwright install chromium
-    # Install CLI tools
-    RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
-        chmod +x /usr/local/bin/yq && \
-        curl -sL https://get.helm.sh/helm-v4.0.4-linux-amd64.tar.gz | tar xz -C /tmp && \
-        mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
-        curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc kubectl
-  from: src
-  to: cost-onprem-test
+  items:
+  - dockerfile_literal: |-
+      FROM src
+      USER root
+      # Install base packages and Python
+      RUN dnf install -y python3.11 python3.11-pip jq && dnf clean all && \
+          alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
+      # Install Playwright system dependencies (browser libraries)
+      RUN dnf install -y \
+          nspr nss nss-util atk at-spi2-atk cups-libs libdrm \
+          libX11 libXcomposite libXdamage libXext libXrandr \
+          libxcb libxkbcommon mesa-libgbm pango alsa-lib \
+          gtk3 ca-certificates && \
+          dnf clean all
+      # Install Python packages including playwright
+      RUN python3 -m pip install --no-cache-dir pytest pyyaml requests pytest-playwright && \
+          playwright install chromium
+      # Install CLI tools
+      RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
+          chmod +x /usr/local/bin/yq && \
+          curl -sL https://get.helm.sh/helm-v4.0.4-linux-amd64.tar.gz | tar xz -C /tmp && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+          curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc kubectl
+    from: src
+    to: cost-onprem-test
 releases:
   latest:
     release:
@@ -58,7 +59,8 @@ tests:
     test:
     - ref: insights-onprem-cost-onprem-chart-e2e
     workflow: insights-onprem-cost-onprem-chart-claim
-- as: e2e-iqe-extended
+- always_run: false
+  as: e2e-iqe-extended
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -67,7 +69,6 @@ tests:
     timeout: 2h0m0s
     version: "4.20"
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^\.github/
   steps:
     env:
       IQE_PROFILE: extended
@@ -75,7 +76,8 @@ tests:
     test:
     - ref: insights-onprem-cost-onprem-chart-e2e
     workflow: insights-onprem-cost-onprem-chart-claim
-- as: e2e-iqe-stable
+- always_run: false
+  as: e2e-iqe-stable
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -84,27 +86,9 @@ tests:
     timeout: 2h0m0s
     version: "4.20"
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^\.github/
   steps:
     env:
       IQE_PROFILE: stable
-      RUN_IQE: "true"
-    test:
-    - ref: insights-onprem-cost-onprem-chart-e2e
-    workflow: insights-onprem-cost-onprem-chart-claim
-- as: e2e-iqe-full
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.20"
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^\.github/
-  steps:
-    env:
-      IQE_PROFILE: full
       RUN_IQE: "true"
     test:
     - ref: insights-onprem-cost-onprem-chart-e2e

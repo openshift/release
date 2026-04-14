@@ -554,6 +554,7 @@ periodics:
     - args:
       - |-
         --query=org:openshift
+        org:terraform-redhat
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
@@ -717,7 +718,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260408-3bbc91829
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -752,7 +753,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260408-3bbc91829
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -774,7 +775,7 @@ periodics:
   - base_ref: main
     org: openshift
     repo: release
-  - base_ref: openshift-4.21
+  - base_ref: openshift-5.0
     org: openshift
     repo: ocp-build-data
   labels:
@@ -792,12 +793,11 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.22
+      - --current-release=5.0
       - --future-release=4.23
       - --future-release=5.0
       - --self-approve=true
       - --assign=openshift/test-platform
-      - --rebalancer-cron=0 0 * * 2,5
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/auto-config-brancher
@@ -1095,7 +1095,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1152,7 +1152,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1243,7 +1243,7 @@ periodics:
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
           --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1264,43 +1264,6 @@ periodics:
   - base_ref: main
     org: openshift
     repo: release
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-openshift-release-main-app-ci-apply
-  spec:
-    containers:
-    - args:
-      - --config-dir=clusters/app.ci
-      - --confirm=true
-      - --as=
-      command:
-      - applyconfig
-      env:
-      - name: SLACK_API_URL
-        valueFrom:
-          secretKeyRef:
-            key: url
-            name: ci-slack-api-url
-      - name: PAGERDUTY_INTEGRATION_KEY
-        valueFrom:
-          secretKeyRef:
-            key: integration_key
-            name: pagerduty
-      image: quay.io/openshift/ci-public:ci_applyconfig_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-    serviceAccountName: config-updater
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
   interval: 1h
   labels:
     ci.openshift.io/role: infra
@@ -1312,7 +1275,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1342,7 +1305,7 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.22
+      - --current-release=5.0
       - --future-release=5.0
       - --confirm
       - --username=openshift-merge-robot
@@ -1897,7 +1860,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1929,7 +1892,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1961,7 +1924,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260325-947fd1958
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2426,6 +2389,7 @@ periodics:
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=openshift-logging/extended-logging-tests-interop
       - --ignore=Azure/ARO-HCP
+      - --ignore=rhbk/sso-test
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2494,6 +2458,7 @@ periodics:
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=red-hat-storage/rook
       - --ignore=Azure/ARO-HCP
+      - --ignore=rhbk/sso-test
       command:
       - ./hack/check-gh-automation.sh
       env:

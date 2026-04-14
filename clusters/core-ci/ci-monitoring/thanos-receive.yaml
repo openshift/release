@@ -23,7 +23,7 @@ metadata:
   namespace: ci-monitoring
 spec:
   routerSpec:
-    replicas: 3
+    replicas: 12
     replicationFactor: 3
     externalLabels:
       receive: "true"
@@ -47,12 +47,14 @@ spec:
             topologyKey: kubernetes.io/hostname
     resourceRequirements:
       requests:
-        cpu: "1"
-        memory: 2Gi
+        cpu: "4"
+        memory: 10Gi
     additionalArgs:
     - --remote-write.server-tls-cert=/etc/thanos/tls/server.crt
     - --remote-write.server-tls-key=/etc/thanos/tls/server.key
     - --remote-write.server-tls-client-ca=/etc/thanos/tls/ca.crt
+    - --receive.forward.async-workers=128
+    - --receive-forward-timeout=20s
     additionalVolumes:
     - name: tls-certs
       secret:
@@ -65,6 +67,11 @@ spec:
     defaultObjectStorageConfig:
       name: thanos-object-storage
       key: thanos.yaml
+    additionalArgs:
+    - --tsdb.wal-compression
+    - --tsdb.min-block-duration=30m
+    - --tsdb.max-block-duration=30m
+    - --tsdb.out-of-order.time-window=5m
     additionalEnv:
     - name: AWS_ROLE_ARN
       valueFrom:
@@ -87,9 +94,16 @@ spec:
       readOnly: true
     hashrings:
     - name: default
-      replicas: 5
+      replicas: 15
+      asyncForwardWorkerCount: 50
       externalLabels:
         replica: "$(POD_NAME)"
+      nodeSelector:
+        node-role.kubernetes.io/worker-highmem: worker-highmem
+      tolerations:
+      - key: node-role.kubernetes.io/worker-highmem
+        value: worker-highmem
+        effect: NoSchedule
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -109,16 +123,16 @@ spec:
                   app.kubernetes.io/component: thanos-receive-ingester
               topologyKey: kubernetes.io/hostname
       tsdbConfig:
-        retention: 15d
+        retention: 4h
       storage:
         size: 100Gi
       resourceRequirements:
         limits:
-          cpu: "4"
-          memory: 48Gi
+          cpu: "8"
+          memory: 110Gi
         requests:
-          cpu: "4"
-          memory: 48Gi
+          cpu: "8"
+          memory: 110Gi
 ---
 apiVersion: v1
 kind: Service
@@ -129,6 +143,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
 spec:
   type: LoadBalancer
+  externalTrafficPolicy: Local
   ports:
   - name: remote-write
     port: 19291

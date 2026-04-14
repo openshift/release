@@ -27,16 +27,12 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- to: hypershift-operator
-- dockerfile_path: Dockerfile.control-plane
-  to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  to: hypershift-tests
-- dockerfile_literal: |
-    FROM base
-    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
-  from: src
-  to: docs-build-src
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
 promotion:
   to:
   - excluded_images:
@@ -51,62 +47,62 @@ releases:
       relative: 1
       stream: ci
       version: "4.23"
-  initial-421:
+  initial-422:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.23"
+      version: "4.22"
   latest:
     integration:
       include_built_images: true
       name: "4.23"
       namespace: ocp
-  latest-417:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.23"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.19"
   latest-420:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.21"
+  latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.22"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.21"
   n3minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.20"
   n4minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -123,13 +119,6 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-agentic-qe-aws
-- as: docs-preview
-  optional: true
-  run_if_changed: ^docs/
-  steps:
-    test:
-    - ref: hypershift-docs-build-and-deploy
-    - ref: hypershift-docs-preview-comment
 - always_run: false
   as: e2e-aks
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
@@ -148,19 +137,22 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
-  as: e2e-aks-4-21
+  as: e2e-aks-4-22
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-421
-      OCP_IMAGE_N1: release:latest-420
-      OCP_IMAGE_N2: release:latest-419
-      OCP_IMAGE_N3: release:latest-418
-      OCP_IMAGE_N4: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-421
+      OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -191,6 +183,9 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-v2-aws
@@ -217,9 +212,12 @@ tests:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
-      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology)$
+      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology|TestAzureOAuthLoadBalancer)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
 - always_run: false
   as: e2e-aws-minimal
@@ -277,19 +275,19 @@ tests:
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
-  as: e2e-aws-4-21
+  as: e2e-aws-4-22
   capabilities:
   - build-tmpfs
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-421
-      OCP_IMAGE_N1: release:latest-420
-      OCP_IMAGE_N2: release:latest-419
-      OCP_IMAGE_N3: release:latest-418
-      OCP_IMAGE_N4: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-421
+      OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -489,6 +487,18 @@ tests:
       GKE_REGION: us-central1
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e
+- always_run: false
+  as: e2e-v2-gke
+  capabilities:
+  - build-tmpfs
+  optional: true
+  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+  steps:
+    cluster_profile: hypershift-gcp
+    env:
+      GKE_REGION: us-central1
+      GKE_RELEASE_CHANNEL: stable
+    workflow: hypershift-gcp-gke-e2e-v2
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

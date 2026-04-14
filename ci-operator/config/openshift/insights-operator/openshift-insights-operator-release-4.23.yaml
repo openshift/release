@@ -14,7 +14,8 @@ base_images:
 build_root:
   from_repository: true
 images:
-- to: insights-operator
+  items:
+  - to: insights-operator
 promotion:
   to:
   - name: "4.23"
@@ -75,7 +76,7 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
@@ -85,7 +86,7 @@ tests:
 - as: insights-operator-e2e-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -147,7 +148,7 @@ tests:
 - as: insights-operator-serial-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -209,7 +210,7 @@ tests:
 - as: insights-operator-slow-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -271,15 +272,13 @@ tests:
   as: tls-scanner
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: openshift-insights
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
     test:
     - ref: tls-scanner-run
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
   capabilities:

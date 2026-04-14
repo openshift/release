@@ -91,9 +91,6 @@ if [[ "${AZURE_MANAGED_IDENTITY_TYPE}" == "user-defined" ]]; then
     user_identity_id=$(az identity show -g ${bastion_rg} -n ${user_identity_name} --query 'principalId' -otsv)
     run_command "az role assignment create --role 'Contributor' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}"
     run_command "az role assignment create --role 'User Access Administrator' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}"
-    # 4.16 OCPBUGS-38821, 4.18 OCPBUGS-37587
-    # additonal permission is required when allowSharedKeyAccess of storage account is disabled and switching to use Azure AD for authentication
-    run_command "az role assignment create --role 'Storage Blob Data Contributor' --assignee ${user_identity_id} --scope /subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}"
     # save role assignment id for destroy
     az role assignment list --assignee ${user_identity_id} --query '[].id' -otsv >> ${azure_role_assignment_file}
     

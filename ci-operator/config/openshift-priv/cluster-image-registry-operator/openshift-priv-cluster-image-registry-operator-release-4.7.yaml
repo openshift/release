@@ -10,9 +10,10 @@ build_root:
     tag: rhel-8-release-golang-1.14-openshift-4.7
 canonical_go_repository: github.com/openshift/cluster-image-registry-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-image-registry-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-image-registry-operator
 promotion:
   to:
   - name: 4.7-priv
@@ -66,14 +67,14 @@ tests:
   optional: true
   run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-operator
   optional: true
   run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

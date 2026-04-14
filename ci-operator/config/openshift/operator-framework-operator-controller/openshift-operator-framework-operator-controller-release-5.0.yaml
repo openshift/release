@@ -6,15 +6,17 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: openshift/catalogd.Dockerfile
-  to: olm-catalogd
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/catalogd.Dockerfile
+    to: olm-catalogd
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
+  - dockerfile_path: openshift/registry.Dockerfile
+    to: e2e-test-registry
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - e2e-test-registry
     name: "5.0"
     namespace: ocp
@@ -169,7 +171,7 @@ tests:
   run_if_changed: ^openshift/tests-extension/(test/qe/testdata/|pkg/bindata/qe/)
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch

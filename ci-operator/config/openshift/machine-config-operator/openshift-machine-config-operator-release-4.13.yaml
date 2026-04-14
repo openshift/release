@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: "4.13"
-    namespace: ocp
-    tag: hypershift-operator
   hypershift-tests:
     name: "4.13"
     namespace: ocp
@@ -46,21 +42,23 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: machine-config-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
-    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
-        chmod +x /usr/bin/rg && \
-        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
-        chmod +x /usr/bin/yq && \
-        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
-        rpm-ostree install tailscale && \
-        systemctl enable tailscaled && \
-        ostree container commit
-  from: ocp_os
-  to: custom-os-image
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: machine-config-operator
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+      RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
+          chmod +x /usr/bin/rg && \
+          curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
+          chmod +x /usr/bin/yq && \
+          cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
+          rpm-ostree install tailscale && \
+          systemctl enable tailscaled && \
+          ostree container commit
+    from: ocp_os
+    to: custom-os-image
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
 promotion:
   to:
   - excluded_images:
@@ -158,13 +156,13 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-rt-op
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     test:
@@ -179,7 +177,7 @@ tests:
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -328,7 +326,7 @@ tests:
   as: e2e-gcp-rt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
@@ -336,13 +334,13 @@ tests:
   as: e2e-gcp-single-node
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
