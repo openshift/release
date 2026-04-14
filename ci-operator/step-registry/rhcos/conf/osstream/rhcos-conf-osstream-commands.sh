@@ -67,3 +67,25 @@ spec:
     name: ${OSSTREAM}
 
 EOF
+
+if [[ "${ADD_ARBITER:-false}" == "true" ]]; then
+cat > "${SHARED_DIR}/manifest_arbiter.machineconfigpool.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: arbiter
+  labels:
+    "machineconfiguration.openshift.io/mco-built-in": ""
+    "pools.operator.machineconfiguration.openshift.io/arbiter": ""
+spec:
+  machineConfigSelector:
+    matchLabels:
+    "machineconfiguration.openshift.io/role": "arbiter"
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/arbiter: ""
+  osImageStream:
+    name: ${OSSTREAM}
+
+EOF
+fi
