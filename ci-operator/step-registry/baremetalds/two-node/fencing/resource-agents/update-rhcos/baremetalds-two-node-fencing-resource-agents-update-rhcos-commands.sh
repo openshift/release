@@ -15,8 +15,15 @@ oc_debug_with_retry() {
  local timeout="${OC_DEBUG_TIMEOUT:-90s}"
  for attempt in $(seq 1 "${retries}"); do
   echo "oc debug attempt ${attempt}/${retries} on node/${node} (timeout ${timeout})..."
-  if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@" 2>/dev/null; then
-   return 0
+  if [[ "${attempt}" -eq "${retries}" ]]; then
+   # Show stderr on the last attempt for diagnostics
+   if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@"; then
+    return 0
+   fi
+  else
+   if oc debug --request-timeout="${timeout}" "node/${node}" -- "$@" 2>/dev/null; then
+    return 0
+   fi
   fi
   echo "Attempt ${attempt} failed."
   if [[ "${attempt}" -lt "${retries}" ]]; then
@@ -242,7 +249,12 @@ if ! oc wait machineconfigpool/master --for=condition=Updated --timeout=30m; the
 fi
 echo "Rollout complete."
 
-# Report the resource-agents version now running on a cluster node (Best-effort) .
+# After MCO rollout nodes have just rebooted. Wait for them to be Ready and
+# schedulable before attempting oc debug, which needs to place a pod on a node.
+echo "Waiting for nodes to be Ready after reboot..."
+oc wait nodes --all --for=condition=Ready --timeout=5m || true
+
+# Report the resource-agents version now running on a cluster node (Best-effort).
 NODE=$(oc get nodes --no-headers | awk 'tolower($2) ~ /^ready/ {print $1; exit}') || true
 if [[ -n "${NODE}" ]]; then
  oc_debug_with_retry "${NODE}" chroot /host rpm -q resource-agents || echo "Could not verify resource-agents version on node after retries."
