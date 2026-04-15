@@ -34,9 +34,16 @@ images:
     to: hypershift
   - dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
+  - dockerfile_literal: |
+      FROM hypershift-operator
+      RUN yum install -y jq && yum clean all
+    from: hypershift-operator
+    to: hypershift-cli
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
+    - hypershift-cli
     - hypershift-operator
     - hypershift-tests
     name: 5.0-priv
@@ -48,7 +55,7 @@ releases:
       relative: 1
       stream: ci
       version: "5.0"
-  initial-421:
+  initial-422:
     candidate:
       product: ocp
       relative: 1
@@ -59,11 +66,6 @@ releases:
       include_built_images: true
       name: 5.0-priv
       namespace: ocp-private
-  latest-417:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "5.0"
   latest-418:
     candidate:
       product: ocp
@@ -80,6 +82,11 @@ releases:
       stream: ci
       version: "5.0"
   latest-421:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+  latest-422:
     candidate:
       product: ocp
       stream: ci
@@ -143,17 +150,17 @@ tests:
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
-  as: e2e-aks-4-21
+  as: e2e-aks-4-22
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-421
-      OCP_IMAGE_N1: release:latest-420
-      OCP_IMAGE_N2: release:latest-419
-      OCP_IMAGE_N3: release:latest-418
-      OCP_IMAGE_N4: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-421
+      OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -213,7 +220,7 @@ tests:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
-      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology|TestAzureOAuthLoadBalancer)$
+      CI_TESTS_RUN: ^(TestCreateCluster$|TestAutoscaling|TestNodePool|TestUpgradeControlPlane|TestHAEtcdChaos|TestAzureOAuthLoadBalancer|TestAzurePrivateTopology)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     post:
@@ -276,19 +283,19 @@ tests:
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
-  as: e2e-aws-4-21
+  as: e2e-aws-4-22
   capabilities:
   - build-tmpfs
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-421
-      OCP_IMAGE_N1: release:latest-420
-      OCP_IMAGE_N2: release:latest-419
-      OCP_IMAGE_N3: release:latest-418
-      OCP_IMAGE_N4: release:latest-417
-      OCP_IMAGE_PREVIOUS: release:initial-421
+      OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
+      OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
