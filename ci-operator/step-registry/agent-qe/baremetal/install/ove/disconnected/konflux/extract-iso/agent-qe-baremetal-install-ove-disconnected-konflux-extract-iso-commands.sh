@@ -26,13 +26,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 # SNAPSHOT example value passed by Konflux
-# {"application":"ove-ui-4-21","components":[{"name":"ove-ui-iso-4-21","containerImage":"quay.io/redhat-user-workloads/ocp-agent-based-installer-tenant/ove-ui-iso-4-21@sha256:c5c5269aec05dd1b16fedfd762b312f0f7b0858633d1f0850d17969f09e3df33",
-# "source":{"git":{"url":"https://github.com/openshift/agent-installer-utils","revision":"d5e584590355867515ff90bb9ccd2e9019073441"}}}],"artifacts":{}}
+# "quay.io/redhat-user-workloads/ocp-agent-based-installer-tenant/ove-ui-iso-4-21@sha256:c5c5269aec05dd1b16fedfd762b312f0f7b0858633d1f0850d17969f09e3df33"
 
+echo "Konflux snapshot ID: ${SNAPSHOT}"
 
-# Make the code compatible with runs triggered by Konflux and manual testing
-KONFLUX_SNAPSHOT=$(echo ${SNAPSHOT} | jq -r '.components[].containerImage' )
-
-echo "Konflux snapshot ID: ${KONFLUX_SNAPSHOT}"
-
-timeout -s 9 2h ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" sh extract_ove_iso.sh "${KONFLUX_SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 2h ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" sh extract_ove_iso.sh "${SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
