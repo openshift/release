@@ -11,6 +11,8 @@ metadata:
 provisioner: disk.csi.azure.com
 parameters:
   skuName: UltraSSD_LRS
+  # UltraSSD_LRS only support None caching mode
+  cachingMode: None
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 reclaimPolicy: Delete

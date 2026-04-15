@@ -148,6 +148,12 @@ configure_claude() {
 #
 echo "Starting MicroShift Claude CI Doctor"
 
+# CI Doctor should only run from the main branch
+if [[ "${JOB_NAME}" != *-main-ci-doctor ]]; then
+    echo "ERROR: CI Doctor should only run from the main branch job (JOB_NAME=${JOB_NAME})"
+    exit 1
+fi
+
 # Ensure reports and session logs are copied to artifacts
 trap copy_reports EXIT TERM INT
 
@@ -172,12 +178,11 @@ timeout 3600 claude \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
 
 # After the analysis, run automatic approval of rebase PRs with all tests passing
-# TODO: Reenable this once we get approval from ProdSec
-# echo "Running automatic approval of rebase PRs with all tests passing..."
-# .claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
-#     --mode approve \
-#     --author 'microshift-rebase-script[bot]'
-# echo "Automatic approval of rebase PRs with all tests passing completed"
+echo "Running automatic approval of rebase PRs with all tests passing..."
+.claude/scripts/microshift-prow-jobs-for-pull-requests.sh \
+    --mode approve \
+    --author 'microshift-rebase-script[bot]'
+echo "Automatic approval of rebase PRs with all tests passing completed"
 
 # After the analysis, attempt to restart failed rebase PRs tests. If the
 # restarted tests complete successfully, the PR will be automatically

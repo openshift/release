@@ -56,8 +56,7 @@ function extract_opct() {
 
   chmod u+x ${OPCT_CLI}
   show_msg "Running ${OPCT_CLI} version"
-  ${OPCT_CLI} version
-  #popd
+  ${OPCT_CLI} version || true
 }
 
 function dump_opct_namespace() {
@@ -84,9 +83,11 @@ fi
 
 # Extracting OPCT version
 show_msg "Extracting OPCT_VERSION..."
-${OPCT_CLI} version | tee "${ARTIFACT_DIR}/opct-version"
+{
+  ${OPCT_CLI} version | tee "${ARTIFACT_DIR}/opct-version"
+} || true
 
-OPCT_VERSION=$($OPCT_CLI version | grep ^"OPCT CLI" | awk -F': ' '{print$2}' | awk -F'+' '{print$1}' || true)
+OPCT_VERSION=$(grep ^"OPCT CLI" "${ARTIFACT_DIR}/opct-version" | awk -F': ' '{print$2}' | awk -F'+' '{print$1}' || true)
 OPCT_MODE="${OPCT_RUN_MODE:-default}"
 
 # Update env script

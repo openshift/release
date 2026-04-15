@@ -40,7 +40,30 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-with-oc-and-kubectl
+  - dockerfile_path: Dockerfile.ci.kueue
+    to: kueue-operand
+  - context_dir: .
+    dockerfile_path: Dockerfile.ci.must-gather
+    to: kueue-must-gather
+operator:
+  bundles:
+  - as: kueue-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
+    with: pipeline:kueue-operator
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
+    with: pipeline:kueue-operand
+  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
+    with: pipeline:kueue-must-gather
 releases:
+  4-21-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
   arm64-4-20-latest:
     candidate:
       architecture: arm64
@@ -87,6 +110,68 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: test-e2e-ci-build-downstream-4-20
+  steps:
+    cluster_profile: openshift-org-aws
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - as: e2e-kueue
+      cli: latest
+      commands: make e2e-ci-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
+- as: test-e2e-ci-build-upstream-4-20
+  steps:
+    cluster_profile: openshift-org-aws
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - as: e2e-kueue-upstream
+      cli: latest
+      commands: make e2e-upstream-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
 - as: test-e2e-4-18
   capabilities:
   - arm64
@@ -341,7 +426,7 @@ tests:
   - arm64
   cron: '@daily'
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
@@ -388,6 +473,25 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+- as: test-e2e-dra-gpu-4-21
+  cron: '@daily'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
+      NVIDIA_DRA_DRIVER_VERSION: 25.12.0
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - ref: nvidia-cleanup
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-dra
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
