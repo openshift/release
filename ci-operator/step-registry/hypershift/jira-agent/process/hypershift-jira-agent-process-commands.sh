@@ -165,8 +165,13 @@ $_SLACK_WAS_TRACING && set -x
 # Load GitHub-to-Slack user ID mapping
 GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/github-to-slack.json"
 if [ -f "$GITHUB_SLACK_MAP_FILE" ]; then
-  GITHUB_SLACK_MAP=$(cat "$GITHUB_SLACK_MAP_FILE")
-  echo "GitHub-to-Slack mapping loaded"
+  if GITHUB_SLACK_MAP=$(jq -c . < "$GITHUB_SLACK_MAP_FILE" 2>/dev/null); then
+    echo "GitHub-to-Slack mapping loaded"
+  else
+    echo "Warning: GitHub-to-Slack mapping is invalid JSON"
+    echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
+    GITHUB_SLACK_MAP="{}"
+  fi
 else
   echo "Warning: GitHub-to-Slack mapping not found at $GITHUB_SLACK_MAP_FILE"
   echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
@@ -174,7 +179,7 @@ else
 fi
 
 # Extract Slack fallback user ID from mapping (pinged when no reviewers are assigned)
-SLACK_FALLBACK_USER_ID=$(echo "$GITHUB_SLACK_MAP" | jq -r '.["backup-user"] // empty' 2>/dev/null)
+SLACK_FALLBACK_USER_ID=$(jq -r '.["backup-user"] // empty' <<<"$GITHUB_SLACK_MAP")
 if [ -n "$SLACK_FALLBACK_USER_ID" ]; then
   echo "Slack fallback user ID loaded from mapping"
 else
@@ -287,12 +292,21 @@ send_slack_notification() {
 
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
+  set +e
   local SLACK_RESPONSE
   SLACK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
     -H 'Content-type: application/json' \
     --data "$SLACK_PAYLOAD" \
     "$SLACK_WEBHOOK_URL")
+  local CURL_EXIT_CODE=$?
+  set -e
   $_was_tracing && set -x
+
+  if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "   Warning: Failed to send Slack notification (curl exit $CURL_EXIT_CODE)"
+    return 0
+  fi
+
   local SLACK_HTTP_CODE
   SLACK_HTTP_CODE=$(echo "$SLACK_RESPONSE" | tail -1)
 
