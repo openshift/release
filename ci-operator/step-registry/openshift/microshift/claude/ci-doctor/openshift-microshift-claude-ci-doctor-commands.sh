@@ -117,6 +117,11 @@ wait_for_mcp_status() {
 }
 
 configure_claude() {
+    # Disable command tracing to prevent leaking credentials in logs
+    # and restore it after the function is executed
+    trap 'set -x' RETURN
+    set +x
+
     echo "Configuring Claude..."
 
     # Create an empty configuration file to avoid the "Claude configuration file
@@ -161,18 +166,13 @@ EOF
         pip install uv --user --upgrade
         export PATH="${HOME}/.local/bin:${PATH}"
 
-        # Load secrets with command tracing disabled to prevent leaking credentials in logs
-        {
-          set +x
-          claude mcp add \
-              -e JIRA_URL="${JIRA_URL}" \
-              -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
-              -e JIRA_USERNAME="${JIRA_USERNAME}" \
-              --scope user \
-              --transport stdio \
-              jira -- uvx mcp-atlassian@0.21.0
-          set -x
-        }
+        claude mcp add \
+            -e JIRA_URL="${JIRA_URL}" \
+            -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
+            -e JIRA_USERNAME="${JIRA_USERNAME}" \
+            --scope user \
+            --transport stdio \
+            jira -- uvx mcp-atlassian@0.21.0
 
         echo "Waiting for JIRA MCP to become available..."
         wait_for_mcp_status "jira" "Connected"
