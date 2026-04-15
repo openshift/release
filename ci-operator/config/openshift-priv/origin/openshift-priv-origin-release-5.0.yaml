@@ -32,7 +32,8 @@ images:
     to: hello-openshift
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -413,6 +414,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
@@ -421,10 +423,19 @@ tests:
   capabilities:
   - intranet
   optional: true
-  pipeline_run_if_changed: (baremetal|metal3|ironic)
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
+- always_run: false
+  as: e2e-metal-ovn-two-node-fencing-recovery
+  capabilities:
+  - intranet
+  optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-recovery
 - always_run: false
   as: e2e-metal-ipi-ovn
   capabilities:

@@ -21,17 +21,17 @@ promotion:
   to:
   - additional_images:
       console-tests: src
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -86,7 +86,13 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
       dependencies:
       - env: CYPRESS_PLUGIN_PULL_SPEC
         name: console-plugin-demo
