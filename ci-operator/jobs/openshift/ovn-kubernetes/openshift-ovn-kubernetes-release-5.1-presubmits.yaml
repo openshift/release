@@ -1,11 +1,313 @@
 presubmits:
   openshift/ovn-kubernetes:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
+    context: ci/prow/4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: 4.22-upgrade-from-stable-4.21
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade
+    rerun_command: /test 4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-upgrade
+        - --variant=4.22-upgrade-from-stable-4.21
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
+    context: ci/prow/4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade-ipsec
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: 4.22-upgrade-from-stable-4.21
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade-ipsec
+    optional: true
+    rerun_command: /test 4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade-ipsec
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-upgrade-ipsec
+        - --variant=4.22-upgrade-from-stable-4.21
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-upgrade-from-stable-4.21-e2e-aws-ovn-upgrade-ipsec,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build08
+    context: ci/prow/4.22-upgrade-from-stable-4.21-e2e-gcp-ovn-rt-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
+      ci-operator.openshift.io/variant: 4.22-upgrade-from-stable-4.21
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-4.22-upgrade-from-stable-4.21-e2e-gcp-ovn-rt-upgrade
+    rerun_command: /test 4.22-upgrade-from-stable-4.21-e2e-gcp-ovn-rt-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp-ovn-rt-upgrade
+        - --variant=4.22-upgrade-from-stable-4.21
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-upgrade-from-stable-4.21-e2e-gcp-ovn-rt-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
+    context: ci/prow/4.22-upgrade-from-stable-4.21-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.22-upgrade-from-stable-4.21
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-4.22-upgrade-from-stable-4.21-images
+    rerun_command: /test 4.22-upgrade-from-stable-4.21-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.22-upgrade-from-stable-4.21
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-upgrade-from-stable-4.21-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     labels:
@@ -13,7 +315,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-agent-compact-ipv4
     optional: true
     rerun_command: /test e2e-agent-compact-ipv4
@@ -35,7 +337,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -85,16 +387,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -116,7 +418,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -166,16 +468,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-clusternetwork-cidr-expansion
     optional: true
     rerun_command: /test e2e-aws-ovn-clusternetwork-cidr-expansion
@@ -197,7 +499,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -247,16 +549,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-edge-zones
     rerun_command: /test e2e-aws-ovn-edge-zones
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -278,7 +580,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -328,16 +630,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-fdp-qe
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-fdp-qe
     rerun_command: /test e2e-aws-ovn-fdp-qe
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -359,7 +661,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -409,16 +711,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-hypershift
     rerun_command: /test e2e-aws-ovn-hypershift
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -440,7 +742,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -490,16 +792,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-local-gateway
     rerun_command: /test e2e-aws-ovn-local-gateway
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -521,7 +823,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -571,16 +873,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-local-to-shared-gateway-mode-migration
     rerun_command: /test e2e-aws-ovn-local-to-shared-gateway-mode-migration
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -602,7 +904,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -652,16 +954,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-microshift
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-microshift
     rerun_command: /test e2e-aws-ovn-microshift
     spec:
@@ -682,7 +984,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -732,16 +1034,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-rhcos10-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-rhcos10-techpreview
     optional: true
     rerun_command: /test e2e-aws-ovn-rhcos10-techpreview
@@ -763,7 +1065,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -813,16 +1115,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-serial
     rerun_command: /test e2e-aws-ovn-serial
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -844,7 +1146,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -894,16 +1196,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-serial-ipsec
     optional: true
     rerun_command: /test e2e-aws-ovn-serial-ipsec
@@ -925,7 +1227,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -975,16 +1277,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-shared-to-local-gateway-mode-migration
     rerun_command: /test e2e-aws-ovn-shared-to-local-gateway-mode-migration
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1006,7 +1308,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1056,16 +1358,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-single-node-techpreview
     optional: true
     rerun_command: /test e2e-aws-ovn-single-node-techpreview
@@ -1087,7 +1389,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1137,16 +1439,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-techpreview
     optional: true
     rerun_command: /test e2e-aws-ovn-techpreview
@@ -1168,7 +1470,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1218,16 +1520,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-upgrade
     rerun_command: /test e2e-aws-ovn-upgrade
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1249,7 +1551,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1299,16 +1601,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-upgrade-ipsec
     optional: true
     rerun_command: /test e2e-aws-ovn-upgrade-ipsec
@@ -1330,7 +1632,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1380,16 +1682,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-upgrade-local-gateway
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-upgrade-local-gateway
     rerun_command: /test e2e-aws-ovn-upgrade-local-gateway
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1411,7 +1713,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1461,16 +1763,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-aws-ovn-windows
     rerun_command: /test e2e-aws-ovn-windows
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1492,7 +1794,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1542,16 +1844,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-azure-ovn
     optional: true
     rerun_command: /test e2e-azure-ovn
@@ -1573,7 +1875,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1623,16 +1925,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-azure-ovn-techpreview
     optional: true
     rerun_command: /test e2e-azure-ovn-techpreview
@@ -1654,7 +1956,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1704,16 +2006,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-azure-ovn-upgrade
     rerun_command: /test e2e-azure-ovn-upgrade
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1735,7 +2037,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1785,16 +2087,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build04
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-gcp-ovn
     rerun_command: /test e2e-gcp-ovn
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -1816,7 +2118,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1866,16 +2168,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build04
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-gcp-ovn-techpreview
     rerun_command: /test e2e-gcp-ovn-techpreview
     spec:
@@ -1896,7 +2198,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -1946,9 +2248,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
     labels:
@@ -1956,7 +2258,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-bgp-virt-dualstack
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-bgp-virt-dualstack
@@ -1978,7 +2280,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2028,9 +2330,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     decorate: true
     labels:
@@ -2038,7 +2340,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
@@ -2060,7 +2362,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2110,9 +2412,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     labels:
@@ -2120,7 +2422,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -2142,7 +2444,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2192,9 +2494,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
     labels:
@@ -2202,7 +2504,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-bgp
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -2224,7 +2526,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2274,9 +2576,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
     labels:
@@ -2284,7 +2586,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -2306,7 +2608,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2356,9 +2658,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
     decorate: true
     labels:
@@ -2366,7 +2668,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
@@ -2388,7 +2690,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2438,9 +2740,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview-frr-next
     decorate: true
     labels:
@@ -2448,7 +2750,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview-frr-next
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview-frr-next
@@ -2470,7 +2772,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2520,9 +2822,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
     labels:
@@ -2530,7 +2832,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-local-gateway
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway
@@ -2552,7 +2854,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2602,9 +2904,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     decorate: true
     labels:
@@ -2612,7 +2914,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
@@ -2634,7 +2936,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2684,9 +2986,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-techpreview
     decorate: true
     labels:
@@ -2694,7 +2996,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-dualstack-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack-techpreview
@@ -2716,7 +3018,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2766,9 +3068,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
     labels:
@@ -2776,7 +3078,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-ipv4
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv4
@@ -2798,7 +3100,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2848,9 +3150,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
@@ -2858,7 +3160,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-ipv6
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
     skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -2880,7 +3182,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -2930,9 +3232,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-techpreview
     decorate: true
     labels:
@@ -2940,7 +3242,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-ipv6-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv6-techpreview
@@ -2962,7 +3264,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3012,9 +3314,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-techpreview
     decorate: true
     labels:
@@ -3022,7 +3324,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ipi-ovn-techpreview
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-techpreview
@@ -3044,7 +3346,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3094,9 +3396,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-metal-ovn-fdp-qe-ipv6
     decorate: true
     decoration_config:
@@ -3105,7 +3407,7 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-metal-ovn-fdp-qe-ipv6
     optional: true
     rerun_command: /test e2e-metal-ovn-fdp-qe-ipv6
@@ -3127,7 +3429,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3177,16 +3479,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-openstack-ovn
     optional: true
     rerun_command: /test e2e-openstack-ovn
@@ -3208,7 +3510,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3258,16 +3560,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-ovn-hybrid-step-registry
     optional: true
     rerun_command: /test e2e-ovn-hybrid-step-registry
@@ -3289,7 +3591,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3339,8 +3641,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
+    - ^release-5.1$
+    - ^release-5.1-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -3348,7 +3650,7 @@ presubmits:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-vsphere-ovn
     optional: true
     rerun_command: /test e2e-vsphere-ovn
@@ -3370,7 +3672,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3420,8 +3722,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
+    - ^release-5.1$
+    - ^release-5.1-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-techpreview
     decorate: true
@@ -3429,7 +3731,7 @@ presubmits:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-vsphere-ovn-techpreview
     optional: true
     rerun_command: /test e2e-vsphere-ovn-techpreview
@@ -3451,7 +3753,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3501,8 +3803,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
+    - ^release-5.1$
+    - ^release-5.1-
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-windows
     decorate: true
@@ -3510,7 +3812,7 @@ presubmits:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-e2e-vsphere-windows
     optional: true
     rerun_command: /test e2e-vsphere-windows
@@ -3532,7 +3834,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3582,14 +3884,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/gofmt
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-gofmt
     rerun_command: /test gofmt
     spec:
@@ -3608,7 +3910,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3643,14 +3945,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-images
     rerun_command: /test images
     spec:
@@ -3665,7 +3967,7 @@ presubmits:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         resources:
           requests:
             cpu: 10m
@@ -3697,14 +3999,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/lint
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-lint
     rerun_command: /test lint
     spec:
@@ -3723,7 +4025,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3758,16 +4060,155 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build04
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
+    context: ci/prow/okd-scos-e2e-aws-ovn
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-okd-scos-e2e-aws-ovn
+    optional: true
+    rerun_command: /test okd-scos-e2e-aws-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
+    context: ci/prow/okd-scos-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
+    name: pull-ci-openshift-ovn-kubernetes-release-5.1-okd-scos-images
+    rerun_command: /test okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ''
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build08
     context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-openshift-e2e-gcp-ovn-techpreview-upgrade
     optional: true
     rerun_command: /test openshift-e2e-gcp-ovn-techpreview-upgrade
@@ -3789,7 +4230,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3839,16 +4280,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-large-cluster-density-v2
     optional: true
     reporter_config:
@@ -3859,25 +4300,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
@@ -3897,7 +4332,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -3947,16 +4382,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-large-node-density-cni
     optional: true
     reporter_config:
@@ -3967,25 +4402,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
     spec:
       containers:
@@ -4005,7 +4434,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4055,16 +4484,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     optional: true
     reporter_config:
@@ -4075,25 +4504,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     spec:
       containers:
@@ -4113,7 +4536,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4163,16 +4586,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     optional: true
     reporter_config:
@@ -4183,25 +4606,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     spec:
       containers:
@@ -4221,7 +4638,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4271,9 +4688,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
     decorate: true
     decoration_config:
@@ -4282,7 +4699,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
     optional: true
     reporter_config:
@@ -4293,25 +4710,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
     spec:
       containers:
@@ -4331,7 +4742,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4381,9 +4792,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
     decorate: true
     decoration_config:
@@ -4392,7 +4803,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
     optional: true
     reporter_config:
@@ -4403,25 +4814,19 @@ presubmits:
         - failure
         - error
         - triggered
-        report_template: |-
-          {{- $link := "" }}
-          {{- $ref := "" }}
-          {{- if .Spec.Refs.Pulls }}
-            {{- $pull := index .Spec.Refs.Pulls 0 }}
-            {{- $link = $pull.Link }}
-            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
-          {{- else }}
-            {{- $link = .Spec.Refs.BaseLink }}
-            {{- $ref = .Spec.Refs.BaseRef }}
-          {{- end }}
-
-          {{- if eq .Status.State "success" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{- else if eq .Status.State "triggered" -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
-          {{- else -}}
-            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-          {{- end -}}
+        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls\
+          \ }}\n  {{- $pull := index .Spec.Refs.Pulls 0 }}\n  {{- $link = $pull.Link\
+          \ }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n\
+          {{- else }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef\
+          \ }}\n{{- end }}\n\n{{- if eq .Status.State \"success\" -}}\n  :ovn: <{{\
+          \ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf\
+          \ \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View\
+          \ logs> :white_check_mark:\n{{- else if eq .Status.State \"triggered\" -}}\n\
+          \  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else\
+          \ -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
+          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
+          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
     rerun_command: /test ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
     spec:
       containers:
@@ -4441,7 +4846,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4491,16 +4896,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/perfscale-aws-ovn-medium-cluster-density-v2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-perfscale-aws-ovn-medium-cluster-density-v2
     optional: true
     rerun_command: /test perfscale-aws-ovn-medium-cluster-density-v2
@@ -4522,7 +4927,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4572,16 +4977,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/perfscale-aws-ovn-small-cluster-density-v2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-perfscale-aws-ovn-small-cluster-density-v2
     optional: true
     rerun_command: /test perfscale-aws-ovn-small-cluster-density-v2
@@ -4603,7 +5008,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4653,16 +5058,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/perfscale-aws-ovn-small-node-density-cni
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-perfscale-aws-ovn-small-node-density-cni
     optional: true
     rerun_command: /test perfscale-aws-ovn-small-node-density-cni
@@ -4684,7 +5089,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4734,16 +5139,16 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-churn-l3
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-qe-perfscale-aws-ovn-small-udn-density-churn-l3
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-churn-l3
@@ -4765,7 +5170,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4815,16 +5220,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-qe-perfscale-aws-ovn-small-udn-density-l2
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l2
@@ -4846,7 +5251,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4896,16 +5301,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l3
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-qe-perfscale-aws-ovn-small-udn-density-l3
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l3
@@ -4927,7 +5332,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -4977,16 +5382,16 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build07
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/qe-perfscale-payload-control-plane-6nodes
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-qe-perfscale-payload-control-plane-6nodes
     rerun_command: /test qe-perfscale-payload-control-plane-6nodes
     spec:
@@ -5007,7 +5412,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -5057,14 +5462,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/security
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-security
     optional: true
     rerun_command: /test security
@@ -5086,7 +5491,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
@@ -5136,14 +5541,14 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
+    - ^release-5.1$
+    - ^release-5.1-
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: 'true'
     name: pull-ci-openshift-ovn-kubernetes-release-5.1-unit
     rerun_command: /test unit
     spec:
@@ -5162,7 +5567,7 @@ presubmits:
               fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
-        name: ""
+        name: ''
         ports:
         - containerPort: 8080
           name: http
