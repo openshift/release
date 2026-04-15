@@ -360,11 +360,16 @@ tests:
         \[apigroup:image.openshift.io\] when installed on the cluster should provide
         named network metrics
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-- as: e2e-aws-ovn-hypershift
-  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+- always_run: false
+  as: e2e-azure-ovn-hypershift-kubevirt
+  optional: true
   steps:
-    cluster_profile: hypershift-aws
-    workflow: hypershift-aws-conformance
+    cluster_profile: openshift-org-azure
+    env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      TEST_INCLUDES: sig-kubevirt
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-kubevirt-azure-conformance
 - as: unit
   commands: |
     cd go-controller
