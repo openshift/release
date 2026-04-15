@@ -1,0 +1,31 @@
+ref:
+  as: telcov10n-functional-cnf-ran-eco-gotests-sno-worker
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-eco-gotests-sno-worker-commands.sh
+  documentation: |-
+    Run eco-gotests on a spoke SNO cluster after day-2 worker expansion.
+    Uses deploy-run-eco-gotests.yaml to prepare and execute gitopsztp and
+    deploymenttypes test suites against the spoke cluster.
+  grace_period: 10s
+  timeout: 24h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: Hub cluster name (used to derive hub clusterconfigs path)
+  - name: SPOKE_CLUSTER
+    default: ""
+    documentation: "Spoke SNO cluster name (array format, e.g. \"['kni-qe-107']\")"
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Whether the environment is disconnected/airgapped (enables mirror registry)
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
