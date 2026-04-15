@@ -59,7 +59,8 @@ LEASES=()
 
 DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"multi-tenant"}
 for job_safe_name in ${SINGLE_TENANT_LEASE_JOB_SAFE_NAMES}; do
-  if [ "${job_safe_name}" == "${JOB_NAME_SAFE}" ]; then
+  job_safe_name=$(echo "${job_safe_name}" | tr -d '[:space:]\r')
+  if [[ "${JOB_NAME_SAFE}" == "${job_safe_name}"* ]]; then
     log "job ${JOB_NAME_SAFE} requires a single-tenant lease. will request a single-tenant network if there is no override in the job yaml."
     DEFAULT_NETWORK_TYPE="single-tenant"
     break
