@@ -1,29 +1,37 @@
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
-  name: rh-ecosystem-edge-4-15-cluster-pool
-  namespace: rh-ecosystem-edge-cluster-pool
-  labels: # architecture, cloud, owner, product, version are used to filter out a pool when a job claims a cluster
+  creationTimestamp: null
+  labels:
     architecture: amd64
     cloud: aws
-    product: ocp
     owner: rh-ecosystem-edge
+    product: ocp
     version: "4.15"
-    version_lower: 4.15.0-0 # optional: lower bound for automatically updated imageset; required if version_upper is set
-    version_upper: 4.16.0-0 # optional: upper bound for automatically updated imageset; required if version_lower is set
+    version_lower: 4.15.0-0
+    version_upper: 4.16.0-0
+  name: rh-ecosystem-edge-4-15-cluster-pool
+  namespace: rh-ecosystem-edge-cluster-pool
 spec:
-  baseDomain: ecoeng-edgeinfra-ci.devcluster.openshift.com # the base domain to install the cluster
+  baseDomain: ecoeng-edgeinfra-ci.devcluster.openshift.com
+  hibernationConfig: null
   imageSetRef:
-    name: ocp-release-4.15.19-x86-64-for-4.15.0-0-to-4.16.0-0 # the name of the imageSet which determines the image to install the cluster; will be automatically updated if `version_*` labels are set
+    name: ocp-release-4.15.62-multi-for-4.15.0-0-to-4.16.0-0
   installConfigSecretTemplateRef:
-    name: rh-ecosystem-edge-install-config # the name of the secret with an installation config for the installer
-  skipMachinePools: true
+    name: rh-ecosystem-edge-install-config
+  labels:
+    tp.openshift.io/owner: rh-ecosystem-edge
+  maxSize: 4
   platform:
     aws:
       credentialsSecretRef:
-        name: aws-credentials # the name of the secret with the credentials of the cloud account
+        name: aws-credentials
       region: us-east-1
   pullSecretRef:
     name: pull-secret
-  size: 2 # the number of clusters that Hive should keep provisioned and waiting for use.
-  maxSize: 4 # the maximum number of clusters that can exist at the same time.
+  size: 2
+  skipMachinePools: true
+status:
+  ready: 0
+  size: 0
+  standby: 0
