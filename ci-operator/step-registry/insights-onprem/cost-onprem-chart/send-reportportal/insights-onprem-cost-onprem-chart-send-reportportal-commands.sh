@@ -33,8 +33,8 @@ validate_prerequisites() {
         ls "${SHARED_DIR}"/junit_*.xml | sed 's/^/  - /'
     fi
 
-    if [[ ! -f "/var/run/datarouter/username" ]] || [[ ! -f "/var/run/datarouter/password" ]]; then
-        echo "ERROR: DataRouter credentials not found at /var/run/datarouter/"
+    if [[ ! -f "/datarouter/secrets/username" ]] || [[ ! -f "/datarouter/secrets/password" ]]; then
+        echo "ERROR: DataRouter credentials not found at /datarouter/secrets/"
         errors=$((errors + 1))
     else
         echo "DataRouter credentials mounted"
@@ -233,8 +233,8 @@ upload_to_datarouter() {
     set +x
 
     local username password
-    username=$(cat /var/run/datarouter/username)
-    password=$(cat /var/run/datarouter/password)
+    username=$(cat /datarouter/secrets/username)
+    password=$(cat /datarouter/secrets/password)
     local datarouter_url="https://datarouter.ccitredhat.com"
 
     $WAS_TRACING && set -x
