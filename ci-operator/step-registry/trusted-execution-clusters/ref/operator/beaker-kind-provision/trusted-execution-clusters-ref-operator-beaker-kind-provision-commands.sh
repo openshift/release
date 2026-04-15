@@ -137,6 +137,7 @@ SSHOPTS=(
   -o 'ServerAliveInterval=30'
   -o 'ServerAliveCountMax=5'
   -o 'LogLevel=ERROR'
+  -o 'PasswordAuthentication=no'
   -i "${SSH_PKEY}"
 )
 
@@ -156,6 +157,8 @@ fi
 progress "Establishing SSH connection to Beaker machine"
 
 log_info "Testing SSH connection to ${BEAKER_USER}@${BEAKER_IP}..."
+eval "$(ssh-agent -s)"
+ssh-add "${SSH_PKEY}"
 
 MAX_SSH_ATTEMPTS=15
 BASE_RETRY_DELAY=5
@@ -164,7 +167,7 @@ for attempt in $(seq 1 $MAX_SSH_ATTEMPTS); do
   RETRY_DELAY=$((BASE_RETRY_DELAY * attempt / 3))
   [ $RETRY_DELAY -gt 30 ] && RETRY_DELAY=30
 
-  if ssh "${SSHOPTS[@]}" "${BEAKER_USER}@${BEAKER_IP}" "echo 'SSH test successful'; hostname; uptime"; then
+  if ssh -v "${SSHOPTS[@]}" "${BEAKER_USER}@${BEAKER_IP}" "echo 'SSH test successful'; hostname; uptime"; then
     log_success "SSH connection established after ${attempt} attempt(s)"
     break
   else
