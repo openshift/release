@@ -52,7 +52,7 @@ fi
 if [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     CL_SEARCH="internalbos"
 fi
-
+CL_SEARCH="internalbos"
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
@@ -108,6 +108,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfdr14": {"port": 6443, "ip": "10.1.104.32", "hvip": "10.1.104.3"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -118,7 +121,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -146,7 +149,7 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster -s
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
