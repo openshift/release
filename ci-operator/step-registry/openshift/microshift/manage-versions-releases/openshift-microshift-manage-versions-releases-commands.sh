@@ -69,7 +69,15 @@ fi
 ./scripts/pyutils/create-venv.sh
 source ./_output/pyutils/bin/activate
 export KEY="/tmp/key.pem"
-xy="\$(echo "${BRANCH}" | awk -F'-' '{ print \$2 }')"
+
+# Script is release agnostic but it clones specific branch, so it needs to provide correct argument based on the release.
+# 4.22 and older: xy=MINOR version
+# 5.0 and newer: xy=MAJOR.MINOR version
+if python ./test/bin/pyutils/generate_common_versions.py --help | grep -q "The minor version number"; then
+    xy="\$(echo "${BRANCH}" | awk -F'[-.]' '{ print \$3 }')"
+else
+    xy="\$(echo "${BRANCH}" | awk -F'-' '{ print \$2 }')"
+fi
 python ./test/bin/pyutils/generate_common_versions.py "\${xy}" --create-pr ${DRY_RUN}
 EOF
 chmod +x /tmp/run.sh
