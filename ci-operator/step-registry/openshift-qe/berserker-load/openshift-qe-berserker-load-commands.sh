@@ -63,8 +63,9 @@ fi
 git clone $REPO_URL $TAG_OPTION --depth 1 e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
+export PPROF=false  # Workaround for custom e2e-benchmarking fork that still references PPROF
 export WORKLOAD=berserker-load
-EXTRA_FLAGS="${BERSERKER_EXTRA_FLAGS} ${KB_FLAGS} --gc=${BERSERKER_GC} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${BERSERKER_EXTRA_FLAGS} ${KB_FLAGS} --gc=${BERSERKER_GC} --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --job-iterations=${JOB_ITERATIONS}"
 EXTRA_FLAGS+=" --job-pause=${JOB_PAUSE}"
 EXTRA_FLAGS+=" --process-load-replicas=${PROCESS_LOAD_REPLICAS}"
@@ -96,8 +97,4 @@ if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
     scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
     set -e
   fi
-fi
-
-if [[ ${PPROF} == "true" ]]; then
-  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
