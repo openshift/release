@@ -3,10 +3,6 @@
 # Enable strict mode options including xtrace (-x) and inherit_errexit
 set -euxo pipefail; shopt -s inherit_errexit
 
-# Env used by CleanupCollect/yq; defaults match step ref so they are always set (for trap and subprocesses).
-export MAP_TESTS="${MAP_TESTS:-false}"
-export MAP_TESTS_SUITE_NAME="${MAP_TESTS_SUITE_NAME:-ACS-lp-interop}"
-
 function InstallYq() {
     : "Installing yq..."
 
@@ -29,6 +25,11 @@ function CleanupCollect() {
 
     InstallYq
 
+    if [[ $MAP_TESTS == "false" ]]; then
+        true
+        return
+    fi
+
     while IFS= read -r -d '' resultFile; do
         grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
     done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" ! -name "${mergedFN}" -print0)
@@ -45,7 +46,7 @@ function CleanupCollect() {
         $suites | .[] |= (
             (
                 select(env(MAP_TESTS) == "true") |
-                ."+@name" = env(MAP_TESTS_SUITE_NAME)
+                ."+@name" = env(REPORTPORTAL_CMP)
             )//. |
             ([] + (.testcase // [])) as $tc |
             ."+@tests" = ($tc | length | tostring) |

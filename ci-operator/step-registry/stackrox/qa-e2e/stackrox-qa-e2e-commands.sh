@@ -8,7 +8,7 @@ function install_yq() {
     # Install yq manually if not found in image
       echo "Installing yq"
       mkdir -p /tmp/bin
-      export PATH=$PATH:/tmp/bin/
+      export PATH="/tmp/bin:${PATH}"
       curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 
@@ -22,43 +22,59 @@ function install_yq() {
       fi
 }
 
+# Merge multiple jUnit XML files into one (avoids naming conflict with other Steps). Optionally map suite name for CR.
+# Archives original XMLs so Prow does not see duplicated results.
+function CleanupCollect() {
+    typeset mergedFN="${1:-jUnit.xml}"; (($#)) && shift
+    typeset resultFile=''
+    typeset -a xmlFiles=()
 
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            echo "Mapping Test Suite Name To: ACSLatest-lp-interop"
-            /tmp/bin/yq eval --output-format xml -iI0 '.testsuite."+@name" = "ACSLatest-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
+    install_yq
+
+    if [[ $MAP_TESTS == "false" ]]; then
+        true
+        return
     fi
-}
 
+    typeset mergedPath="${ARTIFACT_DIR%/}/${mergedFN}"
+    while IFS= read -r -d '' resultFile; do
+        grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
+    done < <(find -L "${ARTIFACT_DIR%/}" -type f \( -iname "*.xml" -a -not -path "${mergedPath}" \) -print0)
+    ((${#xmlFiles[@]})) || {
+        : 'Warning: No JUnit XML file found to process'
+        true
+        return
+    }
 
-# Archive results function
-function cleanup-collect() {
-    if [[ $MAP_TESTS == "true" ]]; then
-      install_yq
-      original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}" || true
-      echo "Collecting original results in ${original_results}"
+    # Prepare one jUnit XML: collect -> map suite name and merge into a single document
+    yq eval-all --input-format xml --output-format xml -I2 '
+        (. | [.[] | (.testsuite // .) | ([] + .)[] | select(kind == "map")]) as $suites |
+        $suites | .[] |= (
+            (
+                select(env(MAP_TESTS) == "true") |
+                ."+@name" = env(REPORTPORTAL_CMP)
+            )//. |
+            ([] + (.testcase // [])) as $tc |
+            ."+@tests" = ($tc | length | tostring) |
+            ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
+            ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
+        ) |
+        {
+            "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
+            "testsuites": {"testsuite": $suites}
+        }
+    ' "${xmlFiles[@]}" 1> "${ARTIFACT_DIR}/${mergedFN}"
 
-      # Keep a copy of all the original Junit files before modifying them
-      cp -r "${ARTIFACT_DIR}"/junit-* "${original_results}" || echo "Warning: couldn't copy original files" >&2
+    # Archive the original jUnit XMLs so Prow does not see duplicated results.
+    tar zcf "${ARTIFACT_DIR}/jUnit-original.tgz" -C "${ARTIFACT_DIR}/" "${xmlFiles[@]#${ARTIFACT_DIR}/}"
+    rm -f "${xmlFiles[@]}"
 
-      # Safely handle filenames with spaces
-      find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 | while IFS= read -r -d '' result_file; do
-        # Map tests if needed for related use cases
-        mapTestsForComponentReadiness "${result_file}"
-      done
-
-      # Send modified files to shared dir for Data Router Reporter step
-      cp -r "${ARTIFACT_DIR}"/junit-* "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
-    fi
+    cp "${ARTIFACT_DIR}/${mergedFN}" "${SHARED_DIR}/"
+    true
 }
 
 # Post test execution
-trap 'cleanup-collect' SIGINT SIGTERM ERR EXIT
+trap 'CleanupCollect junit--stackrox__qa-e2e__stackrox-qa-e2e.xml' EXIT
 
 job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
 job="${job#nightly-}"
