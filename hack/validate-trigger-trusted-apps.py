@@ -24,6 +24,14 @@ def parse_args():
         default="openshift-merge-bot",
         help="App that must exist in every trigger.trusted_apps",
     )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help=(
+            "Auto-fix trigger config by adding missing trusted_apps and creating "
+            "repo-level trigger entries when no matching entry exists."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -65,6 +73,136 @@ def _effective_trigger(trigger_entries, org_repo):
     return None
 
 
+def _collect_trigger_plugin_targets(plugins):
+    """Collect plugin keys that require trigger coverage."""
+    trigger_plugin_targets = set()
+    trigger_enabled_orgs = set()
+    if not isinstance(plugins, dict):
+        return trigger_plugin_targets
+
+    for org_repo, plugin_cfg in plugins.items():
+        if not isinstance(org_repo, str):
+            continue
+        if not isinstance(plugin_cfg, dict):
+            continue
+        plugin_list = plugin_cfg.get("plugins")
+        if not isinstance(plugin_list, list):
+            continue
+        if "trigger" in plugin_list:
+            trigger_plugin_targets.add(org_repo)
+            if "/" not in org_repo:
+                trigger_enabled_orgs.add(org_repo)
+
+    for org_repo in plugins:
+        if not isinstance(org_repo, str) or "/" not in org_repo:
+            continue
+        org, _ = org_repo.split("/", 1)
+        if org in trigger_enabled_orgs:
+            trigger_plugin_targets.add(org_repo)
+
+    return trigger_plugin_targets
+
+
+def _ensure_trigger_has_app(trigger, required_app, location):
+    trusted_apps = trigger.get("trusted_apps")
+    if trusted_apps is None:
+        trigger["trusted_apps"] = [required_app]
+        return True, None
+    if not isinstance(trusted_apps, list):
+        return (
+            False,
+            f"{location}: trusted_apps exists but is not a list",
+        )
+    if required_app not in trusted_apps:
+        trusted_apps.append(required_app)
+        return True, None
+    return False, None
+
+
+def fix_file(path, required_app):
+    """Apply in-place auto-fixes for missing trigger trusted app configuration."""
+    try:
+        with open(path, encoding="utf-8") as file_handle:
+            original_content = file_handle.read()
+    except OSError as exc:
+        return False, [f"{path}: failed to read file: {exc}"]
+
+    try:
+        documents = list(yaml.safe_load_all(original_content))
+    except yaml.YAMLError as exc:
+        return False, [f"{path}: failed to parse YAML: {exc}"]
+
+    changed = False
+    failures = []
+    for doc_idx, document in enumerate(documents):
+        if not isinstance(document, dict):
+            continue
+
+        trigger_plugin_targets = _collect_trigger_plugin_targets(document.get("plugins"))
+        if not trigger_plugin_targets:
+            continue
+
+        triggers = document.get("triggers")
+        if triggers is None:
+            triggers = []
+            document["triggers"] = triggers
+            changed = True
+        elif not isinstance(triggers, list):
+            failures.append(
+                f"{path}: doc {doc_idx + 1}: triggers exists but is not a list"
+            )
+            continue
+
+        trigger_entries = []
+        for trigger_idx, trigger in enumerate(triggers):
+            if not isinstance(trigger, dict):
+                continue
+            trigger_entries.append(trigger)
+            trigger_changed, trigger_failure = _ensure_trigger_has_app(
+                trigger,
+                required_app,
+                f"{path}: doc {doc_idx + 1}, trigger {trigger_idx + 1}",
+            )
+            if trigger_failure:
+                failures.append(trigger_failure)
+            changed = trigger_changed or changed
+
+        for org_repo in sorted(trigger_plugin_targets):
+            effective = _effective_trigger(trigger_entries, org_repo)
+            if effective is not None:
+                trigger_changed, trigger_failure = _ensure_trigger_has_app(
+                    effective,
+                    required_app,
+                    f"{path}: doc {doc_idx + 1}, effective trigger for plugins[{org_repo}]",
+                )
+                if trigger_failure:
+                    failures.append(trigger_failure)
+                changed = trigger_changed or changed
+                continue
+
+            new_entry = {"repos": [org_repo], "trusted_apps": [required_app]}
+            triggers.append(new_entry)
+            trigger_entries.append(new_entry)
+            changed = True
+
+    if failures:
+        return False, failures
+
+    if not changed:
+        return False, []
+
+    try:
+        rendered = yaml.safe_dump_all(
+            documents, sort_keys=False, default_flow_style=False
+        )
+        with open(path, "w", encoding="utf-8") as file_handle:
+            file_handle.write(rendered)
+    except OSError as exc:
+        return False, [f"{path}: failed to write file: {exc}"]
+
+    return True, []
+
+
 def validate_file(path, required_app):
     failures = []
     try:
@@ -86,25 +224,7 @@ def validate_file(path, required_app):
         # 2) If plugins.<org> enables trigger, then every repo-level plugins key
         #    under that org also requires trigger config coverage, even if that
         #    repo-level key does not list trigger itself.
-        trigger_plugin_targets = set()
-        trigger_enabled_orgs = set()
-        if isinstance(plugins, dict):
-            for org_repo, plugin_cfg in plugins.items():
-                if not isinstance(plugin_cfg, dict):
-                    continue
-                plugin_list = plugin_cfg.get("plugins")
-                if not isinstance(plugin_list, list):
-                    continue
-                if "trigger" in plugin_list:
-                    trigger_plugin_targets.add(org_repo)
-                    if "/" not in org_repo:
-                        trigger_enabled_orgs.add(org_repo)
-            for org_repo in plugins:
-                if not isinstance(org_repo, str) or "/" not in org_repo:
-                    continue
-                org, _ = org_repo.split("/", 1)
-                if org in trigger_enabled_orgs:
-                    trigger_plugin_targets.add(org_repo)
+        trigger_plugin_targets = _collect_trigger_plugin_targets(plugins)
 
         trigger_entries = []
         if isinstance(triggers, list):
@@ -156,9 +276,32 @@ def validate_file(path, required_app):
 def main():
     args = parse_args()
     failures = []
+    fixed_files = []
+
+    if args.fix:
+        for path in sorted(yaml_files(args.config_dir)):
+            changed, fix_failures = fix_file(path, args.required_trusted_app)
+            failures.extend(fix_failures)
+            if changed:
+                fixed_files.append(path)
+
+    if failures:
+        print(
+            f"Failed to auto-fix: {len(failures)} file parsing/writing issue(s) found.",
+            file=sys.stderr,
+        )
+        for failure in failures:
+            print(failure, file=sys.stderr)
+        return 1
 
     for path in sorted(yaml_files(args.config_dir)):
         failures.extend(validate_file(path, args.required_trusted_app))
+
+    if args.fix and fixed_files:
+        print(
+            f"Auto-fix updated {len(fixed_files)} file(s): {', '.join(fixed_files)}",
+            file=sys.stderr,
+        )
 
     if failures:
         print(
