@@ -21,10 +21,10 @@ az login --service-principal \
 CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/westus3.yaml"
 ACR_NAME=$(yq '.acr.svc.name' "${CONFIG_FILE}")
 ACR_URL="${ACR_NAME}.azurecr.io"
-BACKEND_REPO=$(yq '.defaults.backend.image.repository' "${CONFIG_FILE}")
-FRONTEND_REPO=$(yq '.defaults.frontend.image.repository' "${CONFIG_FILE}")
-ADMIN_API_REPO=$(yq '.defaults.adminApi.image.repository' "${CONFIG_FILE}")
-SESSIONGATE_REPO=$(yq '.defaults.sessiongate.image.repository' "${CONFIG_FILE}")
+BACKEND_REPO=$(yq '.backend.image.repository' "${CONFIG_FILE}")
+FRONTEND_REPO=$(yq '.frontend.image.repository' "${CONFIG_FILE}")
+ADMIN_API_REPO=$(yq '.adminApi.image.repository' "${CONFIG_FILE}")
+SESSIONGATE_REPO=$(yq '.sessiongate.image.repository' "${CONFIG_FILE}")
 EXPORTER_REPO=$(yq '.customExporter.image.repository' "${CONFIG_FILE}")
 OC_MIRROR_REPO=$(yq '.imageSync.ocMirror.image.repository' "${CONFIG_FILE}")
 echo "Target ACR: ${ACR_URL}"
