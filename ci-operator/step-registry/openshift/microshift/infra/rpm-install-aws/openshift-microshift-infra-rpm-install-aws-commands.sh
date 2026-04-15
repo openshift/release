@@ -58,7 +58,7 @@ chmod +x /tmp/install.sh
 
 ci_clone_src "${SRC_FROM_GIT}"
 
-REBASE_TO=""
+REBASE_TO="registry.ci.openshift.org/ocp/release:4.22.0-0.nightly-2026-04-01-223038"
 # RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
 # a payload job, a periodic, or a presubmit. In order to distinguish between
 # payload/not payload, we inspect the prow job id, which includes the word "nightly"
@@ -82,15 +82,25 @@ if [ -n "${REBASE_TO}" ]; then
 
   cd /go/src/github.com/openshift/microshift/
   DEST_DIR="${HOME}"/.local/bin ./scripts/fetch_tools.sh yq
-  # Extract the ARM image from the nightly release
+
+  # Get the ARM64 release tag from the imported image
+  # The internal pullspec differs from the external one, so we extract the tag and rebuild it
   oc registry login --to=/tmp/registry.json
-  release_arm64="$(oc image info --registry-config=/tmp/registry.json ${OPENSHIFT_RELEASE_IMAGE_ARM} -o json | jq -r '.config.config.Labels."io.openshift.release"')"
-  if [[ -z "${release_arm64}" ]]; then
-    echo "Failed to extract ARM release image from nightly release image"
+  ARM64_TAG=$(oc image info --registry-config=/tmp/registry.json "${OPENSHIFT_RELEASE_IMAGE_ARM}" -o json | jq -r '.config.config.Labels."io.openshift.release" // empty')
+  if [[ -z "${ARM64_TAG}" ]]; then
+    echo "Failed to extract ARM64 release tag from image: ${OPENSHIFT_RELEASE_IMAGE_ARM}"
     trap_install_status_exit_code "$EXIT_CODE_REBASE_FAILURE"
     exit 1
   fi
-  ARM_RELEASE_IMAGE="registry.ci.openshift.org/ocp-arm64/release-arm64:${release_arm64}"
+
+  # Derive the ARM64 pullspec from the AMD64 one (REBASE_TO)
+  # Transform: ocp -> ocp-arm64, release -> release-arm64
+  BASE_IMAGE=$(echo "${REBASE_TO}" | cut -d: -f1)
+  REGISTRY=$(echo "${BASE_IMAGE}" | cut -d/ -f1)
+  NAMESPACE=$(echo "${BASE_IMAGE}" | cut -d/ -f2)
+  IMAGE=$(echo "${BASE_IMAGE}" | cut -d/ -f3)
+  ARM_RELEASE_IMAGE="${REGISTRY}/${NAMESPACE}-arm64/${IMAGE}-arm64:${ARM64_TAG}"
+  echo "ARM64 release image: ${ARM_RELEASE_IMAGE}"
   # Bail out without error if the rebase fails. Next steps should be skipped if this happens.
   PULLSPEC_RELEASE_AMD64="${REBASE_TO}" \
   PULLSPEC_RELEASE_ARM64="${ARM_RELEASE_IMAGE}" \
