@@ -132,7 +132,7 @@ The workflow uses GitHub App authentication (JWT-based) rather than personal acc
 **Optional:**
 - `hypershift-jira-token`: Jira API token for adding `agent-processed` labels
 - `slack-webhook-url`: Slack incoming webhook URL for posting PR notifications to team-ocp-hypershift
-- `github-to-slack.json`: JSON mapping of GitHub usernames to Slack member IDs, plus a `backup-user` key for fallback (e.g., `{"gh-username": "UXXXXXXXXXX", "backup-user": "UXXXXXXXXXX"}`)
+- `gh-to-slack-ids`: JSON mapping of GitHub usernames to Slack member IDs, plus a `backup-user` key for fallback (e.g., `{"gh-username": "UXXXXXXXXXX", "backup-user": "UXXXXXXXXXX"}`)
 
 These should be configured in Vault with secretsync metadata and synced automatically.
 

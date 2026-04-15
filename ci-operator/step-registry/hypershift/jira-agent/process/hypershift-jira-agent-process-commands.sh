@@ -163,7 +163,7 @@ fi
 $_SLACK_WAS_TRACING && set -x
 
 # Load GitHub-to-Slack user ID mapping
-GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/github-to-slack.json"
+GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/gh-to-slack-ids"
 if [ -f "$GITHUB_SLACK_MAP_FILE" ]; then
   if GITHUB_SLACK_MAP=$(jq -c . < "$GITHUB_SLACK_MAP_FILE" 2>/dev/null); then
     echo "GitHub-to-Slack mapping loaded"
@@ -240,7 +240,7 @@ send_slack_notification() {
   local REVIEWERS=""
   local PR_TITLE=""
   local ATTEMPT=0
-  local MAX_ATTEMPTS=4
+  local MAX_ATTEMPTS=5
 
   while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     local PR_DATA
@@ -295,6 +295,8 @@ send_slack_notification() {
   set +e
   local SLACK_RESPONSE
   SLACK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    --connect-timeout 10 \
+    --max-time 20 \
     -H 'Content-type: application/json' \
     --data "$SLACK_PAYLOAD" \
     "$SLACK_WEBHOOK_URL")
