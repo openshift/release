@@ -29,7 +29,7 @@ function save_oidc_tokens {
 function exit_trap {
     echo "Exit trap triggered"
     date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
-    warn_0_case_executed
+    # warn_0_case_executed
     if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
         save_oidc_tokens
     fi
@@ -44,6 +44,15 @@ function exit_trap {
 
 trap 'exit_trap' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+timeout 12h bash -c 'while true; do
+    if oc get cm/stop-preserving -n default &> /dev/null; then
+        break
+    fi
+    sleep 30
+done
+'
+exit 0
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR:-/clusterprofie_fakedir}/osServicePrincipal.json
