@@ -141,7 +141,7 @@ IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER
 PLAN_NAME="${CLUSTER_NAME}_ci"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
-cat << EOF > $SHARED_DIR/e-cluster.yml
+cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
 - name: Release cluster $CLUSTER_NAME
   hosts: bastion
