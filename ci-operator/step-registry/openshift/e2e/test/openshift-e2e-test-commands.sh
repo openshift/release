@@ -288,7 +288,7 @@ function upgrade_paused() {
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
-    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" "${TEST_ARGS:-}" \
         --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
