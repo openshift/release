@@ -275,6 +275,9 @@ sriov "Configure rdma namespace"
 # https://issues.redhat.com/browse/RHEL-86883
 sriov "Switchdev create switchdev policies on supported devices"
 
+# always failing
+metallb "MetalLB"
+
 EOF
 
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
@@ -313,6 +316,9 @@ sriov "Configure rdma namespace"
 # Known bug
 # https://issues.redhat.com/browse/RHEL-86883
 sriov "Switchdev create switchdev policies on supported devices"
+
+# always failing
+metallb "MetalLB"
 
 EOF
 
@@ -354,6 +360,9 @@ sriov "Configure rdma namespace"
 # https://issues.redhat.com/browse/RHEL-86883
 sriov "Switchdev create switchdev policies on supported devices"
 
+# always failing
+metallb "MetalLB"
+
 EOF
 
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
@@ -393,6 +402,9 @@ sriov "Configure rdma namespace"
 # Known bug
 # https://issues.redhat.com/browse/RHEL-86883
 sriov "Switchdev create switchdev policies on supported devices"
+
+# always failing
+metallb "MetalLB"
 
 EOF
 
@@ -611,6 +623,7 @@ else
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
+export BLACKLISTED_TESTS="metallb"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
