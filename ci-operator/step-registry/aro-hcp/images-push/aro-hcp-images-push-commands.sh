@@ -18,12 +18,17 @@ az login --service-principal \
   --output none
 
 # Resolve ACR and repository names from rendered config
-ACR_NAME=$(yq '.acr.svc.name' "config/rendered/dev/${DEPLOY_ENV}/westus3.yaml")
+CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/westus3.yaml"
+ACR_NAME=$(yq '.acr.svc.name' "${CONFIG_FILE}")
 ACR_URL="${ACR_NAME}.azurecr.io"
-EXPORTER_REPO=$(yq '.customExporter.image.repository' "config/rendered/dev/${DEPLOY_ENV}/westus3.yaml")
-OC_MIRROR_REPO=$(yq '.imageSync.ocMirror.image.repository' "config/rendered/dev/${DEPLOY_ENV}/westus3.yaml")
+BACKEND_REPO=$(yq '.defaults.backend.image.repository' "${CONFIG_FILE}")
+FRONTEND_REPO=$(yq '.defaults.frontend.image.repository' "${CONFIG_FILE}")
+ADMIN_API_REPO=$(yq '.defaults.adminApi.image.repository' "${CONFIG_FILE}")
+SESSIONGATE_REPO=$(yq '.defaults.sessiongate.image.repository' "${CONFIG_FILE}")
+EXPORTER_REPO=$(yq '.customExporter.image.repository' "${CONFIG_FILE}")
+OC_MIRROR_REPO=$(yq '.imageSync.ocMirror.image.repository' "${CONFIG_FILE}")
 echo "Target ACR: ${ACR_URL}"
-echo "Exporter repo: ${EXPORTER_REPO}, OC-Mirror repo: ${OC_MIRROR_REPO}"
+echo "Repos: backend=${BACKEND_REPO}, frontend=${FRONTEND_REPO}, admin-api=${ADMIN_API_REPO}, sessiongate=${SESSIONGATE_REPO}, exporter=${EXPORTER_REPO}, oc-mirror=${OC_MIRROR_REPO}"
 
 # Authenticate to CI registry
 export XDG_RUNTIME_DIR="/tmp/run"
@@ -49,6 +54,20 @@ retry() {
   return 1
 }
 
+# Push service images
+echo "Pushing backend: ${ARO_HCP_BACKEND} -> ${ACR_URL}/test-${BACKEND_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_BACKEND}" "${ACR_URL}/test-${BACKEND_REPO}:${IMAGE_TAG}"
+
+echo "Pushing frontend: ${ARO_HCP_FRONTEND} -> ${ACR_URL}/test-${FRONTEND_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_FRONTEND}" "${ACR_URL}/test-${FRONTEND_REPO}:${IMAGE_TAG}"
+
+echo "Pushing admin-api: ${ARO_HCP_ADMIN_API} -> ${ACR_URL}/test-${ADMIN_API_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_ADMIN_API}" "${ACR_URL}/test-${ADMIN_API_REPO}:${IMAGE_TAG}"
+
+echo "Pushing sessiongate: ${ARO_HCP_SESSIONGATE} -> ${ACR_URL}/test-${SESSIONGATE_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_SESSIONGATE}" "${ACR_URL}/test-${SESSIONGATE_REPO}:${IMAGE_TAG}"
+
+# Push non-pipeline images
 echo "Pushing exporter: ${ARO_HCP_EXPORTER} -> ${ACR_URL}/test-${EXPORTER_REPO}:${IMAGE_TAG}"
 retry oc image mirror "${ARO_HCP_EXPORTER}" "${ACR_URL}/test-${EXPORTER_REPO}:${IMAGE_TAG}"
 
