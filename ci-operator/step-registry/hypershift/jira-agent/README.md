@@ -129,8 +129,10 @@ The workflow requires a single secret in the `test-credentials` namespace:
 
 The workflow uses GitHub App authentication (JWT-based) rather than personal access tokens. This provides better security and allows fine-grained permissions.
 
-**Optional** (currently disabled for testing):
+**Optional:**
 - `hypershift-jira-token`: Jira API token for adding `agent-processed` labels
+- `slack-webhook-url`: Slack incoming webhook URL for posting PR notifications to team-ocp-hypershift
+- `gh-to-slack-ids`: JSON mapping of GitHub usernames to Slack member IDs, plus a `backup-user` key for fallback (e.g., `{"gh-username": "UXXXXXXXXXX", "backup-user": "UXXXXXXXXXX"}`)
 
 These should be configured in Vault with secretsync metadata and synced automatically.
 
@@ -278,7 +280,6 @@ Then run `make update` to regenerate job configs.
 
 ## Future Enhancements
 
-- Slack notifications for processed issues
 - Metrics push to Prometheus
 - Automatic retries for transient failures
 - Priority-based processing
