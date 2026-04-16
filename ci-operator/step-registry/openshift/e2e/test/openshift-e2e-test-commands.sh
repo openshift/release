@@ -297,9 +297,10 @@ function upgrade_paused() {
     wait "$!"
     echo "Upgraded control-plane to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
 
+    # remove --disable-monitor=oc-adm-upgrade-status when https://redhat.atlassian.net/browse/OTA-1977 is fixed
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
-        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" --disable-monitor=oc-adm-upgrade-status \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
