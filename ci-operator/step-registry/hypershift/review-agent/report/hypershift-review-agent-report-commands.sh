@@ -83,8 +83,8 @@ extract_from_stream_json() {
 
   case "$field" in
     text)
-      # Get the final result text
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.result // empty' 2>/dev/null | head -1 || echo ""
+      # Get all assistant text output (full conversation, separated by newlines)
+      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "$json_file" 2>/dev/null || echo ""
       ;;
     input_tokens)
       grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.input_tokens // 0' 2>/dev/null | head -1 || echo "0"
@@ -120,12 +120,12 @@ extract_from_stream_json() {
       grep '"type":"system"' "$json_file" 2>/dev/null | jq -r '.tools // [] | join(",")' 2>/dev/null | head -1 || echo ""
       ;;
     tool_calls)
-      # Extract tool use entries
-      grep '"type":"tool_use"' "$json_file" 2>/dev/null | jq -r '[.name // empty] | join("\n")' 2>/dev/null || echo ""
+      # Extract tool use entries from assistant messages
+      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name' "$json_file" 2>/dev/null || echo ""
       ;;
     tool_errors)
-      # Extract tool results with is_error=true
-      grep '"is_error":true' "$json_file" 2>/dev/null | jq -r '.content // empty' 2>/dev/null || echo ""
+      # Extract tool error results from user messages
+      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:"))' "$json_file" 2>/dev/null || echo ""
       ;;
     model_usage)
       grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.inputTokens // .value.input_tokens // 0)|\(.value.outputTokens // .value.output_tokens // 0)|\(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0)|\(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0)"' 2>/dev/null | head -20 || echo ""
@@ -227,12 +227,11 @@ while IFS= read -r line; do
     TOOL_CALLS_RAW=$(jq -r '.tool_calls[]? // empty' "$SUMMARY_FILE" 2>/dev/null | sed 's/^/  /' || echo "")
     TOOL_ERRORS_RAW=$(jq -r '.tool_errors[]? // empty' "$SUMMARY_FILE" 2>/dev/null || echo "")
   elif [ -f "${OUTPUT_FILE:-}" ] && [ -s "${OUTPUT_FILE:-}" ]; then
-    # Legacy stream-json format
-    TOOL_CALLS_RAW=$(grep '"type":"tool_use"' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '"  \(.name)(\(.input | tostring | .[0:120])...)"' 2>/dev/null \
+    # Legacy stream-json format - tool_use is nested inside assistant messages
+    TOOL_CALLS_RAW=$(jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "  \(.name)(\(.input | tostring | .[0:120])...)"' "$OUTPUT_FILE" 2>/dev/null \
       || echo "")
-    TOOL_ERRORS_RAW=$(grep '"is_error":true' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '.content // "unknown error"' 2>/dev/null \
+    TOOL_ERRORS_RAW=$(jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "$OUTPUT_FILE" 2>/dev/null \
+      | sed 's/⏎/\n/g' \
       || echo "")
   fi
 
