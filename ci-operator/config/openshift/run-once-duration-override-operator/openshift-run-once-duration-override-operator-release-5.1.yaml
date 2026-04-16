@@ -1,0 +1,43 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: run-once-duration-override-operator
+promotion:
+  to:
+  - name: "5.1"
+    namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "5.1"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify-gofmt
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift
+  repo: run-once-duration-override-operator
