@@ -181,7 +181,22 @@ if [[ -z "${CONTROL_PLANE_ZONES}" ]]; then
 fi
 
 # For heterogeneous clusters, also constrain zones based on additional worker machine type
-if [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]]; then
+# Only apply this logic for OCP 4.17+ to avoid changing behavior of older releases
+is_version_gte_4_17() {
+  if command -v oc &> /dev/null && command -v openshift-install &> /dev/null; then
+    local release_image ocp_version
+    release_image="$(openshift-install version | sed -n 's/^release image\s\+\(.*\)$/\1/p' | tr -d '\n')"
+    ocp_version="$(oc adm release info "$release_image" -o json | jq -r '.metadata.version' | tr -d '\n')"
+    echo "$(date -u --rfc-3339=seconds) - INFO: Detected OCP version: ${ocp_version}"
+    printf '%s\n%s' "4.17" "$ocp_version" | sort -C -V
+  else
+    # If we can't detect version, assume it's new enough
+    echo "$(date -u --rfc-3339=seconds) - WARNING: Cannot detect OCP version, assuming >= 4.17"
+    return 0
+  fi
+}
+
+if [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]] && is_version_gte_4_17; then
   echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE specified, getting zones supporting '${ADDITIONAL_WORKER_VM_TYPE}'"
   ZONES_ARRAY3=()
   get_zones_by_machine_type "${ADDITIONAL_WORKER_VM_TYPE}" ZONES_ARRAY3
@@ -198,6 +213,8 @@ if [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: No common zones support all machine types (compute: ${MACHINE_TYPE1}, control-plane: ${MACHINE_TYPE2}, additional: ${ADDITIONAL_WORKER_VM_TYPE})"
     exit 1
   fi
+elif [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE specified but OCP version < 4.17, skipping zone intersection logic"
 fi
 
 if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -gt 0 ]]; then
