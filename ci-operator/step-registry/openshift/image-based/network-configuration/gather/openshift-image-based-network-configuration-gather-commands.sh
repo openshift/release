@@ -22,6 +22,8 @@ set -xeuo pipefail
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
+echo "test"
+
 make ipc-gather \
   IPC_CLUSTER_NAME=${IPC_CLUSTER_NAME} \
   IBI_VM_NAME=${IBI_VM_NAME}
