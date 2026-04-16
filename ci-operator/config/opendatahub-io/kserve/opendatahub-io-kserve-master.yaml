@@ -21,7 +21,10 @@ build_root:
       ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - build_args:
+    - name: GOTAGS
+      value: distro
+    dockerfile_path: Dockerfile
     from: ubi_minimal
     to: kserve-controller
   - build_args:
@@ -436,28 +439,6 @@ tests:
       SOURCE_IMAGE_REF: kserve-storage-initializer
     env:
       IMAGE_REPO: kserve-storage-initializer
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
-- always_run: false
-  as: fast-image-mirror-kserve-success-200-isvc
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: success-200-isvc
-    env:
-      IMAGE_REPO: success-200-isvc
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
-- always_run: false
-  as: fast-image-mirror-kserve-error-404-isvc
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: error-404-isvc
-    env:
-      IMAGE_REPO: error-404-isvc
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
