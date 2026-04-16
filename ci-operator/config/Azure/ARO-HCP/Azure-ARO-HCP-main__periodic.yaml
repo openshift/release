@@ -18,11 +18,34 @@ tests:
   steps:
     test:
     - ref: aro-hcp-deprovision-kusto-role-assignments
-- as: delete-expired-development-resource-groups
+- as: delete-expired-red-hat-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: red-hat-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
+- as: delete-expired-msft-test-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: msft-test-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
+- as: delete-expired-dev-prow-resource-groups
   cron: 7,37 * * * *
   steps:
     env:
       CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO HCP E2E Hosted Clusters (EA Subscription)
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-dev-pers-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-integration-resource-groups
@@ -56,6 +79,17 @@ tests:
         (EA Subscription), ARO Hosted Control Planes (EA Subscription 1)
       CLEANUP_SWEEPER_WAIT: "false"
       CLEANUP_SWEEPER_WORKFLOW: rg-ordered
+    test:
+    - ref: aro-hcp-deprovision-cleanup-sweeper
+- as: cleanup-sweeper-shared-leftovers
+  cron: 35 * * * *
+  steps:
+    env:
+      CLEANUP_SWEEPER_SUBSCRIPTION_NAMES: ARO HCP E2E Service Clusters (EA Subscription),
+        ARO HCP E2E Hosted Clusters (EA Subscription), ARO HCP E2E Management Clusters
+        (EA Subscription), ARO Hosted Control Planes (EA Subscription 1)
+      CLEANUP_SWEEPER_VERBOSITY: "1"
+      CLEANUP_SWEEPER_WORKFLOW: shared-leftovers
     test:
     - ref: aro-hcp-deprovision-cleanup-sweeper
 - as: integration-e2e-parallel
