@@ -1,0 +1,50 @@
+chain:
+  as: hypershift-azure-destroy-selfmanaged-guests
+  steps:
+  - as: destroy-guests
+    best_effort: true
+    cli: latest
+    env:
+    - name: HYPERSHIFT_AZURE_LOCATION
+      default: "centralus"
+      documentation: "Specifies the Azure location of the clusters."
+    commands: |-
+      set -xuo pipefail
+
+      # Use the nested management cluster kubeconfig
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+
+      AZURE_CREDS="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+      HC_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-centralus}"
+
+      # Re-derive cluster names from job ID (same logic as create step)
+      PUBLIC_NAME="$(echo -n "${PROW_JOB_ID}-pub"|sha256sum|cut -c-20)"
+      PRIVATE_NAME="$(echo -n "${PROW_JOB_ID}-prv"|sha256sum|cut -c-20)"
+      OAUTH_LB_NAME="$(echo -n "${PROW_JOB_ID}-oau"|sha256sum|cut -c-20)"
+
+      # Destroy all clusters, continue per-cluster, but preserve failure signal
+      FAILED=0
+      for CLUSTER in "${PUBLIC_NAME}" "${PRIVATE_NAME}" "${OAUTH_LB_NAME}"; do
+        echo "$(date) Destroying self-managed cluster: ${CLUSTER}"
+        if ! /usr/bin/hypershift destroy cluster azure \
+          --azure-creds="${AZURE_CREDS}" \
+          --name="${CLUSTER}" \
+          --location="${HC_LOCATION}" \
+          --cluster-grace-period=40m; then
+          echo "$(date) WARNING: Failed to destroy cluster ${CLUSTER}" >&2
+          FAILED=1
+        fi
+        echo "$(date) Finished destroying cluster ${CLUSTER}"
+      done
+      exit "${FAILED}"
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 2h0m0s
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
+      namespace: test-credentials
