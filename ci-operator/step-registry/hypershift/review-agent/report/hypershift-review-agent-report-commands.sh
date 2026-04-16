@@ -83,8 +83,8 @@ extract_from_stream_json() {
 
   case "$field" in
     text)
-      # Get the final result text
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.result // empty' 2>/dev/null | head -1 || echo ""
+      # Get all assistant text output (full conversation, separated by newlines)
+      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "$json_file" 2>/dev/null || echo ""
       ;;
     input_tokens)
       grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.input_tokens // 0' 2>/dev/null | head -1 || echo "0"
