@@ -32,7 +32,14 @@ workflow:
     - ref: aws-neuron-operator-test
     post:
     - ref: aws-neuron-operator-gather
-    - chain: rosa-aws-sts-hcp-deprovision
+    # Inline the rosa-aws-sts-hcp-deprovision chain so we can mark
+    # aws-deprovision-stacks as best_effort independently — its
+    # CloudFormation DELETE_FAILED errors must not fail the overall job.
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: aws-deprovision-stacks
       best_effort: true
   documentation: |-
     This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
