@@ -36,6 +36,12 @@ atexit_handler() {
         echo "ERROR: No HTML report was generated"
         return 1
     fi
+
+    # Check if Claude log contains tool errors
+    if grep -q '"is_error":\s*true' "${WORKDIR}/claude-output.log"; then
+        echo "ERROR: Claude log contains tool errors"
+        return 1
+    fi
 }
 
 load_secrets() {
