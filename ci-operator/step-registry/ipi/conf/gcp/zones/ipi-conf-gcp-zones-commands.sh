@@ -15,6 +15,7 @@ echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_ZONES '${COMPUTE_ZONES}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_NODE_TYPE '${COMPUTE_NODE_TYPE}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_ZONES '${CONTROL_PLANE_ZONES}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_NODE_TYPE '${CONTROL_PLANE_NODE_TYPE}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE '${ADDITIONAL_WORKER_VM_TYPE}'"
 
 function get_zones_from_region() {
   # shellcheck disable=SC2178
@@ -177,6 +178,26 @@ if [[ -z "${CONTROL_PLANE_ZONES}" ]]; then
   fi
   echo "$(date -u --rfc-3339=seconds) - INFO: As a temporary workaround of https://redhat.atlassian.net/browse/OCPBUGS-78431, ensure the zones of compute & controlPlane machines are the same"
   array_intersection_or_fallback CANDIDATE_ZONES_ARRAY ZONES_ARRAY2
+fi
+
+# For heterogeneous clusters, also constrain zones based on additional worker machine type
+if [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE specified, getting zones supporting '${ADDITIONAL_WORKER_VM_TYPE}'"
+  ZONES_ARRAY3=()
+  get_zones_by_machine_type "${ADDITIONAL_WORKER_VM_TYPE}" ZONES_ARRAY3
+
+  if [[ ${#ZONES_ARRAY3[@]} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: No zones found supporting additional worker machine type '${ADDITIONAL_WORKER_VM_TYPE}' in region ${GCP_REGION}"
+    exit 1
+  fi
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: For heterogeneous clusters, restrict zones to those supporting all machine types"
+  array_intersection_or_fallback CANDIDATE_ZONES_ARRAY ZONES_ARRAY3
+
+  if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: No common zones support all machine types (compute: ${MACHINE_TYPE1}, control-plane: ${MACHINE_TYPE2}, additional: ${ADDITIONAL_WORKER_VM_TYPE})"
+    exit 1
+  fi
 fi
 
 if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -gt 0 ]]; then
