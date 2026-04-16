@@ -14,8 +14,8 @@ spec:
       name: quay.io/openshift/ci:ci_forge-light_latest
   source:
     dockerfile: |
+      # synchronized on 2026-04-13 from openshift-psap/forge:projects/core/image/Containerfile.lightweight
       FROM quay.io/centos/centos:stream10
-      # synchronized on 2026-04-01 with openshift-psap/forge:projects/core/image/Containerfile.lightweight
 
       MAINTAINER Perf&Scale PSAP Team <team-psap@redhat.com>
 
@@ -29,6 +29,13 @@ spec:
             python3 python3-pip python3-setuptools \
           && dnf clean all \
           && rm -rf /var/cache/yum
+
+      # Install OpenShift CLI (oc)
+      RUN curl -LO "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" && \
+          tar -xzf openshift-client-linux.tar.gz && \
+          chmod +x oc && \
+          mv oc /usr/local/bin/ && \
+          rm -f openshift-client-linux.tar.gz kubectl
 
       COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
