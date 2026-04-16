@@ -643,6 +643,151 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 1,9 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Stale PRs are closed after 21d of inactivity.
+
+        If this PR is still relevant, comment to refresh it or remove the stale label.
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=336h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Stale PRs rot after 14d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten PRs close after an additional 7d of inactivity.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=168h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Rotten PRs close after 7d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+
+        /close
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 0 * * 3
   decorate: true
   decoration_config:
