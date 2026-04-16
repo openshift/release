@@ -12,6 +12,31 @@ echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
 # ---------------------------------------------------------------------------
 set +x
 
+if [[ -f "${GITHUB_APP_ID_PATH}" ]] && [[ -f "${GITHUB_KEY_PATH}" ]]; then
+    GH_TOKEN_VER="2.0.8"
+    GH_TOKEN_SHA="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
+    GH_TOKEN_EXE="/tmp/gh-token-${GH_TOKEN_VER}"
+
+    curl -sSL "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" -o "${GH_TOKEN_EXE}"
+    if ! echo "${GH_TOKEN_SHA}  ${GH_TOKEN_EXE}" | sha256sum -c -; then
+        echo "ERROR: Failed to verify gh-token checksum."
+        exit 1
+    fi
+    chmod +x "${GH_TOKEN_EXE}"
+
+    GITHUB_TOKEN="$("${GH_TOKEN_EXE}" generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
+    rm -f "${GH_TOKEN_EXE}"
+    if [[ -z "${GITHUB_TOKEN}" ]] || [[ "${GITHUB_TOKEN}" == "null" ]]; then
+        echo "ERROR: Failed to generate GitHub token from App credentials."
+        exit 1
+    fi
+    export GITHUB_TOKEN
+    echo "GitHub token generated."
+else
+    echo "ERROR: GitHub App credentials not found. Cannot clone edge-tooling."
+    exit 1
+fi
+
 if [[ -f "${JIRA_API_TOKEN_PATH}" ]]; then
     export JIRA_TOKEN
     JIRA_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
@@ -110,7 +135,7 @@ trap copy_artifacts EXIT TERM INT
 # Clone and set up payload-monitor
 # ---------------------------------------------------------------------------
 echo "Cloning edge-tooling repository..."
-git clone --depth 1 --branch main https://github.com/openshift-eng/edge-tooling.git
+gh repo clone openshift-eng/edge-tooling edge-tooling -- --depth 1 --branch main
 cd edge-tooling/payload-monitor
 
 echo "Setting up Python environment..."
@@ -148,17 +173,21 @@ fi
 PHASE_MONITOR_START=$(date +%s)
 
 # stdout has blocking markers, stderr has logging
+MONITOR_EXIT=0
 python -m payload_monitor "${MONITOR_ARGS[@]}" \
     > "${WORKDIR}/monitor-stdout.txt" \
-    2> >(tee "${ARTIFACT_DIR}/monitor.log" >&2) || {
-    echo "Warning: Payload monitor exited with non-zero status."
-}
+    2> >(tee "${ARTIFACT_DIR}/monitor.log" >&2) || MONITOR_EXIT=$?
 
 PHASE_MONITOR_DURATION=$(( $(date +%s) - PHASE_MONITOR_START ))
 
-# Copy initial dashboard to artifacts immediately
+# Copy initial dashboard to artifacts immediately (even on failure)
 cp "${DASHBOARD_PATH}" "${ARTIFACT_DIR}/" 2>/dev/null || true
 cp "${JSON_PATH}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+if [[ "${MONITOR_EXIT}" -ne 0 ]]; then
+    echo "ERROR: Payload monitor failed with exit code ${MONITOR_EXIT}."
+    exit "${MONITOR_EXIT}"
+fi
 
 BLOCKING_COUNT=$(grep -c "^BLOCKING|" "${WORKDIR}/monitor-stdout.txt" 2>/dev/null || true)
 BLOCKING_LIST=$(grep "^BLOCKING|" "${WORKDIR}/monitor-stdout.txt" 2>/dev/null || true)
