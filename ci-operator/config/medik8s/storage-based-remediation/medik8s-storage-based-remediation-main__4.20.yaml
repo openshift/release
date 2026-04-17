@@ -52,7 +52,35 @@ tests:
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
         # OPERATOR_NAMESPACE variable is used by bundle-run
-        BUNDLE_IMG=quay.io/medik8s/storage-based-remediation-operator-bundle:latest make bundle-run
+        BUNDLE_IMG="$OO_BUNDLE" make bundle-run
+
+        # Inject CI-built agent image into the CSV so OLM propagates it to the deployment
+        CSV_NAME=""
+        for _ in {1..30}; do
+          CSV_NAME=$(oc get csv -n "$OPERATOR_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | tail -n1)
+          [[ -n "$CSV_NAME" ]] && break
+          sleep 5
+        done
+        [[ -n "$CSV_NAME" ]] || { echo "CSV not found in namespace ${OPERATOR_NAMESPACE}"; exit 1; }
+
+        # Ensure env array exists before appending
+        if ! oc get csv "$CSV_NAME" -n "$OPERATOR_NAMESPACE" -o jsonpath='{.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[0].name}' >/dev/null 2>&1; then
+          oc -n "$OPERATOR_NAMESPACE" patch csv "$CSV_NAME" --type=json -p='[
+            {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env","value":[]}
+          ]'
+        fi
+        oc -n "$OPERATOR_NAMESPACE" patch csv "$CSV_NAME" --type=json -p='[
+          {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_SBR_AGENT","value":"'"${SBR_AGENT_IMAGE}"'"}}
+        ]'
+        echo "CSV patched, waiting for OLM to process and trigger rollout..."
+        sleep 30
+        oc rollout status deployment/sbr-operator-controller-manager \
+          -n "$OPERATOR_NAMESPACE" --timeout=120s
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      - env: SBR_AGENT_IMAGE
+        name: sbr-agent
       env:
       - name: OPERATOR_NAMESPACE
       from: src
