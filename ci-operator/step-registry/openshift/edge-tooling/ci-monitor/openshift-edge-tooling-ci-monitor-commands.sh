@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "=== Edge Enablement Payload Monitor ==="
+echo "=== Edge Enablement CI Monitor ==="
 echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ cat > "${CLAUDE_HOME}/settings.json" <<'EOF'
       "Bash(python -m payload_monitor:*)",
       "Bash(python3 -m payload_monitor:*)",
       "Skill(ci:*)",
-      "Skill(generate-dashboard)"
+      "Skill(edge-ocp-ci:*)"
     ]
   }
 }
@@ -102,8 +102,8 @@ cd "${WORKDIR}"
 
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
-    find "${WORKDIR}" -maxdepth 2 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-    find "${WORKDIR}" -maxdepth 2 -name "*.json" \
+    find "${WORKDIR}" -maxdepth 3 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+    find "${WORKDIR}" -maxdepth 3 -name "*.json" \
         -not -path "*/.venv/*" -not -path "*/node_modules/*" \
         -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
 
@@ -119,155 +119,81 @@ copy_artifacts() {
 trap copy_artifacts EXIT TERM INT
 
 # ---------------------------------------------------------------------------
-# Clone and set up payload-monitor
+# Clone edge-tooling (needed for payload-monitor tool and plugin skills)
 # ---------------------------------------------------------------------------
 echo "Cloning edge-tooling repository..."
 gh repo clone openshift-eng/edge-tooling edge-tooling -- --depth 1 --branch main
-cd edge-tooling/payload-monitor
 
-echo "Setting up Python environment..."
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -q -r requirements.txt
-
-# ===========================================================================
-# Phase 1: Generate dashboard (deterministic, no AI)
-# ===========================================================================
-echo ""
-echo "=== Phase 1: Generating payload dashboard ==="
-
-DASHBOARD_PATH="${WORKDIR}/edge-payload-dashboard.html"
-JSON_PATH="${WORKDIR}/edge-payload-dashboard.json"
-
-MONITOR_ARGS=(
-    --output "${DASHBOARD_PATH}"
-    --json
-    --verbose
-)
-
-if [[ -n "${MONITOR_VERSIONS}" ]]; then
-    MONITOR_ARGS+=(--versions "${MONITOR_VERSIONS}")
-fi
-
-if [[ "${SKIP_PROW}" == "true" ]]; then
-    MONITOR_ARGS+=(--skip-prow)
-fi
-
-if [[ "${WITH_TIMING}" == "true" ]]; then
-    MONITOR_ARGS+=(--with-timing)
-fi
-
-PHASE_MONITOR_START=$(date +%s)
-
-# stdout has blocking markers, stderr has logging
-MONITOR_EXIT=0
-python -m payload_monitor "${MONITOR_ARGS[@]}" \
-    > "${WORKDIR}/monitor-stdout.txt" \
-    2> >(tee "${ARTIFACT_DIR}/monitor.log" >&2) || MONITOR_EXIT=$?
-
-PHASE_MONITOR_DURATION=$(( $(date +%s) - PHASE_MONITOR_START ))
-
-# Copy initial dashboard to artifacts immediately (even on failure)
-cp "${DASHBOARD_PATH}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-cp "${JSON_PATH}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-
-if [[ "${MONITOR_EXIT}" -ne 0 ]]; then
-    echo "ERROR: Payload monitor failed with exit code ${MONITOR_EXIT}."
-    exit "${MONITOR_EXIT}"
-fi
-
-BLOCKING_COUNT=$(grep -c "^BLOCKING|" "${WORKDIR}/monitor-stdout.txt" 2>/dev/null || true)
-BLOCKING_LIST=$(grep "^BLOCKING|" "${WORKDIR}/monitor-stdout.txt" 2>/dev/null || true)
-echo "Found ${BLOCKING_COUNT} blocking job failures."
-
-# No blocking failures — exit early
-if [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
-    echo "No blocking failures detected across monitored topologies."
-    exit 0
-fi
-
-# ===========================================================================
-# Phase 2: Claude AI analysis (best-effort)
-# ===========================================================================
-echo ""
-echo "=== Phase 2: Claude AI analysis of ${BLOCKING_COUNT} blocking failures ==="
-
+# ---------------------------------------------------------------------------
+# Install marketplace plugins for CI analysis skills
+# ---------------------------------------------------------------------------
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
 export CLAUDE_CODE_ENTRYPOINT=cli
 
-# Install marketplace plugins for CI analysis skills
 echo "Installing marketplace plugins..."
-claude plugin install openshift-eng/edge-tooling 2>/dev/null || echo "Warning: edge-tooling marketplace install failed."
-claude plugin install openshift-eng/ai-helpers 2>/dev/null || echo "Warning: ai-helpers marketplace install failed."
+claude plugin install openshift-eng/edge-tooling
+claude plugin install openshift-eng/ai-helpers
 
-ANALYSIS_JSON="${WORKDIR}/analysis.json"
+# ---------------------------------------------------------------------------
+# Build skill arguments from env vars
+# ---------------------------------------------------------------------------
+SKILL_ARGS=""
+if [[ -n "${MONITOR_VERSIONS}" ]]; then
+    SKILL_ARGS+="--versions ${MONITOR_VERSIONS} "
+fi
+if [[ "${SKIP_PROW}" == "true" ]]; then
+    SKILL_ARGS+="--skip-prow "
+fi
+if [[ "${WITH_TIMING}" == "true" ]]; then
+    SKILL_ARGS+="--with-timing "
+fi
+
+# ===========================================================================
+# Invoke Claude with the generate-dashboard skill
+# ===========================================================================
+echo ""
+echo "=== Invoking Claude with edge-ocp-ci:generate-dashboard ==="
+
 ALLOWED_TOOLS="Agent Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
-PHASE_ANALYSIS_START=$(date +%s)
+PHASE_START=$(date +%s)
 CLAUDE_EXIT=0
 timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --max-turns 80 \
-    -p "Load the /edge-ocp-ci:generate-dashboard skill.
-
-Phase 1 (Steps 1-3) is already complete. The payload monitor has run and produced:
-- HTML dashboard: ${DASHBOARD_PATH}
-- JSON report: ${JSON_PATH}
-- Python tool directory: $(pwd) (venv already activated)
-
-The following blocking jobs were detected:
-${BLOCKING_LIST}
-
-Start from Step 4 of the skill. Analyze each blocking failure, write the analysis
-JSON to ${ANALYSIS_JSON}, then merge it into the dashboard (Steps 4-6)." \
+    -p "/edge-ocp-ci:generate-dashboard ${SKILL_ARGS}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-analysis.log" || CLAUDE_EXIT=$?
 
-PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
+PHASE_DURATION=$(( $(date +%s) - PHASE_START ))
 
 # Handle timeout — nudge Claude to wrap up
 PHASE_NUDGE_START=$(date +%s)
 NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
-    echo "Claude analysis timed out. Nudging to wrap up..."
+    echo "Claude timed out. Nudging to wrap up..."
     timeout 600 claude \
         --model "${CLAUDE_MODEL}" \
         --continue \
         --allowedTools "${ALLOWED_TOOLS}" \
         --output-format stream-json \
         --max-turns 10 \
-        -p "Time is up. Write the analysis JSON to ${ANALYSIS_JSON} immediately with whatever findings you have." \
+        -p "Time is up. Write whatever analysis you have to the JSON file now (Step 5), then merge into the dashboard (Step 6)." \
         --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-analysis.log" || NUDGE_EXIT=$?
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
 # ===========================================================================
-# Phase 3: Merge analysis into dashboard
-# ===========================================================================
-if [[ -f "${ANALYSIS_JSON}" ]]; then
-    echo ""
-    echo "=== Phase 3: Merging AI analysis into dashboard ==="
-    python -m payload_monitor \
-        --merge-analysis "${ANALYSIS_JSON}" \
-        --output "${DASHBOARD_PATH}" || echo "Warning: Failed to merge analysis."
-    cp "${DASHBOARD_PATH}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-    echo "Dashboard updated with AI analysis."
-else
-    echo "No analysis JSON produced. Dashboard remains without AI enrichment."
-fi
-
-# ===========================================================================
 # JUnit XML for CI tracking
 # ===========================================================================
-TOTAL_DURATION=$(( PHASE_MONITOR_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
+TOTAL_DURATION=$(( PHASE_DURATION + PHASE_NUDGE_DURATION ))
 JUNIT_FILE="${ARTIFACT_DIR}/junit_ci-monitor.xml"
 
 PHASE_PREFIX="[sig-edge-enablement]"
-PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: dashboard generation\" time=\"${PHASE_MONITOR_DURATION}\"/>
-  <testcase name=\"${PHASE_PREFIX} Phase: AI analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
-PHASE_COUNT=2
+PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} CI monitor\" time=\"${PHASE_DURATION}\"/>"
+PHASE_COUNT=1
 
 FAILURE_COUNT=0
 TIMEOUT_CASES=""
@@ -275,15 +201,15 @@ TIMEOUT_TEST_COUNT=1
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     FAILURE_COUNT=1
-    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_ANALYSIS_DURATION}\">
+    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_DURATION}\">
     <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
 
     PHASE_CASES="${PHASE_CASES}
-  <testcase name=\"${PHASE_PREFIX} Phase: recovery nudge\" time=\"${PHASE_NUDGE_DURATION}\"/>"
-    PHASE_COUNT=3
+  <testcase name=\"${PHASE_PREFIX} Recovery nudge\" time=\"${PHASE_NUDGE_DURATION}\"/>"
+    PHASE_COUNT=2
 
-    if [[ "${NUDGE_EXIT}" -ne 0 ]] && [[ ! -f "${ANALYSIS_JSON}" ]]; then
+    if [[ "${NUDGE_EXIT}" -ne 0 ]]; then
         FAILURE_COUNT=2
         TIMEOUT_TEST_COUNT=2
         TIMEOUT_CASES="${TIMEOUT_CASES}
@@ -292,13 +218,13 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
   </testcase>"
     fi
 else
-    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
+    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_DURATION}\"/>"
 fi
 
 TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="edge-payload-monitor" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+<testsuite name="edge-ci-monitor" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
 ${PHASE_CASES}
 ${TIMEOUT_CASES}
 </testsuite>
@@ -306,4 +232,4 @@ EOF
 
 echo ""
 echo "JUnit XML written to ${JUNIT_FILE}"
-echo "=== Edge Payload Monitor complete ==="
+echo "=== Edge CI Monitor complete ==="
