@@ -102,10 +102,15 @@ cd "${WORKDIR}"
 
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
-    find "${WORKDIR}" -maxdepth 3 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-    find "${WORKDIR}" -maxdepth 3 -name "*.json" \
-        -not -path "*/.venv/*" -not -path "*/node_modules/*" \
-        -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+    local report_dir="${WORKDIR}/edge-tooling/payload-monitor/reports"
+    if [[ -d "${report_dir}" ]]; then
+        local latest_html
+        latest_html=$(ls -t "${report_dir}"/*.html 2>/dev/null | head -1)
+        if [[ -n "${latest_html}" ]]; then
+            cp "${latest_html}" "${ARTIFACT_DIR}/edge-ci-monitor-summary.html"
+        fi
+        cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
+    fi
 
     # Archive Claude session for local continuation
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
