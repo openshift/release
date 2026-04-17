@@ -182,7 +182,7 @@ ALLOWED_TOOLS="Agent Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skil
 
 PHASE_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 3600 claude \
+timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
