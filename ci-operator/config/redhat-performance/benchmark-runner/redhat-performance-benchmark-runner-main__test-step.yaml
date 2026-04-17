@@ -1,0 +1,480 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: benchmark-runner-step-stressng-pod
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: stressng_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-uperf-pod
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: uperf_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-mariadb-ephemeral
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_mariadb_ephemeral
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-postgres-ephemeral
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_postgres_ephemeral
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-mssql-ephemeral
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_mssql_ephemeral
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-mariadb
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_mariadb
+    test:
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-postgres
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_postgres
+    test:
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-pod-mssql
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_pod_mssql
+    test:
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-stressng-vm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: stressng_vm
+    test:
+    - ref: kubevirt-install
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-uperf-vm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: uperf_vm
+    test:
+    - ref: kubevirt-install
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-vm-mariadb
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      RUN_TYPE: perf_ci
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_vm_mariadb
+    test:
+    - ref: kubevirt-install
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-vm-postgres
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      RUN_TYPE: perf_ci
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_vm_postgres
+    test:
+    - ref: kubevirt-install
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-hammerdb-vm-mssql
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      RUN_TYPE: perf_ci
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: hammerdb_vm_mssql
+    test:
+    - ref: kubevirt-install
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-vdbench-pod
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: vdbench_pod
+    test:
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-vdbench-vm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: vdbench_vm
+    test:
+    - ref: kubevirt-install
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-prepare-cluster
+    - ref: odf-apply-storage-cluster
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-step-bootstorm-vm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: bootstorm_vm
+    test:
+    - ref: kubevirt-install
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+- always_run: false
+  as: benchmark-runner-perflab-stressng-pod
+  steps:
+    env:
+      WORKLOAD: stressng_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-stressng-vm
+  steps:
+    env:
+      WORKLOAD: stressng_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-uperf-pod
+  steps:
+    env:
+      WORKLOAD: uperf_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-uperf-vm
+  steps:
+    env:
+      WORKLOAD: uperf_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-mariadb
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_mariadb
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-mariadb
+  steps:
+    env:
+      WORKLOAD: hammerdb_vm_mariadb
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-mariadb-lso
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_mariadb_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-mariadb-lso
+  steps:
+    env:
+      RUN_TYPE: perf_ci
+      WORKLOAD: hammerdb_vm_mariadb_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-postgres
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_postgres
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-postgres
+  steps:
+    env:
+      RUN_TYPE: perf_ci
+      WORKLOAD: hammerdb_vm_postgres
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-postgres-lso
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_postgres_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-postgres-lso
+  steps:
+    env:
+      RUN_TYPE: perf_ci
+      WORKLOAD: hammerdb_vm_postgres_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-mssql
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_mssql
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-mssql
+  steps:
+    env:
+      RUN_TYPE: perf_ci
+      WORKLOAD: hammerdb_vm_mssql
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-pod-mssql-lso
+  steps:
+    env:
+      WORKLOAD: hammerdb_pod_mssql_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-hammerdb-vm-mssql-lso
+  steps:
+    env:
+      RUN_TYPE: perf_ci
+      WORKLOAD: hammerdb_vm_mssql_lso
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-vdbench-pod
+  steps:
+    env:
+      WORKLOAD: vdbench_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-vdbench-vm
+  steps:
+    env:
+      WORKLOAD: vdbench_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-bootstorm-vm
+  steps:
+    env:
+      WORKLOAD: bootstorm_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-winmssql-vm
+  steps:
+    env:
+      WORKLOAD: winmssql_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-vdbench-pod-scale
+  steps:
+    env:
+      SCALE: "2"
+      WORKLOAD: vdbench_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-vdbench-vm-scale
+  steps:
+    env:
+      SCALE: "2"
+      WORKLOAD: vdbench_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+- always_run: false
+  as: benchmark-runner-perflab-bootstorm-vm-scale
+  steps:
+    env:
+      SCALE: "20"
+      WORKLOAD: bootstorm_vm
+    test:
+    - ref: redhat-performance-benchmark-runner
+zz_generated_metadata:
+  branch: main
+  org: redhat-performance
+  repo: benchmark-runner
+  variant: test-step

@@ -1,0 +1,42 @@
+ref:
+  as: redhat-performance-benchmark-runner
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: benchmark-runner-perfci-config
+    mount_path: /secret
+  grace_period: 30s
+  env:
+  - name: RUN_TYPE
+    default: test_ci
+    documentation: Run type (test_ci, func_ci, perf_ci). Controls VM sizing and workload parameters.
+  - name: LSO_DISK_ID
+    default: ""
+    documentation: LSO disk ID for local storage workloads.
+  - name: WORKER_DISK_IDS
+    default: ""
+    documentation: JSON dict mapping worker nodes to LSO disk ID lists.
+  - name: SCALE
+    default: ""
+    documentation: Number of VMs/pods for scale workloads.
+  - name: REDIS
+    default: ""
+    documentation: Redis endpoint for scale workload synchronization.
+  - name: THREADS_LIMIT
+    default: ""
+    documentation: Maximum concurrent threads for scale workloads.
+  - name: WORKLOAD
+    default: stressng_pod
+    documentation: Benchmark workload to run (e.g. stressng_pod, uperf_pod).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    Runs benchmark-runner native workloads (python3.14 /benchmark_runner/main/main.py)
+    in the test cluster. Workloads run as native K8s Jobs (no benchmark-operator).
+    Used for PerfCI workloads (e.g. stressng, uperf, bootstorm).
