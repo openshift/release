@@ -1,15 +1,25 @@
+base_images:
+  stolostron_builder_go1.24-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
   items:
   - dockerfile_path: Dockerfile
+    inputs:
+      stolostron_builder_go1.24-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: observatorium-operator
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -53,13 +63,32 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium-operator
     env:
-      DESTINATION_BRANCH: release-5.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: observatorium-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="observatorium-operator"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-5.0
   org: stolostron
   repo: observatorium-operator
