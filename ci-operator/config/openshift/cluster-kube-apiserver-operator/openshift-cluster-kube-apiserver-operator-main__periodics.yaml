@@ -146,13 +146,18 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
 - as: e2e-metal-encryption-kms
+  capabilities:
+  - intranet
   cron: 12 7 * * *
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-metal-qe
     env:
-      DEVSCRIPTS_CONFIG: |
-        NETWORK_TYPE=OVNKubernetes
-        FEATURE_SET=TechPreviewNoUpgrade
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
     test:
     - as: test
       cli: latest
@@ -163,7 +168,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: baremetalds-e2e
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: main
   org: openshift
