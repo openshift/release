@@ -46,8 +46,20 @@ fi
 # ---------------------------------------------------------------------------
 # Install gcloud CLI for Prow artifact access (no root required)
 # ---------------------------------------------------------------------------
-echo "Installing gcloud CLI..."
-curl -sSL --connect-timeout 10 --max-time 300 --fail https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
+GCLOUD_VER="565.0.0"
+GCLOUD_SHA="733e3640b5892baecd997474cb1b2cfe80204b6584c64166c3d78bae3f1108c3"
+GCLOUD_TGZ="/tmp/google-cloud-cli.tar.gz"
+
+echo "Installing gcloud CLI ${GCLOUD_VER}..."
+curl -sSL --connect-timeout 10 --max-time 300 --fail \
+    "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VER}-linux-x86_64.tar.gz" \
+    -o "${GCLOUD_TGZ}"
+if ! echo "${GCLOUD_SHA}  ${GCLOUD_TGZ}" | sha256sum -c -; then
+    echo "ERROR: Failed to verify gcloud CLI checksum."
+    exit 1
+fi
+tar -xzf "${GCLOUD_TGZ}" -C /tmp
+rm -f "${GCLOUD_TGZ}"
 /tmp/google-cloud-sdk/install.sh --quiet --path-update true
 export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 
@@ -229,6 +241,11 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     <failure message=\"Claude failed to recover\">Claude was nudged but did not produce analysis (exit: ${NUDGE_EXIT}).</failure>
   </testcase>"
     fi
+elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+    FAILURE_COUNT=1
+    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete successfully\" time=\"${PHASE_DURATION}\">
+    <failure message=\"Claude exited with code ${CLAUDE_EXIT}\">Claude failed with exit code ${CLAUDE_EXIT}.</failure>
+  </testcase>"
 else
     TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_DURATION}\"/>"
 fi
