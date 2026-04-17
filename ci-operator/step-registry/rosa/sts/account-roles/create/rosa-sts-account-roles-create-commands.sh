@@ -82,7 +82,7 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   # version that has existing account-role policies in the AWS account.
   if ! rosa list account-roles --output json 2>/dev/null | jq -e --arg v "${OPENSHIFT_VERSION}" '.[] | select(.Version // "" | startswith($v))' > /dev/null 2>&1; then
     echo "Version ${OPENSHIFT_VERSION} may not have published policies, checking account roles for available versions..."
-    available_version=$(rosa list account-roles --output json 2>/dev/null | jq -r '[.[].Version // empty] | map(split(".") | .[0:2] | join(".")) | unique | sort | last // empty' 2>/dev/null || true)
+    available_version=$(rosa list account-roles --output json 2>/dev/null | jq -r '.[].Version // empty' 2>/dev/null | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
     if [[ -n "${available_version}" && "${available_version}" != "${OPENSHIFT_VERSION}" ]]; then
       echo "Falling back from ${OPENSHIFT_VERSION} to ${available_version} (latest with published policies)"
       OPENSHIFT_VERSION="${available_version}"
