@@ -82,6 +82,15 @@ images:
     dockerfile_path: hcp-recovery/Dockerfile
     from: src
     to: aro-hcp-hcp-recovery
+  - context_dir: image-sync/oc-mirror
+    dockerfile_path: Dockerfile
+    to: aro-hcp-oc-mirror
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    context_dir: tooling
+    dockerfile_path: aro-hcp-exporter/Dockerfile
+    to: aro-hcp-exporter
   - dockerfile_literal: |
       FROM src
       USER root
@@ -466,6 +475,23 @@ tests:
       resource_type: aro-hcp-dev-global-pipeline-quota-slice
     test:
     - ref: aro-hcp-provision-global-pipeline
+- as: images-push
+  steps:
+    leases:
+    - count: 1
+      env: LEASED_IMAGE_PUSH_RESOURCE
+      resource_type: aro-hcp-dev-image-push-quota-slice
+    test:
+    - ref: aro-hcp-images-push
+- as: cspr
+  steps:
+    env:
+      DEPLOY_ENV: cspr
+    leases:
+    - count: 1
+      env: LEASED_CSPR_PIPELINE_RESOURCE
+      resource_type: aro-hcp-dev-cspr-pipeline-quota-slice
+    workflow: aro-hcp-cspr
 zz_generated_metadata:
   branch: main
   org: Azure
