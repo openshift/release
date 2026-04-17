@@ -1,0 +1,19 @@
+workflow:
+  as: rosa-operator-e2e-workflow
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      OPENSHIFT_VERSION: ""
+    pre:
+      - chain: rosa-aws-sts-provision
+      - ref: rosa-cluster-wait-ready-nodes
+      - ref: rosa-operator-install
+    test:
+      - ref: rosa-operator-e2e
+    post:
+      - ref: osd-gather-extra
+      - chain: rosa-aws-sts-deprovision
+  documentation: |-
+    Provisions a ROSA Classic STS cluster, installs an operator via PKO,
+    runs the operator e2e tests, then deprovisions. Designed for operator
+    CI validation with ephemeral clusters.
