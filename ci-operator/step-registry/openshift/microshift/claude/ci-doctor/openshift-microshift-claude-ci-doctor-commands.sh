@@ -96,12 +96,20 @@ load_secrets() {
 }
 
 install_prerequisites() {
-    echo "Installing gcloud CLI..."
+    # Export the PATH to include the local bin directory
+    export PATH="${HOME}/.local/bin:${PATH}"
 
+    echo "Installing gcloud CLI..."
     curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
     /tmp/google-cloud-sdk/install.sh --quiet --path-update true
     export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
     echo "gcloud CLI installed."
+
+    echo "Installing Python package dependencies..."
+    pip install --user \
+        'uv==0.11.6' \
+        'matplotlib==3.9.4'
+    echo "Python package dependencies installed."
 }
 
 wait_for_mcp_status() {
@@ -167,11 +175,6 @@ EOF
     # Configure JIRA MCP
     if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
         echo "Configuring JIRA MCP..."
-
-        # Install uv to manage MCP dependencies
-        pip install uv --user --upgrade
-        export PATH="${HOME}/.local/bin:${PATH}"
-
         claude mcp add \
             -e JIRA_URL="${JIRA_URL}" \
             -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
