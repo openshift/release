@@ -40,6 +40,33 @@ tests:
     make lint
   container:
     from: src
+- as: rosa-ci-daily-status
+  commands: |
+    #!/bin/bash
+    set -euo pipefail
+    SIPPY_API="https://sippy.dptools.openshift.org/api/jobs"
+    RELEASE="rosa-stage"
+    echo "Querying Sippy for ${RELEASE} job results..."
+    response=$(curl -sf "${SIPPY_API}?release=${RELEASE}&limit=100" 2>/dev/null) || {
+      echo "Warning: Failed to fetch data from Sippy API"
+      response="[]"
+    }
+    total=$(echo "${response}" | jq 'length')
+    if [[ "${total}" == "0" ]]; then
+      echo "No jobs found in Sippy for ${RELEASE}"
+      exit 1
+    fi
+    passing=$(echo "${response}" | jq '[.[] | select(.current_pass_percentage >= 80)] | length')
+    failing=$((total - passing))
+    echo "ROSA CI Status: ${passing}/${total} jobs healthy, ${failing} failing"
+    echo "${response}" | jq -r '.[] | "\(.name): \(.current_pass_percentage)%"' | sort
+    if [[ "${failing}" -gt 0 ]]; then
+      echo "Some jobs are below threshold"
+      exit 1
+    fi
+  container:
+    from: src
+  cron: 0 14 * * *
 zz_generated_metadata:
   branch: main
   org: openshift-online
