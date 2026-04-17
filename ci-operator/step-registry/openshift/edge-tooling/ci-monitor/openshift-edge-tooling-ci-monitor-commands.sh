@@ -130,9 +130,12 @@ gh repo clone openshift-eng/edge-tooling edge-tooling -- --depth 1 --branch main
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
 export CLAUDE_CODE_ENTRYPOINT=cli
 
-echo "Installing marketplace plugins..."
-claude plugin install openshift-eng/edge-tooling
-claude plugin install openshift-eng/ai-helpers
+echo "Cloning ai-helpers for CI analysis skills..."
+gh repo clone openshift-eng/ai-helpers ai-helpers -- --depth 1 --branch main
+
+echo "Installing plugins from local clones..."
+claude plugin install "${WORKDIR}/edge-tooling"
+claude plugin install "${WORKDIR}/ai-helpers"
 
 # ---------------------------------------------------------------------------
 # Build skill arguments from env vars
