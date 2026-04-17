@@ -4,7 +4,7 @@ export OPENSHIFT_CI_STEP_NAME="stackrox-stackrox-begin"
 
 # Log rox-ci-image info for traceability.
 echo "INFO: rox-ci-image:"
-kubectl get imagestreamtag pipeline:root -o jsonpath='{.tag.from.name}{"\n"}{.image.dockerImageMetadata}{"\n"}' || true
+kubectl get imagestreamtag pipeline:root -o jsonpath='{.tag.from.name}{"\n"}Created: {.image.dockerImageMetadata.Created}{"\n"}Labels: {.image.dockerImageMetadata.Config.Labels}{"\n"}' || true
 echo "INFO: /i-am-rox-ci-image:"
 cat /i-am-rox-ci-image || true
 
