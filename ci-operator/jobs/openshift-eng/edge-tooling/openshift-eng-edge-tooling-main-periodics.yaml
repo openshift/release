@@ -15,13 +15,13 @@ periodics:
   name: periodic-ci-openshift-eng-edge-tooling-main-edge-payload-monitor
   reporter_config:
     slack:
-      channel: '#vimauro-test-edge-monitor'
+      channel: '#vimauro-test-ci-monitor'
       job_states_to_report:
       - success
       - failure
       - error
       report_template: |
-        {{if eq .Status.State "success"}} :large_green_circle: {{else}} :red_circle: {{end}} *Edge Payload Monitor* ended with *{{.Status.State}}*. <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/edge-payload-monitor/openshift-claude-edge-monitor/artifacts/edge-payload-dashboard.html|View Dashboard>
+        {{if eq .Status.State "success"}} :large_green_circle: {{else}} :red_circle: {{end}} *Edge Payload Monitor* ended with *{{.Status.State}}*. <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/edge-payload-monitor/openshift-edge-tooling-ci-monitor/artifacts/edge-payload-dashboard.html|View Dashboard>
   spec:
     containers:
     - args:
@@ -29,22 +29,26 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=edge-payload-monitor
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -66,9 +70,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

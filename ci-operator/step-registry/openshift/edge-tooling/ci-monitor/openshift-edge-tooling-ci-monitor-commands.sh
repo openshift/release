@@ -17,7 +17,7 @@ if [[ -f "${GITHUB_APP_ID_PATH}" ]] && [[ -f "${GITHUB_KEY_PATH}" ]]; then
     GH_TOKEN_SHA="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
     GH_TOKEN_EXE="/tmp/gh-token-${GH_TOKEN_VER}"
 
-    curl -sSL "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" -o "${GH_TOKEN_EXE}"
+    curl -sSL --connect-timeout 10 --max-time 30 --fail "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" -o "${GH_TOKEN_EXE}"
     if ! echo "${GH_TOKEN_SHA}  ${GH_TOKEN_EXE}" | sha256sum -c -; then
         echo "ERROR: Failed to verify gh-token checksum."
         exit 1
@@ -44,21 +44,10 @@ if [[ -f "${JIRA_API_TOKEN_PATH}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-build_prow_url() {
-    if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
-        echo "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-    else
-        echo "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-    fi
-}
-
-# ---------------------------------------------------------------------------
 # Install gcloud CLI for Prow artifact access (no root required)
 # ---------------------------------------------------------------------------
 echo "Installing gcloud CLI..."
-curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
+curl -sSL --connect-timeout 10 --max-time 300 --fail https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
 /tmp/google-cloud-sdk/install.sh --quiet --path-update true
 export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 
@@ -108,10 +97,8 @@ echo "Claude permissions configured."
 # ---------------------------------------------------------------------------
 # Set up workspace
 # ---------------------------------------------------------------------------
-WORKDIR=$(mktemp -d /tmp/edge-monitor-XXXXXX)
+WORKDIR=$(mktemp -d /tmp/ci-monitor-XXXXXX)
 cd "${WORKDIR}"
-
-PROW_JOB_URL=$(build_prow_url)
 
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
@@ -214,11 +201,7 @@ claude plugin install openshift-eng/edge-tooling 2>/dev/null || echo "Warning: e
 claude plugin install openshift-eng/ai-helpers 2>/dev/null || echo "Warning: ai-helpers marketplace install failed."
 
 ANALYSIS_JSON="${WORKDIR}/analysis.json"
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
-
-SYSTEM_PROMPT="You are analyzing edge payload monitoring results for OpenShift nightly payloads.
-You have CI analysis skills available — load them using the Skill tool before starting.
-Focus on blocking job failures and identify root causes."
+ALLOWED_TOOLS="Agent Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
@@ -227,19 +210,18 @@ timeout 3600 claude \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --max-turns 80 \
-    --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "Analyze the edge payload monitor results. The JSON report is at: ${JSON_PATH}
+    -p "Load the /edge-ocp-ci:generate-dashboard skill.
 
-The following blocking jobs failed:
+Phase 1 (Steps 1-3) is already complete. The payload monitor has run and produced:
+- HTML dashboard: ${DASHBOARD_PATH}
+- JSON report: ${JSON_PATH}
+- Python tool directory: $(pwd) (venv already activated)
+
+The following blocking jobs were detected:
 ${BLOCKING_LIST}
 
-For each blocking failure:
-1. Load relevant CI skills (e.g., /ci:prow-job-analyze-test-failure)
-2. Investigate the Prow job artifacts to find root causes
-3. Check for existing JIRA bugs
-
-After analysis, write a JSON file to ${ANALYSIS_JSON} mapping each prow_url to its analysis summary:
-{\"<prow_url>\": \"<analysis text>\", ...}" \
+Start from Step 4 of the skill. Analyze each blocking failure, write the analysis
+JSON to ${ANALYSIS_JSON}, then merge it into the dashboard (Steps 4-6)." \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-analysis.log" || CLAUDE_EXIT=$?
 
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
@@ -280,7 +262,7 @@ fi
 # JUnit XML for CI tracking
 # ===========================================================================
 TOTAL_DURATION=$(( PHASE_MONITOR_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
-JUNIT_FILE="${ARTIFACT_DIR}/junit_edge-monitor.xml"
+JUNIT_FILE="${ARTIFACT_DIR}/junit_ci-monitor.xml"
 
 PHASE_PREFIX="[sig-edge-enablement]"
 PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: dashboard generation\" time=\"${PHASE_MONITOR_DURATION}\"/>
