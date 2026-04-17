@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   ocp_4.16_cli-artifacts:
     name: "4.16"
     namespace: ocp
@@ -39,10 +35,6 @@ base_images:
     name: scos-4.22
     namespace: origin
     tag: operator-registry
-  upi-installer:
-    name: "4.20"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -130,10 +122,9 @@ images:
   run_if_changed: ^non-existing$
 releases:
   latest:
-    integration:
-      include_built_images: true
-      name: "4.20"
-      namespace: ocp
+    release:
+      channel: fast
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -147,7 +138,6 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
       HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
       HYPERSHIFT_NODE_COUNT: "6"
     test:
@@ -230,9 +220,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 420-hypershift
+  variant: 421-hypershift
