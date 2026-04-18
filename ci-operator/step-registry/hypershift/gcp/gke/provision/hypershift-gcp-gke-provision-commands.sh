@@ -20,9 +20,13 @@ CLUSTER_NAME="${RESOURCE_NAME_PREFIX}-gke"
 INFRA_ID="${RESOURCE_NAME_PREFIX}"
 
 # Dynamic project IDs (created per-test)
-# Truncate to meet GCP's 30 character limit for project IDs
-CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
-HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
+# Use BUILD_ID (unique per Prow job) to avoid project ID collisions between
+# concurrent tests sharing the same NAMESPACE and UNIQUE_HASH (e.g. e2e-gke and e2e-v2-gke).
+# Prefix with "ci" to satisfy GCP's requirement that project IDs start with a letter.
+# Result: "ci" + 8 hex chars + suffix = 24-25 chars, under the 30-char GCP limit.
+PROJECT_HASH="ci$(echo -n "${BUILD_ID}" | sha256sum | cut -c1-8)"
+CP_PROJECT_ID="${PROJECT_HASH}-control-plane"
+HC_PROJECT_ID="${PROJECT_HASH}-hosted-cluster"
 
 # Write deprovision-critical values to SHARED_DIR before creating any resources,
 # so the deprovision step can clean up if the step fails or the job is interrupted.
