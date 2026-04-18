@@ -13,6 +13,7 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
+canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
   items:
   - dockerfile_path: Dockerfile.base
@@ -25,18 +26,18 @@ images:
     to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "5.0"
-    namespace: ocp
+  - name: 5.0-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: "5.0"
-      namespace: ocp
+      name: 5.0-priv
+      namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
-      namespace: ocp
+      name: 5.0-priv
+      namespace: ocp-private
   nightly-arm64:
     candidate:
       architecture: arm64
@@ -260,13 +261,6 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: ibmcloud
-    env:
-      EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
@@ -274,23 +268,8 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EXTRA_MG_ARGS: --host-network
-    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EXTRA_MG_ARGS: --host-network
-      GATEWAY_MODE: local
-    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
-- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -858,6 +837,6 @@ tests:
     - ref: openshift-qe-node-density-cni
   timeout: 16h0m0s
 zz_generated_metadata:
-  branch: master
-  org: openshift
+  branch: main
+  org: openshift-priv
   repo: ovn-kubernetes
