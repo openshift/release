@@ -226,7 +226,7 @@ function ci_clone_src() {
             pr_number="${MICROSHIFT_PR}"
         elif [ -n "${MICROSHIFT_GIT:-}" ]; then
             branch="${MICROSHIFT_GIT}"
-        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] && [ -n "${OCP_VERSION:-}" ]; then
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] || [ -n "${OCP_VERSION:-}" ]; then
             branch="release-${OCP_VERSION}"
         else
             branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')

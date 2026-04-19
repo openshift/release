@@ -1,0 +1,40 @@
+ref:
+  as: nvidia-nfd-operator-install
+  from: cli
+  grace_period: 10m
+  commands: nvidia-nfd-operator-install-commands.sh
+  timeout: 20m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Installs the Node Feature Discovery (NFD) Operator via OLM.
+
+    This step:
+    1. Creates the openshift-nfd namespace
+    2. Creates an OperatorGroup for the namespace
+    3. Waits for redhat-operators catalog source to be READY (up to 10 minutes)
+    4. Waits for NFD packagemanifest to be available (up to 5 minutes)
+    5. Discovers the default channel from the packagemanifest
+    6. Creates Subscription to nfd from redhat-operators catalog
+    7. Waits for the subscription CSV to be created (up to 10 minutes)
+    8. Waits for CSV to reach Succeeded phase (up to 10 minutes)
+    9. Creates a NodeFeatureDiscovery CR instance from CSV examples (default config)
+    10. Waits for NFD to become available (up to 15 minutes)
+    11. Waits for NFD to detect NVIDIA GPUs via PCI vendor ID (10de)
+    11b. Labels GPU nodes with nvidia.com/gpu.present=true for GPU operator compatibility
+
+    Prerequisites:
+    - OpenShift cluster with GPU-enabled worker nodes (g2-standard-4 or similar)
+    - redhat-operators catalog source available in openshift-marketplace
+
+    This step is REQUIRED before GPU Operator installation to ensure GPU nodes
+    are properly labeled with nvidia.com/gpu.present=true before DRA tests run.
+
+    The step uses NFD's default PCI device detection (feature.node.kubernetes.io/pci-10de.present)
+    and applies the additional nvidia.com/gpu.present label that GPU operator expects.
+    This approach keeps the default NFD configuration intact.
+
+    The step will FAIL if no NVIDIA GPUs are detected, indicating GPU node
+    provisioning issues or NFD detection problems.
