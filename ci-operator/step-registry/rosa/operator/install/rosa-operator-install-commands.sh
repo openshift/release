@@ -11,7 +11,7 @@ log(){
 }
 
 # Use shared kubeconfig from provision step if available
-if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
@@ -31,6 +31,7 @@ if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
 fi
 
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME}}"
+OPERATOR_DEPLOYMENT_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
 
 log "Installing ${OPERATOR_NAME} via PKO ClusterPackage"
 log "  PKO image: ${OPERATOR_PKO_IMAGE}"
@@ -61,8 +62,8 @@ spec:
 EOF
 
 # Wait for the operator deployment to be available
-log "Waiting for ${OPERATOR_NAME} deployment to be ready..."
-oc wait deployment "${OPERATOR_NAME}" \
+log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to be ready..."
+oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" \
     -n "${OPERATOR_NAMESPACE}" \
     --for=condition=Available \
     --timeout=300s

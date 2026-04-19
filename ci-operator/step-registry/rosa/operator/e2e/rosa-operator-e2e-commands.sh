@@ -17,7 +17,7 @@ fi
 
 # Get cluster access: prefer shared kubeconfig from provision step,
 # fall back to backplane for persistent clusters
-if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/kubeconfig" ]]; then
     log "Using kubeconfig from provision step"
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 elif [[ -n "${OPERATOR_E2E_CLUSTER_ID:-}" ]]; then
@@ -50,14 +50,14 @@ log "Connected to cluster: $(oc whoami --show-server)"
 
 # Run the operator e2e tests
 JUNIT_REPORT="${ARTIFACT_DIR}/junit-${OPERATOR_NAME}-e2e.xml"
-GINKGO_FLAGS="--ginkgo.junit-report=${JUNIT_REPORT} --ginkgo.v"
+GINKGO_ARGS=("--ginkgo.junit-report=${JUNIT_REPORT}" "--ginkgo.v")
 
 if [[ -n "${GINKGO_LABEL_FILTER:-}" ]]; then
-    GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${GINKGO_LABEL_FILTER}"
+    GINKGO_ARGS+=("--ginkgo.label-filter=${GINKGO_LABEL_FILTER}")
 fi
 
 log "Running ${OPERATOR_NAME} e2e tests..."
-/usr/local/bin/e2e.test ${GINKGO_FLAGS} || {
+/usr/local/bin/e2e.test "${GINKGO_ARGS[@]}" || {
     log "Tests failed. JUnit report at ${JUNIT_REPORT}"
     exit 1
 }
