@@ -55,26 +55,26 @@ retry() {
 }
 
 # Push service images
-echo "Pushing backend: ${ARO_HCP_BACKEND} -> ${ACR_URL}/test-${BACKEND_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_BACKEND}" "${ACR_URL}/test-${BACKEND_REPO}:${IMAGE_TAG}"
+echo "Pushing backend: ${ARO_HCP_BACKEND} -> ${ACR_URL}/${BACKEND_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_BACKEND}" "${ACR_URL}/${BACKEND_REPO}:${IMAGE_TAG}"
 
-echo "Pushing frontend: ${ARO_HCP_FRONTEND} -> ${ACR_URL}/test-${FRONTEND_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_FRONTEND}" "${ACR_URL}/test-${FRONTEND_REPO}:${IMAGE_TAG}"
+echo "Pushing frontend: ${ARO_HCP_FRONTEND} -> ${ACR_URL}/${FRONTEND_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_FRONTEND}" "${ACR_URL}/${FRONTEND_REPO}:${IMAGE_TAG}"
 
-echo "Pushing admin-api: ${ARO_HCP_ADMIN_API} -> ${ACR_URL}/test-${ADMIN_API_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_ADMIN_API}" "${ACR_URL}/test-${ADMIN_API_REPO}:${IMAGE_TAG}"
+echo "Pushing admin-api: ${ARO_HCP_ADMIN_API} -> ${ACR_URL}/${ADMIN_API_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_ADMIN_API}" "${ACR_URL}/${ADMIN_API_REPO}:${IMAGE_TAG}"
 
-echo "Pushing sessiongate: ${ARO_HCP_SESSIONGATE} -> ${ACR_URL}/test-${SESSIONGATE_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_SESSIONGATE}" "${ACR_URL}/test-${SESSIONGATE_REPO}:${IMAGE_TAG}"
+echo "Pushing sessiongate: ${ARO_HCP_SESSIONGATE} -> ${ACR_URL}/${SESSIONGATE_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_SESSIONGATE}" "${ACR_URL}/${SESSIONGATE_REPO}:${IMAGE_TAG}"
 
 # Push non-pipeline images
-echo "Pushing exporter: ${ARO_HCP_EXPORTER} -> ${ACR_URL}/test-${EXPORTER_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_EXPORTER}" "${ACR_URL}/test-${EXPORTER_REPO}:${IMAGE_TAG}"
+echo "Pushing exporter: ${ARO_HCP_EXPORTER} -> ${ACR_URL}/${EXPORTER_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_EXPORTER}" "${ACR_URL}/${EXPORTER_REPO}:${IMAGE_TAG}"
 
-echo "Pushing oc-mirror: ${ARO_HCP_OC_MIRROR} -> ${ACR_URL}/test-${OC_MIRROR_REPO}:${IMAGE_TAG}"
-retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/test-${OC_MIRROR_REPO}:${IMAGE_TAG}"
+echo "Pushing oc-mirror: ${ARO_HCP_OC_MIRROR} -> ${ACR_URL}/${OC_MIRROR_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/${OC_MIRROR_REPO}:${IMAGE_TAG}"
 
-echo "Pushing oc-mirror latest: ${ARO_HCP_OC_MIRROR} -> ${ACR_URL}/test-${OC_MIRROR_REPO}:latest"
-retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/test-${OC_MIRROR_REPO}:latest"
+echo "Pushing oc-mirror latest: ${ARO_HCP_OC_MIRROR} -> ${ACR_URL}/${OC_MIRROR_REPO}:latest"
+retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/${OC_MIRROR_REPO}:latest"
 
 echo "All images pushed successfully."
