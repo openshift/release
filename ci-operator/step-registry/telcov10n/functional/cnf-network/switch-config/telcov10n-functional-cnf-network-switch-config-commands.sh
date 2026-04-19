@@ -85,6 +85,9 @@ echo SECONDARY_NIC="${SECONDARY_NIC}"
 
 cd /eco-ci-cd/
 
+echo 'sleep'
+sleep 3600
+
 export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/cnf/switch-config.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "cluster_name=$CLUSTER_NAME artifact_dest_dir=$SHARED_DIR ocp_nic=$OCP_NIC secondary_nic=$SECONDARY_NIC"
