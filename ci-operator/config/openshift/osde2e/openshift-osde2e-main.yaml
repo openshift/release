@@ -144,7 +144,7 @@ tests:
   container:
     clone: true
     from: osde2e
-  cron: 0 0 * * 2
+  cron: 0 1 * * 0
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -160,7 +160,23 @@ tests:
   container:
     clone: true
     from: osde2e
-  cron: 45 0 * * 2
+  cron: 0 2 * * 0
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: int-clusters-cleanup
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="int"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 3 * * 0
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
