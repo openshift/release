@@ -259,9 +259,9 @@ if [[ -n "${CHART_REF:-}" ]]; then
     elif [[ -z "$RESOLVED_REF" ]]; then
         echo "No matching chart reference found for CHART_REF=${CHART_REF}, exiting gracefully"
         # Guard ARTIFACT_DIR and ensure directory exists
-        local artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
-        mkdir -p "$artifact_dir"
-        echo "skipped" > "${artifact_dir}/test_status.txt"
+        _artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
+        mkdir -p "$_artifact_dir"
+        echo "skipped" > "${_artifact_dir}/test_status.txt"
         exit 0
     fi
 
