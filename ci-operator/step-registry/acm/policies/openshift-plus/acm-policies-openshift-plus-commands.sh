@@ -20,7 +20,6 @@ sleep 120
 
 # wait for policies to be compliant
 RETRIES=40
-SECONDARY_FILTER="grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status"
 for try in $(seq "${RETRIES}"); do
   results=$(oc get policies -n policies)
   data_rows=$(echo "$results" | tail -n +2)
