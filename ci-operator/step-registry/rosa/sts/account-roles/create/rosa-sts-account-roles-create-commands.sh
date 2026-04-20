@@ -47,6 +47,11 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+CLUSTER_SWITCH="--classic"
+if [[ "$HOSTED_CP" == "true" ]]; then
+   CLUSTER_SWITCH="--hosted-cp"
+fi
+
 # Support to create the account-roles with the higher version
 VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
@@ -67,6 +72,12 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
 
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
 
+  # Determine cluster type switch early so the version fallback can use it
+  CLUSTER_SWITCH="--classic"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    CLUSTER_SWITCH="--hosted-cp"
+  fi
+
   # Verify the version has published policies. If not, fall back to the latest
   # available version. This handles cases where nightly builds for unreleased
   # versions (e.g., 4.23, 5.0) don't have IAM policies published yet.
@@ -80,11 +91,6 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   fi
 
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-fi
-
-CLUSTER_SWITCH="--classic"
-if [[ "$HOSTED_CP" == "true" ]]; then
-   CLUSTER_SWITCH="--hosted-cp"
 fi
 
 ARN_PATH_SWITCH=""

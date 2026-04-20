@@ -377,7 +377,7 @@ periodics:
         Mark the issue as fresh by commenting `/remove-lifecycle rotten`.
         Exclude this issue from closing again by commenting `/lifecycle frozen`.
 
-        /close
+        /close not-planned
       - --template
       - --ceiling=10
       - --confirm
@@ -643,6 +643,151 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 1,9 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Stale PRs are closed after 21d of inactivity.
+
+        If this PR is still relevant, comment to refresh it or remove the stale label.
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=336h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Stale PRs rot after 14d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten PRs close after an additional 7d of inactivity.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hypershift-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=168h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Rotten PRs close after 7d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+
+        /close
+      - --template
+      - --ceiling=30
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 0 * * 3
   decorate: true
   decoration_config:
@@ -718,7 +863,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260414-6691f5aff
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -753,7 +898,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260414-6691f5aff
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -795,7 +940,7 @@ periodics:
       - --config-dir=./ci-operator/config
       - --current-release=5.0
       - --future-release=4.23
-      - --future-release=5.0
+      - --future-release=5.1
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -1095,7 +1240,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1152,7 +1297,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1243,7 +1388,7 @@ periodics:
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
           --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1275,7 +1420,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1306,7 +1451,7 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/
       - --current-release=5.0
-      - --future-release=5.0
+      - --future-release=5.1
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1428,8 +1573,9 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.22
+      - --current-release=5.0
       - --future-release=4.23
-      - --future-release=5.0
+      - --future-release=5.1
       command:
       - blocking-issue-creator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_blocking-issue-creator_latest
@@ -1860,7 +2006,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1892,7 +2038,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1924,7 +2070,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260408-3bbc91829
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2389,6 +2535,7 @@ periodics:
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=openshift-logging/extended-logging-tests-interop
       - --ignore=Azure/ARO-HCP
+      - --ignore=rhbk/sso-test
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2457,6 +2604,7 @@ periodics:
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=red-hat-storage/rook
       - --ignore=Azure/ARO-HCP
+      - --ignore=rhbk/sso-test
       command:
       - ./hack/check-gh-automation.sh
       env:

@@ -21,13 +21,56 @@ tests:
     test:
     - as: fournos
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_FOURNOS_DEPLOY_SECRET_PATH=/var/run/psap-forge-fournos-deploy
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
 
-        git -C $HOME fetch --quiet origin main
+        export PSAP_FORGE_FOREIGN_TESTING=openshift-psap/fournos
+
+        TMP_MAIN_BRANCH=fournos-testing
+        git -C $HOME fetch --quiet origin $TMP_MAIN_BRANCH
         git -C $HOME reset --hard FETCH_HEAD
 
-        exec ./bin/run_ci foreign_testing ci run
+        exec ./bin/run_ci foreign_testing ci submit
+      credentials:
+      - mount_path: /var/run/psap-forge-fournos-deploy
+        name: psap-forge-fournos-deploy
+        namespace: test-credentials
+      - mount_path: /var/run/psap-forge-notifications
+        name: psap-forge-notifications
+        namespace: test-credentials
+      from_image:
+        name: forge-light
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 23h0m0s
+- always_run: false
+  as: fournos-wip
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: fournos
+      commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
+        export PSAP_FORGE_FOURNOS_DEPLOY_SECRET_PATH=/var/run/psap-forge-fournos-deploy
+        export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+
+        export PSAP_FORGE_FOREIGN_TESTING=openshift-psap/fournos
+
+        TMP_MAIN_BRANCH=fournos-testing
+        git -C $HOME fetch --quiet origin $TMP_MAIN_BRANCH
+        git -C $HOME reset --hard FETCH_HEAD
+
+        exec ./bin/run_ci foreign_testing ci submit
       credentials:
       - mount_path: /var/run/psap-forge-fournos-deploy
         name: psap-forge-fournos-deploy

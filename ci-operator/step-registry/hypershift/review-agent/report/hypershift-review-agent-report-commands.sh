@@ -83,8 +83,8 @@ extract_from_stream_json() {
 
   case "$field" in
     text)
-      # Get the final result text
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.result // empty' 2>/dev/null | head -1 || echo ""
+      # Get all assistant text output (full conversation, separated by newlines)
+      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "$json_file" 2>/dev/null || echo ""
       ;;
     input_tokens)
       grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.input_tokens // 0' 2>/dev/null | head -1 || echo "0"
@@ -120,12 +120,12 @@ extract_from_stream_json() {
       grep '"type":"system"' "$json_file" 2>/dev/null | jq -r '.tools // [] | join(",")' 2>/dev/null | head -1 || echo ""
       ;;
     tool_calls)
-      # Extract tool use entries
-      grep '"type":"tool_use"' "$json_file" 2>/dev/null | jq -r '[.name // empty] | join("\n")' 2>/dev/null || echo ""
+      # Extract tool use entries from assistant messages
+      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name' "$json_file" 2>/dev/null || echo ""
       ;;
     tool_errors)
-      # Extract tool results with is_error=true
-      grep '"is_error":true' "$json_file" 2>/dev/null | jq -r '.content // empty' 2>/dev/null || echo ""
+      # Extract tool error results from user messages
+      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:"))' "$json_file" 2>/dev/null || echo ""
       ;;
     model_usage)
       grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.inputTokens // .value.input_tokens // 0)|\(.value.outputTokens // .value.output_tokens // 0)|\(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0)|\(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0)"' 2>/dev/null | head -20 || echo ""
@@ -157,24 +157,41 @@ while IFS= read -r line; do
     STATUS_LABEL="Failed"
   fi
 
-  # Try to find the Claude output JSON
-  OUTPUT_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
-  if [ ! -f "$OUTPUT_FILE" ]; then
-    OUTPUT_FILE="/tmp/claude-pr-${PR_NUMBER}-output.json"
+  # Read from compact summary JSON (written by process step)
+  SUMMARY_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-summary.json"
+  if [ ! -f "$SUMMARY_FILE" ]; then
+    # Fallback to legacy stream-json format
+    SUMMARY_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
   fi
 
-  # Extract data from stream-json output
-  RESULT_TEXT=$(extract_from_stream_json "$OUTPUT_FILE" "text" | html_escape)
-  PR_INPUT=$(extract_from_stream_json "$OUTPUT_FILE" "input_tokens")
-  PR_OUTPUT=$(extract_from_stream_json "$OUTPUT_FILE" "output_tokens")
-  PR_CACHE_READ=$(extract_from_stream_json "$OUTPUT_FILE" "cache_read")
-  PR_CACHE_CREATE=$(extract_from_stream_json "$OUTPUT_FILE" "cache_create")
-  DURATION_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_ms")
-  DURATION_API_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_api_ms")
-  NUM_TURNS=$(extract_from_stream_json "$OUTPUT_FILE" "num_turns")
-  MODEL=$(extract_from_stream_json "$OUTPUT_FILE" "model")
-  SESSION_ID=$(extract_from_stream_json "$OUTPUT_FILE" "session_id")
-  TOOLS_AVAILABLE=$(extract_from_stream_json "$OUTPUT_FILE" "tools_available")
+  if [ -f "$SUMMARY_FILE" ] && grep -q '"result"' "$SUMMARY_FILE" 2>/dev/null && ! grep -q '"type":"result"' "$SUMMARY_FILE" 2>/dev/null; then
+    # New compact summary format
+    RESULT_TEXT=$(jq -r '.result // empty' "$SUMMARY_FILE" 2>/dev/null | html_escape)
+    PR_INPUT=$(jq -r '.usage.input_tokens // 0' "$SUMMARY_FILE" 2>/dev/null)
+    PR_OUTPUT=$(jq -r '.usage.output_tokens // 0' "$SUMMARY_FILE" 2>/dev/null)
+    PR_CACHE_READ=$(jq -r '.usage.cache_read_input_tokens // 0' "$SUMMARY_FILE" 2>/dev/null)
+    PR_CACHE_CREATE=$(jq -r '.usage.cache_creation_input_tokens // (.usage.cache_creation.ephemeral_5m_input_tokens // 0)' "$SUMMARY_FILE" 2>/dev/null)
+    DURATION_MS=$(jq -r '.duration_ms // 0' "$SUMMARY_FILE" 2>/dev/null)
+    DURATION_API_MS=$(jq -r '.duration_api_ms // 0' "$SUMMARY_FILE" 2>/dev/null)
+    NUM_TURNS=$(jq -r '.num_turns // 0' "$SUMMARY_FILE" 2>/dev/null)
+    MODEL=$(jq -r '.model // "unknown"' "$SUMMARY_FILE" 2>/dev/null)
+    SESSION_ID=$(jq -r '.session_id // "unknown"' "$SUMMARY_FILE" 2>/dev/null)
+    TOOLS_AVAILABLE=$(jq -r '.tools // [] | join(",")' "$SUMMARY_FILE" 2>/dev/null)
+  else
+    # Legacy stream-json format
+    OUTPUT_FILE="$SUMMARY_FILE"
+    RESULT_TEXT=$(extract_from_stream_json "$OUTPUT_FILE" "text" | html_escape)
+    PR_INPUT=$(extract_from_stream_json "$OUTPUT_FILE" "input_tokens")
+    PR_OUTPUT=$(extract_from_stream_json "$OUTPUT_FILE" "output_tokens")
+    PR_CACHE_READ=$(extract_from_stream_json "$OUTPUT_FILE" "cache_read")
+    PR_CACHE_CREATE=$(extract_from_stream_json "$OUTPUT_FILE" "cache_create")
+    DURATION_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_ms")
+    DURATION_API_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_api_ms")
+    NUM_TURNS=$(extract_from_stream_json "$OUTPUT_FILE" "num_turns")
+    MODEL=$(extract_from_stream_json "$OUTPUT_FILE" "model")
+    SESSION_ID=$(extract_from_stream_json "$OUTPUT_FILE" "session_id")
+    TOOLS_AVAILABLE=$(extract_from_stream_json "$OUTPUT_FILE" "tools_available")
+  fi
 
   : "${PR_INPUT:=0}"
   : "${PR_OUTPUT:=0}"
@@ -185,7 +202,13 @@ while IFS= read -r line; do
 
   DURATION_SECS=$((DURATION_MS / 1000))
   DURATION_API_SECS=$((DURATION_API_MS / 1000))
-  PR_COST_RAW=$(extract_from_stream_json "$OUTPUT_FILE" "cost_usd")
+
+  # Cost - try summary format first, then legacy
+  if [ -f "$SUMMARY_FILE" ] && ! grep -q '"type":"result"' "$SUMMARY_FILE" 2>/dev/null; then
+    PR_COST_RAW=$(jq -r '.total_cost_usd // 0' "$SUMMARY_FILE" 2>/dev/null)
+  else
+    PR_COST_RAW=$(extract_from_stream_json "${OUTPUT_FILE:-$SUMMARY_FILE}" "cost_usd")
+  fi
   : "${PR_COST_RAW:=0}"
   PR_COST=$(format_cost "$PR_COST_RAW")
 
@@ -196,18 +219,19 @@ while IFS= read -r line; do
   GRAND_TOTAL_CACHE_CREATE=$((GRAND_TOTAL_CACHE_CREATE + PR_CACHE_CREATE))
   GRAND_TOTAL_COST_USD=$(sum_costs "$GRAND_TOTAL_COST_USD" "$PR_COST_RAW")
 
-  # Extract tool calls from stream-json
+  # Extract tool calls and errors
   TOOL_CALLS_RAW=""
   TOOL_ERRORS_RAW=""
-  if [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
-    # Tool calls: extract tool_use messages with name and input
-    TOOL_CALLS_RAW=$(grep '"type":"tool_use"' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '"  \(.name)(\(.input | tostring | .[0:120])...)"' 2>/dev/null \
+  if [ -f "$SUMMARY_FILE" ] && ! grep -q '"type":"result"' "$SUMMARY_FILE" 2>/dev/null; then
+    # New compact summary format - tool_calls is a list of names, tool_errors is a list of strings
+    TOOL_CALLS_RAW=$(jq -r '.tool_calls[]? // empty' "$SUMMARY_FILE" 2>/dev/null | sed 's/^/  /' || echo "")
+    TOOL_ERRORS_RAW=$(jq -r '.tool_errors[]? // empty' "$SUMMARY_FILE" 2>/dev/null || echo "")
+  elif [ -f "${OUTPUT_FILE:-}" ] && [ -s "${OUTPUT_FILE:-}" ]; then
+    # Legacy stream-json format - tool_use is nested inside assistant messages
+    TOOL_CALLS_RAW=$(jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "  \(.name)(\(.input | tostring | .[0:120])...)"' "$OUTPUT_FILE" 2>/dev/null \
       || echo "")
-
-    # Tool errors: extract tool_result messages where is_error is true
-    TOOL_ERRORS_RAW=$(grep '"is_error":true' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '.content // "unknown error"' 2>/dev/null \
+    TOOL_ERRORS_RAW=$(jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "$OUTPUT_FILE" 2>/dev/null \
+      | sed 's/⏎/\n/g' \
       || echo "")
   fi
 
@@ -254,7 +278,11 @@ while IFS= read -r line; do
   # Token usage table
   # Build per-model breakdown rows
   MODEL_BREAKDOWN_ROWS=""
-  MODEL_BREAKDOWN_RAW=$(extract_from_stream_json "$OUTPUT_FILE" "model_usage")
+  if [ -f "$SUMMARY_FILE" ] && ! grep -q '"type":"result"' "$SUMMARY_FILE" 2>/dev/null; then
+    MODEL_BREAKDOWN_RAW=$(jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.inputTokens // .value.input_tokens // 0)|\(.value.outputTokens // .value.output_tokens // 0)|\(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0)|\(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0)"' "$SUMMARY_FILE" 2>/dev/null | head -20 || echo "")
+  else
+    MODEL_BREAKDOWN_RAW=$(extract_from_stream_json "${OUTPUT_FILE:-$SUMMARY_FILE}" "model_usage")
+  fi
   if [ -n "$MODEL_BREAKDOWN_RAW" ]; then
     MODEL_BREAKDOWN_ROWS="<tr><td colspan=\"7\" style=\"background:#f0f0f0; font-size:0.85em; color:#666; padding:0.3em 1em;\"><em>Per-model breakdown</em></td></tr>"
     while IFS='|' read -r M_NAME M_INPUT M_OUTPUT M_CACHE_READ M_CACHE_CREATE; do

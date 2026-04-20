@@ -48,7 +48,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    else
      # Assuming HTTP or HTTPS
      # IF _SNAPSHOT_ is not empty, this is a konflux job
-     if [ ! -n "${SNAPSHOT}" ]; then
+     if [ ! -z "${SNAPSHOT}" ]; then
         OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
         iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${CLUSTER_NAME}.agent-ove.x86_64.iso"
      else
