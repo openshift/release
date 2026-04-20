@@ -43,7 +43,7 @@ ref:
     documentation: "CPU limit for listener during IQE tests (e.g., 500m, 1000m, or 'max' for dynamic)"
   - name: CHART_REF
     default: ""
-    documentation: "Chart reference for nightly jobs: 'release' (latest released tag), 'rc' (latest RC tag), 'main' (branch), or explicit tag. Empty uses current source."
+    documentation: "Chart source for testing: 'release' (Helm repo latest stable), 'rc' (Helm repo with --devel). Empty uses local source (PR testing)."
   documentation: |-
     This step runs the cost-onprem e2e tests by executing the
     deploy-test-cost-onprem.sh script from the cost-onprem-chart repository.
@@ -66,8 +66,9 @@ ref:
     stable (~40min), or full (~60min). Requires insights-qe-secrets for
     pulling the IQE container image from Quay.
     
-    For nightly/periodic jobs, set CHART_REF to test specific releases:
-    - 'release': Tests latest released tag (e.g., cost-onprem-0.2.19)
-    - 'rc': Tests latest RC tag (e.g., cost-onprem-0.2.20-rc1), skips if none
-    - 'main': Tests current main branch
-    - Explicit tag/branch name for specific versions
+    For nightly/periodic jobs, set CHART_REF to control chart source:
+    - 'release': Install from Helm repo (latest stable release)
+    - 'rc': If deploy script supports --devel, uses Helm repo with pre-release.
+            Otherwise, checks out latest RC git tag and uses local chart.
+    
+    For PR presubmit jobs, leave CHART_REF empty to use local source.

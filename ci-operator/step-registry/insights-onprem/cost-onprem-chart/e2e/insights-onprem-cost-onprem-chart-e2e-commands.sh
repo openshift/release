@@ -162,24 +162,18 @@ oc adm policy add-scc-to-user anyuid -z cost-onprem -n "${NAMESPACE}" || true
 
 echo "SecurityContextConstraints configured"
 
-echo "========== Resolving Chart Reference =========="
+echo "========== Determining Chart Source =========="
 
 # ============================================================================
-# Chart Tag Resolution for Nightly Jobs
+# Chart Source Resolution
 # ============================================================================
-# CHART_REF can be: "release", "rc", "main", or an explicit tag/branch
-# For nightly jobs, this allows testing specific release types
+# CHART_REF controls which chart version to test:
+# - "release": Latest released chart from Helm repo (non-RC)
+# - "rc": Latest RC - tries --devel flag first, falls back to git tag checkout
+# - Not set: Use local chart from current source (for PR testing)
 #
-# - "release": Latest released (non-RC) chart version
-# - "rc": Latest release candidate version
-# - "main": Current main branch (bleeding edge)
-#
-# For RC resolution, we first check if the deployment script supports --devel
-# (which tells Helm to include pre-release versions). If supported, we pass
-# that flag instead of checking out a specific tag. This allows testing the
-# chart from the Helm repo with RC versions included.
-#
-# Fallback: If --devel is not supported, we resolve the latest RC tag via git.
+# For nightly/periodic jobs: CHART_REF is set
+# For PR presubmit jobs: CHART_REF is not set, uses local source (USE_LOCAL_CHART=true)
 
 # Check if deploy script supports --devel flag
 check_devel_support() {
@@ -194,97 +188,98 @@ check_devel_support() {
     fi
 }
 
-resolve_chart_ref() {
-    local chart_ref="${CHART_REF:-main}"
-    local devel_supported
-    devel_supported=$(check_devel_support)
+# Resolve latest RC tag from git
+get_latest_rc_tag() {
+    # Ensure we have the origin remote (ci-operator may not set it up)
+    if ! git remote get-url origin &>/dev/null; then
+        echo "Adding origin remote for tag fetch..." >&2
+        git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
+    fi
+    git fetch --tags origin 2>/dev/null
+    
+    # Find latest RC tag (e.g., cost-onprem-0.2.20-rc1)
+    local latest_rc
+    latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
+    echo "$latest_rc"
+}
 
-    case "$chart_ref" in
+USE_HELM_DEVEL="false"
+USE_LOCAL_CHART="true"  # Default for PR runs
+CHART_REF_RESOLVED=""
+
+if [[ -n "${CHART_REF:-}" ]]; then
+    case "${CHART_REF}" in
         release)
-            # Get latest released (non-RC) tag (e.g., cost-onprem-0.2.19)
-            echo "Resolving latest release tag..." >&2
-            local latest_release
-            latest_release=$(git tag -l "cost-onprem-*" 2>/dev/null | grep -v '\-rc' | sort -V | tail -1)
-            if [[ -n "$latest_release" ]]; then
-                echo "Found latest release: $latest_release" >&2
-                echo "$latest_release"
-            else
-                echo "WARNING: No release tags found, using main" >&2
-                echo "main"
-            fi
+            echo "Testing latest RELEASED chart from Helm repo"
+            # Helm will fetch the latest stable (non-prerelease) version by default
+            USE_LOCAL_CHART="false"
+            CHART_REF_RESOLVED="release"
             ;;
         rc)
-            # For RC, prefer using --devel flag if script supports it
-            if [[ "$devel_supported" == "true" ]]; then
-                echo "Deploy script supports --devel flag, will use Helm pre-release resolution" >&2
-                # Return special marker to indicate --devel should be used
-                echo "USE_DEVEL_FLAG"
+            echo "Testing latest RC chart..."
+            DEVEL_SUPPORTED=$(check_devel_support)
+            
+            if [[ "$DEVEL_SUPPORTED" == "true" ]]; then
+                # Deploy script supports --devel, use Helm repo
+                echo "Deploy script supports --devel flag - will use Helm repo with pre-release resolution"
+                USE_LOCAL_CHART="false"
+                USE_HELM_DEVEL="true"
+                CHART_REF_RESOLVED="rc"
             else
-                # Fallback: resolve latest RC tag via git
-                echo "Resolving latest RC tag via git (--devel not supported)..." >&2
-                local latest_rc
-                latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
-                if [[ -n "$latest_rc" ]]; then
-                    echo "Found latest RC: $latest_rc" >&2
-                    echo "$latest_rc"
+                # Fallback: checkout latest RC tag and use local chart
+                echo "Deploy script does not support --devel - falling back to git tag checkout"
+                LATEST_RC_TAG=$(get_latest_rc_tag)
+                
+                if [[ -n "$LATEST_RC_TAG" ]]; then
+                    echo "Found latest RC tag: $LATEST_RC_TAG"
+                    git checkout "$LATEST_RC_TAG"
+                    echo "Checked out: $(git describe --tags --always)"
+                    USE_LOCAL_CHART="true"  # Use local source from the checked-out tag
+                    CHART_REF_RESOLVED="$LATEST_RC_TAG"
                 else
-                    echo "WARNING: No RC tags found, skipping RC test" >&2
-                    echo ""
+                    echo "WARNING: No RC tags found in repository"
+                    echo "Skipping RC test - no RC available"
+                    # Write skip status and exit gracefully
+                    _artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
+                    mkdir -p "$_artifact_dir"
+                    echo "skipped - no RC tags found" > "${_artifact_dir}/test_status.txt"
+                    exit 0
                 fi
             fi
             ;;
-        main)
-            # Use HEAD of main branch
-            echo "Using main branch" >&2
-            echo "main"
-            ;;
         *)
-            # Explicit tag or branch
-            echo "Using explicit ref: $chart_ref" >&2
-            echo "$chart_ref"
+            echo "Testing explicit chart reference: ${CHART_REF}"
+            # Could be a specific version like "0.2.19" or "0.2.20-rc1"
+            # Assume it's a git tag, checkout and use local
+            if ! git remote get-url origin &>/dev/null; then
+                git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
+            fi
+            git fetch --tags origin 2>/dev/null
+            if git rev-parse "${CHART_REF}" &>/dev/null; then
+                git checkout "${CHART_REF}"
+                echo "Checked out: $(git describe --tags --always)"
+            fi
+            USE_LOCAL_CHART="true"
+            CHART_REF_RESOLVED="${CHART_REF}"
             ;;
     esac
-}
-
-# Resolve chart reference if CHART_REF is set
-USE_HELM_DEVEL="false"
-if [[ -n "${CHART_REF:-}" ]]; then
-    RESOLVED_REF=$(resolve_chart_ref)
-    
-    if [[ "$RESOLVED_REF" == "USE_DEVEL_FLAG" ]]; then
-        # Script supports --devel, we'll pass that flag instead of checking out a tag
-        echo "Will use --devel flag for Helm to include pre-release (RC) versions"
-        USE_HELM_DEVEL="true"
-        RESOLVED_REF="main"  # Stay on main, let Helm resolve the RC
-    elif [[ -z "$RESOLVED_REF" ]]; then
-        echo "No matching chart reference found for CHART_REF=${CHART_REF}, exiting gracefully"
-        # Guard ARTIFACT_DIR and ensure directory exists
-        _artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
-        mkdir -p "$_artifact_dir"
-        echo "skipped" > "${_artifact_dir}/test_status.txt"
-        exit 0
-    fi
-
-    if [[ "$RESOLVED_REF" != "main" ]]; then
-        echo "Checking out chart reference: $RESOLVED_REF"
-        git fetch --tags origin
-        git checkout "$RESOLVED_REF"
-        echo "Now at: $(git describe --tags --always)"
-    fi
-
-    # Export for version_info.json and downstream scripts
-    export CHART_REF_RESOLVED="$RESOLVED_REF"
-    export USE_HELM_DEVEL
 else
-    echo "No CHART_REF set, using current source (PR or main branch)"
+    echo "No CHART_REF set - using LOCAL chart from current source (PR testing mode)"
 fi
+
+export USE_LOCAL_CHART
+export USE_HELM_DEVEL
+export CHART_REF_RESOLVED
+echo "USE_LOCAL_CHART=${USE_LOCAL_CHART}"
+echo "USE_HELM_DEVEL=${USE_HELM_DEVEL}"
+echo "CHART_REF_RESOLVED=${CHART_REF_RESOLVED}"
 
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
-export USE_LOCAL_CHART="true"
+# USE_LOCAL_CHART is already set above based on CHART_REF
 export COST_MGMT_NAMESPACE="${NAMESPACE}"
 export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 

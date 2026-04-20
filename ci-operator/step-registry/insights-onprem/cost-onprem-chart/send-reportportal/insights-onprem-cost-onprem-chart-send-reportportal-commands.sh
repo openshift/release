@@ -53,17 +53,20 @@ determine_release_type() {
     # CHART_REF_RESOLVED and USE_HELM_DEVEL are exported by the e2e step
     
     # Check authoritative flags from e2e step first
-    if [[ "${USE_HELM_DEVEL:-false}" == "true" ]]; then
-        # Using --devel flag means we're testing an RC
+    if [[ "${USE_HELM_DEVEL:-false}" == "true" ]] || [[ "${CHART_REF_RESOLVED:-}" == "rc" ]]; then
+        # Using --devel flag or CHART_REF=rc means we're testing an RC
         RELEASE_TYPE="rc"
+    elif [[ "${CHART_REF_RESOLVED:-}" == "release" ]]; then
+        # CHART_REF=release means testing latest stable from Helm repo
+        RELEASE_TYPE="release"
     elif [[ "${CHART_REF_RESOLVED:-}" == "main" ]]; then
         # Explicitly testing main branch
         RELEASE_TYPE="main"
     elif [[ -n "${CHART_REF_RESOLVED:-}" ]] && [[ "${CHART_REF_RESOLVED}" == *"-rc"* ]]; then
-        # Resolved ref contains RC indicator
+        # Resolved ref contains RC indicator (explicit version like 0.2.20-rc1)
         RELEASE_TYPE="rc"
     else
-        # Fall back to inferring from chart version
+        # Fall back to inferring from chart version (for PRs using local chart)
         local chart_version
         chart_version=$(get_chart_version)
         if [[ "$chart_version" == *"-rc"* ]]; then
