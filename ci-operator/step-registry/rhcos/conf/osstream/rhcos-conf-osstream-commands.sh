@@ -24,15 +24,6 @@ if [[ -z "${MASTER_STREAM}" && -z "${WORKER_STREAM}" ]]; then
   exit 0
 fi
 
-# Validate stream values
-for stream_var in MASTER_STREAM WORKER_STREAM; do
-  stream_val="${!stream_var}"
-  if [[ -n "${stream_val}" && "${stream_val}" != "rhel-9" && "${stream_val}" != "rhel-10" ]]; then
-    echo "Error: ${stream_var} must be either 'rhel-9' or 'rhel-10', got: '${stream_val}'"
-    exit 1
-  fi
-done
-
 # Generate master MCP manifest if stream is configured
 if [[ -n "${MASTER_STREAM}" ]]; then
   echo "Configuring the master MCP for ${MASTER_STREAM} osImageStream"
