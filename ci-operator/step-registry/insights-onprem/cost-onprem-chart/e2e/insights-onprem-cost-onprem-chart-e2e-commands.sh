@@ -202,45 +202,45 @@ resolve_chart_ref() {
     case "$chart_ref" in
         release)
             # Get latest released (non-RC) tag (e.g., cost-onprem-0.2.19)
-            echo "Resolving latest release tag..."
+            echo "Resolving latest release tag..." >&2
             local latest_release
             latest_release=$(git tag -l "cost-onprem-*" 2>/dev/null | grep -v '\-rc' | sort -V | tail -1)
             if [[ -n "$latest_release" ]]; then
-                echo "Found latest release: $latest_release"
+                echo "Found latest release: $latest_release" >&2
                 echo "$latest_release"
             else
-                echo "WARNING: No release tags found, using main"
+                echo "WARNING: No release tags found, using main" >&2
                 echo "main"
             fi
             ;;
         rc)
             # For RC, prefer using --devel flag if script supports it
             if [[ "$devel_supported" == "true" ]]; then
-                echo "Deploy script supports --devel flag, will use Helm pre-release resolution"
+                echo "Deploy script supports --devel flag, will use Helm pre-release resolution" >&2
                 # Return special marker to indicate --devel should be used
                 echo "USE_DEVEL_FLAG"
             else
                 # Fallback: resolve latest RC tag via git
-                echo "Resolving latest RC tag via git (--devel not supported)..."
+                echo "Resolving latest RC tag via git (--devel not supported)..." >&2
                 local latest_rc
                 latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
                 if [[ -n "$latest_rc" ]]; then
-                    echo "Found latest RC: $latest_rc"
+                    echo "Found latest RC: $latest_rc" >&2
                     echo "$latest_rc"
                 else
-                    echo "WARNING: No RC tags found, skipping RC test"
+                    echo "WARNING: No RC tags found, skipping RC test" >&2
                     echo ""
                 fi
             fi
             ;;
         main)
             # Use HEAD of main branch
-            echo "Using main branch"
+            echo "Using main branch" >&2
             echo "main"
             ;;
         *)
             # Explicit tag or branch
-            echo "Using explicit ref: $chart_ref"
+            echo "Using explicit ref: $chart_ref" >&2
             echo "$chart_ref"
             ;;
     esac
@@ -258,7 +258,10 @@ if [[ -n "${CHART_REF:-}" ]]; then
         RESOLVED_REF="main"  # Stay on main, let Helm resolve the RC
     elif [[ -z "$RESOLVED_REF" ]]; then
         echo "No matching chart reference found for CHART_REF=${CHART_REF}, exiting gracefully"
-        echo "skipped" > "${ARTIFACT_DIR}/test_status.txt"
+        # Guard ARTIFACT_DIR and ensure directory exists
+        local artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
+        mkdir -p "$artifact_dir"
+        echo "skipped" > "${artifact_dir}/test_status.txt"
         exit 0
     fi
 

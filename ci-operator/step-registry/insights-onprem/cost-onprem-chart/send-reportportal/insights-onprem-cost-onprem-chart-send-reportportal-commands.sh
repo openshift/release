@@ -15,66 +15,102 @@ if [[ "${DISABLE_REPORTPORTAL:-false}" == "true" ]]; then
 fi
 
 # ============================================================================
-# Determine Dynamic Launch Name Based on Run Type
+# Determine Dynamic Launch Name and Run/Release Type
 # ============================================================================
+# These functions set global variables instead of echoing, to avoid subshell
+# issues with exported variables like RUN_TYPE.
 
-determine_launch_name() {
-    local base="${LAUNCH_NAME:-insights-onprem-e2e}"
+# Global variables set by these functions
+DYNAMIC_LAUNCH_NAME=""
+RUN_TYPE=""
+RELEASE_TYPE=""
+
+get_chart_version() {
+    # Returns chart version from env var or version_info.json
     local chart_version="${HELM_CHART_VERSION:-}"
-
-    # Extract chart version from version_info.json if not set
     if [[ -z "$chart_version" ]] && [[ -f "${SHARED_DIR}/version_info.json" ]]; then
         chart_version=$(jq -r '.helm_chart_version // empty' "${SHARED_DIR}/version_info.json" 2>/dev/null || true)
     fi
+    echo "$chart_version"
+}
 
-    # Determine run type based on Prow environment variables
+determine_run_type() {
+    # Sets RUN_TYPE based on Prow environment variables
     if [[ "${JOB_TYPE:-}" == "periodic" ]]; then
-        # Nightly/scheduled job
-        if [[ -n "$chart_version" ]]; then
-            echo "${base}-nightly-${chart_version}"
-        else
-            echo "${base}-nightly"
-        fi
-        export RUN_TYPE="nightly"
+        RUN_TYPE="nightly"
     elif [[ -n "${PULL_NUMBER:-}" ]]; then
-        # PR presubmit job
-        echo "${base}-pr-${PULL_NUMBER}"
-        export RUN_TYPE="pr"
+        RUN_TYPE="pr"
     elif [[ "${JOB_TYPE:-}" == "postsubmit" ]]; then
-        # Post-merge job
-        if [[ -n "$chart_version" ]]; then
-            echo "${base}-postsubmit-${chart_version}"
-        else
-            echo "${base}-postsubmit"
-        fi
-        export RUN_TYPE="postsubmit"
+        RUN_TYPE="postsubmit"
     else
-        # Ad-hoc or unknown
-        if [[ -n "$chart_version" ]]; then
-            echo "${base}-adhoc-${chart_version}"
-        else
-            echo "${base}-adhoc"
-        fi
-        export RUN_TYPE="adhoc"
+        RUN_TYPE="adhoc"
     fi
+    export RUN_TYPE
 }
 
 determine_release_type() {
-    local chart_version="${HELM_CHART_VERSION:-}"
-
-    # Extract chart version from version_info.json if not set
-    if [[ -z "$chart_version" ]] && [[ -f "${SHARED_DIR}/version_info.json" ]]; then
-        chart_version=$(jq -r '.helm_chart_version // empty' "${SHARED_DIR}/version_info.json" 2>/dev/null || true)
-    fi
-
-    # Determine release type from version string
-    if [[ "$chart_version" == *"-rc"* ]]; then
-        echo "rc"
-    elif [[ -n "$chart_version" ]] && [[ "$chart_version" != "unknown" ]]; then
-        echo "release"
+    # Sets RELEASE_TYPE based on CHART_REF_RESOLVED, USE_HELM_DEVEL, or version string
+    # CHART_REF_RESOLVED and USE_HELM_DEVEL are exported by the e2e step
+    
+    # Check authoritative flags from e2e step first
+    if [[ "${USE_HELM_DEVEL:-false}" == "true" ]]; then
+        # Using --devel flag means we're testing an RC
+        RELEASE_TYPE="rc"
+    elif [[ "${CHART_REF_RESOLVED:-}" == "main" ]]; then
+        # Explicitly testing main branch
+        RELEASE_TYPE="main"
+    elif [[ -n "${CHART_REF_RESOLVED:-}" ]] && [[ "${CHART_REF_RESOLVED}" == *"-rc"* ]]; then
+        # Resolved ref contains RC indicator
+        RELEASE_TYPE="rc"
     else
-        echo "main"
+        # Fall back to inferring from chart version
+        local chart_version
+        chart_version=$(get_chart_version)
+        if [[ "$chart_version" == *"-rc"* ]]; then
+            RELEASE_TYPE="rc"
+        elif [[ -n "$chart_version" ]] && [[ "$chart_version" != "unknown" ]]; then
+            RELEASE_TYPE="release"
+        else
+            RELEASE_TYPE="main"
+        fi
     fi
+    export RELEASE_TYPE
+}
+
+build_launch_name() {
+    # Sets DYNAMIC_LAUNCH_NAME based on RUN_TYPE and chart version
+    # Must be called after determine_run_type()
+    local base="${LAUNCH_NAME:-insights-onprem-e2e}"
+    local chart_version
+    chart_version=$(get_chart_version)
+
+    case "$RUN_TYPE" in
+        nightly)
+            if [[ -n "$chart_version" ]]; then
+                DYNAMIC_LAUNCH_NAME="${base}-nightly-${chart_version}"
+            else
+                DYNAMIC_LAUNCH_NAME="${base}-nightly"
+            fi
+            ;;
+        pr)
+            DYNAMIC_LAUNCH_NAME="${base}-pr-${PULL_NUMBER}"
+            ;;
+        postsubmit)
+            if [[ -n "$chart_version" ]]; then
+                DYNAMIC_LAUNCH_NAME="${base}-postsubmit-${chart_version}"
+            else
+                DYNAMIC_LAUNCH_NAME="${base}-postsubmit"
+            fi
+            ;;
+        *)
+            if [[ -n "$chart_version" ]]; then
+                DYNAMIC_LAUNCH_NAME="${base}-adhoc-${chart_version}"
+            else
+                DYNAMIC_LAUNCH_NAME="${base}-adhoc"
+            fi
+            ;;
+    esac
+    export DYNAMIC_LAUNCH_NAME
 }
 
 # ============================================================================
@@ -224,21 +260,19 @@ generate_datarouter_metadata() {
 
     local metadata_file="${ARTIFACT_DIR}/datarouter_metadata.json"
 
-    # Determine dynamic launch name and release type
-    local dynamic_launch_name
-    dynamic_launch_name=$(determine_launch_name)
-    local release_type
-    release_type=$(determine_release_type)
+    # Determine run type, release type, and launch name (sets global variables)
+    determine_run_type
+    determine_release_type
+    build_launch_name
 
-    echo "Dynamic launch name: ${dynamic_launch_name}"
-    echo "Run type: ${RUN_TYPE:-unknown}"
-    echo "Release type: ${release_type}"
+    echo "Dynamic launch name: ${DYNAMIC_LAUNCH_NAME}"
+    echo "Run type: ${RUN_TYPE}"
+    echo "Release type: ${RELEASE_TYPE}"
 
     # Extract chart version for attribute
-    local chart_version=""
-    if [[ -f "${SHARED_DIR}/version_info.json" ]]; then
-        chart_version=$(jq -r '.helm_chart_version // "unknown"' "${SHARED_DIR}/version_info.json" 2>/dev/null || echo "unknown")
-    fi
+    local chart_version
+    chart_version=$(get_chart_version)
+    [[ -z "$chart_version" ]] && chart_version="unknown"
 
     local ci_attributes
     ci_attributes=$(jq -n \
@@ -247,8 +281,8 @@ generate_datarouter_metadata() {
         --arg jenkins_build "${BUILD_ID}" \
         --arg job_name "${JOB_NAME}" \
         --arg uploadfrom "prow" \
-        --arg run_type "${RUN_TYPE:-unknown}" \
-        --arg release_type "${release_type}" \
+        --arg run_type "${RUN_TYPE}" \
+        --arg release_type "${RELEASE_TYPE}" \
         --arg chart_version "${chart_version}" \
         --arg job_type "${JOB_TYPE:-unknown}" \
         --arg pull_number "${PULL_NUMBER:-}" \
@@ -277,7 +311,7 @@ generate_datarouter_metadata() {
     jq -n \
         --arg hostname "${REPORTPORTAL_HOSTNAME}" \
         --arg project "${REPORTPORTAL_PROJECT}" \
-        --arg launch_name "${dynamic_launch_name}" \
+        --arg launch_name "${DYNAMIC_LAUNCH_NAME}" \
         --arg description "[View CI job](${PROW_JOB_URL})" \
         --argjson attributes "$all_attributes" \
         '{
