@@ -1,21 +1,16 @@
 #!/bin/bash
-set -x
-
 if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
     LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -25,7 +20,7 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git switch ${PULL_NUMBER}
 fi
 
-pip install -r requirements.txt
+pip install -q -r requirements.txt
 
 case "$ES_TYPE" in
   qe)
@@ -57,9 +52,10 @@ esac
 
 export ES_SERVER
 
-pip install .
+pip install -q .
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -94,15 +90,6 @@ export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status
 # Unset proxy so we can pip install, reach sippy, etc.
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
-fi
-
-# Print Orion version
-orion_version=$(orion --version 2>&1)
-orion_version_exit=$?
-if [ "$orion_version_exit" -ne 0 ]; then
-  echo "orion version prior to v0.1.7"
-else
-  echo "Orion version: $orion_version"
 fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
@@ -192,12 +179,11 @@ fi
 
 set +e
 set -o pipefail
-FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/${FILENAME}.txt
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 
