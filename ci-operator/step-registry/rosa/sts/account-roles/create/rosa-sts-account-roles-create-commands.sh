@@ -72,6 +72,12 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
 
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
 
+  # Determine cluster type switch early so the version fallback can use it
+  CLUSTER_SWITCH="--classic"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    CLUSTER_SWITCH="--hosted-cp"
+  fi
+
   # Verify the version has published policies. If not, fall back to the latest
   # available version. This handles cases where nightly builds for unreleased
   # versions (e.g., 4.23, 5.0) don't have IAM policies published yet.
