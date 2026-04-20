@@ -160,14 +160,6 @@ echo "Preparing nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
   --selector='node-role.kubernetes.io/worker' --overwrite
 
-echo "Assigning rack topology labels"
-nodes=($(oc get nodes -l node-role.kubernetes.io/worker -o name))
-i=0
-for node in "${nodes[@]}"; do
-  oc label $node topology.rook.io/rack="rack${i}" --overwrite
-  ((i++))
-done
-
 echo "Wait for StorageCluster CRD to be created"
 timeout 30m bash -c '
   until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
