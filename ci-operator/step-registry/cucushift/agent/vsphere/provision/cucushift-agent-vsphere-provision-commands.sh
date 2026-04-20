@@ -49,12 +49,6 @@ cp -t "${SHARED_DIR}" \
   "${dir}/auth/kubeadmin-password" \
   "${dir}/auth/kubeconfig"
 
-# Why do we want this silent? We want to see what curl is doing
-# vsphere_context.sh now contains SSL_CERT_FILE that needs to be unset for curl
-env -u SSL_CERT_FILE curl -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o ${HOME}/glx.tar.gz
-
-tar -C ${HOME} -xvf ${HOME}/glx.tar.gz govc && rm -f ${HOME}/glx.tar.gz
-
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
@@ -62,7 +56,7 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to datastore ${vsphere_datastore}"
 
 for ((i = 0; i < 3; i++)); do
-  if env -u SSL_CERT_FILE -u GOVC_TLS_CA_CERTS /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
+  if env -u SSL_CERT_FILE -u GOVC_TLS_CA_CERTS govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
     echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
     status=0
     break
@@ -89,14 +83,14 @@ declare -a hostnames
 mapfile -t hostnames <"${SHARED_DIR}"/hostnames.txt
 
 folder_name=$(<"${SHARED_DIR}"/cluster-name.txt)
-/tmp/govc folder.create "/${vsphere_datacenter}/vm/${folder_name}"
+govc folder.create "/${vsphere_datacenter}/vm/${folder_name}"
 
 [[ ${MASTERS} -eq 1 ]] && cpu="8" || cpu="4"
 
 for ((i = 0; i < total_host; i++)); do
   vm_name=${hostnames[$i]}
   echo "creating Vm $vm_name.."
-  /tmp/govc vm.create \
+  govc vm.create \
     -m=32768 \
     -g=coreos64Guest \
     -c=${cpu} \
@@ -110,24 +104,24 @@ for ((i = 0; i < total_host; i++)); do
     -iso=agent-installer-isos/"${agent_iso}" \
     "$vm_name"
 
-  /tmp/govc vm.change \
+  govc vm.change \
     -e="disk.EnableUUID=1" \
     -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
-  /tmp/govc vm.change \
+  govc vm.change \
     -nested-hv-enabled=true \
     -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
-  /tmp/govc device.boot \
+  govc device.boot \
     -secure \
     -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
-  /tmp/govc vm.network.change \
+  govc vm.network.change \
     -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}" \
     -net "${vsphere_portgroup}" \
     -net.address "${mac_addresses[$i]}" ethernet-0
 
-  /tmp/govc vm.power \
+  govc vm.power \
     -on=true "/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 done
 
