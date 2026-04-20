@@ -490,12 +490,21 @@ tests:
       exit 1
     fi
     MAIN_REF="FETCH_HEAD"
-    BASE=$(git merge-base HEAD "$MAIN_REF")
+    # ci-operator runs on a merge commit (PR merged into base). HEAD is the
+    # merge result, so workflow files from main are already present. We need
+    # the actual PR head commit (second parent of the merge) to detect
+    # outdated files on the PR branch itself.
+    PR_HEAD=$(git rev-parse HEAD^2 2>/dev/null) || PR_HEAD="HEAD"
+    BASE=$(git merge-base "$PR_HEAD" "$MAIN_REF")
+    echo "PR_HEAD: $(git rev-parse "$PR_HEAD")"
+    echo "MAIN:    $(git rev-parse "$MAIN_REF")"
+    echo "BASE:    $BASE"
+    echo ""
     FAILED=0
     while IFS= read -r file; do
       [ -z "$file" ] && continue
       main_hash=$(git rev-parse "${MAIN_REF}:${file}" 2>/dev/null) || continue
-      head_hash=$(git rev-parse "HEAD:${file}" 2>/dev/null) || head_hash=""
+      head_hash=$(git rev-parse "${PR_HEAD}:${file}" 2>/dev/null) || head_hash=""
       if [ -z "$head_hash" ]; then
         echo "MISSING: $file exists on main but not on this branch."
         FAILED=1
