@@ -44,7 +44,7 @@ if [ $err -ne 0 ]; then
     exit 2
 fi
 
-ls -lh kata-containers.rpm
+echo "upload RPM to workers: $(ls -lh kata-containers.rpm)"
 
 # checks for a bad URL
 if grep -q 'title.*404 Not Found' kata-containers.rpm && \
@@ -55,8 +55,11 @@ if grep -q 'title.*404 Not Found' kata-containers.rpm && \
 fi
 
 kata_rpm_md5sum=$(md5sum kata-containers.rpm | cut -d' ' -f1)
+# output the rpm version
+echo "upload RPM version: $(rpm -q ./kata-containers.rpm)"
+echo "upload RPM md5sum: ${kata_rpm_md5sum}"
 
-echo "Upload to workers and check against the rpm md5sum"
+echo "Uploading RPM to workers and checking against the rpm md5sum"
 failed_nodes=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 if [[ -z "${nodes}" ]]; then
