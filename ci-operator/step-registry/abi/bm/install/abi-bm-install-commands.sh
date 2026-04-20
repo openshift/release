@@ -1,18 +1,17 @@
 #!/bin/bash
-# abi-bm-install — Agent-based installer **install** phase (bare metal).
-#
-# Unpacks **`${SHARED_DIR}/ocpClusterInf.tgz`** into **OCP__ABI__CLUSTER_DIR**, runs **`openshift-install agent create image`**, serves the ISO
-# with local HTTP + mandatory Chisel, drives Redfish from **`bmc--info.json`**, **`wait-for bootstrap-complete`** / **`install-complete`**,
-# copies **kubeconfig** / **kubeadmin-password** and **`${ARTIFACT_DIR}/ocp.tgz`**, then nodes Ready, **OCP__ABI__DAY2_SCRIPTS_YAML** (cluster health is checked by **`cucushift-installer-check-cluster-health`** in the workflow test phase, not here).
-# ISO / tunnel / Redfish narrative: **`../../README.md`** (**abi-bm-install** section).
+# abi-bm-install — Agent-based installer **install** phase (bare metal). Broader ABI context: **../../README.md**.
 #
 # **Chisel:** OpenShift Secret **`test-credentials/chisel-creds`** is mounted at **`/secret/chisel`**. Basic-auth filenames use the **`chisel-usr--…`** / **`chisel-pwd--…`** pattern (suffix from **`OCP__ABI__TEAM_NAME`** in **`abi-bm-install-ref.yaml`**).
 #
-# Step input parameters: **`abi-bm-install-ref.yaml`** (`env` entries; step registry docs). Set via Job Conf. YAML **.tests[*].steps.env**. **DAY0** / **DAY1** script YAML are **abi-bm-conf** only.
+# Step input parameters: **`abi-bm-install-ref.yaml`** (`env` entries; step registry docs). Set via Job Conf. YAML **.tests[*].steps.env**.
 #
 # Logic in this Step:
-# - **`ocpClusterInf.tgz`** -> **`agent create image`** -> HTTP **:8080** (stdlib server with **Range** support) + **Chisel** (HTTPS) -> **Redfish** (**`bmc--info.json`** only) -> **`wait-for bootstrap-complete`** / **`install-complete`** -> **kubeconfig** / **ocp.tgz** / **kubeadmin-password** -> **SHARED_DIR** (**ARTIFACT_DIR** for **ocp.tgz**).
-# - **Day-2**: **`KUBECONFIG`** under cluster dir for **`oc`** -> **nodes** Ready -> **OCP__ABI__DAY2_SCRIPTS_YAML**. Post-install cluster health (incl. ClusterOperators) is left to **`cucushift-installer-check-cluster-health`** in the job workflow. HTTP + **Chisel** are torn down by the **EXIT** trap when the step finishes (no explicit kill).
+# - **`agent create image`** -> ISO served via HTTP **:8080** (Range-aware) + **Chisel** reverse tunnel.
+# - Redfish boot loop (background): mount ISO + boot nodes (order from **`ocp--bmc--info.json`**) + conditional disk wipe (BMC: pre-boot, OS: post-boot via SSH).
+# - **`wait-for bootstrap-complete`** -> copy minimal **kubeconfig** -> **Day-1.5** (background, runs concurrently with **`wait-for install-complete`**).
+# - **`wait-for install-complete`** -> eject virtual media.
+# - **Day-2**: Nodes Ready -> **DAY2** scripts for custom post-deployment actions.
+# - HTTP + **Chisel** torn down by **EXIT** trap.
 #
 set -euxo pipefail
 shopt -s inherit_errexit
@@ -21,32 +20,46 @@ eval "$(
     curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 
+
+typeset bmcInfo="${SHARED_DIR}/ocp--bmc--info.json"; [ -f "${bmcInfo}" ]
 typeset isoFile='' isoURL='' chiselCrdUsr='' chiselCrdPwd=''
 typeset -i httpSvcPort=8080
-typeset -ai svcPIDs=()
+typeset -ai taskPIDs=()
+export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
+
+
+function openshift-install () {
+    typeset -i es=0
+    {
+        echo \
+"$(date -Iseconds)|${FUNCNAME[0]@Q} ${@@Q}"$'\n'"$(printf '%.0s-' {1..80})"
+        command openshift-install \
+            --dir "${OCP__ABI__CLUSTER_DIR}/" \
+            --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
+            "$@" 2>&1 || es=$?
+        echo "$(printf '%.0s=' {1..80})"
+        ((! es))
+    } | tee -a "${ARTIFACT_DIR}/ocp--installer--cluster.log"
+    ((! PIPESTATUS[0]))
+}
 
 function RedfishAPIcall () {
-    typeset bmcURL="${1:?}"
-    (($#)) && shift
-    typeset apiMethod="${1:?}"
-    (($#)) && shift
-    # Empty **apiEP** → service root **GET** (e.g. **Vendor**); **${1:-}** keeps **nounset** safe when the path is **''**.
-    typeset apiEP="${1:-}"
-    (($#)) && shift
-
+    typeset bmcInfo="${1:?}"; (($#)) && shift
+    typeset bmcURL="${1:?}"; (($#)) && shift
+    typeset apiMethod="${1:?}"; (($#)) && shift
+    typeset apiEP="${1?}"; (($#)) && shift
     curl -sSLk -X "${apiMethod}" \
         --fail-with-body \
         -K <(
             set +x
-            # **curl --config** (-K) uses its own token/quoting rules — not shell **@sh**; **@json** emits a safe **-u** argument for the config file.
             jq -r \
                 --arg url "${bmcURL}" \
                 '
                     .[] |
                     select(.url == $url) |
-                    "-u " + ((.usr + ":" + .pwd) | @json)
+                    "-u \("\(.usr):\(.pwd)" | @json)"
                 ' \
-                0< "${OCP__ABI__CLUSTER_DIR}/bmc--info.json"
+            0< "${bmcInfo}"
         ) \
         -H 'Content-Type: application/json' \
         -H 'Accept: application/json' \
@@ -55,13 +68,135 @@ function RedfishAPIcall () {
     true
 }
 
-function openshift-install () {
-    command openshift-install \
-        --dir "${OCP__ABI__CLUSTER_DIR}/" \
-        --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
-        "$@"
+function VCD-Eject () {
+    typeset bmcInfo="${1:?}"; (($#)) && shift
+    typeset bmcURL="${1:?}"; (($#)) && shift
+    typeset bmcMgrId="${1:?}"; (($#)) && shift
+    RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+        "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
+        -d '{}' || true
     true
 }
+
+function Host-PowerControl () {
+    typeset bmcInfo="${1:?}"; (($#)) && shift
+    typeset bmcURL="${1:?}"; (($#)) && shift
+    typeset bmcSysId="${1:?}"; (($#)) && shift
+    typeset resetType="${1:?}"; (($#)) && shift
+    RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+        "Systems/${bmcSysId}/Actions/ComputerSystem.Reset" \
+        -d "{\"ResetType\": \"${resetType}\"}"
+    true
+}
+
+function WipeDisks () {
+    typeset -i tPID="${1:?}"; (($#)) && shift
+    typeset bmcInfo="${1:?}"; (($#)) && shift
+    typeset bmcURL="${1:?}"; (($#)) && shift
+    typeset bmcSysId="${1:?}"; (($#)) && shift
+    typeset bmcMgrId="${1:?}"; (($#)) && shift
+    typeset wipeMethod="${1?}"; (($#)) && shift
+    case ${wipeMethod} in
+      (OS) (
+        typeset hostIPv4="$(jq -r \
+            --arg url "${bmcURL}" \
+            '.[] | select(.url == $url).hostIPv4' \
+        0< "${bmcInfo}")"
+        while true; do
+            kill -0 "${tPID}" 2>/dev/null || break
+            sleep 30
+            ssh -n \
+                -o UserKnownHostsFile=/dev/null \
+                -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=5 \
+                -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+                "core@${hostIPv4}" \
+                "$(cat - 0<<'sshEOF'
+sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
+    typeset dev=
+    udevadm settle
+    while IFS= read -r dev; do
+        sgdisk --zap-all "${dev}"
+        wipefs -a "${dev}"
+        blkdiscard "${dev}" 2> /dev/null || true
+    done 0< <(
+        lsblk -dpno NAME,TYPE | awk '($2 == "disk"){print $1}'
+    )
+    true
+shEOF
+)"
+sshEOF
+                    )" && break || true
+        done
+      ) ;;
+      (BMC) (
+        typeset ctrlId= volEP= driveEP= jobId=
+        typeset -a jobIds=()
+        while IFS= read -r ctrlId; do
+            while IFS= read -r volEP; do
+                # Try `Volume.Initialize`.
+                jobId="$(
+                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                        "${volEP#/redfish/v1/}/Actions/Volume.Initialize" \
+                        -d '{
+                            "InitializeType": "Slow",
+                            "@Redfish.OperationApplyTime": "OnReset"
+                        }' -o /dev/null -w '%header{location}'
+                )" || true
+                jobId="${jobId##*/}"
+                [ -n "${jobId}" ] && jobIds+=("${jobId}") && continue
+                # Fallback to `SecureErase` the Volume's Physical Drives.
+                while IFS= read -r driveEP; do
+                    jobId="$(
+                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                            "${driveEP#/redfish/v1/}/Actions/Drive.SecureErase" \
+                            -d '{}' -o /dev/null -w '%header{location}'
+                    )" || true
+                    jobId="${jobId##*/}"
+                    [ -n "${jobId}" ] && jobIds+=("${jobId}")
+                done 0< <(
+                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                        "${volEP#/redfish/v1/}" |
+                    jq -r '.Links.Drives[]?."@odata.id" // empty'
+                )
+            done 0< <(
+                RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                    "Systems/${bmcSysId}/Storage/${ctrlId}/Volumes" |
+                jq -r '.Members[]?."@odata.id" // empty'
+            )
+        done 0< <(
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                "Systems/${bmcSysId}/Storage" |
+            jq -r '.Members[]."@odata.id" | split("/")[-1]'
+        )
+        # Restart Host.
+        Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
+        # Wait for all wipe Jobs to complete.
+        while true; do
+            kill -0 "${tPID}" 2>/dev/null || break
+            sleep 60
+            for jobId in "${jobIds[@]}"; do
+                {
+                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                        "Managers/${bmcMgrId}/Jobs/${jobId}" |
+                    jq -e '
+                        .JobState | test("^Completed"; "i")
+                    '
+                } && {
+                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" DELETE \
+                        "Managers/${bmcMgrId}/Jobs/${jobId}" ||
+                    true
+                } || continue 2
+            done
+            break
+        done
+      ) ;;
+      ('')  ;;
+      (*)   : "Unknown method: ${wipeMethod}"; false;;
+    esac
+    true
+}
+
 
 # Chisel basic auth (disable **xtrace** while reading secrets).
 set +x
@@ -69,7 +204,12 @@ chiselCrdUsr="$(cat "/secret/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
 chiselCrdPwd="$(cat "/secret/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
 set -x
 
-trap '((${#svcPIDs[@]})) && kill "${svcPIDs[@]}" 2>/dev/null || true' EXIT
+trap '
+    ((${#taskPIDs[@]})) && {
+        kill "${taskPIDs[@]}" 2>/dev/null || true
+        wait "${taskPIDs[@]}" 2>/dev/null || true
+    }
+' EXIT
 
 # Restore install workspace from **abi-bm-conf** (then drop tarball from **SHARED_DIR**).
 mkdir -p "${OCP__ABI__CLUSTER_DIR}"
@@ -161,7 +301,7 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
             pass
 
     def log_message(self, fmt, *args):
-        hdrs = ''.join(f' {k}: {v}\n' for k, v in self.headers.items())
+        hdrs = ''.join(f'  {k}: {v}\n' for k, v in self.headers.items())
         sys.stderr.write(
             f'[{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}] {fmt % args}\n'
             f'{hdrs}'
@@ -178,7 +318,7 @@ http.server.test(
     bind='0.0.0.0',
 )
 pyEOF
-} 1> "${ARTIFACT_DIR}/httpd.log" 2>&1 & svcPIDs+=($!)
+} 1> "${ARTIFACT_DIR}/ocp--installer--httpd.log" 2>&1 & taskPIDs+=($!)
 
 # Chisel reverse tunnel (CI has no ingress to the test pod).
 set +x
@@ -186,74 +326,116 @@ chisel client \
     --auth "${chiselCrdUsr}:${chiselCrdPwd}" \
     "${OCP__ABI__TUN_SVC__CP_URL%%/}/" \
     "R:0.0.0.0:${OCP__ABI__TUN_SVC__DP_PORT}:localhost:${httpSvcPort}" \
-    1> "${ARTIFACT_DIR}/chisel.log" 2>&1 & svcPIDs+=($!)
+    1> "${ARTIFACT_DIR}/ocp--installer--chisel.log" 2>&1 & taskPIDs+=($!)
 set -x
 
-# Probe BMC-facing ISO URL over the tunnel (**HEAD**). **sleep** before **curl** so Chisel can finish the reverse tunnel; **-k** temporarily allows **HTTPS** by IP (until BMC firmware/TLS is aligned).
-typeset -i tryLeft=5
-while (( tryLeft )); do
-    sleep 5
-    curl -fsSLk -I -o /dev/null --connect-timeout 2 --max-time 5 "${isoURL}" && break
-    (( tryLeft-- ))
-done
-(( tryLeft ))
+# Probe BMC-facing ISO URL over the tunnel (**HEAD**). Do **sleep** before **curl** so Chisel can finish the reverse tunnel.
+(
+    typeset -i tryLeft=5
+    while ((tryLeft)); do
+        sleep 5
+        curl -fsSL -I -o /dev/null \
+            --connect-timeout 2 --max-time 5 \
+            "${isoURL}" && break
+        ((tryLeft--))
+    done
+    ((tryLeft))
+)
 
-[ -f "${OCP__ABI__CLUSTER_DIR}/bmc--info.json" ]
+# Reboot Nodes into OCP Agent Installation ISO.
+({
+    typeset bmcURL= bmcVend= bmcSysId= bmcMgrId=
+    typeset diskWipeMethod=
+    typeset -i myPID="${BASHPID}"
+    typeset -i tPID="$(ps -o ppid= -p "${myPID}")"
+    while IFS= read -r bmcURL; do
+        kill -0 "${tPID}" 2>/dev/null || break
 
-# Reboot nodes into the OCP install ISO
-while read -r bmcURL; do
-    # Auto-discover BMC vendor and Redfish identifiers.
-    typeset bmcVend bmcSysId bmcMgrId
-    bmcVend="$(
-        RedfishAPIcall "${bmcURL}" GET '' |
+        # Auto-discover BMC Vendor and Identifiers.
+        bmcVend=$(
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET '' |
             jq -r '.Vendor // "Unknown"'
-    )"
-    bmcSysId="$(
-        RedfishAPIcall "${bmcURL}" GET 'Systems' |
+        )
+        bmcSysId=$(
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Systems' |
             jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
-    )"
-    bmcMgrId="$(
-        RedfishAPIcall "${bmcURL}" GET 'Managers' |
+        )
+        bmcMgrId=$(
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Managers' |
             jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
-    )"
+        )
 
-    # Vendor-specific preparation (Dell iDRAC: allow HTTPS ISO when cert warnings apply). Service root **Vendor** is a short manufacturer id per Redfish (null → **Unknown** above).
-    case "${bmcVend}" in
-        (Dell)
-            RedfishAPIcall "${bmcURL}" PATCH \
+        # Vendor-specific preparation.
+        case ${bmcVend} in
+          (Dell)
+            # Ignore Cert. on `.RFS.1` (VirtualMedia/CD).
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
                 "Managers/${bmcMgrId}/Attributes" \
                 -d '{"Attributes": {"RFS.1.IgnoreCertWarning": "Yes"}}'
             ;;
-        (*)
-            false
-            ;;
-    esac
+          (*)   false;;
+        esac
 
-    # Eject previously mounted media, then mount ISO (**Stream** + **HTTPS**).
-    RedfishAPIcall "${bmcURL}" POST \
-        "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
-        -d '{}' || true
-    # **InsertMedia** is blocking on tested BMCs (no poll for **Inserted**; rely on **curl --fail-with-body** / step failure).
-    RedfishAPIcall "${bmcURL}" POST \
-        "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia" \
-        -d "$(
-            jq -cnr \
-                --arg img "${isoURL}" \
-                '{"Image": $img, "TransferProtocolType": "HTTPS", "TransferMethod": "Stream"}'
-        )"
-
-    # Set boot order.
-    RedfishAPIcall "${bmcURL}" PATCH \
-        "Systems/${bmcSysId}" \
-        -d '{"Boot": {"BootSourceOverrideEnabled": "Once", "BootSourceOverrideTarget": "Cd"}}'
-
-    # Power cycle the system.
-    RedfishAPIcall "${bmcURL}" POST \
-        "Systems/${bmcSysId}/Actions/ComputerSystem.Reset" \
-        -d '{"ResetType": "ForceRestart"}'
-done < <(jq -r '.[] | .url' 0< "${OCP__ABI__CLUSTER_DIR}/bmc--info.json")
-
-# Wait for bootstrap ( **`openshift-install agent wait-for bootstrap-complete`** is ~1h per attempt; loop for slow BM).
+        # Eject previously mounted media.
+        VCD-Eject "${bmcInfo}" "${bmcURL}" "${bmcMgrId}"
+        # Set Boot Order.
+        {
+            # Try to set to VCD for wiping Disks via Host OS.
+            diskWipeMethod=OS
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                "Systems/${bmcSysId}" \
+                -d '{"Boot": {
+                    "BootSourceOverrideEnabled": "Continuous",
+                    "BootSourceOverrideTarget": "Cd"
+                }}'
+        } || {
+            # Fallback to wiping Disks via BMC.
+            diskWipeMethod=''
+            WipeDisks "${tPID}" "${bmcInfo}" \
+                "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
+                BMC
+        }
+        # Mount ISO.
+        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+            "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia" \
+            -d "$(
+                jq -cnr \
+                    --arg img "${isoURL}" \
+                    '{
+                        "Image": $img,
+                        "TransferProtocolType": "HTTPS",
+                        "TransferMethod": "Stream"
+                    }'
+            )"
+        # Set boot `Once` if BMC Wipe (`Continuous` not supported).
+        [ -n "${diskWipeMethod}" ] || {
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                "Systems/${bmcSysId}" \
+                -d '{"Boot": {
+                    "BootSourceOverrideEnabled": "Once",
+                    "BootSourceOverrideTarget": "Cd"
+                }}'
+        }
+        # Restart Host.
+        Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
+        # Wipe Disks via Host OS (no-op for BMC Wipe).
+        WipeDisks "${tPID}" "${bmcInfo}" \
+            "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
+            "${diskWipeMethod}"
+        # Restore Boot Order.
+        [ -z "${diskWipeMethod}" ] || {
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                "Systems/${bmcSysId}" \
+                -d '{"Boot": {
+                    "BootSourceOverrideEnabled": "Disabled",
+                    "BootSourceOverrideTarget": "None"
+                }}'
+        }
+    done < <(jq -r '
+        .[] | .url
+    ' 0< "${bmcInfo}")
+} |& tee "${ARTIFACT_DIR}/ocp--installer--bmc.log") & taskPIDs+=($!)
+# Wait for BootStrap Node to finish.
 (
     typeset -i tryLeft="${OCP__ABI__WAIT__BOOTSTRAP__H}"
     while ((tryLeft)); do
@@ -264,6 +446,37 @@ done < <(jq -r '.[] | .url' 0< "${OCP__ABI__CLUSTER_DIR}/bmc--info.json")
 )
 cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minimal"
 
+# Day-1.5 Phase.
+(
+    typeset cfgKey= cfgVal=
+    export KUBECONFIG="${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
+    while IFS=$'\t' read -r cfgKey cfgVal; do
+        case ${cfgKey} in
+          (NodeProv)
+            [ "${cfgVal}" = false ] && {
+                # Workers are provisioned by ABI. No
+                #   BareMetalHost CRDs or Ironic
+                #   provisioning network.
+                while true; do
+                    oc -n openshift-machine-api \
+                        scale MachineSets \
+                        --replicas 0 --all \
+                    && break || sleep 60
+                done
+            }
+            ;;
+        esac
+    done 0< <(
+        yq -o json eval '
+            ."Day1.5".config // []
+        ' "${OCP__ABI__CFG}" |
+        jq -r '
+            .[] | to_entries[] |
+            [.key, (.value | tostring)] | join("\t")
+        '
+    )
+    true
+) & taskPIDs+=($!)
 # Wait for OCP installation to complete (**install-complete** can be slow with many workers).
 (
     typeset -i tryLeft="${OCP__ABI__WAIT__CLUSTER__H}"
@@ -275,14 +488,12 @@ cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minim
 )
 
 # Eject virtual media on all nodes (ISO no longer needed after install).
-while read -r bmcURL; do
-    RedfishAPIcall "${bmcURL}" POST \
-        "Managers/$(
-            RedfishAPIcall "${bmcURL}" GET 'Managers' |
-                jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
-        )/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
-        -d '{}' || true
-done < <(jq -r '.[] | .url' 0< "${OCP__ABI__CLUSTER_DIR}/bmc--info.json")
+while IFS= read -r bmcURL; do
+    VCD-Eject "${bmcInfo}" "${bmcURL}" "$(
+        RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Managers' |
+        jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
+    )"
+done < <(jq -r '.[] | .url' 0< "${bmcInfo}")
 
 # Collect cluster authentication artifacts.
 tar zcf "${ARTIFACT_DIR}/ocp.tgz" -C "${OCP__ABI__CLUSTER_DIR}/" auth/
@@ -290,6 +501,8 @@ cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kube"{config,admin-password} "${SHARED_DIR}
 
 export KUBECONFIG="${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
 [ -f "${KUBECONFIG}" ]
+
+# TODO: Update secret store with KUBECONFIG.
 
 # Ensure node readiness before Day-2 customization (**KUBECONFIG** under cluster **auth/**, not **SHARED_DIR**).
 oc wait node --all --for=condition=Ready --timeout=300s
