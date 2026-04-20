@@ -336,7 +336,10 @@ fi
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
-bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
+# Capture exit code but continue to artifact collection regardless of test results
+DEPLOY_EXIT_CODE=0
+bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}" || DEPLOY_EXIT_CODE=$?
+echo "Deploy script exited with code: ${DEPLOY_EXIT_CODE}"
 
 # Copy test artifacts to CI artifact directory
 echo "========== Collecting Test Artifacts =========="
@@ -407,3 +410,11 @@ if [ "${RUN_IQE:-false}" == "true" ]; then
         echo "No IQE listener pod found, skipping log collection"
     fi
 fi
+
+# Exit with the original deploy script exit code
+# This ensures Prow correctly reports test failures while still collecting artifacts
+echo "========== E2E Step Complete =========="
+if [ "${DEPLOY_EXIT_CODE}" -ne 0 ]; then
+    echo "Tests failed (exit code: ${DEPLOY_EXIT_CODE})"
+fi
+exit "${DEPLOY_EXIT_CODE}"
