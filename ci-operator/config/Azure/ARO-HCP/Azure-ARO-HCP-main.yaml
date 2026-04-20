@@ -40,7 +40,6 @@ images:
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
     dockerfile_path: backend/Dockerfile
-    from: src
     to: aro-hcp-backend
   - build_args:
     - name: PLATFORM
@@ -50,7 +49,6 @@ images:
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
     dockerfile_path: frontend/Dockerfile
-    from: src
     to: aro-hcp-frontend
   - build_args:
     - name: PLATFORM
@@ -60,7 +58,6 @@ images:
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
     dockerfile_path: admin/Dockerfile
-    from: src
     to: aro-hcp-admin-api
   - build_args:
     - name: PLATFORM
@@ -70,7 +67,6 @@ images:
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
     dockerfile_path: sessiongate/Dockerfile
-    from: src
     to: aro-hcp-sessiongate
   - build_args:
     - name: PLATFORM
@@ -82,6 +78,15 @@ images:
     dockerfile_path: hcp-recovery/Dockerfile
     from: src
     to: aro-hcp-hcp-recovery
+  - context_dir: image-sync/oc-mirror
+    dockerfile_path: Dockerfile
+    to: aro-hcp-oc-mirror
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    context_dir: tooling
+    dockerfile_path: aro-hcp-exporter/Dockerfile
+    to: aro-hcp-exporter
   - dockerfile_literal: |
       FROM src
       USER root
@@ -466,6 +471,21 @@ tests:
       resource_type: aro-hcp-dev-global-pipeline-quota-slice
     test:
     - ref: aro-hcp-provision-global-pipeline
+- as: images-push
+  postsubmit: true
+  steps:
+    test:
+    - ref: aro-hcp-images-push
+- as: cspr
+  postsubmit: true
+  steps:
+    env:
+      DEPLOY_ENV: cspr
+    leases:
+    - count: 1
+      env: LEASED_CSPR_PIPELINE_RESOURCE
+      resource_type: aro-hcp-dev-cspr-pipeline-quota-slice
+    workflow: aro-hcp-cspr
 zz_generated_metadata:
   branch: main
   org: Azure
