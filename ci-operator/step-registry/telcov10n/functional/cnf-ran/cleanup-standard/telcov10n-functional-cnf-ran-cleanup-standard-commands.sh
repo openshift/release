@@ -2,73 +2,76 @@
 set -e
 set -o pipefail
 
-echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt file — skipping the job"
+  echo "Detected skip.txt — skipping"
   exit 0
 fi
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
 process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+  local directory="$1"
+  local dest_file="$2"
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
+  if [ -z "$directory" ]; then
+    echo "Usage: process_inventory <directory> <dest_file>"
+    return 1
+  fi
+
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  find "$directory" -type f | while IFS= read -r filename; do
+    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+      continue
+    elif [[ $filename == *"ansible_ssh_private_key"* ]]; then
+      echo -e "$(basename "${filename}")": \|"\n$(sed 's/^/  /' "${filename}")"
+    else
+      echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
     fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        elif [[ $filename == *"ansible_ssh_private_key"* ]]; then
-          echo -e "$(basename "${filename}")": \|"\n$(sed 's/^/  /' "${filename}")"
-        else
-          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
+  done > "${dest_file}"
 }
 
 echo "SPOKE_CLUSTER=${SPOKE_CLUSTER}"
 echo "HUB_CLUSTER=${HUB_CLUSTER}"
 
-echo "Create group_vars directory"
+echo "Processing common group_vars"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
-echo "Process common group variables (all, bastions)"
 find /var/group_variables/common/ -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
 done
 
-echo "Process spoke cluster group variables"
-find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
+if [ -d "/var/group_variables/${SPOKE_CLUSTER}/" ]; then
+  echo "Processing spoke group_vars (${SPOKE_CLUSTER})"
+  find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' | while read -r dir; do
+    echo "  group_var: $(basename "${dir}")"
     process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
-done
+  done
+else
+  echo "No spoke group_vars found for ${SPOKE_CLUSTER} — skipping"
+fi
 
-echo "Create host_vars directory"
+echo "Processing hub host_vars (${HUB_CLUSTER})"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
-echo "Process bastion host variables (from hub ${HUB_CLUSTER})"
 find "/var/host_variables/${HUB_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
+  echo "  host_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
 done
 
-echo "Process spoke cluster host variables"
-find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
+if [ -d "/var/host_variables/${SPOKE_CLUSTER}/" ]; then
+  echo "Processing spoke host_vars (${SPOKE_CLUSTER})"
+  find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' | while read -r dir; do
+    echo "  host_var: $(basename "${dir}")"
     process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
-done
+  done
+else
+  echo "No spoke host_vars found for ${SPOKE_CLUSTER} — skipping"
+fi
 
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
 
