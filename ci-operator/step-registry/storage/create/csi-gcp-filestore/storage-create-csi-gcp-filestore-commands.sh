@@ -19,6 +19,29 @@ export STORAGECLASS_LOCATION=${SHARED_DIR}/filestore-sc.yaml
 export MANIFEST_LOCATION=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 export CONNECT_MODE="DIRECT_PEERING"
 
+# Version comparison functions using sort -V, copied from upi-install-gcp-commands.sh
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# Version detection, copied from upi-install-gcp-commands.sh
+dir=$(mktemp -d)
+pushd "${dir}"
+cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+KUBECONFIG="" oc registry login --to pull-secret
+ocp_version=$(oc adm release info --registry-config pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+rm pull-secret
+echo "[DEBUG] current OCP version: '${ocp_version}'"
+popd
+
+TEST_VOLUME_SIZE="1Ti"
+if version_ge "${ocp_version}" "4.22"; then
+    TEST_VOLUME_SIZE="100Gi"
+fi
+echo "Using volume size: ${TEST_VOLUME_SIZE}"
+
 CLUSTER_NAME="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
 NETWORK_NAME="${CLUSTER_NAME}-network"
 
@@ -86,7 +109,7 @@ DriverInfo:
   SupportedMountOption:
     sync: {}
   SupportedSizeRange:
-    Min: 1Ti
+    Min: ${TEST_VOLUME_SIZE}
     Max: 63.9Ti
   Capabilities:
     persistence: true
