@@ -15,6 +15,69 @@ if [[ "${DISABLE_REPORTPORTAL:-false}" == "true" ]]; then
 fi
 
 # ============================================================================
+# Determine Dynamic Launch Name Based on Run Type
+# ============================================================================
+
+determine_launch_name() {
+    local base="${LAUNCH_NAME:-insights-onprem-e2e}"
+    local chart_version="${HELM_CHART_VERSION:-}"
+
+    # Extract chart version from version_info.json if not set
+    if [[ -z "$chart_version" ]] && [[ -f "${SHARED_DIR}/version_info.json" ]]; then
+        chart_version=$(jq -r '.helm_chart_version // empty' "${SHARED_DIR}/version_info.json" 2>/dev/null || true)
+    fi
+
+    # Determine run type based on Prow environment variables
+    if [[ "${JOB_TYPE:-}" == "periodic" ]]; then
+        # Nightly/scheduled job
+        if [[ -n "$chart_version" ]]; then
+            echo "${base}-nightly-${chart_version}"
+        else
+            echo "${base}-nightly"
+        fi
+        export RUN_TYPE="nightly"
+    elif [[ -n "${PULL_NUMBER:-}" ]]; then
+        # PR presubmit job
+        echo "${base}-pr-${PULL_NUMBER}"
+        export RUN_TYPE="pr"
+    elif [[ "${JOB_TYPE:-}" == "postsubmit" ]]; then
+        # Post-merge job
+        if [[ -n "$chart_version" ]]; then
+            echo "${base}-postsubmit-${chart_version}"
+        else
+            echo "${base}-postsubmit"
+        fi
+        export RUN_TYPE="postsubmit"
+    else
+        # Ad-hoc or unknown
+        if [[ -n "$chart_version" ]]; then
+            echo "${base}-adhoc-${chart_version}"
+        else
+            echo "${base}-adhoc"
+        fi
+        export RUN_TYPE="adhoc"
+    fi
+}
+
+determine_release_type() {
+    local chart_version="${HELM_CHART_VERSION:-}"
+
+    # Extract chart version from version_info.json if not set
+    if [[ -z "$chart_version" ]] && [[ -f "${SHARED_DIR}/version_info.json" ]]; then
+        chart_version=$(jq -r '.helm_chart_version // empty' "${SHARED_DIR}/version_info.json" 2>/dev/null || true)
+    fi
+
+    # Determine release type from version string
+    if [[ "$chart_version" == *"-rc"* ]]; then
+        echo "rc"
+    elif [[ -n "$chart_version" ]] && [[ "$chart_version" != "unknown" ]]; then
+        echo "release"
+    else
+        echo "main"
+    fi
+}
+
+# ============================================================================
 # Validate Prerequisites
 # ============================================================================
 
@@ -161,6 +224,22 @@ generate_datarouter_metadata() {
 
     local metadata_file="${ARTIFACT_DIR}/datarouter_metadata.json"
 
+    # Determine dynamic launch name and release type
+    local dynamic_launch_name
+    dynamic_launch_name=$(determine_launch_name)
+    local release_type
+    release_type=$(determine_release_type)
+
+    echo "Dynamic launch name: ${dynamic_launch_name}"
+    echo "Run type: ${RUN_TYPE:-unknown}"
+    echo "Release type: ${release_type}"
+
+    # Extract chart version for attribute
+    local chart_version=""
+    if [[ -f "${SHARED_DIR}/version_info.json" ]]; then
+        chart_version=$(jq -r '.helm_chart_version // "unknown"' "${SHARED_DIR}/version_info.json" 2>/dev/null || echo "unknown")
+    fi
+
     local ci_attributes
     ci_attributes=$(jq -n \
         --arg cluster_name "${CLUSTER_NAME:-unknown}" \
@@ -168,13 +247,22 @@ generate_datarouter_metadata() {
         --arg jenkins_build "${BUILD_ID}" \
         --arg job_name "${JOB_NAME}" \
         --arg uploadfrom "prow" \
+        --arg run_type "${RUN_TYPE:-unknown}" \
+        --arg release_type "${release_type}" \
+        --arg chart_version "${chart_version}" \
+        --arg job_type "${JOB_TYPE:-unknown}" \
+        --arg pull_number "${PULL_NUMBER:-}" \
         '[
           {key: "cluster_name",   value: $cluster_name},
           {key: "cluster_domain", value: $cluster_domain},
           {key: "jenkins_build",  value: $jenkins_build},
           {key: "job_name",       value: $job_name},
-          {key: "uploadfrom",     value: $uploadfrom}
-        ]')
+          {key: "uploadfrom",     value: $uploadfrom},
+          {key: "run_type",       value: $run_type},
+          {key: "release_type",   value: $release_type},
+          {key: "chart_version",  value: $chart_version},
+          {key: "job_type",       value: $job_type}
+        ] + (if $pull_number != "" then [{key: "pull_number", value: $pull_number}] else [] end)')
 
     local version_attributes='[]'
     if [[ -f "${ARTIFACT_DIR}/version_attributes.json" ]]; then
@@ -189,7 +277,7 @@ generate_datarouter_metadata() {
     jq -n \
         --arg hostname "${REPORTPORTAL_HOSTNAME}" \
         --arg project "${REPORTPORTAL_PROJECT}" \
-        --arg launch_name "${LAUNCH_NAME}" \
+        --arg launch_name "${dynamic_launch_name}" \
         --arg description "[View CI job](${PROW_JOB_URL})" \
         --argjson attributes "$all_attributes" \
         '{

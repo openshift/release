@@ -162,6 +162,120 @@ oc adm policy add-scc-to-user anyuid -z cost-onprem -n "${NAMESPACE}" || true
 
 echo "SecurityContextConstraints configured"
 
+echo "========== Resolving Chart Reference =========="
+
+# ============================================================================
+# Chart Tag Resolution for Nightly Jobs
+# ============================================================================
+# CHART_REF can be: "release", "rc", "main", or an explicit tag/branch
+# For nightly jobs, this allows testing specific release types
+#
+# - "release": Latest released (non-RC) chart version
+# - "rc": Latest release candidate version
+# - "main": Current main branch (bleeding edge)
+#
+# For RC resolution, we first check if the deployment script supports --devel
+# (which tells Helm to include pre-release versions). If supported, we pass
+# that flag instead of checking out a specific tag. This allows testing the
+# chart from the Helm repo with RC versions included.
+#
+# Fallback: If --devel is not supported, we resolve the latest RC tag via git.
+
+# Check if deploy script supports --devel flag
+check_devel_support() {
+    if [[ -f "./scripts/deploy-test-cost-onprem.sh" ]]; then
+        if grep -q -- '--devel' ./scripts/deploy-test-cost-onprem.sh 2>/dev/null; then
+            echo "true"
+        else
+            echo "false"
+        fi
+    else
+        echo "false"
+    fi
+}
+
+resolve_chart_ref() {
+    local chart_ref="${CHART_REF:-main}"
+    local devel_supported
+    devel_supported=$(check_devel_support)
+
+    case "$chart_ref" in
+        release)
+            # Get latest released (non-RC) tag (e.g., cost-onprem-0.2.19)
+            echo "Resolving latest release tag..."
+            local latest_release
+            latest_release=$(git tag -l "cost-onprem-*" 2>/dev/null | grep -v '\-rc' | sort -V | tail -1)
+            if [[ -n "$latest_release" ]]; then
+                echo "Found latest release: $latest_release"
+                echo "$latest_release"
+            else
+                echo "WARNING: No release tags found, using main"
+                echo "main"
+            fi
+            ;;
+        rc)
+            # For RC, prefer using --devel flag if script supports it
+            if [[ "$devel_supported" == "true" ]]; then
+                echo "Deploy script supports --devel flag, will use Helm pre-release resolution"
+                # Return special marker to indicate --devel should be used
+                echo "USE_DEVEL_FLAG"
+            else
+                # Fallback: resolve latest RC tag via git
+                echo "Resolving latest RC tag via git (--devel not supported)..."
+                local latest_rc
+                latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
+                if [[ -n "$latest_rc" ]]; then
+                    echo "Found latest RC: $latest_rc"
+                    echo "$latest_rc"
+                else
+                    echo "WARNING: No RC tags found, skipping RC test"
+                    echo ""
+                fi
+            fi
+            ;;
+        main)
+            # Use HEAD of main branch
+            echo "Using main branch"
+            echo "main"
+            ;;
+        *)
+            # Explicit tag or branch
+            echo "Using explicit ref: $chart_ref"
+            echo "$chart_ref"
+            ;;
+    esac
+}
+
+# Resolve chart reference if CHART_REF is set
+USE_HELM_DEVEL="false"
+if [[ -n "${CHART_REF:-}" ]]; then
+    RESOLVED_REF=$(resolve_chart_ref)
+    
+    if [[ "$RESOLVED_REF" == "USE_DEVEL_FLAG" ]]; then
+        # Script supports --devel, we'll pass that flag instead of checking out a tag
+        echo "Will use --devel flag for Helm to include pre-release (RC) versions"
+        USE_HELM_DEVEL="true"
+        RESOLVED_REF="main"  # Stay on main, let Helm resolve the RC
+    elif [[ -z "$RESOLVED_REF" ]]; then
+        echo "No matching chart reference found for CHART_REF=${CHART_REF}, exiting gracefully"
+        echo "skipped" > "${ARTIFACT_DIR}/test_status.txt"
+        exit 0
+    fi
+
+    if [[ "$RESOLVED_REF" != "main" ]]; then
+        echo "Checking out chart reference: $RESOLVED_REF"
+        git fetch --tags origin
+        git checkout "$RESOLVED_REF"
+        echo "Now at: $(git describe --tags --always)"
+    fi
+
+    # Export for version_info.json and downstream scripts
+    export CHART_REF_RESOLVED="$RESOLVED_REF"
+    export USE_HELM_DEVEL
+else
+    echo "No CHART_REF set, using current source (PR or main branch)"
+fi
+
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
@@ -184,6 +298,12 @@ if [ "${DEPLOY_S4:-false}" == "true" ]; then
     # Use the same namespace as the application for S4 if S4_NAMESPACE is not explicitly set
     # This ensures the storage credentials secret is created in the correct namespace
     DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
+fi
+
+# Add --devel flag if we're testing RC via Helm pre-release resolution
+if [ "${USE_HELM_DEVEL:-false}" == "true" ]; then
+    echo "Adding --devel flag for Helm pre-release (RC) chart resolution"
+    DEPLOY_ARGS+=(--devel)
 fi
 
 # Add IQE test flags if enabled
