@@ -15,8 +15,8 @@ E2E_VM_TEMPLATE="$3"
 E2E_CLUSTER_TEMPLATE="$4"
 OSAC_TEST_IMAGE="$5"
 
-KUBECONFIG=$(find /root -name kubeconfig -type f -print -quit 2>/dev/null)
-[[ -z "${KUBECONFIG}" ]] && echo "ERROR: No kubeconfig found under /root" && exit 1
+KUBECONFIG=$(find ${KUBECONFIG} -type f -print -quit 2>/dev/null)
+[[ -z "${KUBECONFIG}" ]] && echo "ERROR: No kubeconfig found" && exit 1
 
 PULL_SECRET_PATH="/root/pull-secret"
 
