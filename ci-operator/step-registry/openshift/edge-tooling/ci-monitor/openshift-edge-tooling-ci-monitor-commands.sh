@@ -43,6 +43,12 @@ if [[ -f "${JIRA_API_TOKEN_PATH}" ]]; then
     echo "JIRA token loaded."
 fi
 
+if [[ -f "${JIRA_USERNAME_PATH}" ]]; then
+    export JIRA_USERNAME
+    JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
+    echo "JIRA username loaded."
+fi
+
 # ---------------------------------------------------------------------------
 # Install gcloud CLI for Prow artifact access (no root required)
 # ---------------------------------------------------------------------------
