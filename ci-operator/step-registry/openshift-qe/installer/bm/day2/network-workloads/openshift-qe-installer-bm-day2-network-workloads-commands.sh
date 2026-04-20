@@ -24,7 +24,7 @@ fi
 # shellcheck disable=SC2087
 if [ "${NETWORK_WORKLOAD}" == "udn-bgp" ]; then
     ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
-        export KUBECONFIG=/root/vmno/kubeconfig
+        export KUBECONFIG=/root/mno/kubeconfig
         oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
         sleep 60
         oc rollout status daemonset/frr-k8s -n openshift-frr-k8s --timeout=10m

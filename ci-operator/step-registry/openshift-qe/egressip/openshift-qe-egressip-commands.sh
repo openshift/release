@@ -14,7 +14,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    set -o pipefail
    podman ps -q --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman stop
    podman ps -aq --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman rm
-   for port in {9002..9020}; do
+   for port in {9002..9061}; do
       podman run --network=host -d -e LISTEN_PORT=\$port quay.io/cloud-bulldozer/nginxecho:latest
    done
 "
@@ -62,6 +62,11 @@ fi
 
 export EXTRA_FLAGS
 
+# Pre-load egressip test image on all worker nodes sequentially
+for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+  echo "Pre-loading image on node ${node}..."
+  oc debug "node/${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/eipvalidator:latest
+done
 
 # Run workload immediately
 ./run.sh
