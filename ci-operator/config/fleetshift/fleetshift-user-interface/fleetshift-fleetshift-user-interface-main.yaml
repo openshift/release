@@ -1,0 +1,74 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.gui
+    to: fleetshift-gui
+  - dockerfile_path: Dockerfile.mock-servers
+    to: fleetshift-mock-servers
+  - dockerfile_path: Dockerfile.mock-ui-plugins
+    to: fleetshift-mock-ui-plugins
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror-gui
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-gui
+    env:
+      IMAGE_REPO: fleetshift-gui
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-gui
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-gui
+    env:
+      IMAGE_REPO: fleetshift-gui
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-mock-servers
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-mock-servers
+    env:
+      IMAGE_REPO: fleetshift-mock-servers
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-mock-servers
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-mock-servers
+    env:
+      IMAGE_REPO: fleetshift-mock-servers
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-mock-ui-plugins
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-mock-ui-plugins
+    env:
+      IMAGE_REPO: fleetshift-mock-ui-plugins
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-mock-ui-plugins
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-mock-ui-plugins
+    env:
+      IMAGE_REPO: fleetshift-mock-ui-plugins
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: fleetshift
+  repo: fleetshift-user-interface
