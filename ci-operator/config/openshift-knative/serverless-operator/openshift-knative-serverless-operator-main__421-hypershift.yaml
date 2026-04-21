@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   ocp_4.16_cli-artifacts:
     name: "4.16"
     namespace: ocp
@@ -39,16 +35,14 @@ base_images:
     name: scos-4.22
     namespace: origin
     tag: operator-registry
-  upi-installer:
-    name: "4.20"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
   items:
-  - dockerfile_path: knative-operator/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: knative-operator/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
@@ -57,7 +51,9 @@ images:
         as:
         - $GO_BUILDER
     to: serverless-knative-operator
-  - dockerfile_path: must-gather/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: must-gather/Dockerfile
     inputs:
       ocp_4.16_cli-artifacts:
         as:
@@ -66,7 +62,9 @@ images:
         as:
         - $RUNTIME
     to: serverless-must-gather
-  - dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: olm-catalog/serverless-operator-index/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
@@ -75,13 +73,17 @@ images:
         as:
         - registry.ci.openshift.org/origin/scos-4.22:operator-registry
     to: serverless-index
-  - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: olm-catalog/serverless-operator/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
         - $GO_RUNTIME
     to: serverless-bundle
-  - dockerfile_path: openshift-knative-operator/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: openshift-knative-operator/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
@@ -90,7 +92,9 @@ images:
         as:
         - $GO_BUILDER
     to: serverless-openshift-knative-operator
-  - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: openshift/ci-operator/source-image/Dockerfile
     from: src
     inputs:
       openshift_eventing-istio-src_knative-v1.21:
@@ -109,7 +113,9 @@ images:
         as:
         - registry.ci.openshift.org/origin/scos-4.22:cli-artifacts
     to: serverless-source-image
-  - dockerfile_path: serving/ingress/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: serving/ingress/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
@@ -118,7 +124,9 @@ images:
         as:
         - $GO_BUILDER
     to: serverless-ingress
-  - dockerfile_path: serving/metadata-webhook/Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: serving/metadata-webhook/Dockerfile
     inputs:
       ocp_ubi-minimal_9:
         as:
@@ -130,10 +138,10 @@ images:
   run_if_changed: ^non-existing$
 releases:
   latest:
-    integration:
-      include_built_images: true
-      name: "4.20"
-      namespace: ocp
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -147,7 +155,7 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
       HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
       HYPERSHIFT_NODE_COUNT: "6"
     test:
@@ -230,9 +238,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 420-hypershift
+  variant: 421-hypershift
