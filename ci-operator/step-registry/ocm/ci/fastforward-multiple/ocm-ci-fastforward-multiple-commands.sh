@@ -24,6 +24,22 @@ for version in ${DESTINATION_VERSIONS}; do
   fi
 done
 
+# Repos with release-* default branch - exclude from fast-forward
+EXCLUDED_REPOS=(
+  "grafana"
+  "grafana-dashboard-loader"
+  "kube-rbac-proxy"
+  "kube-state-metrics"
+  "metrics-collector"
+  "node-exporter"
+  "prometheus"
+  "prometheus-alertmanager"
+  "prometheus-operator"
+  "rbac-query-proxy"
+  "thanos"
+  "thanos-receive-controller"
+)
+
 for product in mce acm; do
   component_repos=$(yq '.components[] | 
       select((.bundle == "'"${product}-operator-bundle"'" or
@@ -31,8 +47,22 @@ for product in mce acm; do
       .repository == "https://github.com/stolostron/*").repository' "${REPO_MAP_PATH}")
   for repo in ${component_repos}; do
     owner_repo=${repo#https://github.com/}
-    # owner=${owner_repo%/*}
+    owner=${owner_repo%/*}
     repo=${owner_repo#*/}
+
+    # Check if repo is in exclusion list
+    skip=false
+    for excluded in "${EXCLUDED_REPOS[@]}"; do
+      if [[ "${repo}" == "${excluded}" ]]; then
+        skip=true
+        break
+      fi
+    done
+
+    if [[ "${skip}" == "true" ]]; then
+      echo "INFO: Skipping ${owner_repo} (excluded - uses release-* default branch)"
+      continue
+    fi
 
     echo "INFO: Handling ${owner_repo}"
 
@@ -46,19 +76,20 @@ for product in mce acm; do
       echo "INFO: Fast-forwarding ${owner_repo} main to branch: ${branch}"
       log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
 
-      ### Swap out this code with the commented out code after testing
-      echo "INFO: Fast-forwarding ${owner_repo} main to branch: ${branch}" > "${log_file}"
-      # REPO_OWNER=${owner} \
-      #   REPO_NAME=${repo} \
-      #   SOURCE_BRANCH=main \
-      #   DESTINATION_BRANCH=${branch} \
-      #   ../fastforward/ocm-ci-fastforward-commands.sh >"${log_file}" 2>&1 ||
-      #   {
-      #     exit_code=$?
-      #     echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
-      #     echo "Logs:"
-      #     sed 's/^/    /' "${log_file}"
-      #   }
+      REPO_OWNER=${owner} \
+        REPO_NAME=${repo} \
+        SOURCE_BRANCH=main \
+        DESTINATION_BRANCH=${branch} \
+        ../fastforward/ocm-ci-fastforward-commands.sh >"${log_file}" 2>&1 ||
+        {
+          exit_code=$?
+          echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
+          echo "Logs:"
+          sed 's/^/    /' "${log_file}"
+        }
+
+      # Cleanup temp dirs created by fastforward script to avoid conflicts
+      rm -rf /tmp/ocm-*
     done
   done
 done
