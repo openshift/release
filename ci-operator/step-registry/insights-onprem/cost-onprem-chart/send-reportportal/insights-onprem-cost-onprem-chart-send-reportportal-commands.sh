@@ -125,6 +125,11 @@ validate_prerequisites() {
 
     local errors=0
 
+    # Debug: Show SHARED_DIR contents
+    echo "DEBUG: SHARED_DIR=${SHARED_DIR}"
+    echo "DEBUG: Contents of SHARED_DIR:"
+    ls -la "${SHARED_DIR}/" 2>&1 | head -20 || echo "  (failed to list directory)"
+
     # JUnit files are passed via SHARED_DIR (not ARTIFACT_DIR which is step-specific)
     if ! ls "${SHARED_DIR}"/junit_*.xml &>/dev/null; then
         echo "ERROR: No junit_*.xml files found in ${SHARED_DIR}"
