@@ -1,0 +1,30 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: aws-nuke-cf
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: push-image
+  postsubmit: true
+  steps:
+    dependencies:
+      CI_COMPONENT_IMAGE: aws-nuke-cf
+    env:
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/aws-nuke-cf
+    test:
+    - ref: rosa-regional-platform-image-push
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: aws-nuke-cf
