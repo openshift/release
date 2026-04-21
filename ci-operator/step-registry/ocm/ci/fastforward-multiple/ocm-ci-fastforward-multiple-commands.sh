@@ -18,6 +18,7 @@ get_default_branch() {
 }
 
 # Find highest semantic version in Tekton files
+# Returns version number (e.g., "217", "50") or "main" if only -main- files exist
 get_highest_tekton_version() {
   local repo_dir=$1
   local product_prefix=$2  # "acm" or "mce"
@@ -31,7 +32,9 @@ get_highest_tekton_version() {
   local highest_compact=0
   local highest_major=0
   local highest_minor=0
+  local has_main_files=false
 
+  # First pass: look for versioned files (acm-X, mce-X)
   for file in "${repo_dir}"/.tekton/*-${product_prefix}-*-*.yaml; do
     [[ -f "$file" ]] || continue
 
@@ -64,7 +67,24 @@ get_highest_tekton_version() {
     fi
   done
 
-  echo "$highest_compact"
+  # If versioned files found, return highest
+  if [[ $highest_compact -gt 0 ]]; then
+    echo "$highest_compact"
+    return
+  fi
+
+  # No versioned files, check for -main- pattern
+  for file in "${repo_dir}"/.tekton/*-main-*.yaml; do
+    [[ -f "$file" ]] || continue
+    has_main_files=true
+    break
+  done
+
+  if [[ "$has_main_files" == "true" ]]; then
+    echo "main"
+  else
+    echo "0"
+  fi
 }
 
 # Create Tekton files for missing versions
@@ -117,36 +137,46 @@ create_tekton_files() {
     highest_version=$(get_highest_tekton_version "." "${product_prefix}" "${branch_prefix}")
 
     if [[ "$highest_version" == "0" ]]; then
-      log "INFO No existing ${product_prefix}-* Tekton files found, skipping"
+      log "INFO No existing ${product_prefix}-* or -main- Tekton files found, skipping"
       exit 0
     fi
 
-    log "INFO Highest existing version: ${product_prefix}-${highest_version}"
+    log "INFO Highest existing version: ${highest_version}"
 
-    # Extract source version from template file (e.g., "release-2.17" from file content)
+    # Determine if using -main- template or versioned template
+    local using_main_template=false
     local template_file
-    template_file=$(ls .tekton/*-${product_prefix}-${highest_version}-*.yaml 2>/dev/null | head -1)
     local source_version=""
 
-    if [[ -f "$template_file" ]]; then
-      # Extract version from patterns like "release-2.17" or "backplane-2.17"
-      source_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$template_file" | head -1 | cut -d'-' -f2)
-    fi
+    if [[ "$highest_version" == "main" ]]; then
+      using_main_template=true
+      template_file=$(ls .tekton/*-main-*.yaml 2>/dev/null | head -1)
+      log "INFO Using -main- files as template"
+    else
+      template_file=$(ls .tekton/*-${product_prefix}-${highest_version}-*.yaml 2>/dev/null | head -1)
+      log "INFO Using ${product_prefix}-${highest_version} files as template"
 
-    if [[ -z "$source_version" ]]; then
-      log "WARNING Could not extract source version from template, using calculated version"
-      # Fallback: assume format like 217 = 2.17, 50 = 5.0
-      if [[ $highest_version -ge 100 ]]; then
-        local source_major=$((highest_version / 100))
-        local source_minor=$((highest_version % 100))
-      else
-        local source_major=$((highest_version / 10))
-        local source_minor=$((highest_version % 10))
+      # Extract source version from template file (e.g., "release-2.17" from file content)
+      if [[ -f "$template_file" ]]; then
+        # Extract version from patterns like "release-2.17" or "backplane-2.17"
+        source_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$template_file" | head -1 | cut -d'-' -f2)
       fi
-      source_version="${source_major}.${source_minor}"
-    fi
 
-    log "INFO Source version: ${branch_prefix}-${source_version}"
+      if [[ -z "$source_version" ]]; then
+        log "WARNING Could not extract source version from template, using calculated version"
+        # Fallback: assume format like 217 = 2.17, 50 = 5.0
+        if [[ $highest_version -ge 100 ]]; then
+          local source_major=$((highest_version / 100))
+          local source_minor=$((highest_version % 100))
+        else
+          local source_major=$((highest_version / 10))
+          local source_minor=$((highest_version % 10))
+        fi
+        source_version="${source_major}.${source_minor}"
+      fi
+
+      log "INFO Source version: ${branch_prefix}-${source_version}"
+    fi
 
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
@@ -165,24 +195,49 @@ create_tekton_files() {
         continue
       fi
 
-      log "INFO Creating ${product_prefix}-${dest_ver_compact} files from ${product_prefix}-${highest_version}"
+      local dest_branch="${branch_prefix}-${dest_version}"
 
-      # Copy and transform template files
-      for template_file in .tekton/*-${product_prefix}-${highest_version}-*.yaml; do
-        [[ -f "$template_file" ]] || continue
+      if [[ "$using_main_template" == "true" ]]; then
+        log "INFO Creating ${product_prefix}-${dest_ver_compact} files from -main- template"
 
-        local new_file="${template_file//${product_prefix}-${highest_version}/${product_prefix}-${dest_ver_compact}}"
-        local dest_branch="${branch_prefix}-${dest_version}"
+        # Copy and transform -main- template files
+        for template_file in .tekton/*-main-*.yaml; do
+          [[ -f "$template_file" ]] || continue
 
-        # Replace version strings in file content
-        sed -e "s/${product_prefix}-${highest_version}/${product_prefix}-${dest_ver_compact}/g" \
-            -e "s/${branch_prefix}-${source_version}/${dest_branch}/g" \
-            "$template_file" > "$new_file"
+          # Replace -main- with -acm-50- (or -mce-50-)
+          local new_file="${template_file//-main-/-${product_prefix}-${dest_ver_compact}-}"
 
-        git add "$new_file"
-        files_created=true
-        log "INFO Created $(basename "$new_file")"
-      done
+          # Transform file content:
+          # 1. Replace -main with -acm-50 (or -mce-50)
+          # 2. Add release branch to target_branch expression
+          #    target_branch == "main" -> target_branch == "main" || target_branch == "release-5.0"
+          sed -e "s/-main/-${product_prefix}-${dest_ver_compact}/g" \
+              -e "s/target_branch == \"main\"/target_branch == \"main\" || target_branch == \"${dest_branch}\"/g" \
+              "$template_file" > "$new_file"
+
+          git add "$new_file"
+          files_created=true
+          log "INFO Created $(basename "$new_file")"
+        done
+      else
+        log "INFO Creating ${product_prefix}-${dest_ver_compact} files from ${product_prefix}-${highest_version}"
+
+        # Copy and transform versioned template files
+        for template_file in .tekton/*-${product_prefix}-${highest_version}-*.yaml; do
+          [[ -f "$template_file" ]] || continue
+
+          local new_file="${template_file//${product_prefix}-${highest_version}/${product_prefix}-${dest_ver_compact}}"
+
+          # Replace version strings in file content
+          sed -e "s/${product_prefix}-${highest_version}/${product_prefix}-${dest_ver_compact}/g" \
+              -e "s/${branch_prefix}-${source_version}/${dest_branch}/g" \
+              "$template_file" > "$new_file"
+
+          git add "$new_file"
+          files_created=true
+          log "INFO Created $(basename "$new_file")"
+        done
+      fi
     done
 
     if [[ "$files_created" == "false" ]]; then
