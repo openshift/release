@@ -13,8 +13,10 @@ fastforward_repo() {
   local dest_branch=$4
   local log_file=$5
 
-  local ocm_dir=$(mktemp -d -t ocm-XXXXX)
-  local token=$(cat "${GITHUB_TOKEN_FILE}")
+  local ocm_dir
+  ocm_dir=$(mktemp -d -t ocm-XXXXX)
+  local token
+  token=$(cat "${GITHUB_TOKEN_FILE}")
   local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
 
   (
