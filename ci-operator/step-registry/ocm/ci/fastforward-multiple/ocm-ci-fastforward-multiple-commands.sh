@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exit_code=0
 
 echo "Fast-forward workflow inputs:
@@ -80,16 +83,18 @@ for product in mce acm; do
         REPO_NAME=${repo} \
         SOURCE_BRANCH=main \
         DESTINATION_BRANCH=${branch} \
-        ../fastforward/ocm-ci-fastforward-commands.sh >"${log_file}" 2>&1 ||
+        "${SCRIPT_DIR}/../fastforward/ocm-ci-fastforward-commands.sh" >"${log_file}" 2>&1 ||
         {
-          exit_code=$?
+          local err=$?
+          exit_code=$((exit_code | err))
           echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
           echo "Logs:"
           sed 's/^/    /' "${log_file}"
         }
 
-      # Cleanup temp dirs created by fastforward script to avoid conflicts
-      rm -rf /tmp/ocm-*
+      # Cleanup temp dirs created by fastforward script
+      # Safe because script has completed and we're in sequential loop
+      find /tmp -maxdepth 1 -name 'ocm-*' -type d -mmin +1 -exec rm -rf {} + 2>/dev/null || true
     done
   done
 done
