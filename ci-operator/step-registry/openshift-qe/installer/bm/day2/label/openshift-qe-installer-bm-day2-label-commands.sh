@@ -123,3 +123,12 @@ if [ ${TELCO} == "true" ]; then
     oc get nodes -l node-role.kubernetes.io/worker --show-labels
   fi
 fi
+
+if [ ${NODE_DENSITY_CNI_WORKLOAD}] == "true" ]; then
+  # Label the nodes with node-density-cni-workload
+  for node in `oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -${LABEL_NUM_NODES} | awk '{print $1}'`; do
+      oc label node $node node-role.kubernetes.io/node-density-cni-workload=""
+  done
+  echo "=== Labeling Summary ==="
+  oc get nodes -l node-role.kubernetes.io/worker --show-labels
+fi

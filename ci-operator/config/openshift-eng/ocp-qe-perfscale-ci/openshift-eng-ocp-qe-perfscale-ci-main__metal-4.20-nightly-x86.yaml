@@ -64,6 +64,9 @@ tests:
       EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=false --gc=true
       ITERATIONS: "15"
       LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      ND_CNI_EXTRA_FLAGS: --churn-cycles 3 --selector="node-role.kubernetes.io/node-density-cni-workload="
+        --churn-delay 2m --churn-percent 100 --num-sriovs=1 --sriov-networkname sriov-net-node-density
+      PODS_PER_NODE: "80"
       RUN_ORION: "true"
       TELCO: "true"
     test:
@@ -71,8 +74,25 @@ tests:
     - ref: openshift-qe-installer-bm-day2-sriov
     - ref: openshift-qe-installer-bm-day2-metallb
     - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-node-density-cni
     - ref: openshift-qe-rds-core
     - ref: openshift-qe-orion-rds-core
+    workflow: openshift-qe-installer-bm-deploy
+- as: daily-node-density-cni-sriov-mlx
+  capabilities:
+  - intranet
+  cron: 0 17 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-telco
+    env:
+      ND_CNI_EXTRA_FLAGS: --churn-cycles 3 --selector="node-role.kubernetes.io/node-density-cni-workload="
+        --churn-delay 2m --churn-percent 100 --num-sriovs=1 --sriov-networkname sriov-net-node-density
+      PODS_PER_NODE: "80"
+    test:
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main
