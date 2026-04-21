@@ -5,6 +5,17 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exit_code=0
 
+echo "DEBUG: SCRIPT_DIR=${SCRIPT_DIR}"
+echo "DEBUG: BASH_SOURCE[0]=${BASH_SOURCE[0]}"
+echo "DEBUG: PWD=$(pwd)"
+echo "DEBUG: ls -la \${SCRIPT_DIR}:"
+ls -la "${SCRIPT_DIR}" || true
+echo "DEBUG: ls -la \${SCRIPT_DIR}/../fastforward:"
+ls -la "${SCRIPT_DIR}/../fastforward" || true
+echo "DEBUG: find step-registry scripts:"
+find / -name "ocm-ci-fastforward-commands.sh" 2>/dev/null | head -5 || true
+echo ""
+
 echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
