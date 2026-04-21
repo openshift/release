@@ -1,20 +1,86 @@
 #!/bin/bash
 
 set -uo pipefail
+shopt -s extglob
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exit_code=0
 
-echo "DEBUG: SCRIPT_DIR=${SCRIPT_DIR}"
-echo "DEBUG: BASH_SOURCE[0]=${BASH_SOURCE[0]}"
-echo "DEBUG: PWD=$(pwd)"
-echo "DEBUG: ls -la \${SCRIPT_DIR}:"
-ls -la "${SCRIPT_DIR}" || true
-echo "DEBUG: ls -la \${SCRIPT_DIR}/../fastforward:"
-ls -la "${SCRIPT_DIR}/../fastforward" || true
-echo "DEBUG: find step-registry scripts:"
-find / -name "ocm-ci-fastforward-commands.sh" 2>/dev/null | head -5 || true
-echo ""
+# Fastforward function - performs git fast-forward for a single repo
+fastforward_repo() {
+  local owner=$1
+  local repo=$2
+  local source_branch=$3
+  local dest_branch=$4
+  local log_file=$5
+
+  local ocm_dir=$(mktemp -d -t ocm-XXXXX)
+  local token=$(cat "${GITHUB_TOKEN_FILE}")
+  local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
+
+  (
+    cd "$ocm_dir" || exit 1
+    export HOME="$ocm_dir"
+
+    log() {
+      local ts
+      ts=$(date --iso-8601=seconds)
+      echo "$ts" "$@"
+    }
+
+    log "INFO Cloning DESTINATION_BRANCH"
+    if ! git clone -b "$dest_branch" "$repo_url" 2>&1; then
+      log "INFO DESTINATION_BRANCH does not exist. Will create it"
+      log "INFO Cloning SOURCE_BRANCH"
+      if ! git clone -b "$source_branch" "$repo_url" 2>&1; then
+        log "ERROR Could not clone SOURCE_BRANCH"
+        log "      repo_url = https://github.com/${owner}/${repo}.git"
+        exit 1
+      fi
+
+      log "INFO Changing into repo directory"
+      cd "$repo" || exit 1
+
+      log "INFO Checking out new DESTINATION_BRANCH"
+      if ! git checkout -b "$dest_branch" 2>&1; then
+        log "ERROR Could not checkout DESTINATION_BRANCH"
+        exit 1
+      fi
+
+      log "INFO Pushing DESTINATION_BRANCH to origin"
+      if ! git push -u origin "$dest_branch" 2>&1; then
+        log "ERROR Could not push to origin DESTINATION_BRANCH"
+        exit 1
+      fi
+
+      log "INFO Fast forward complete"
+      exit 0
+    fi
+
+    log "INFO Changing into repo directory"
+    cd "$repo" || exit 1
+
+    log "INFO Pulling from SOURCE_BRANCH into DESTINATION_BRANCH"
+    if ! git pull --ff-only origin "$source_branch" 2>&1; then
+      log "ERROR Could not pull from SOURCE_BRANCH"
+      exit 1
+    fi
+
+    log "INFO Pushing to origin/DESTINATION_BRANCH"
+    if ! git push 2>&1; then
+      log "ERROR Could not push to DESTINATION_BRANCH"
+      exit 1
+    fi
+
+    log "INFO Fast forward complete"
+  ) >"${log_file}" 2>&1
+
+  local result=$?
+
+  # Cleanup temp dir
+  rm -rf "$ocm_dir" 2>/dev/null || true
+
+  return $result
+}
 
 echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
@@ -90,22 +156,13 @@ for product in mce acm; do
       echo "INFO: Fast-forwarding ${owner_repo} main to branch: ${branch}"
       log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
 
-      REPO_OWNER=${owner} \
-        REPO_NAME=${repo} \
-        SOURCE_BRANCH=main \
-        DESTINATION_BRANCH=${branch} \
-        "${SCRIPT_DIR}/../fastforward/ocm-ci-fastforward-commands.sh" >"${log_file}" 2>&1 ||
-        {
-          err=$?
-          exit_code=$((exit_code | err))
-          echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
-          echo "Logs:"
-          sed 's/^/    /' "${log_file}"
-        }
-
-      # Cleanup temp dirs created by fastforward script
-      # Safe because script has completed and we're in sequential loop
-      find /tmp -maxdepth 1 -name 'ocm-*' -type d -exec rm -rf {} + 2>/dev/null || true
+      if ! fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"; then
+        err=$?
+        exit_code=$((exit_code | err))
+        echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
+        echo "Logs:"
+        sed 's/^/    /' "${log_file}"
+      fi
     done
   done
 done
