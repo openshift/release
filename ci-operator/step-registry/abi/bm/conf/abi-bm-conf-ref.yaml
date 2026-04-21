@@ -14,13 +14,13 @@ ref:
     - name: OCP__ABI__CLUSTER_DIR
       default: ocpClusterDir
       documentation: |-
-        `openshift-install` workspace path relative to the step working directory (not **SHARED_DIR**); must match **abi-bm-install** when overriding.
+        The `openshift-install` workspace path (preferred: relative to the Step's CWD); must match **abi-bm-install** when overriding.
     - name: OCP__ABI__BM__CLS_NAME
       documentation: |-
-        Required (no default). **metadata.name** in the initial **install-config**.
+        Required (no default). The Cluster name to be deployed.
     - name: OCP__ABI__BM__BASE_DOM
       documentation: |-
-        Required (no default). **baseDomain** for **install-config**.
+        Required (no default). The Cluster DNS Base Domain.
     - name: OCP__ABI__INSTLR_LOG_LEVEL
       default: "info"
       documentation: |-
@@ -28,16 +28,15 @@ ref:
     - name: OCP__ABI__DAY0_SCRIPTS_YAML
       default: "Scripts: []"
       documentation: |-
-        Customization YAML after **install-config** / **agent-config** scaffolding and before **bmc--info.json** (passed to BuildCustomScriptsFromYAML). Default is an empty script list. Schema: [BuildCustomScriptsFromYAML.sh](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/HEAD/libs/bash/common/BuildCustomScriptsFromYAML.sh).
+        Phase Customization Script for Day-0 (see [Phase Customization Scripts](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/main/ci-operator/step-registry/abi/README.md#phase-customization-scripts)).
     - name: OCP__ABI__DAY1_SCRIPTS_YAML
       default: "Scripts: []"
       documentation: |-
-        Customization YAML after **cluster-manifests** are generated, before the workspace is archived for **abi-bm-install**. Default is an empty script list. Schema: [BuildCustomScriptsFromYAML.sh](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/HEAD/libs/bash/common/BuildCustomScriptsFromYAML.sh).
+        Phase Customization Script for Day-1 (see [Phase Customization Scripts](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/main/ci-operator/step-registry/abi/README.md#phase-customization-scripts)).
   documentation: |-
-    Step input parameters are documented on each **`env`** entry above.
+    The `${CLUSTER_PROFILE_DIR}/` MUST contain files: `pull-secret`, `ssh-publickey`, `cred--bmc--usr`, `cred--bmc--pwd`, and `ocp--abi--cfg.yaml`.
 
-    **CLUSTER_PROFILE_DIR** (provided by CI; not an `env` field here) must contain **pull-secret**, **ssh-publickey**, **cred--bmc--usr**, and **cred--bmc--pwd**.
+    See [ABI overview](../../README.md) for details.
 
-    ABI overview: [`abi/README.md`](../../README.md).
-
-    **`from_image`:** **`ci/baremetal-qe-base:latest`** is built from [openshift-eng/baremetal-qe-infra](https://github.com/openshift-eng/baremetal-qe-infra) (`images/prow-image/Dockerfile`) and promoted to **`ci`**. The image installs the **`nmstate`** RPM (provides **`nmstatectl`**). This step runs **`EnsureReqs yq`** and expects **`jq`** on **`PATH`**.
+    The Container Image [ci/baremetal-qe-base:latest](https://github.com/openshift-eng/baremetal-qe-infra/blob/master/images/prow-image/Dockerfile) is used
+    because it provides `nmstatectl`.

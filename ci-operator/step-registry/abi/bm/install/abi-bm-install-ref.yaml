@@ -15,10 +15,6 @@ ref:
       name: chisel-creds
       mount_path: /secret/chisel
   env:
-    - name: OCP__ABI__DAY2_SCRIPTS_YAML
-      default: "Scripts: []"
-      documentation: |-
-        Post-install customization YAML after nodes are Ready (passed to BuildCustomScriptsFromYAML). Default is an empty script list.
     - name: OCP__ABI__CLUSTER_DIR
       default: ocpClusterDir
       documentation: |-
@@ -27,14 +23,6 @@ ref:
       default: "info"
       documentation: |-
         Log level for `openshift-install` (`--log-level`).
-    - name: OCP__ABI__WAIT__BOOTSTRAP__H
-      default: "2"
-      documentation: |-
-        Maximum attempts for `openshift-install agent wait-for bootstrap-complete` (each attempt is still subject to the installer's internal timeout).
-    - name: OCP__ABI__WAIT__CLUSTER__H
-      default: "2"
-      documentation: |-
-        Maximum attempts for `openshift-install agent wait-for install-complete`.
     - name: OCP__ABI__TEAM_NAME
       documentation: |-
         Required (no default). Vault-synced Chisel basic-auth files under `/secret/chisel` use this value as the filename suffix (`chisel-usr--…`, `chisel-pwd--…`).
@@ -47,9 +35,27 @@ ref:
     - name: OCP__ABI__TUN_SVC__CP_URL
       documentation: |-
         Required (no default). Control-plane URL for `chisel client` (e.g. `https://<svcFQDN>/cp`).
+    - name: OCP__ABI__MIN_ISO
+      default: "1"
+      documentation: |-
+        When non-zero, patches `agent-config.yaml` with `.minimalISO=true` and `.bootArtifactsBaseURL` (boot artifacts served via Chisel tunnel) before `agent create image`. Set to `0` to embed all artifacts in the ISO.
+    - name: OCP__ABI__WAIT__BOOTSTRAP__H
+      default: "2"
+      documentation: |-
+        Maximum attempts for `openshift-install agent wait-for bootstrap-complete` (each attempt is still subject to the installer's internal timeout).
+    - name: OCP__ABI__WAIT__CLUSTER__H
+      default: "2"
+      documentation: |-
+        Maximum attempts for `openshift-install agent wait-for install-complete`.
+    - name: OCP__ABI__DAY2_SCRIPTS_YAML
+      default: "Scripts: []"
+      documentation: |-
+        Phase Customization Script for Day-2 (see [Phase Customization Scripts](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/main/ci-operator/step-registry/abi/README.md#phase-customization-scripts)).
   documentation: |-
-    **`OCP__ABI__DAY0_SCRIPTS_YAML`** / **`OCP__ABI__DAY1_SCRIPTS_YAML`** are on **`abi-bm-conf`** only.
+    The `${CLUSTER_PROFILE_DIR}/` MUST contain files: `ocp--abi--cfg.yaml`.
 
-    The shared **Chisel** service and **NGINX** in front of it must be built so configurable data-plane port forwarding works, as described in [WebApp Services — Chisel Tunneling Service](https://redhat.atlassian.net/wiki/spaces/MPEXIENG/pages/254804070/WebApp+Services#Chisel-Tunneling-Service) (MPEXIENG). Required tunnel-related parameters are documented on their respective `env` entries above. Do not change URL or port semantics without that reference.
+    See [ABI overview](../../README.md) for details.
 
-    Step execution and Redfish details: **`abi-bm-install-commands.sh`** header. Job configuration: [`abi/README.md`](../../README.md), [`../../gs-baremetal/CI-ABI-JOB-CONFIG.md`](../../gs-baremetal/CI-ABI-JOB-CONFIG.md). YAML script schema: [BuildCustomScriptsFromYAML.sh](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/HEAD/libs/bash/common/BuildCustomScriptsFromYAML.sh).
+    The shared **Chisel** service and **NGINX** in front of it must be built so configurable data-plane port forwarding works, as described in
+    [WebApp Services — Chisel Tunneling Service](https://redhat.atlassian.net/wiki/spaces/MPEXIENG/pages/254804070/WebApp+Services#Chisel-Tunneling-Service).
+    Required tunnel-related parameters are documented on their respective Env. Var. entries above. Do not change URL or port semantics without that reference.
