@@ -417,6 +417,7 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
               body
               state
               submittedAt
+              comments(first: 0) { totalCount }
             }
           }
         }
@@ -461,6 +462,15 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
 
         # Check if author is authorized
         if not is_authorized_author(author):
+            continue
+
+        # Skip approved bot review bodies when inline comments exist.
+        # Bot review bodies (e.g. CodeRabbit's "Actionable comments posted: N")
+        # are machine-generated summaries of their inline comments. Those inline
+        # comments are already handled by analyze_review_threads, so flagging the
+        # body too causes Claude to address the same feedback twice.
+        inline_count = review.get("comments", {}).get("totalCount", 0)
+        if is_approved_bot(author) and inline_count > 0:
             continue
 
         review_id = review["id"]
