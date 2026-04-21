@@ -385,13 +385,7 @@ fi
 # Copy JUnit files to SHARED_DIR for ReportPortal post step
 # (ARTIFACT_DIR is step-specific; SHARED_DIR persists across steps)
 echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
-echo "DEBUG: ARTIFACT_DIR=${ARTIFACT_DIR}"
-echo "DEBUG: SHARED_DIR=${SHARED_DIR}"
-echo "DEBUG: Files in ARTIFACT_DIR:"
-ls -la "${ARTIFACT_DIR}"/junit_*.xml 2>&1 || echo "  (no junit files in ARTIFACT_DIR)"
 cp "${ARTIFACT_DIR}"/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || true
-echo "DEBUG: Files in SHARED_DIR after copy:"
-ls -la "${SHARED_DIR}"/junit_*.xml 2>&1 || echo "  (no junit files in SHARED_DIR)"
 ls "${SHARED_DIR}"/junit_*.xml 2>/dev/null | sed 's/^/  - /' || echo "  (no junit files to copy)"
 
 # Copy version_info.json for ReportPortal metadata
