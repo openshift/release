@@ -10,11 +10,38 @@ get_default_branch() {
   local owner=$1
   local repo=$2
   local token
-  token=$(cat "${GITHUB_TOKEN_FILE}")
 
-  curl -s -H "Authorization: token ${token}" \
-    "https://api.github.com/repos/${owner}/${repo}" | \
-    jq -r '.default_branch'
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    echo "ERROR: GITHUB_TOKEN_FILE not found" >&2
+    return 1
+  fi
+
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  if [[ -z "${token}" ]]; then
+    echo "ERROR: GITHUB_TOKEN_FILE is empty" >&2
+    return 1
+  fi
+
+  local response http_code
+  response=$(curl -s -w "\n%{http_code}" -H "Authorization: token ${token}" \
+    "https://api.github.com/repos/${owner}/${repo}")
+  http_code=$(echo "$response" | tail -1)
+  response=$(echo "$response" | sed '$d')
+
+  if [[ "$http_code" != "200" ]]; then
+    echo "ERROR: GitHub API returned HTTP $http_code for ${owner}/${repo}" >&2
+    return 1
+  fi
+
+  local default_branch
+  default_branch=$(echo "$response" | jq -r '.default_branch')
+
+  if [[ -z "$default_branch" || "$default_branch" == "null" ]]; then
+    echo "ERROR: Could not parse default_branch from API response for ${owner}/${repo}" >&2
+    return 1
+  fi
+
+  echo "$default_branch"
 }
 
 # Find highest semantic version in Tekton files
@@ -150,10 +177,10 @@ create_tekton_files() {
 
     if [[ "$highest_version" == "main" ]]; then
       using_main_template=true
-      template_file=$(ls .tekton/*-main-*.yaml 2>/dev/null | head -1)
+      template_file=$(compgen -G ".tekton/*-main-*.yaml" | head -1)
       log "INFO Using -main- files as template"
     else
-      template_file=$(ls .tekton/*-${product_prefix}-${highest_version}-*.yaml 2>/dev/null | head -1)
+      template_file=$(compgen -G ".tekton/*-${product_prefix}-${highest_version}-*.yaml" | head -1)
       log "INFO Using ${product_prefix}-${highest_version} files as template"
 
       # Extract source version from template file (e.g., "release-2.17" from file content)
@@ -190,7 +217,7 @@ create_tekton_files() {
       local dest_ver_compact="${dest_version//./}"
 
       # Check if files already exist
-      if ls .tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml >/dev/null 2>&1; then
+      if compgen -G ".tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml" >/dev/null; then
         log "INFO ${product_prefix}-${dest_ver_compact} files already exist, skipping"
         continue
       fi
@@ -268,14 +295,19 @@ Generated from existing ${product_prefix}-${highest_version} templates.
 /cc @stolostron/acm-cicd"
 
     if command -v gh >/dev/null 2>&1; then
-      gh pr create \
+      export GH_TOKEN="${token}"
+      if ! gh pr create \
         --title "${pr_title}" \
         --body "${pr_body}" \
         --base "${default_branch}" \
-        --head "${pr_branch}" 2>&1 || log "WARNING: PR creation failed, branch pushed but PR not created"
+        --head "${pr_branch}" 2>&1; then
+        log "WARNING: PR creation failed, branch pushed but PR not created"
+        exit 1
+      fi
     else
       log "WARNING: gh CLI not available, branch pushed but PR not created"
       log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${default_branch}...${pr_branch}"
+      exit 1
     fi
 
     log "INFO Tekton file creation complete"
@@ -442,9 +474,10 @@ for product in mce acm; do
       echo "INFO: Fast-forwarding ${owner_repo} main to branch: ${branch}"
       log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
 
-      if ! fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"; then
-        err=$?
-        exit_code=$((exit_code | err))
+      fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"
+      status=$?
+      if [[ $status -ne 0 ]]; then
+        exit_code=$((exit_code | status))
         echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
         echo "Logs:"
         sed 's/^/    /' "${log_file}"
@@ -455,9 +488,10 @@ for product in mce acm; do
     echo "INFO: Creating Tekton files for ${owner_repo}"
     tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
-    if ! create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "main" "${DESTINATION_VERSIONS}" "${tekton_log_file}"; then
-      err=$?
-      exit_code=$((exit_code | err))
+    create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "main" "${DESTINATION_VERSIONS}" "${tekton_log_file}"
+    status=$?
+    if [[ $status -ne 0 ]]; then
+      exit_code=$((exit_code | status))
       echo "WARNING: Failed to create Tekton files for ${owner_repo}"
       echo "Logs:"
       sed 's/^/    /' "${tekton_log_file}"
@@ -501,8 +535,7 @@ for product in mce acm; do
     echo "INFO: Handling excluded repo ${owner_repo}"
 
     # Get default branch
-    default_branch=$(get_default_branch "${owner}" "${repo}")
-    if [[ -z "${default_branch}" ]]; then
+    if ! default_branch=$(get_default_branch "${owner}" "${repo}"); then
       echo "WARNING: Could not determine default branch for ${owner_repo}, skipping"
       continue
     fi
@@ -517,9 +550,10 @@ for product in mce acm; do
       echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
       branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
 
-      if ! fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"; then
-        err=$?
-        exit_code=$((exit_code | err))
+      fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+      status=$?
+      if [[ $status -ne 0 ]]; then
+        exit_code=$((exit_code | status))
         echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
         echo "Logs:"
         sed 's/^/    /' "${branch_log}"
@@ -530,9 +564,10 @@ for product in mce acm; do
       echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
-      if ! create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"; then
-        err=$?
-        exit_code=$((exit_code | err))
+      create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
+      status=$?
+      if [[ $status -ne 0 ]]; then
+        exit_code=$((exit_code | status))
         echo "WARNING: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
         echo "Logs:"
         sed 's/^/    /' "${tekton_log_file}"
