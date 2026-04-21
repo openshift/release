@@ -54,7 +54,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-index-lifecycle-agent-operator-bundle-pipeline,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -66,12 +66,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-ci-job
     rerun_command: /test ci-job
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/lifecycle-agent-coverall
         - --target=ci-job
         command:
         - ci-operator
@@ -93,6 +95,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/lifecycle-agent-coverall
+          name: lifecycle-agent-coverall
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -104,6 +109,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: lifecycle-agent-coverall
+        secret:
+          secretName: lifecycle-agent-coverall
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -130,7 +138,7 @@ presubmits:
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-ibi-e2e-flow
     optional: true
     rerun_command: /test ibi-e2e-flow
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -212,7 +220,7 @@ presubmits:
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-ibu-e2e-flow
     optional: true
     rerun_command: /test ibu-e2e-flow
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -279,7 +287,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ibu-e2e-flow,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -291,6 +299,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-images
     rerun_command: /test images
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -346,7 +355,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-integration
     rerun_command: /test integration
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -427,7 +436,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-ipc-e2e-flow
     rerun_command: /test ipc-e2e-flow
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -569,7 +578,7 @@ presubmits:
     name: pull-ci-openshift-kni-lifecycle-agent-release-4.20-security
     optional: true
     rerun_command: /test security
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    skip_if_only_changed: ^docs/|^hack/|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
     spec:
       containers:
       - args:
