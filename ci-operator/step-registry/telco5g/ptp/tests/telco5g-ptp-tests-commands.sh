@@ -294,7 +294,7 @@ build_images
 
 # Get an updated version of oc
 mkdir ~/bin
-wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 tar -zxvf openshift-client-linux.tar.gz -C ~/bin
 export PATH=$HOME/bin:$PATH
 

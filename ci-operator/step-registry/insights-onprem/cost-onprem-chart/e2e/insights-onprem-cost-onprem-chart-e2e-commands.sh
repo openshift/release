@@ -46,7 +46,7 @@ fi
 # Install oc if not available
 if ! command -v oc &> /dev/null; then
     echo "oc not found, installing..."
-    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
+    curl -sL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
     tar -xzf /tmp/oc.tar.gz -C /tmp oc
     chmod +x /tmp/oc
     export PATH="/tmp:${PATH}"

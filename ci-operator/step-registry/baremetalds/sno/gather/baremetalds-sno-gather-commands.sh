@@ -65,7 +65,7 @@ must_gather_dir=/tmp/artifacts/post-tests-must-gather
 mkdir -p "${must_gather_dir}"
 
 # Download the MCO sanitizer binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 echo "Gathering must-gather data..."
