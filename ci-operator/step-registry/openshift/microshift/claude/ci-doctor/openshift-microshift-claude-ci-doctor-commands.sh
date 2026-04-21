@@ -262,7 +262,7 @@ cd "${SRC_DIR}"
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
+    --max-turns 100 \
     --output-format stream-json \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
