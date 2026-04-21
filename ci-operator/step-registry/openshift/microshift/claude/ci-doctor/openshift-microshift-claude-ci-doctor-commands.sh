@@ -2,6 +2,8 @@
 set -euo pipefail
 set -x
 
+# Dummy change to trigger rehearsals
+
 # Set global variables
 WORKDIR="/tmp/microshift-ci-claude-workdir.$(date +%y%m%d)"
 mkdir -p "${WORKDIR}"
