@@ -412,6 +412,7 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
           reviews(first: 100) {
             nodes {
               id
+              url
               author { login }
               body
               state
@@ -463,14 +464,16 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
             continue
 
         review_id = review["id"]
+        review_url = review.get("url", "")
 
-        # Check if any bot comment references this specific review
-        replied = any(str(review_id) in b for b in bot_bodies)
+        # Check if any bot comment references this specific review (by node ID or URL)
+        replied = any(str(review_id) in b or (review_url and review_url in b) for b in bot_bodies)
 
         if not replied:
             needs_attention.append({
                 "type": "review_body",
                 "id": review_id,
+                "url": review_url,
                 "author": author,
                 "author_type": "approved_bot" if is_approved_bot(author) else "human",
                 "state": review["state"],
@@ -845,7 +848,7 @@ RESPONSE RULES:
 3. For questions or clarifications, reply with an explanation only - do not change code unless asked
 4. COMMENT LINKAGE: When replying to a flat comment (type: issue_comment or review_body), you MUST include a reference so the system knows which comment you addressed:
    - For issue_comment: include the html_url from the JSON in your reply. Format: start with 'Re: <html_url>' on its own line
-   - For review_body: include the review id from the JSON in your reply. Format: start with 'Re: review <id>' on its own line
+   - For review_body: include the review url from the JSON in your reply. Format: start with 'Re: <url>' on its own line
 
 ${SUBAGENT_PROMPT}"
 
