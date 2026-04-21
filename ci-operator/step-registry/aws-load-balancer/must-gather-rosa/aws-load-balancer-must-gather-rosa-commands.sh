@@ -8,7 +8,7 @@ MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
 mkdir -p "${MUST_GATHER_DIR}"
 
 # Download the MCO sanitizer binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 oc --kubeconfig="${SHARED_DIR}/kubeconfig" adm must-gather --dest-dir="${MUST_GATHER_DIR}"

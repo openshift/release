@@ -11,7 +11,7 @@ export PATH="${TOOLS_DIR}:${PATH}"
 
 if ! command -v oc &>/dev/null; then
     echo "oc not found, downloading OpenShift client..."
-    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    curl -sL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
         | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
     if command -v oc &>/dev/null; then
         echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"

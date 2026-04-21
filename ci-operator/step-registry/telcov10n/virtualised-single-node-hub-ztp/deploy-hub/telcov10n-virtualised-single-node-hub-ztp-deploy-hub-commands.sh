@@ -376,7 +376,7 @@ all:
             -o LogLevel=ERROR'
           # kcli_wrp_install_depencencies: true
           # kcli_wrp_oc:
-          #   url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+          #   url: https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
           #   dest: /usr/local/bin
           # kcli_wrp_libvirt:
           #  pool:
