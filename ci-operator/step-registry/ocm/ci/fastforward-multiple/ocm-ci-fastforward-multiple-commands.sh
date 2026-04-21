@@ -44,10 +44,10 @@ EXCLUDED_REPOS=(
 )
 
 for product in mce acm; do
-  component_repos=$(yq '.components[] | 
+  component_repos=$(yq '.components[] |
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
-      .repository == "https://github.com/stolostron/*").repository' "${REPO_MAP_PATH}")
+      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}")
   for repo in ${component_repos}; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
@@ -85,7 +85,7 @@ for product in mce acm; do
         DESTINATION_BRANCH=${branch} \
         "${SCRIPT_DIR}/../fastforward/ocm-ci-fastforward-commands.sh" >"${log_file}" 2>&1 ||
         {
-          local err=$?
+          err=$?
           exit_code=$((exit_code | err))
           echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
           echo "Logs:"
@@ -94,7 +94,7 @@ for product in mce acm; do
 
       # Cleanup temp dirs created by fastforward script
       # Safe because script has completed and we're in sequential loop
-      find /tmp -maxdepth 1 -name 'ocm-*' -type d -mmin +1 -exec rm -rf {} + 2>/dev/null || true
+      find /tmp -maxdepth 1 -name 'ocm-*' -type d -exec rm -rf {} + 2>/dev/null || true
     done
   done
 done
