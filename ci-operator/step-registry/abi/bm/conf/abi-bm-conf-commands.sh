@@ -1,20 +1,12 @@
 #!/bin/bash
 # abi-bm-conf — Agent-based installer configuration (bare metal).
 #
-# Prepares **install-config** / **agent-config**, runs DAY0/DAY1 YAML hooks, builds **bmc--info.json**,
-# strips **.bmc** credentials from **agent-config**, runs **`openshift-install agent create cluster-manifests`**,
-# and writes **`${SHARED_DIR}/ocpClusterInf.tgz`** for **abi-bm-install**. Broader ABI context: **../../README.md**.
-#
-# **CLUSTER_PROFILE_DIR** must contain: **pull-secret**, **ssh-publickey**, **cred--bmc--usr**, **cred--bmc--pwd**.
-#
-# Step input parameters: **`abi-bm-conf-ref.yaml`** (`env` entries; step registry docs). Set via Job Conf. YAML **.tests[*].steps.env**.
-#
 # Logic in this Step:
-# - Bare-minimum **install-config** scaffold -> OCP-version-aware defaults -> **baremetal** platform -> **agent-config** template.
-# - **UpdateCfg Day0** merges, updates, or replaces config entries; DAY0 scripts further customize **install-config** / **agent-config**.
-# - BMC info extracted to **bmc--info.json**; BMC credentials stripped from **agent-config**.
-# - **cluster-manifests** generated.
-# - **UpdateCfg Day1** + DAY1 scripts customize manifests.
+# - Bare-minimum `install-config.yaml` scaffold -> OCP-version-aware defaults -> `baremetal` platform -> `agent-config.yaml` template.
+# - `UpdateCfg Day0` merges, updates, or replaces config entries; `OCP__ABI__DAY0_SCRIPTS_YAML` scripts further customize `install-config.yaml` / `agent-config.yaml`.
+# - Extracts BMC info to `ocp--bmc--info.json`; strips BMC credentials from `agent-config.yaml`.
+# - Generates Cluster manifests.
+# - `UpdateCfg Day1` + `OCP__ABI__DAY1_SCRIPTS_YAML` scripts customize manifests.
 #
 set -euxo pipefail
 shopt -s inherit_errexit

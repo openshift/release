@@ -1,17 +1,16 @@
 #!/bin/bash
-# abi-bm-install — Agent-based installer **install** phase (bare metal). Broader ABI context: **../../README.md**.
+# abi-bm-install — Agent-based installer install phase (bare metal).
 #
-# **Chisel:** OpenShift Secret **`test-credentials/chisel-creds`** is mounted at **`/secret/chisel`**. Basic-auth filenames use the **`chisel-usr--…`** / **`chisel-pwd--…`** pattern (suffix from **`OCP__ABI__TEAM_NAME`** in **`abi-bm-install-ref.yaml`**).
-#
-# Step input parameters: **`abi-bm-install-ref.yaml`** (`env` entries; step registry docs). Set via Job Conf. YAML **.tests[*].steps.env**.
+# **Chisel:** OpenShift Secret `test-credentials/chisel-creds` is mounted at `/secret/chisel`.
+# Basic-auth filenames use the `chisel-usr--…` / `chisel-pwd--…` pattern (suffix from `OCP__ABI__TEAM_NAME`).
 #
 # Logic in this Step:
-# - **`agent create image`** -> ISO served via HTTP **:8080** (Range-aware) + **Chisel** reverse tunnel.
-# - Redfish boot loop (background): mount ISO + boot nodes (order from **`ocp--bmc--info.json`**) + conditional disk wipe (BMC: pre-boot, OS: post-boot via SSH).
-# - **`wait-for bootstrap-complete`** -> copy minimal **kubeconfig** -> **Day-1.5** (background, runs concurrently with **`wait-for install-complete`**).
-# - **`wait-for install-complete`** -> eject virtual media.
-# - **Day-2**: Nodes Ready -> **DAY2** scripts for custom post-deployment actions.
-# - HTTP + **Chisel** torn down by **EXIT** trap.
+# - `agent create image` -> ISO is served via HTTP Server `8080` (Range-aware) + **Chisel** reversed tunnel.
+# - Redfish boot loop: mount ISO + boot nodes (order from `ocp--bmc--info.json`) + conditional disk wipe (BMC: pre-boot, OS: post-boot via SSH).
+# - `wait-for bootstrap-complete` -> copy minimal `KUBECONFIG` -> **Day-1.5** (runs concurrently with `wait-for install-complete`).
+# - `wait-for install-complete` -> eject virtual media.
+# - **Day-2**: Nodes Ready -> `OCP__ABI__DAY2_SCRIPTS_YAML` scripts for custom post-deployment actions.
+# - HTTP Server + **Chisel** torn down by `EXIT` trap.
 #
 set -euxo pipefail
 shopt -s inherit_errexit
@@ -198,7 +197,7 @@ sshEOF
 }
 
 
-# Chisel basic auth (disable **xtrace** while reading secrets).
+# Chisel basic auth (disable `xtrace` while reading secrets).
 set +x
 chiselCrdUsr="$(cat "/secret/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
 chiselCrdPwd="$(cat "/secret/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
@@ -211,15 +210,22 @@ trap '
     }
 ' EXIT
 
-# Restore install workspace from **abi-bm-conf** (then drop tarball from **SHARED_DIR**).
+# Restore OCP Installation information from previous Step.
 mkdir -p "${OCP__ABI__CLUSTER_DIR}"
 tar zxf "${SHARED_DIR}/ocpClusterInf.tgz" -C "${OCP__ABI__CLUSTER_DIR}/"
 rm -f "${SHARED_DIR}/ocpClusterInf.tgz"
 
-# Chisel / ISO URL (Job Conf. YAML key **.tests[*].steps.env**); fail before **`agent create image`**.
+# Chisel / ISO URL (Job Conf. YAML key `.tests[*].steps.env`); fail before `agent create image`.
 [ -n "${OCP__ABI__TUN_SVC__DP_BASE_URL}" ] && [ -n "${OCP__ABI__TUN_SVC__DP_PORT}" ] && [ -n "${OCP__ABI__TUN_SVC__CP_URL}" ]
 
-# **agent.*.iso** path after **`openshift-install agent create image`** (nullglob in subshell; rely on **errexit** / prior success).
+# ISO Creation Phase.
+((OCP__ABI__MIN_ISO)) && (
+    export __IMG__ROOT_FS="${OCP__ABI__TUN_SVC__DP_BASE_URL%%/}/${OCP__ABI__TUN_SVC__DP_PORT}/boot-artifacts"
+    yq -i eval '
+        .minimalISO=true |
+        .bootArtifactsBaseURL=strenv(__IMG__ROOT_FS)
+    ' "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
+)
 openshift-install agent create image
 isoFile="$(
     shopt -s nullglob
@@ -228,7 +234,7 @@ isoFile="$(
 [ -f "${isoFile}" ]
 isoURL="${OCP__ABI__TUN_SVC__DP_BASE_URL%%/}/${OCP__ABI__TUN_SVC__DP_PORT}/${isoFile##*/}"
 
-# Local HTTP serves the ISO (**HTTP Range** required by some BMC / virtual-media stacks); **ARTIFACT_DIR** holds logs.
+# Local HTTP serves the ISO (`HTTP Range` required by some BMC / virtual-media stacks); `ARTIFACT_DIR` holds logs.
 {
     python3 - "${httpSvcPort}" "${OCP__ABI__CLUSTER_DIR}" 0<<'pyEOF'
 import functools
@@ -329,7 +335,7 @@ chisel client \
     1> "${ARTIFACT_DIR}/ocp--installer--chisel.log" 2>&1 & taskPIDs+=($!)
 set -x
 
-# Probe BMC-facing ISO URL over the tunnel (**HEAD**). Do **sleep** before **curl** so Chisel can finish the reverse tunnel.
+# Probe BMC-facing ISO URL over the tunnel (`HEAD` Do `sleep` before `curl` so Chisel can finish the reverse tunnel.
 (
     typeset -i tryLeft=5
     while ((tryLeft)); do
@@ -477,7 +483,7 @@ cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minim
     )
     true
 ) & taskPIDs+=($!)
-# Wait for OCP installation to complete (**install-complete** can be slow with many workers).
+# Wait for OCP installation to complete (`install-complete` can be slow with many workers).
 (
     typeset -i tryLeft="${OCP__ABI__WAIT__CLUSTER__H}"
     while ((tryLeft)); do
@@ -499,12 +505,12 @@ done < <(jq -r '.[] | .url' 0< "${bmcInfo}")
 tar zcf "${ARTIFACT_DIR}/ocp.tgz" -C "${OCP__ABI__CLUSTER_DIR}/" auth/
 cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kube"{config,admin-password} "${SHARED_DIR}/"
 
-export KUBECONFIG="${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -f "${KUBECONFIG}" ]
 
-# TODO: Update secret store with KUBECONFIG.
+# TODO: Update secret store with `KUBECONFIG`.
 
-# Ensure node readiness before Day-2 customization (**KUBECONFIG** under cluster **auth/**, not **SHARED_DIR**).
+# Ensure Nodes readiness before Day-2 customization.
 oc wait node --all --for=condition=Ready --timeout=300s
 
 # Post-Deployment Customization.
