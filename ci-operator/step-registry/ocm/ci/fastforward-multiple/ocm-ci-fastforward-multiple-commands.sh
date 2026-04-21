@@ -98,10 +98,30 @@ create_tekton_files() {
 
     log "INFO Highest existing version: ${product_prefix}-${highest_version}"
 
-    # Determine source version branch (e.g., 2.17 from 217)
-    local source_major=$((highest_version / 10))
-    local source_minor=$((highest_version % 10))
-    local source_version="${source_major}.${source_minor}"
+    # Extract source version from template file (e.g., "release-2.17" from file content)
+    local template_file
+    template_file=$(ls .tekton/*-${product_prefix}-${highest_version}-*.yaml 2>/dev/null | head -1)
+    local source_version=""
+
+    if [[ -f "$template_file" ]]; then
+      # Extract version from patterns like "release-2.17" or "backplane-2.17"
+      source_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$template_file" | head -1 | cut -d'-' -f2)
+    fi
+
+    if [[ -z "$source_version" ]]; then
+      log "WARNING Could not extract source version from template, using calculated version"
+      # Fallback: assume format like 217 = 2.17, 50 = 5.0
+      if [[ $highest_version -ge 100 ]]; then
+        local source_major=$((highest_version / 100))
+        local source_minor=$((highest_version % 100))
+      else
+        local source_major=$((highest_version / 10))
+        local source_minor=$((highest_version % 10))
+      fi
+      source_version="${source_major}.${source_minor}"
+    fi
+
+    log "INFO Source version: ${branch_prefix}-${source_version}"
 
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
