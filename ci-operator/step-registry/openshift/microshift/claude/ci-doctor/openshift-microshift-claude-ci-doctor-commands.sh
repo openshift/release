@@ -44,6 +44,28 @@ atexit_handler() {
     fi
 }
 
+github_app_token() {
+    local -r jwt="$1"
+    local -r repo="$2"
+
+    local install_id
+    install_id="$(curl -s \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${repo}/installation" \
+        | jq -r '.id')"
+    if [ -z "${install_id}" ] || [ "${install_id}" = "null" ]; then
+        echo "ERROR: Failed to get installation ID for ${repo}" >&2
+        return 1
+    fi
+
+    curl -s -X POST \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${install_id}/access_tokens" \
+        | jq -r '.token'
+}
+
 load_secrets() {
     # Disable command tracing to prevent leaking credentials in logs
     # and restore it after the secrets are loaded
@@ -56,24 +78,39 @@ load_secrets() {
         local -r app_sha="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
         local -r app_exe="/tmp/gh-token-${app_ver}"
 
-        # Install a GitHub CLI extension to generate tokens for GitHub Apps
-        curl -sSL https://github.com/Link-/gh-token/releases/download/v${app_ver}/linux-amd64 -o "${app_exe}"
+        curl -sSL \
+            "https://github.com/Link-/gh-token/releases/download/v${app_ver}/linux-amd64" \
+            -o "${app_exe}"
         if ! echo "${app_sha}  ${app_exe}" | sha256sum -c -; then
             echo "ERROR: Failed to verify GitHub CLI extension checksum"
-            exit 1
+            return 1
         fi
         chmod +x "${app_exe}"
 
-        # Generate a GitHub token for the GitHub App
-        GITHUB_TOKEN="$("${app_exe}" generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
-        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
-            echo "ERROR: Failed to generate GitHub token"
-            exit 1
+        GITHUB_APP_JWT="$("${app_exe}" generate \
+            --app-id "$(< "${GITHUB_APP_ID_PATH}")" \
+            --key "${GITHUB_KEY_PATH}" \
+            --jwt \
+            --token-only)"
+        if [ -z "${GITHUB_APP_JWT}" ]; then
+            echo "ERROR: Failed to generate GitHub App JWT"
+            return 1
         fi
         rm -f "${app_exe}"
 
-        export GITHUB_TOKEN
-        echo "GitHub token generated."
+        GITHUB_TOKEN_USHIFT="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
+        if [ -z "${GITHUB_TOKEN_USHIFT}" ] || [ "${GITHUB_TOKEN_USHIFT}" = "null" ]; then
+            echo "ERROR: Failed to generate installation access token for openshift/microshift"
+            return 1
+        fi
+
+        GITHUB_TOKEN_EDGE="$(github_app_token "${GITHUB_APP_JWT}" openshift-eng/edge-tooling)"
+        if [ -z "${GITHUB_TOKEN_EDGE}" ] || [ "${GITHUB_TOKEN_EDGE}" = "null" ]; then
+            echo "ERROR: Failed to generate installation access token for openshift-eng/edge-tooling"
+            return 1
+        fi
+
+        echo "GitHub tokens generated."
     else
         echo "WARNING: GitHub App credentials not found at ${GITHUB_APP_ID_PATH} and ${GITHUB_KEY_PATH}. GitHub operations will not be available."
     fi
@@ -96,12 +133,20 @@ load_secrets() {
 }
 
 install_prerequisites() {
-    echo "Installing gcloud CLI..."
+    # Export the PATH to include the local bin directory
+    export PATH="${HOME}/.local/bin:${PATH}"
 
+    echo "Installing gcloud CLI..."
     curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
     /tmp/google-cloud-sdk/install.sh --quiet --path-update true
     export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
     echo "gcloud CLI installed."
+
+    echo "Installing Python package dependencies..."
+    pip install --user \
+        'uv==0.11.6' \
+        'matplotlib==3.9.4'
+    echo "Python package dependencies installed."
 }
 
 wait_for_mcp_status() {
@@ -167,11 +212,6 @@ EOF
     # Configure JIRA MCP
     if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
         echo "Configuring JIRA MCP..."
-
-        # Install uv to manage MCP dependencies
-        pip install uv --user --upgrade
-        export PATH="${HOME}/.local/bin:${PATH}"
-
         claude mcp add \
             -e JIRA_URL="${JIRA_URL}" \
             -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
@@ -210,15 +250,19 @@ configure_claude
 # microshift-ci skills and run analysis on all releases and open pull requests
 SRC_DIR="/tmp/edge-tooling"
 EXE_DIR="${SRC_DIR}/plugins/microshift-ci/scripts"
+{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_EDGE}"; set -x; }
 gh repo clone openshift-eng/edge-tooling "${SRC_DIR}" -- --branch main
 cd "${SRC_DIR}"
+
+# The rest of the script runs with the MicroShift GitHub token
+{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
 
 # Run analysis on all releases and open rebase PRs.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
+    --max-turns 100 \
     --output-format stream-json \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
