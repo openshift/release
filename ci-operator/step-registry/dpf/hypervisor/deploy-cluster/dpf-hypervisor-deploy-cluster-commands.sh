@@ -90,7 +90,12 @@ echo "Remote deployment logs directory on hypervisor: ${DEPLOYMENT_LOG}"
 
 
 # Git clone the dpf-openshift repo on hypervisor
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_MAIN_WORK_DIR}; mkdir -p openshift-dpf-${datetime_string}; cd openshift-dpf-${datetime_string}; git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
+  env; \
+  cd ${REMOTE_MAIN_WORK_DIR}; \
+  mkdir -p openshift-dpf-${datetime_string}; \
+  cd openshift-dpf-${datetime_string}; \
+  git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
   # need more checks to ensure repo was git cloned successfully
   echo "Git clone openshift-dpf repo was successful"
 else
@@ -102,11 +107,34 @@ REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
 echo "Checking if github repo branch was cloned successfully"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_WORK_DIR}/openshift-dpf; git status"; then
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
+   env; \
+   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+   git status; \
+   git log -1"; then
   echo "Git repository verified successfully"
 else
   echo "ERROR: Failed to verify git repository at ${REMOTE_WORK_DIR}/openshift-dpf"
   exit 1
+fi
+
+echo "Verify last-openshift-dpf-dir.sh file exists..."
+if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
+  echo "WARNING: File ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} does not exist, creating it..."
+  if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
+    echo "ERROR: Failed to create ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
+    exit 1
+  fi
+  echo "File created successfully"
+else
+  echo "Update hypervisor file ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} with path to latest openshift-dpf install dir"
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}; \
+    sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' last-openshift-dpf-dir.sh"; then
+    echo "Updated variable LAST_OPENSHIFT_DPF with path '${REMOTE_WORK_DIR}/openshift-dpf' in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
+  else
+    echo "ERROR: Failed to update variable LAST_OPENSHIFT_DPF in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
+    exit 1
+  fi
 fi
 
 # Generate the .env file using the env.user file on hypervisor
@@ -201,24 +229,8 @@ else
   exit 1
 fi
 
-echo "Verify last-openshift-dpf-dir.sh file exists..."
-if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
-  echo "WARNING: File ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} does not exist, creating it..."
-  if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
-    echo "ERROR: Failed to create ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
-    exit 1
-  fi
-  echo "File created successfully"
-else
-  echo "Update hypervisor file ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} with path to latest openshift-dpf install dir"
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}; \
-    sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' last-openshift-dpf-dir.sh"; then
-    echo "Updated variable LAST_OPENSHIFT_DPF with path '${REMOTE_WORK_DIR}/openshift-dpf' in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
-  else
-    echo "ERROR: Failed to update variable LAST_OPENSHIFT_DPF in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
-    exit 1
-  fi
-fi
+# Need basic oc commands to verify make all step passed
+
 
 #### Global comment:
 : <<'GLOBALCOMMENT'
