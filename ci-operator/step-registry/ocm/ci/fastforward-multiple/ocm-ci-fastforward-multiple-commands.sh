@@ -17,29 +17,54 @@ get_default_branch() {
     jq -r '.default_branch'
 }
 
-# Find highest version number in Tekton files
+# Find highest semantic version in Tekton files
 get_highest_tekton_version() {
   local repo_dir=$1
   local product_prefix=$2  # "acm" or "mce"
+  local branch_prefix=$3   # "release" or "backplane"
 
   if [[ ! -d "${repo_dir}/.tekton" ]]; then
     echo "0"
     return
   fi
 
-  local highest=0
+  local highest_compact=0
+  local highest_major=0
+  local highest_minor=0
+
   for file in "${repo_dir}"/.tekton/*-${product_prefix}-*-*.yaml; do
     [[ -f "$file" ]] || continue
-    # Extract version like "217" from "acm-217" or "mce-217"
+
+    # Extract compact version like "217" from "acm-217" or "mce-217"
     if [[ $(basename "$file") =~ ${product_prefix}-([0-9]+)- ]]; then
-      local ver="${BASH_REMATCH[1]}"
-      if [[ $ver -gt $highest ]]; then
-        highest=$ver
+      local ver_compact="${BASH_REMATCH[1]}"
+
+      # Extract semantic version from file content (e.g., "2.17" from "release-2.17")
+      local semantic_version=""
+      semantic_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$file" 2>/dev/null | head -1 | cut -d'-' -f2)
+
+      if [[ -n "$semantic_version" ]]; then
+        local major="${semantic_version%%.*}"
+        local minor="${semantic_version##*.}"
+
+        # Compare semantic versions (major.minor)
+        # e.g., 5.1 > 2.17 even though 51 < 217 numerically
+        if [[ $major -gt $highest_major ]] || \
+           [[ $major -eq $highest_major && $minor -gt $highest_minor ]]; then
+          highest_major=$major
+          highest_minor=$minor
+          highest_compact=$ver_compact
+        fi
+      else
+        # Fallback to numeric comparison if can't extract semantic version
+        if [[ $ver_compact -gt $highest_compact ]]; then
+          highest_compact=$ver_compact
+        fi
       fi
     fi
   done
 
-  echo "$highest"
+  echo "$highest_compact"
 }
 
 # Create Tekton files for missing versions
@@ -89,7 +114,7 @@ create_tekton_files() {
 
     # Find highest existing version
     local highest_version
-    highest_version=$(get_highest_tekton_version "." "${product_prefix}")
+    highest_version=$(get_highest_tekton_version "." "${product_prefix}" "${branch_prefix}")
 
     if [[ "$highest_version" == "0" ]]; then
       log "INFO No existing ${product_prefix}-* Tekton files found, skipping"
