@@ -28,7 +28,7 @@ DATA_AVAILABLE=false
 
 if [[ -f "${LOG_FILE}" ]]; then
     BLOCKING_LINES=$(sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${LOG_FILE}" \
-        | grep -v 'BLOCKING_JOBS_START\|BLOCKING_JOBS_END' \
+        | { grep -v 'BLOCKING_JOBS_START\|BLOCKING_JOBS_END' || true; } \
         | sed 's/^[0-9]*\t//' \
         | sed '/^[[:space:]]*$/d')
 
