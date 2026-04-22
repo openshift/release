@@ -513,6 +513,7 @@ SKIPPED_REPOS=(
   "mce-operator-bundle"
   "cluster-proxy-addon"
   "memcached"
+  "grafana-dashboard-loader"
 )
 
 # Repos with release-* default branch - exclude from main fast-forward
@@ -520,7 +521,6 @@ SKIPPED_REPOS=(
 EXCLUDED_REPOS=(
   "cluster-permission"
   "grafana"
-  "grafana-dashboard-loader"
   "kube-rbac-proxy"
   "kube-state-metrics"
   "memcached_exporter"
