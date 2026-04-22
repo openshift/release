@@ -10,6 +10,7 @@ postsubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
     max_concurrency: 1
     name: branch-ci-openshift-aws-vpce-operator-main-avo-e2e-postsubmit
     spec:
@@ -19,6 +20,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=avo-e2e-postsubmit
         command:
         - ci-operator
@@ -40,6 +42,9 @@ postsubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -60,6 +65,9 @@ postsubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -77,6 +85,7 @@ postsubmits:
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
     max_concurrency: 1
     name: branch-ci-openshift-aws-vpce-operator-main-publish-coverage
     spec:
