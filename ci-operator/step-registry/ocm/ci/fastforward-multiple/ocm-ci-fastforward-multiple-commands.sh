@@ -224,7 +224,8 @@ create_tekton_files() {
       # Extract source version from template file (e.g., "release-2.17" from file content)
       if [[ -f "$template_file" ]]; then
         # Extract version from patterns like "release-2.17" or "backplane-2.17"
-        source_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$template_file" | head -1 | cut -d'-' -f2)
+        # Use || true to handle grep returning 1 when no match found (pipefail would kill script)
+        source_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$template_file" | head -1 | cut -d'-' -f2 || true)
       fi
 
       if [[ -z "$source_version" ]]; then
