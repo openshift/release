@@ -510,6 +510,7 @@ done
 # Repos with release-* default branch - exclude from fast-forward
 EXCLUDED_REPOS=(
   "acm-operator-bundle"
+  "cluster-permission"
   "grafana"
   "grafana-dashboard-loader"
   "kube-rbac-proxy"
@@ -630,6 +631,13 @@ for product in mce acm; do
 
     echo "INFO: Handling excluded repo ${owner_repo}"
 
+    # Override branch_prefix for specific repos (deprecated in ACM, moved to MCE)
+    local repo_branch_prefix="${branch_prefix}"
+    if [[ "${repo}" == "cluster-permission" && "${product}" == "acm" ]]; then
+      echo "INFO: cluster-permission deprecated in ACM, using backplane-* branches"
+      repo_branch_prefix="backplane"
+    fi
+
     # Get default branch
     if ! default_branch=$(get_default_branch "${owner}" "${repo}"); then
       echo "WARNING: Could not determine default branch for ${owner_repo}, skipping"
@@ -640,7 +648,7 @@ for product in mce acm; do
 
     # For each destination version, ensure branch exists and create Tekton files
     for version in ${DESTINATION_VERSIONS}; do
-      dest_branch="${branch_prefix}-${version}"
+      dest_branch="${repo_branch_prefix}-${version}"
 
       # Check if branch exists, create if not
       echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
@@ -664,7 +672,7 @@ for product in mce acm; do
       echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
-      create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
+      create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
       status=$?
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
