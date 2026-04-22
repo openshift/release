@@ -33,6 +33,14 @@ get_default_branch() {
     return 1
   fi
 
+  # Check if repo is archived
+  local archived
+  archived=$(echo "$response" | jq -r '.archived')
+  if [[ "$archived" == "true" ]]; then
+    echo "ARCHIVED" >&2
+    return 2
+  fi
+
   local default_branch
   default_branch=$(echo "$response" | jq -r '.default_branch')
 
@@ -513,7 +521,6 @@ SKIPPED_REPOS=(
   "mce-operator-bundle"
   "cluster-proxy-addon"
   "memcached"
-  "grafana-dashboard-loader"
 )
 
 # Repos with release-* default branch - exclude from main fast-forward
@@ -524,12 +531,10 @@ EXCLUDED_REPOS=(
   "kube-rbac-proxy"
   "kube-state-metrics"
   "memcached_exporter"
-  "metrics-collector"
   "node-exporter"
   "prometheus"
   "prometheus-alertmanager"
   "prometheus-operator"
-  "rbac-query-proxy"
   "thanos"
   "thanos-receive-controller"
 )
@@ -667,7 +672,12 @@ for product in mce acm; do
     fi
 
     # Get default branch
-    if ! default_branch=$(get_default_branch "${owner}" "${repo}"); then
+    default_branch=$(get_default_branch "${owner}" "${repo}" 2>&1)
+    status=$?
+    if [[ $status -eq 2 ]]; then
+      echo "INFO: Skipping ${owner_repo} (archived repo)"
+      continue
+    elif [[ $status -ne 0 ]]; then
       echo "WARNING: Could not determine default branch for ${owner_repo}, skipping"
       continue
     fi
