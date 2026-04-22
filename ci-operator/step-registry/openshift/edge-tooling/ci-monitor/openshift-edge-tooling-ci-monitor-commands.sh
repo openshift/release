@@ -130,6 +130,9 @@ copy_artifacts() {
         cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
     fi
 
+    # Share the analysis log with downstream steps (e.g. Slack notification)
+    cp "${ARTIFACT_DIR}/claude-analysis.log" "${SHARED_DIR}/" 2>/dev/null || true
+
     # Archive Claude session for local continuation
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session..."
