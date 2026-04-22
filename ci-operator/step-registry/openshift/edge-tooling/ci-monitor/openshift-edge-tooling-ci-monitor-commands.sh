@@ -131,7 +131,12 @@ copy_artifacts() {
     fi
 
     # Share the analysis log with downstream steps (e.g. Slack notification)
-    cp "${ARTIFACT_DIR}/claude-analysis.log" "${SHARED_DIR}/" 2>/dev/null || true
+    if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
+        cp "${ARTIFACT_DIR}/claude-analysis.log" "${SHARED_DIR}/" || \
+            echo "ERROR: failed to copy claude-analysis.log to SHARED_DIR" >&2
+    else
+        echo "Warning: ${ARTIFACT_DIR}/claude-analysis.log not found or unreadable" >&2
+    fi
 
     # Archive Claude session for local continuation
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then

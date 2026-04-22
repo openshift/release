@@ -24,6 +24,7 @@ LOG_FILE="${SHARED_DIR}/claude-analysis.log"
 BLOCKING_COUNT=0
 VERSIONS=""
 TOPOLOGIES=""
+DATA_AVAILABLE=false
 
 if [[ -f "${LOG_FILE}" ]]; then
     BLOCKING_LINES=$(sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${LOG_FILE}" \
@@ -32,6 +33,7 @@ if [[ -f "${LOG_FILE}" ]]; then
         | sed '/^[[:space:]]*$/d')
 
     if [[ -n "${BLOCKING_LINES}" ]]; then
+        DATA_AVAILABLE=true
         BLOCKING_COUNT=$(echo "${BLOCKING_LINES}" | wc -l)
         VERSIONS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $5}' | sort -uV | paste -sd ', ')
         TOPOLOGIES=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | paste -sd ', ')
@@ -43,7 +45,10 @@ fi
 # ---------------------------------------------------------------------------
 # Compose the Slack message
 # ---------------------------------------------------------------------------
-if [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
+if [[ "${DATA_AVAILABLE}" != "true" ]]; then
+    ICON=":warning:"
+    MESSAGE="${ICON} *Edge OCP CI Monitor* — Blocking jobs data unavailable. Please investigate the artifacts."
+elif [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
     ICON=":large_green_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — No blocking jobs found."
 else
@@ -58,8 +63,10 @@ MESSAGE+="\n<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-e
 # ---------------------------------------------------------------------------
 # Send to Slack
 # ---------------------------------------------------------------------------
+PAYLOAD=$(jq -nc --arg text "${MESSAGE}" '{"text": $text}')
+
 curl -sf -X POST -H 'Content-type: application/json' \
-    --data "{\"text\":\"${MESSAGE}\"}" \
+    --data "${PAYLOAD}" \
     "${WEBHOOK_URL}"
 
 echo "Slack notification sent (${BLOCKING_COUNT} blocking jobs found)."
