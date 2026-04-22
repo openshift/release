@@ -494,8 +494,12 @@ for product in mce acm; do
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
         echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
-        echo "Logs:"
-        sed 's/^/    /' "${log_file}"
+        if [[ -f "${log_file}" ]]; then
+          echo "Logs:"
+          sed 's/^/    /' "${log_file}"
+        else
+          echo "ERROR: Log file not found: ${log_file}"
+        fi
       fi
     done
 
@@ -508,8 +512,12 @@ for product in mce acm; do
     if [[ $status -ne 0 ]]; then
       exit_code=$((exit_code | status))
       echo "WARNING: Failed to create Tekton files for ${owner_repo}"
-      echo "Logs:"
-      sed 's/^/    /' "${tekton_log_file}"
+      if [[ -f "${tekton_log_file}" ]]; then
+        echo "Logs:"
+        sed 's/^/    /' "${tekton_log_file}"
+      else
+        echo "ERROR: Log file not found: ${tekton_log_file}"
+      fi
     fi
   done
 done
@@ -570,8 +578,12 @@ for product in mce acm; do
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
         echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
-        echo "Logs:"
-        sed 's/^/    /' "${branch_log}"
+        if [[ -f "${branch_log}" ]]; then
+          echo "Logs:"
+          sed 's/^/    /' "${branch_log}"
+        else
+          echo "ERROR: Log file not found: ${branch_log}"
+        fi
         continue
       fi
 
@@ -584,8 +596,12 @@ for product in mce acm; do
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
         echo "WARNING: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
-        echo "Logs:"
-        sed 's/^/    /' "${tekton_log_file}"
+        if [[ -f "${tekton_log_file}" ]]; then
+          echo "Logs:"
+          sed 's/^/    /' "${tekton_log_file}"
+        else
+          echo "ERROR: Log file not found: ${tekton_log_file}"
+        fi
       fi
     done
   done
