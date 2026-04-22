@@ -36,6 +36,7 @@ timelines and identifying only threads where:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from functools import lru_cache
@@ -59,6 +60,14 @@ APPROVED_BOTS = [
     "coderabbitai[bot]",
 ]
 
+# Prow/CI bots whose comments should be ignored entirely
+IGNORED_ACCOUNTS = [
+    "openshift-ci-robot",
+    "openshift-ci",
+    "openshift-merge-robot",
+    "openshift-bot",
+]
+
 # Cache for authorization results to minimize API calls
 _auth_cache: dict[str, bool] = {}
 
@@ -74,11 +83,27 @@ def run_gh(args: list[str]) -> Any:
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def is_bot(login: str) -> bool:
-    """Check if login is a known bot account."""
+def is_our_bot(login: str) -> bool:
+    """Check if login is our bot account (whose comments count as replies)."""
     if not login:
         return False
-    return login in BOT_ACCOUNTS or login.endswith("[bot]")
+    return login in BOT_ACCOUNTS
+
+
+def is_approved_bot(login: str) -> bool:
+    """Check if login is an approved bot whose comments should trigger responses."""
+    if not login:
+        return False
+    return login in APPROVED_BOTS
+
+
+def is_ignored_bot(login: str) -> bool:
+    """Check if login is a bot that should be ignored (prow bots, unknown [bot] accounts)."""
+    if not login:
+        return False
+    if login in BOT_ACCOUNTS or login in APPROVED_BOTS:
+        return False
+    return login in IGNORED_ACCOUNTS or login.endswith("[bot]")
 
 
 def is_openshift_org_member(login: str) -> bool:
@@ -329,41 +354,46 @@ def analyze_review_threads(pr_number: int) -> list[dict]:
         if not comments:
             continue
 
-        # Find last human and last bot comment
-        last_human = None
-        last_bot = None
+        # Classify comments:
+        #   our_bot: our bot's reply (counts as "addressed")
+        #   actionable: human or approved bot comment (needs response)
+        #   ignored: unrecognized bots (skip)
+        last_actionable = None
+        last_our_bot = None
 
         for comment in comments:
             author = comment["author"]["login"] if comment["author"] else "unknown"
-            if is_bot(author):
-                last_bot = comment
-            else:
-                last_human = comment
-
-        # Needs attention if no bot reply, or human commented after bot
-        if last_bot is None:
-            last_author = last_human["author"]["login"] if last_human and last_human["author"] else "unknown"
-            # Check if author is authorized
-            if not is_authorized_author(last_author):
+            if is_our_bot(author):
+                last_our_bot = comment
+            elif is_ignored_bot(author):
                 continue
+            elif is_authorized_author(author):
+                last_actionable = comment
+
+        if last_actionable is None:
+            continue
+
+        last_author = last_actionable["author"]["login"] if last_actionable["author"] else "unknown"
+        author_type = "approved_bot" if is_approved_bot(last_author) else "human"
+
+        # Needs attention if no bot reply, or actionable comment after bot reply
+        if last_our_bot is None:
             needs_attention.append({
                 "type": "review_thread",
                 "id": thread["id"],
-                "last_human_comment": last_human["body"][:200] if last_human else None,
-                "last_human_author": last_author,
+                "last_comment": last_actionable["body"][:200],
+                "last_author": last_author,
+                "author_type": author_type,
                 "reason": "no_bot_reply"
             })
-        elif last_human and last_human["createdAt"] > last_bot["createdAt"]:
-            last_author = last_human["author"]["login"] if last_human["author"] else "unknown"
-            # Check if author is authorized
-            if not is_authorized_author(last_author):
-                continue
+        elif last_actionable["createdAt"] > last_our_bot["createdAt"]:
             needs_attention.append({
                 "type": "review_thread",
                 "id": thread["id"],
-                "last_human_comment": last_human["body"][:200],
-                "last_human_author": last_author,
-                "reason": "human_followup_after_bot"
+                "last_comment": last_actionable["body"][:200],
+                "last_author": last_author,
+                "author_type": author_type,
+                "reason": "followup_after_bot"
             })
 
     return needs_attention
@@ -382,10 +412,12 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
           reviews(first: 100) {
             nodes {
               id
+              url
               author { login }
               body
               state
               submittedAt
+              comments(first: 0) { totalCount }
             }
           }
         }
@@ -404,7 +436,7 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
     reviews = result["data"]["repository"]["pullRequest"]["reviews"]["nodes"]
     needs_attention = []
 
-    # Get issue comments to check if bot has replied to any review
+    # Get bot issue comment bodies to check for review ID references
     try:
         issue_comments = run_gh([
             "api", f"repos/openshift/hypershift/issues/{pr_number}/comments",
@@ -413,18 +445,15 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
     except subprocess.CalledProcessError:
         issue_comments = []
 
-    # Find last bot comment time from issue comments
-    bot_comment_times = []
-    if issue_comments:
-        for c in issue_comments:
-            if c["user"]["login"] in BOT_ACCOUNTS:
-                bot_comment_times.append(c["created_at"])
-    last_bot_time = max(bot_comment_times) if bot_comment_times else None
+    bot_bodies = [
+        c["body"] for c in (issue_comments or [])
+        if c["user"]["login"] in BOT_ACCOUNTS
+    ]
 
     for review in reviews:
-        # Skip reviews without bodies or from bots
+        # Skip reviews without bodies, from our bot, or from ignored bots
         author = review["author"]["login"] if review["author"] else None
-        if not author or is_bot(author):
+        if not author or is_our_bot(author) or is_ignored_bot(author):
             continue
 
         body = review.get("body", "").strip()
@@ -435,25 +464,44 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
         if not is_authorized_author(author):
             continue
 
-        submitted_at = review["submittedAt"]
+        # Skip approved bot review bodies when inline comments exist.
+        # Bot review bodies (e.g. CodeRabbit's "Actionable comments posted: N")
+        # are machine-generated summaries of their inline comments. Those inline
+        # comments are already handled by analyze_review_threads, so flagging the
+        # body too causes Claude to address the same feedback twice.
+        inline_count = review.get("comments", {}).get("totalCount", 0)
+        if is_approved_bot(author) and inline_count > 0:
+            continue
 
-        # Needs attention if no bot reply, or review was submitted after last bot comment
-        if last_bot_time is None or submitted_at > last_bot_time:
+        review_id = review["id"]
+        review_url = review.get("url", "")
+
+        # Check if any bot comment references this specific review (by node ID or URL)
+        replied = any(str(review_id) in b or (review_url and review_url in b) for b in bot_bodies)
+
+        if not replied:
             needs_attention.append({
                 "type": "review_body",
-                "id": review["id"],
+                "id": review_id,
+                "url": review_url,
                 "author": author,
+                "author_type": "approved_bot" if is_approved_bot(author) else "human",
                 "state": review["state"],
-                "body": body[:500],  # Include more context for review bodies
-                "submitted_at": submitted_at,
-                "reason": "no_bot_reply" if last_bot_time is None else "review_after_bot_reply"
+                "body": body[:500],
+                "submitted_at": review["submittedAt"],
+                "reason": "no_bot_reply"
             })
 
     return needs_attention
 
 
 def analyze_issue_comments(pr_number: int) -> list[dict]:
-    """Analyze issue comments (general PR comments) and return those needing attention."""
+    """Analyze issue comments (general PR comments) and return those needing attention.
+
+    Since issue comments are flat (no threading), we rely on our bot
+    including the comment URL when replying. A comment is considered
+    addressed only if our bot's reply contains its URL or comment ID anchor.
+    """
     try:
         comments = run_gh([
             "api", f"repos/openshift/hypershift/issues/{pr_number}/comments",
@@ -465,34 +513,50 @@ def analyze_issue_comments(pr_number: int) -> list[dict]:
     if not comments:
         return []
 
-    # Separate human and bot comments
-    human_comments = [c for c in comments if not is_bot(c["user"]["login"])]
-    bot_comments = [c for c in comments if c["user"]["login"] in BOT_ACCOUNTS]
+    # Actionable comments: humans and approved bots (not our bot, not ignored bots)
+    actionable_comments = [
+        c for c in comments
+        if not is_our_bot(c["user"]["login"]) and not is_ignored_bot(c["user"]["login"])
+    ]
+    # Our bot's comments (used for reply matching)
+    bot_comments = [c for c in comments if is_our_bot(c["user"]["login"])]
 
-    if not human_comments:
+    if not actionable_comments:
         return []
 
-    # Find the last bot comment timestamp
-    last_bot_time = None
-    if bot_comments:
-        last_bot_time = max(c["created_at"] for c in bot_comments)
+    # Collect all our bot comment bodies for reference matching
+    bot_bodies = [c["body"] for c in bot_comments]
 
     needs_attention = []
 
-    # Find human comments after last bot reply
-    for comment in human_comments:
-        if last_bot_time is None or comment["created_at"] > last_bot_time:
-            author = comment["user"]["login"]
-            # Check if author is authorized
-            if not is_authorized_author(author):
-                continue
+    for comment in actionable_comments:
+        author = comment["user"]["login"]
+        # Check if author is authorized
+        if not is_authorized_author(author):
+            continue
+
+        # Check if any bot comment references this specific comment
+        comment_id = str(comment["id"])
+        comment_url = comment.get("html_url", "")
+        # Match by full URL or by the #issuecomment-{id} anchor with word boundary
+        # to prevent #issuecomment-123 from matching #issuecomment-1234
+        anchor_pattern = re.compile(rf"#issuecomment-{re.escape(comment_id)}(?!\d)")
+
+        replied = any(
+            anchor_pattern.search(body) or (comment_url and comment_url in body)
+            for body in bot_bodies
+        )
+
+        if not replied:
             needs_attention.append({
                 "type": "issue_comment",
                 "id": comment["id"],
+                "html_url": comment_url,
                 "author": author,
+                "author_type": "approved_bot" if is_approved_bot(author) else "human",
                 "body": comment["body"][:200],
                 "created_at": comment["created_at"],
-                "reason": "no_bot_reply" if last_bot_time is None else "human_followup_after_bot"
+                "reason": "no_bot_reply"
             })
 
     return needs_attention
@@ -792,6 +856,9 @@ RESPONSE RULES:
 1. For each piece of feedback, choose ONE response mechanism only - never respond to the same feedback via both inline reply AND general PR comment
 2. Only make code changes when explicitly requested (look for imperative language like 'change', 'fix', 'update', 'remove')
 3. For questions or clarifications, reply with an explanation only - do not change code unless asked
+4. COMMENT LINKAGE: When replying to a flat comment (type: issue_comment or review_body), you MUST include a reference so the system knows which comment you addressed:
+   - For issue_comment: include the html_url from the JSON in your reply. Format: start with 'Re: <html_url>' on its own line
+   - For review_body: include the review url from the JSON in your reply. Format: start with 'Re: <url>' on its own line
 
 ${SUBAGENT_PROMPT}"
 
@@ -811,9 +878,53 @@ ${SUBAGENT_PROMPT}"
   set -e
   echo "Claude processing complete. Full output saved to /tmp/claude-pr-${PR_NUMBER}-output.json"
 
-  # Copy Claude output to SHARED_DIR for the report step
   if [ -f "/tmp/claude-pr-${PR_NUMBER}-output.json" ]; then
-    cp "/tmp/claude-pr-${PR_NUMBER}-output.json" "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
+    # Full output to ARTIFACT_DIR (GCS-backed, no size limit)
+    cp "/tmp/claude-pr-${PR_NUMBER}-output.json" "${ARTIFACT_DIR}/claude-pr-${PR_NUMBER}-output.json"
+    # Compact summary to SHARED_DIR for the report step.
+    # SHARED_DIR is backed by a Kubernetes secret (1MB limit), so we
+    # extract only the fields the report needs into a small JSON file.
+    python3 -c "
+import json, sys
+f = sys.argv[1]
+result_line = system_line = None
+tool_calls = []
+tool_errors = []
+for line in open(f):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    t = obj.get('type', '')
+    if t == 'result':
+        result_line = obj
+    elif t == 'system':
+        system_line = obj
+    elif t == 'tool_use':
+        tool_calls.append(obj.get('name', 'unknown'))
+    if obj.get('is_error'):
+        tool_errors.append(str(obj.get('content', ''))[:200])
+summary = {}
+if result_line:
+    summary['result'] = (result_line.get('result') or '')[:5000]
+    summary['usage'] = result_line.get('usage', {})
+    summary['duration_ms'] = result_line.get('duration_ms', 0)
+    summary['duration_api_ms'] = result_line.get('duration_api_ms', 0)
+    summary['num_turns'] = result_line.get('num_turns', 0)
+    summary['session_id'] = result_line.get('session_id', '')
+    summary['total_cost_usd'] = result_line.get('total_cost_usd', 0)
+    summary['modelUsage'] = result_line.get('modelUsage', {})
+if system_line:
+    summary['model'] = system_line.get('model', 'unknown')
+    summary['tools'] = system_line.get('tools', [])
+summary['tool_calls'] = tool_calls
+summary['tool_errors'] = tool_errors
+print(json.dumps(summary))
+" "/tmp/claude-pr-${PR_NUMBER}-output.json" \
+      > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-summary.json" 2>/dev/null || true
   fi
 
   if [ $EXIT_CODE -eq 0 ]; then

@@ -257,7 +257,6 @@ platform:
     datacenter: "IBMCloud"
     cluster: vcs-mdcnc-workload-1
     defaultDatastore: mdcnc-ds-shared
-    folder: "/IBMCloud/vm/${cluster_name}"
     failureDomains:
     - name: us-east-1
       region: us-east
@@ -292,7 +291,6 @@ platform:
         networks:
         - ${vsphere_portgroup}
         datastore: mdcnc-ds-4
-        folder: "/datacenter-2/vm/${cluster_name}"
 
 networking:
   machineNetwork:

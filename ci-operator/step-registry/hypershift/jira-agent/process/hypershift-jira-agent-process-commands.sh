@@ -148,6 +148,44 @@ else
   JIRA_AUTH=""
 fi
 
+# Load Slack webhook URL for notifications (tracing disabled to protect credential)
+SLACK_WEBHOOK_FILE="/var/run/claude-code-service-account/slack-webhook-url"
+[[ $- == *x* ]] && _SLACK_WAS_TRACING=true || _SLACK_WAS_TRACING=false
+set +x
+if [ -f "$SLACK_WEBHOOK_FILE" ]; then
+  SLACK_WEBHOOK_URL=$(cat "$SLACK_WEBHOOK_FILE")
+  echo "Slack webhook URL loaded"
+else
+  echo "Warning: Slack webhook URL not found at $SLACK_WEBHOOK_FILE"
+  echo "Slack notifications will be skipped"
+  SLACK_WEBHOOK_URL=""
+fi
+$_SLACK_WAS_TRACING && set -x
+
+# Load GitHub-to-Slack user ID mapping
+GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/gh-to-slack-ids"
+if [ -f "$GITHUB_SLACK_MAP_FILE" ]; then
+  if GITHUB_SLACK_MAP=$(jq -c . < "$GITHUB_SLACK_MAP_FILE" 2>/dev/null); then
+    echo "GitHub-to-Slack mapping loaded"
+  else
+    echo "Warning: GitHub-to-Slack mapping is invalid JSON"
+    echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
+    GITHUB_SLACK_MAP="{}"
+  fi
+else
+  echo "Warning: GitHub-to-Slack mapping not found at $GITHUB_SLACK_MAP_FILE"
+  echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
+  GITHUB_SLACK_MAP="{}"
+fi
+
+# Extract Slack fallback user ID from mapping (pinged when no reviewers are assigned)
+SLACK_FALLBACK_USER_ID=$(jq -r '.["backup-user"] // empty' <<<"$GITHUB_SLACK_MAP")
+if [ -n "$SLACK_FALLBACK_USER_ID" ]; then
+  echo "Slack fallback user ID loaded from mapping"
+else
+  echo "Warning: No 'backup-user' key in GitHub-to-Slack mapping"
+fi
+
 # Function to transition a Jira issue to a target status
 transition_issue() {
   local ISSUE_KEY=$1
@@ -186,6 +224,99 @@ set_assignee() {
     -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json" \
     -d "{\"accountId\":\"$ACCOUNT_ID\"}"
+}
+
+# Function to send Slack notification after PR creation
+send_slack_notification() {
+  local PR_URL=$1
+  local PR_NUM=$2
+
+  if [ -z "$SLACK_WEBHOOK_URL" ]; then
+    echo "   Skipping Slack notification (no webhook URL configured)"
+    return 0
+  fi
+
+  echo "   Polling for PR reviewers (up to 2 minutes)..."
+  local REVIEWERS=""
+  local PR_TITLE=""
+  local ATTEMPT=0
+  local MAX_ATTEMPTS=5
+
+  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    local PR_DATA
+    PR_DATA=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json reviewRequests,title 2>/dev/null || echo "{}")
+    PR_TITLE=$(echo "$PR_DATA" | jq -r '.title // empty' 2>/dev/null)
+    REVIEWERS=$(echo "$PR_DATA" | jq -r '.reviewRequests[]?.login // empty' 2>/dev/null)
+    if [ -n "$REVIEWERS" ]; then
+      echo "   Reviewers found: $REVIEWERS"
+      break
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+      echo "   No reviewers yet, retrying in 30s (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+      sleep 30
+    fi
+  done
+
+  # Fallback PR title if not fetched
+  if [ -z "$PR_TITLE" ]; then
+    PR_TITLE="PR #${PR_NUM}"
+  fi
+
+  # Build reviewer mention string
+  local REVIEWER_MENTIONS=""
+  if [ -n "$REVIEWERS" ]; then
+    while IFS= read -r gh_user; do
+      local slack_id
+      slack_id=$(echo "$GITHUB_SLACK_MAP" | jq -r --arg user "$gh_user" '.[$user] // empty' 2>/dev/null)
+      if [ -n "$slack_id" ]; then
+        REVIEWER_MENTIONS="${REVIEWER_MENTIONS} <@${slack_id}>"
+      else
+        REVIEWER_MENTIONS="${REVIEWER_MENTIONS} ${gh_user}"
+      fi
+    done <<< "$REVIEWERS"
+  else
+    echo "   No reviewers assigned after 2 minutes, using fallback"
+    if [ -n "$SLACK_FALLBACK_USER_ID" ]; then
+      REVIEWER_MENTIONS="<@${SLACK_FALLBACK_USER_ID}>"
+    else
+      REVIEWER_MENTIONS="(none assigned)"
+    fi
+  fi
+  REVIEWER_MENTIONS=$(echo "$REVIEWER_MENTIONS" | sed 's/^ //')
+
+  # Send Slack message (tracing disabled to protect webhook URL)
+  local SLACK_PAYLOAD
+  SLACK_PAYLOAD=$(jq -n --arg title "$PR_TITLE" --arg url "$PR_URL" --arg reviewers "$REVIEWER_MENTIONS" \
+    '{text: ":hypershift-bot: *Jira Agent PR ready for review*\n:review: <\($url)|\($title)>\n:eyes: Reviewers: \($reviewers)"}')
+
+  [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
+  set +x
+  set +e
+  local SLACK_RESPONSE
+  SLACK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    --connect-timeout 10 \
+    --max-time 20 \
+    -H 'Content-type: application/json' \
+    --data "$SLACK_PAYLOAD" \
+    "$SLACK_WEBHOOK_URL")
+  local CURL_EXIT_CODE=$?
+  set -e
+  $_was_tracing && set -x
+
+  if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "   Warning: Failed to send Slack notification (curl exit $CURL_EXIT_CODE)"
+    return 0
+  fi
+
+  local SLACK_HTTP_CODE
+  SLACK_HTTP_CODE=$(echo "$SLACK_RESPONSE" | tail -1)
+
+  if [ "$SLACK_HTTP_CODE" = "200" ]; then
+    echo "   Slack notification sent successfully"
+  else
+    echo "   Warning: Failed to send Slack notification (HTTP $SLACK_HTTP_CODE)"
+  fi
 }
 
 # Query Jira for issues (excluding already processed ones via label)
@@ -570,6 +701,11 @@ ${REPORT_SECTION}"
             gh pr edit "$PR_NUM" --repo openshift/hypershift --body "$UPDATED_BODY" 2>/dev/null || echo "Warning: Failed to update PR #${PR_NUM} description"
           fi
         fi
+      fi
+
+      # Send Slack notification to team channel
+      if [ -n "$PR_URL" ] && [ -n "$PR_NUM" ]; then
+        send_slack_notification "$PR_URL" "$PR_NUM"
       fi
     else
       echo "No code changes detected for $ISSUE_KEY, skipping review and PR creation"

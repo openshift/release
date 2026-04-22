@@ -129,7 +129,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: hook
-        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260408-3bbc91829
+        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260414-6691f5aff
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -148,7 +148,8 @@ spec:
         - --jira-username=aos-team-dp-testplatform@redhat.com
         - --jira-password-file=/etc/jira/password
         - --projected-token-file=/var/sa-token/token
-        - --supplemental-plugin-config-dir=/etc/plugins
+        - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
         env:
@@ -179,9 +180,6 @@ spec:
           readOnly: true
         - name: unsplash-api
           mountPath: /etc/unsplash-api
-          readOnly: true
-        - name: plugins
-          mountPath: /etc/plugins
           readOnly: true
         - name: tmp
           mountPath: /tmp
@@ -243,9 +241,6 @@ spec:
       - name: config
         configMap:
           name: config
-      - name: plugins
-        configMap:
-          name: plugins
       - name: release
         emptyDir: {}
       - name: build-farm-credentials
