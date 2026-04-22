@@ -147,6 +147,14 @@ create_tekton_files() {
 
   local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
 
+  # Open log file early to capture all output
+  exec 3>&1 4>&2
+  exec 1>>"${log_file}" 2>&1
+
+  echo "INFO [DRY-RUN] Starting Tekton file creation for ${owner}/${repo}"
+  echo "INFO [DRY-RUN] default_branch=${default_branch}, dest_versions=${dest_versions}"
+  echo "INFO [DRY-RUN] log_file=${log_file}"
+
   (
     cd "$ocm_dir" || exit 1
     export HOME="$ocm_dir"
@@ -157,8 +165,7 @@ create_tekton_files() {
       echo "$ts" "$@"
     }
 
-    log "INFO [DRY-RUN] Starting Tekton file creation for ${owner}/${repo}"
-    log "INFO [DRY-RUN] default_branch=${default_branch}, dest_versions=${dest_versions}"
+    log "INFO [DRY-RUN] Inside subshell"
     log "INFO Cloning ${default_branch} branch"
     if ! git clone -b "${default_branch}" "$repo_url" 2>&1; then
       log "ERROR Could not clone ${default_branch} branch"
@@ -334,9 +341,13 @@ Generated from existing ${product_prefix}-${highest_version} templates.
     # fi
 
     log "INFO Tekton file creation complete"
-  ) >"${log_file}" 2>&1
+  )
 
   local result=$?
+
+  # Restore stdout/stderr
+  exec 1>&3 2>&4
+  exec 3>&- 4>&-
 
   # Cleanup temp dir
   rm -rf "$ocm_dir" 2>/dev/null || true
