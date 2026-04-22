@@ -128,8 +128,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-PLATFORM_ARGS_COMPUTE=( )
-PLATFORM_ARGS_WORKER=( )
+PLATFORM_ARGS_COMPUTE=( "processors" "0.75" "procType" "shared" )
+PLATFORM_ARGS_WORKER=( "processors" "0.75" "procType" "shared" )
 POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
 PERSISTENT_VPC=""
