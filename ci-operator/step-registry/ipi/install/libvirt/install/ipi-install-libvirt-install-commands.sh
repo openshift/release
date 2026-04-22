@@ -93,6 +93,63 @@ EOF
 
 }
 
+# libvirt-installer runs as non-root (UID 1000); microdnf/yum cannot install packages. When we need
+# xsltproc for the s390x ACPI terraform workaround, unpack CentOS Stream 9 libxml2/libxslt RPMs
+# (same major userspace as the image) into /tmp and prepend PATH/LD_LIBRARY_PATH.
+function ipi_stream9_pick_latest_rpm() {
+	local pkg="$1"
+	local html="$2"
+	echo "${html}" | grep -oE "href=\"${pkg}-[0-9][^\"]*\\.rpm\"" | sed 's/href="//;s/"$//' \
+		| grep -Ev -- '-(devel|static)' | LC_ALL=C sort -V | tail -n1
+}
+
+function ipi_install_xsltproc_user_local_stream9() {
+	local arch base html tmpd root xml_rpm xsl_rpm curl_bin
+	# libvirt-installer sets PATH=/bin; common tools live under /usr/bin.
+	export PATH="/usr/bin:/bin:${PATH:-}"
+	command -v rpm2cpio >/dev/null 2>&1 || return 1
+	command -v cpio >/dev/null 2>&1 || return 1
+	command -v mktemp >/dev/null 2>&1 || return 1
+	curl_bin="$(command -v curl 2>/dev/null || true)"
+	if [[ -z "${curl_bin}" && -x /usr/bin/curl ]]; then
+		curl_bin=/usr/bin/curl
+	fi
+	[[ -n "${curl_bin}" ]] || return 1
+	arch="$(uname -m)"
+	tmpd="$(mktemp -d)"
+	root="/tmp/ipi-libxslt-extract-$$"
+	mkdir -p "${root}"
+	for base in \
+			"https://mirror.stream.centos.org/9-stream/BaseOS/${arch}/os/Packages/" \
+			"https://vault.centos.org/9-stream/BaseOS/${arch}/os/Packages/"
+	do
+		html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${base}" 2>/dev/null)" || continue
+		xml_rpm="$(ipi_stream9_pick_latest_rpm libxml2 "${html}")"
+		xsl_rpm="$(ipi_stream9_pick_latest_rpm libxslt "${html}")"
+		if [[ -z "${xml_rpm}" || -z "${xsl_rpm}" ]]; then
+			continue
+		fi
+		if "${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" &&
+			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}"
+		then
+			if ( cd "${root}" && rpm2cpio "${tmpd}/${xml_rpm}" | cpio -idm 2>/dev/null ) &&
+				( cd "${root}" && rpm2cpio "${tmpd}/${xsl_rpm}" | cpio -idm 2>/dev/null )
+			then
+				export PATH="${root}/usr/bin:${PATH:-}"
+				export LD_LIBRARY_PATH="${root}/usr/lib64:${LD_LIBRARY_PATH:-}"
+				if xsltproc --version >/dev/null 2>&1; then
+					rm -rf "${tmpd}"
+					return 0
+				fi
+			fi
+		fi
+		rm -rf "${root}"
+		mkdir -p "${root}"
+	done
+	rm -rf "${tmpd}" "${root}"
+	return 1
+}
+
 function collect_bootstrap() {
 	local ID=$1
 	local FROM
@@ -214,23 +271,27 @@ fi
 
 # terraform-provider-libvirt shells out to xsltproc when xml.xslt is set; libvirt-installer image
 # may not ship it. Install before openshift-install runs terraform (s390x ACPI workaround only).
+# The CI image runs as UID 1000, so prefer unpacking Stream 9 RPMs; package managers only work as root.
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
 	if ! command -v xsltproc >/dev/null 2>&1; then
 		set +e
-		if command -v microdnf >/dev/null 2>&1; then
-			microdnf install -y libxslt
-		elif command -v dnf >/dev/null 2>&1; then
-			dnf install -y libxslt
-		elif command -v yum >/dev/null 2>&1; then
-			yum install -y libxslt
-		elif command -v apt-get >/dev/null 2>&1; then
-			export DEBIAN_FRONTEND=noninteractive
-			apt-get update && apt-get install -y xsltproc
+		ipi_install_xsltproc_user_local_stream9
+		if ! command -v xsltproc >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
+			if command -v microdnf >/dev/null 2>&1; then
+				microdnf install -y libxslt
+			elif command -v dnf >/dev/null 2>&1; then
+				dnf install -y libxslt
+			elif command -v yum >/dev/null 2>&1; then
+				yum install -y libxslt
+			elif command -v apt-get >/dev/null 2>&1; then
+				export DEBIAN_FRONTEND=noninteractive
+				apt-get update && apt-get install -y xsltproc
+			fi
 		fi
 		set -e
 	fi
 	if ! command -v xsltproc >/dev/null 2>&1; then
-		echo "ERROR: xsltproc is required when IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true but could not be installed." >&2
+		echo "ERROR: xsltproc is required when IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true but could not be installed (non-root image: unpack libxml2/libxslt RPMs or run as root)." >&2
 		exit 1
 	fi
 fi
