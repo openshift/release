@@ -412,7 +412,13 @@ fastforward_repo() {
 echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
+* ARTIFACT_DIR: ${ARTIFACT_DIR:-<not set>}
 "
+
+if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+  echo "ERROR: ARTIFACT_DIR is not set"
+  exit 1
+fi
 
 if [[ ! -f "${REPO_MAP_PATH}" ]]; then
   echo "ERROR: REPO_MAP_PATH '${REPO_MAP_PATH}' not found"
