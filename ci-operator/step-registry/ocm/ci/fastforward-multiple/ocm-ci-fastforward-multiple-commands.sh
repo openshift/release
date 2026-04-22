@@ -656,6 +656,12 @@ for product in mce acm; do
       continue
     fi
 
+    # EXCLUDED_REPOS use release-* branches, only process in ACM loop
+    if [[ "${product}" == "mce" ]]; then
+      echo "INFO: Skipping ${owner_repo} in MCE loop (uses release-* branches)"
+      continue
+    fi
+
     echo "INFO: Handling excluded repo ${owner_repo}"
 
     # Override branch_prefix for specific repos (deprecated in ACM, moved to MCE)
