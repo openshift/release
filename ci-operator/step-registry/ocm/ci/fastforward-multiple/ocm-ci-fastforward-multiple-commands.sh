@@ -713,6 +713,56 @@ for product in mce acm; do
         fi
       fi
     done
+
+    # Special case: kube-rbac-proxy needs Tekton files on BOTH branch sets
+    if [[ "${repo}" == "kube-rbac-proxy" ]]; then
+      # Determine alternate prefix (release <-> backplane)
+      alternate_prefix="release"
+      if [[ "${branch_prefix}" == "release" ]]; then
+        alternate_prefix="backplane"
+      fi
+
+      echo "INFO: kube-rbac-proxy special case - also processing ${alternate_prefix}-* branches"
+
+      for version in ${DESTINATION_VERSIONS}; do
+        dest_branch="${alternate_prefix}-${version}"
+
+        # Check if branch exists, create if not
+        echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
+        branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
+
+        fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+        status=$?
+        if [[ $status -ne 0 ]]; then
+          exit_code=$((exit_code | status))
+          echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
+          if [[ -f "${branch_log}" ]]; then
+            echo "Logs:"
+            sed 's/^/    /' "${branch_log}"
+          else
+            echo "ERROR: Log file not found: ${branch_log}"
+          fi
+          continue
+        fi
+
+        # Create Tekton files on the alternate branch
+        echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
+        tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
+
+        create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
+        status=$?
+        if [[ $status -ne 0 ]]; then
+          exit_code=$((exit_code | status))
+          echo "WARNING: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
+          if [[ -f "${tekton_log_file}" ]]; then
+            echo "Logs:"
+            sed 's/^/    /' "${tekton_log_file}"
+          else
+            echo "ERROR: Log file not found: ${tekton_log_file}"
+          fi
+        fi
+      done
+    fi
   done
 done
 
