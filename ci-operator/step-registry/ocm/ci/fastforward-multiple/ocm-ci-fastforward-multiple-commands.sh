@@ -559,7 +559,20 @@ for product in mce acm; do
     done
 
     if [[ "${skip}" == "true" ]]; then
-      echo "INFO: Skipping ${owner_repo} (bundle repo - no fast-forward needed)"
+      case "${repo}" in
+        acm-operator-bundle|mce-operator-bundle)
+          echo "INFO: Skipping ${owner_repo} (bundle repo - no fast-forward needed)"
+          ;;
+        cluster-proxy-addon)
+          echo "INFO: Skipping ${owner_repo} (deprecated MCE 2.11)"
+          ;;
+        memcached)
+          echo "INFO: Skipping ${owner_repo} (deprecated, not in current manifest)"
+          ;;
+        *)
+          echo "INFO: Skipping ${owner_repo}"
+          ;;
+      esac
       continue
     fi
 
