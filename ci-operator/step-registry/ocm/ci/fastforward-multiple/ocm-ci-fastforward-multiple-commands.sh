@@ -515,6 +515,7 @@ EXCLUDED_REPOS=(
   "kube-rbac-proxy"
   "kube-state-metrics"
   "mce-operator-bundle"
+  "memcached_exporter"
   "metrics-collector"
   "node-exporter"
   "prometheus"
