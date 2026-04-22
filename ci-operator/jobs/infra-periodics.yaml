@@ -2672,6 +2672,9 @@ periodics:
         -pr-title="Automated - Update config ./config/openshift.yaml"
       command:
       - /bin/bash
+      env:
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/bigquery/token
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-sippy-config-generator_latest
       imagePullPolicy: Always
       name: auto-sippy-config-generator
@@ -2682,10 +2685,16 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
+      - mountPath: /etc/bigquery
+        name: bigquery-token
+        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+    - name: bigquery-token
+      secret:
+        secretName: ci-data-bigquery-readonly
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1 * * 5
