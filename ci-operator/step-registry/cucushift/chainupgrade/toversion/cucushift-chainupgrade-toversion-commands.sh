@@ -686,6 +686,10 @@ function get_target_from_available_update(){
     fi
     export TARGET_VERSION
     TARGET=$(oc get clusterversion version -o json| jq -r --arg z "${TARGET_VERSION}" '.status.availableUpdates[]? | select(.version==$z).image')
+    
+    #debug
+    echo "Debug Print in function"
+    echo "$TARGET_VERSION $TARGET"
     if [[ -z "${TARGET}" ]]; then
         echo "The target version ${TARGET_VERSION} is a bad update without image!"
         return 1
@@ -773,6 +777,9 @@ for target in "${TARGET_RELEASES[@]}"; do
     export SOURCE_VERSION
     export SOURCE_MINOR_VERSION
 
+    #debug 
+    echo "Debug Print"
+    echo "$SOURCE_VERSION $SOURCE_MINOR_VERSION $TARGET_MAJOR_MINOR_VERSION $TARGET_MINOR_VERSION"
     if ! get_target_from_available_update "${TARGET_MAJOR_MINOR_VERSION}"; then
         echo "Fail to get target from available update for version: ${TARGET_MAJOR_MINOR_VERSION}"
         exit 1
