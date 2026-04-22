@@ -131,8 +131,20 @@ create_tekton_files() {
 
   local ocm_dir
   ocm_dir=$(mktemp -d -t ocm-tekton-XXXXX)
+
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    echo "ERROR: GITHUB_TOKEN_FILE not found: ${GITHUB_TOKEN_FILE}" >&2
+    return 1
+  fi
+
   local token
   token=$(cat "${GITHUB_TOKEN_FILE}")
+
+  if [[ -z "${token}" ]]; then
+    echo "ERROR: GITHUB_TOKEN_FILE is empty: ${GITHUB_TOKEN_FILE}" >&2
+    return 1
+  fi
+
   local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
 
   (
@@ -421,6 +433,23 @@ if [[ -z "${ARTIFACT_DIR:-}" ]]; then
   echo "ERROR: ARTIFACT_DIR is not set"
   exit 1
 fi
+
+if [[ ! -d "${ARTIFACT_DIR}" ]]; then
+  echo "ERROR: ARTIFACT_DIR '${ARTIFACT_DIR}' is not a directory"
+  exit 1
+fi
+
+if [[ ! -w "${ARTIFACT_DIR}" ]]; then
+  echo "ERROR: ARTIFACT_DIR '${ARTIFACT_DIR}' is not writable"
+  exit 1
+fi
+
+# Test write to verify
+if ! echo "test" > "${ARTIFACT_DIR}/.write-test" 2>/dev/null; then
+  echo "ERROR: Cannot write to ARTIFACT_DIR '${ARTIFACT_DIR}'"
+  exit 1
+fi
+rm -f "${ARTIFACT_DIR}/.write-test"
 
 if [[ ! -f "${REPO_MAP_PATH}" ]]; then
   echo "ERROR: REPO_MAP_PATH '${REPO_MAP_PATH}' not found"
