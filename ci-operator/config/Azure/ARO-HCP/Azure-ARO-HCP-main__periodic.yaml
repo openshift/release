@@ -3,11 +3,6 @@ base_images:
     name: aro-hcp-e2e-tools
     namespace: aro-hcp
     tag: latest
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.20"
 resources:
   '*':
     requests:
@@ -21,45 +16,114 @@ tests:
 - as: delete-expired-kusto-role-assignments
   cron: 0 4 * * *
   steps:
-    cluster_profile: aro-hcp-dev
     test:
     - ref: aro-hcp-deprovision-kusto-role-assignments
-- as: delete-expired-development-resource-groups
+- as: delete-expired-red-hat-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: red-hat-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
+- as: delete-expired-msft-test-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: msft-test-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
+- as: delete-expired-dev-prow-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-dev
     env:
       CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO HCP E2E Hosted Clusters (EA Subscription)
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-dev-pers-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-integration-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-int
+    env:
+      VAULT_SECRET_PROFILE: int
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-stage-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-stg
+    env:
+      VAULT_SECRET_PROFILE: stg
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-prod-resource-groups
   cron: 7,37 * * * *
   steps:
-    cluster_profile: aro-hcp-prod
+    env:
+      VAULT_SECRET_PROFILE: prod
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
+- as: cleanup-sweeper-rg-ordered
+  cron: 5 * * * *
+  steps:
+    env:
+      CLEANUP_SWEEPER_POLICY: tooling/cleanup-sweeper/resourcegroups.policy.yaml
+      CLEANUP_SWEEPER_SUBSCRIPTION_NAMES: ARO HCP E2E Service Clusters (EA Subscription),
+        ARO HCP E2E Hosted Clusters (EA Subscription), ARO HCP E2E Management Clusters
+        (EA Subscription), ARO Hosted Control Planes (EA Subscription 1)
+      CLEANUP_SWEEPER_WAIT: "false"
+      CLEANUP_SWEEPER_WORKFLOW: rg-ordered
+    test:
+    - ref: aro-hcp-deprovision-cleanup-sweeper
+- as: cleanup-sweeper-shared-leftovers
+  cron: 35 * * * *
+  steps:
+    env:
+      CLEANUP_SWEEPER_SUBSCRIPTION_NAMES: ARO HCP E2E Service Clusters (EA Subscription),
+        ARO HCP E2E Hosted Clusters (EA Subscription), ARO HCP E2E Management Clusters
+        (EA Subscription), ARO Hosted Control Planes (EA Subscription 1)
+      CLEANUP_SWEEPER_VERBOSITY: "1"
+      CLEANUP_SWEEPER_WORKFLOW: shared-leftovers
+    test:
+    - ref: aro-hcp-deprovision-cleanup-sweeper
 - as: integration-e2e-parallel
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: aro-hcp-int
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- as: integration-e2e-parallel-ocp-nightly
+  cron: 0 4 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
     - count: 20
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-int
@@ -67,13 +131,35 @@ tests:
 - as: stage-e2e-parallel
   cron: 0 2 * * *
   steps:
-    cluster_profile: aro-hcp-stg
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- as: stage-e2e-parallel-ocp-nightly
+  cron: 0 4 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
     - count: 30
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-stg
@@ -81,13 +167,36 @@ tests:
 - as: prod-e2e-parallel
   cron: 0 2 * * *
   steps:
-    cluster_profile: aro-hcp-prod
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+  timeout: 4h0m0s
+- as: prod-e2e-parallel-ocp-nightly
+  cron: 0 4 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
     - count: 15
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-prod

@@ -5,22 +5,31 @@ images:
   items:
   - dockerfile_path: Dockerfile.rhel7
     to: sriov-network-device-plugin
+  - dockerfile_literal: |-
+      FROM src
+      RUN dnf install -y --nodocs hwdata && dnf clean all
+    from: src
+    to: unit-test-bin
 promotion:
   to:
   - disabled: true
-    name: sriov-4.22
+    excluded_images:
+    - unit-test-bin
+    name: sriov-5.0
     namespace: origin
-  - name: 4.22-priv
+  - excluded_images:
+    - unit-test-bin
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -35,7 +44,7 @@ tests:
 - as: unit-test
   commands: make test-race
   container:
-    from: src
+    from: unit-test-bin
 - as: security
   optional: true
   steps:

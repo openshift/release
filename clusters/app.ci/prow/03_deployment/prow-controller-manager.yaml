@@ -56,13 +56,14 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: prow-controller-manager
-        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260328-dc2bbc9fc
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260414-6691f5aff
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --dry-run=false
         - --job-config-path=/var/repo/release/ci-operator/jobs
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -71,13 +72,19 @@ spec:
         - --kubeconfig-suffix=config
         - --enable-controller=plank
         - --enable-controller=scheduler
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
         ports:
         - name: metrics
           containerPort: 9090
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
         - name: config
@@ -116,9 +123,9 @@ spec:
           sources:
           - serviceAccountToken:
               path: token
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-prow-github-app
       - name: config
         configMap:
           name: config

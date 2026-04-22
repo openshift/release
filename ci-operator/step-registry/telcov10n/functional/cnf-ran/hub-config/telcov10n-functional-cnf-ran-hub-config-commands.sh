@@ -2,131 +2,117 @@
 set -e
 set -o pipefail
 
-echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt file — skipping the job"
+  echo "Detected skip.txt — skipping"
   exit 0
 fi
 
 process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+  local directory="$1"
+  local dest_file="$2"
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
+  if [ -z "$directory" ]; then
+    echo "Usage: process_inventory <directory> <dest_file>"
+    return 1
+  fi
+
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  find "$directory" -type f | while IFS= read -r filename; do
+    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+      continue
     fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
+    local content
+    content=$(cat "$filename")
+    local varname
+    varname=$(basename "${filename}")
+    if [[ "$content" == *$'\n'* ]]; then
+      echo "${varname}: |"
+      echo "$content" | sed 's/^/  /'
+    else
+      echo "${varname}": \'"${content}"\'
     fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-        local content
-        content=$(cat "$filename")
-        local varname
-        varname=$(basename "${filename}")
-        # Check if content has newlines - if so, use literal block scalar (|)
-        if [[ "$content" == *$'\n'* ]]; then
-          echo "${varname}: |"
-          # Indent each line with 2 spaces for YAML block scalar
-          echo "$content" | sed 's/^/  /'
-        else
-          echo "${varname}": \'"${content}"\'
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
+  done > "${dest_file}"
 }
 
-echo "Create group_vars directory"
+echo "Processing common group_vars"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
 
-echo "Process common group variables (all, bastions)"
 find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
 done
 
-echo "Create host_vars directory"
+echo "Copying host_vars from SHARED_DIR"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-echo "Copy host inventory files from SHARED_DIR (populated by hub-deploy step)"
-cp ${SHARED_DIR}/bastion /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
-cp ${SHARED_DIR}/master0 /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
+cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
+cp "${SHARED_DIR}/master0" /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
 
-echo "Set CLUSTER_NAME env var"
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
-    CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
 fi
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
-echo CLUSTER_NAME=${CLUSTER_NAME}
-
-# Set kubeconfig path
 KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-# Extract and configure SSH key for Ansible to connect to masters
-
-echo "Set up SSH key configuration for Ansible"
 PROJECT_DIR="/tmp"
 cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/ansible_ssh_key"
 chmod 600 "${PROJECT_DIR}/ansible_ssh_key"
 export ANSIBLE_PRIVATE_KEY_FILE="${PROJECT_DIR}/ansible_ssh_key"
-echo "SSH key configured at: ${ANSIBLE_PRIVATE_KEY_FILE}"
 
-# Configure Ansible SSH settings for connection resilience
 export ANSIBLE_SSH_RETRIES=3
 export ANSIBLE_TIMEOUT=600
+export ANSIBLE_HOST_KEY_CHECKING=False
 
-# Create VERSION_TAG for TALM operator by replacing dots with dashes
-# Example: VERSION="4.19" becomes VERSION_TAG="4-19"
 VERSION_TAG=$(echo "${VERSION}" | tr '.' '-')
 export VERSION_TAG
 echo "VERSION_TAG=${VERSION_TAG}"
 
-# Substitute VERSION_TAG in HUB_OPERATORS variable for TALM operator configuration
 HUB_OPERATORS=$(echo "${HUB_OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
-echo "HUB_OPERATORS after substitution: ${HUB_OPERATORS}"
-
-export ANSIBLE_HOST_KEY_CHECKING=False
-# deploy ztp operators (acm, lso, gitops)
+echo "HUB_OPERATORS=${HUB_OPERATORS}"
 
 cd /eco-ci-cd/
 
-# mirror ose-kube-rbac-proxy workaround for 4.14
+echo "Deploying hub operators (VERSION=${VERSION}, VERSION_TAG=${VERSION_TAG})"
+
 if [[ "$VERSION" == "4.14" ]]; then
-    echo "Running ose-kube-rbac-proxy mirror workaround for version 4.14"
-    ansible-playbook playbooks/ran/mirror-ose-kube-rbac-proxy-wa.yml \
-        -i inventories/ocp-deployment/build-inventory.py \
-        --extra-vars "version=$VERSION"
+  echo "Applying ose-kube-rbac-proxy workaround for 4.14"
+  ansible-playbook playbooks/ran/mirror-ose-kube-rbac-proxy-wa.yml \
+    -i inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "version=$VERSION"
 fi
 
-# For 4.14, skip internal registry cleanup to preserve images mirrored by the ose-kube-rbac-proxy workaround
 SKIP_REGISTRY_CLEANUP=""
 if [[ "$VERSION" == "4.14" ]]; then
-    SKIP_REGISTRY_CLEANUP="ocp_operator_mirror_skip_internal_registry_cleanup=true"
+  SKIP_REGISTRY_CLEANUP="ocp_operator_mirror_skip_internal_registry_cleanup=true"
 fi
 
-ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS' $SKIP_REGISTRY_CLEANUP"
+echo "Running deploy-ocp-operators"
+ansible-playbook ./playbooks/deploy-ocp-operators.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS' $SKIP_REGISTRY_CLEANUP"
 
-# configure lso 
-ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --private-key="${PROJECT_DIR}/ansible_ssh_key" \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
+echo "Configuring LVM storage"
+ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --private-key="${PROJECT_DIR}/ansible_ssh_key" \
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
-# configure acm
-ansible-playbook playbooks/ran/hub-sno-configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
+echo "Configuring ACM"
+ansible-playbook playbooks/ran/hub-sno-configure-acm.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
-# configure kustomize plugin
-ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
+echo "Configuring kustomize plugin"
+ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
-# configure gitops
-ansible-playbook playbooks/ran/hub-sno-configure-gitops.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} gitlab_repo_url=${GITLAB_REPO_URL}" -vv
+echo "Configuring GitOps"
+ansible-playbook playbooks/ran/hub-sno-configure-gitops.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH} gitlab_repo_url=${GITLAB_REPO_URL}" -vv

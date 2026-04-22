@@ -16,7 +16,7 @@ resources:
       memory: 200Mi
 tests:
 - as: rosa-classic-sts
-  cron: 0 0 1 1 *
+  cron: 5 2 * * *
   steps:
     env:
       CONFIGS: rosa,sts,stage,rosa-e2e-suite
@@ -28,8 +28,21 @@ tests:
     - ref: osde2e-cleanup
     test:
     - ref: osde2e-test
+- as: rosa-hcp
+  cron: 5 20 * * *
+  steps:
+    env:
+      CONFIGS: hypershift
+      INSTALL_LATEST_NIGHTLY: "4.20"
+      SECRET_LOCATIONS: /usr/local/rosa-e2e-prow-ci-01-osde2e
+      SKIP_MUST_GATHER: "true"
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    test:
+    - ref: osde2e-test
 - as: osd-aws
-  cron: 0 0 1 1 *
+  cron: 5 3 * * *
   steps:
     env:
       CONFIGS: aws,stage,e2e-suite
@@ -42,7 +55,7 @@ tests:
     test:
     - ref: osde2e-test
 - as: osd-gcp
-  cron: 0 0 1 1 *
+  cron: 5 4 * * *
   steps:
     env:
       CONFIGS: gcp,stage,e2e-suite

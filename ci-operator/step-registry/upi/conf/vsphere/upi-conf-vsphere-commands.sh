@@ -267,7 +267,6 @@ platform:
     network: "${vsphere_portgroup}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
-    folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 
 #set machine cidr if proxy is enabled

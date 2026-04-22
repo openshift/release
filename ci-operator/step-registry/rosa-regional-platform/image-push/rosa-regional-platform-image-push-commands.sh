@@ -34,5 +34,11 @@ echo "  Destination: ${DEST}"
 
 oc image mirror "${CI_COMPONENT_IMAGE}" "${DEST}"
 
+if [[ -z "${PULL_NUMBER:-}" ]]; then
+  LATEST="${ROSA_REGIONAL_QUAY_DEST_REPO}:latest"
+  echo "Postsubmit: also tagging as ${LATEST}"
+  oc image mirror "${CI_COMPONENT_IMAGE}" "${LATEST}"
+fi
+
 echo "${DEST}" > "${SHARED_DIR}/component-image-override"
 echo "Image pushed successfully: ${DEST}"

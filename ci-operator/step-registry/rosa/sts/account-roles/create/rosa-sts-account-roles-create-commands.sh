@@ -47,6 +47,11 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+CLUSTER_SWITCH="--classic"
+if [[ "$HOSTED_CP" == "true" ]]; then
+   CLUSTER_SWITCH="--hosted-cp"
+fi
+
 # Support to create the account-roles with the higher version
 VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
@@ -66,12 +71,27 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   fi
 
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
-  VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-fi
 
-CLUSTER_SWITCH="--classic"
-if [[ "$HOSTED_CP" == "true" ]]; then
-   CLUSTER_SWITCH="--hosted-cp"
+  # Determine cluster type switch early so the version fallback can use it
+  CLUSTER_SWITCH="--classic"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    CLUSTER_SWITCH="--hosted-cp"
+  fi
+
+  # Verify the version has published policies. If not, fall back to the latest
+  # version that has existing account-role policies in the AWS account.
+  if ! rosa list account-roles --output json 2>/dev/null | jq -e --arg v "${OPENSHIFT_VERSION}" '.[] | select(.Version // "" | startswith($v))' > /dev/null 2>&1; then
+    echo "Version ${OPENSHIFT_VERSION} may not have published policies, checking account roles for available versions..."
+    available_version=$(rosa list account-roles --output json 2>/dev/null | jq -r '.[].Version // empty' 2>/dev/null | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+    if [[ -n "${available_version}" && "${available_version}" != "${OPENSHIFT_VERSION}" ]]; then
+      echo "Falling back from ${OPENSHIFT_VERSION} to ${available_version} (latest with published policies)"
+      OPENSHIFT_VERSION="${available_version}"
+    else
+      echo "WARNING: No fallback version found in account roles, continuing with ${OPENSHIFT_VERSION}"
+    fi
+  fi
+
+  VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
 
 ARN_PATH_SWITCH=""

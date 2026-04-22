@@ -22,23 +22,64 @@ run_tests() {
     AMBIENT_ENV_VAR_EXPORT="export TRUSTED_ZTUNNEL_NAMESPACE=ztunnel"
   fi
 
+  # set the test file name based on the SMOKE_TEST environment variable
+  export TEST_FILE_NAME="skip_tests_full.yaml" 
+  if [ "${SMOKE_TEST}" = "true" ]; then
+      TEST_FILE_NAME="skip_tests_smoke.yaml"
+  fi
+  # check whether the config file exists in the repo under prow/skip_tests directory
+  CONFIG_FILE="./prow/skip_tests/${TEST_FILE_NAME}"
+  if [ ! -f "${CONFIG_FILE}" ]; then
+      echo "Error: Config file ${CONFIG_FILE} not found in the repository under prow/skip_tests directory"
+      echo "[debug]"
+      pwd
+      ls -la
+      exit 1
+  fi
+
+  # download the parse-test-config.sh script from the ci-utils repo
+  curl -fO https://raw.githubusercontent.com/openshift-service-mesh/ci-utils/refs/heads/main/skip_tests/parse-test-config.sh
+  chmod +x ./parse-test-config.sh
+
+  # parse-test-config.sh expects midstream_sail vs midstream_helm (istio CP uses helm-style install in CI)
+  case "${CONTROL_PLANE_SOURCE}" in
+    sail)
+      PARSE_TEST_CONFIG_MIDSTREAM_VARIANT="midstream_sail"
+      ;;
+    istio)
+      PARSE_TEST_CONFIG_MIDSTREAM_VARIANT="midstream_helm"
+      ;;
+    *)
+      echo "Unsupported CONTROL_PLANE_SOURCE: ${CONTROL_PLANE_SOURCE} (expected istio or sail)" >&2
+      exit 1
+      ;;
+  esac
+
+  ./parse-test-config.sh "${CONFIG_FILE}" "${TEST_SUITE}" "${PARSE_TEST_CONFIG_MIDSTREAM_VARIANT}"
+  # it will eval SKIP_PARSER_SKIP_TESTS and SKIP_PARSER_SKIP_SUBSUITES ENV variables which will be used in the prow/integ-suite-ocp.sh
+  eval "$(./parse-test-config.sh "${CONFIG_FILE}" "${TEST_SUITE}" "${PARSE_TEST_CONFIG_MIDSTREAM_VARIANT}")"
+  echo "[debug] ENVS after parser skip tests"
+  echo "[debug] SKIP_PARSER_SKIP_TESTS: ${SKIP_PARSER_SKIP_TESTS}"
+  echo "[debug] SKIP_PARSER_SKIP_SUBSUITES: ${SKIP_PARSER_SKIP_SUBSUITES}"
+
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-    sh -c "
+    sh -c '
     export KUBECONFIG=/work/ci-kubeconfig
-    export BUILD_WITH_CONTAINER=\"0\"
+    export BUILD_WITH_CONTAINER="0"
     export ENABLE_OVERLAY2_STORAGE_DRIVER=true
-    export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
-    export ARTIFACT_DIR=\"${ARTIFACT_DIR}\"
-    export CONTROL_PLANE_SOURCE=\"${CONTROL_PLANE_SOURCE}\"
-    export INSTALL_SAIL_OPERATOR=\"${INSTALL_SAIL_OPERATOR}\"
-    export AMBIENT=\"${AMBIENT}\"
-    ${AMBIENT_ENV_VAR_EXPORT:-}
-    ${HELM_ENV_VAR_EXPORT:-}
+    export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='"'"'{.items[0].spec.host}'"'"' | awk -F. '"'"'{print substr($0, index($0,$2))}'"'"')"
+    export ARTIFACT_DIR="'"${ARTIFACT_DIR}"'"
+    export CONTROL_PLANE_SOURCE="'"${CONTROL_PLANE_SOURCE}"'"
+    export INSTALL_SAIL_OPERATOR="'"${INSTALL_SAIL_OPERATOR}"'"
+    export AMBIENT="'"${AMBIENT}"'"
+    '"${AMBIENT_ENV_VAR_EXPORT:-}"'
+    '"${HELM_ENV_VAR_EXPORT:-}"'
     oc version
     cd /work
     entrypoint \
     prow/integ-suite-ocp.sh \
-    ${TEST_SUITE} '${SKIPPED_TESTS}' '${SKIPPED_SUITES}'"
+    "$1" "$2" "$3"
+    ' -- "${TEST_SUITE}" "${SKIP_PARSER_SKIP_TESTS}" "${SKIP_PARSER_SKIP_SUBSUITES}"
 }
 
 # check if /tmp/ISTIO_TESTS_DONE file exists which marks whole test run as done

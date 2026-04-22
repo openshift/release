@@ -36,8 +36,7 @@ images:
     to: hypershift-tests
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: 4.22-priv
@@ -54,7 +53,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.22"
+      version: "4.21"
   latest:
     integration:
       include_built_images: true
@@ -64,47 +63,47 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.17"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   latest-420:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   n3minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   n4minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -214,7 +213,7 @@ tests:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
-      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology)$
+      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology|TestAzureOAuthLoadBalancer)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     post:
@@ -489,6 +488,18 @@ tests:
       GKE_REGION: us-central1
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e
+- always_run: false
+  as: e2e-v2-gke
+  capabilities:
+  - build-tmpfs
+  optional: true
+  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+  steps:
+    cluster_profile: hypershift-gcp
+    env:
+      GKE_REGION: us-central1
+      GKE_RELEASE_CHANNEL: stable
+    workflow: hypershift-gcp-gke-e2e-v2
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv

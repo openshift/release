@@ -35,10 +35,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  postgresql-13-c9s:
+  postgresql-15-c9s:
     name: postgresql
     namespace: ci
-    tag: postgresql-13-c9s
+    tag: postgresql-15-c9s
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -109,8 +109,8 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
     with: assisted-image-service
-  - pullspec: quay.io/sclorg/postgresql-13-c9s:latest
-    with: postgresql-13-c9s
+  - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
+    with: postgresql-15-c9s
 promotion:
   to:
   - name: ocm-2.17
@@ -935,6 +935,16 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.22
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-5-0
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-onprem-4-22
