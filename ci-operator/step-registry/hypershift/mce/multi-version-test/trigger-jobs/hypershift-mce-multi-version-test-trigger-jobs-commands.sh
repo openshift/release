@@ -109,11 +109,11 @@ function wait_for_jobs() {
             local job_status=""
             local job_url=""
             local http_status=""
-            set +x
             for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
+                set +x
                 response=$(curl -s -X GET -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
                     "${GANGWAY_API}/v1/executions/${job_id}" -w "%{http_code}")
-
+                set -x
                 json_body=$(echo "$response" | sed '$d')
                 http_status=$(echo "$response" | tail -n 1)
 
@@ -129,7 +129,6 @@ function wait_for_jobs() {
                     sleep "$retry_interval"
                 fi
             done
-            set -x
 
             if [ "$http_status" -ne 200 ]; then
                 echo "${prefix}, JOB_URL=, JOB_STATUS=QueryNotFound" >> "${SHARED_DIR}/job_list"
