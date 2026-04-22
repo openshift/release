@@ -306,6 +306,13 @@ EOF
 "[sig-etcd] etcd should not log excessive took too long messages"
 "[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
+       # Skip the PodObservedGenerationTracking test for 4.21 only until https://redhat.atlassian.net/browse/OCPBUGS-83561 is fixed
+       # This test has timeout issues while pulling non-existent image on PowerVS for 4.21 (fixed in 4.22 with K8s 1.35)
+       if [ "${BRANCH}" == "4.21" ]; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
+EOF
+       fi
     fi
 else
     echo "Executing all tests"
