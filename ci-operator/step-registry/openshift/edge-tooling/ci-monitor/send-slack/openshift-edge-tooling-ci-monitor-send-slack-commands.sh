@@ -14,9 +14,9 @@ GCS_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-
 DASHBOARD_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/ocp-ci-monitor/openshift-edge-tooling-ci-monitor/artifacts/edge-ci-monitor-summary.html"
 
 # ---------------------------------------------------------------------------
-# Extract blocking jobs from the analysis log
+# Extract blocking jobs from the analysis log (stream-JSON format)
 #
-# Format between BLOCKING_JOBS_START/END:
+# Entries between BLOCKING_JOBS_START/END delimiters, pipe-separated:
 #   BLOCKING|<job_name>|<prow_url>|<topology>|<version>|<payload>
 # ---------------------------------------------------------------------------
 LOG_FILE="${SHARED_DIR}/claude-analysis.log"
@@ -31,15 +31,15 @@ if [[ -f "${LOG_FILE}" ]]; then
         DATA_AVAILABLE=true
     fi
 
+    # Scope to the delimited block, then extract structured entries from stream-JSON.
     BLOCKING_LINES=$(sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${LOG_FILE}" \
-        | { grep -v 'BLOCKING_JOBS_START\|BLOCKING_JOBS_END' || true; } \
-        | sed 's/^[0-9]*\t//' \
-        | sed '/^[[:space:]]*$/d')
+        | { grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+' || true; } \
+        | sort -u)
 
     if [[ -n "${BLOCKING_LINES}" ]]; then
         BLOCKING_COUNT=$(echo "${BLOCKING_LINES}" | wc -l)
-        VERSIONS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $5}' | sort -uV | paste -sd ', ')
-        TOPOLOGIES=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | paste -sd ', ')
+        VERSIONS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $5}' | sort -uV | tr '\n' ',' | sed 's/,/, /g; s/, $//')
+        TOPOLOGIES=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
     fi
 else
     echo "Warning: ${LOG_FILE} not found."
@@ -48,6 +48,8 @@ fi
 # ---------------------------------------------------------------------------
 # Compose the Slack message
 # ---------------------------------------------------------------------------
+NL=$'\n'
+
 if [[ "${DATA_AVAILABLE}" != "true" ]]; then
     ICON=":warning:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — Blocking jobs data unavailable. Please investigate the artifacts."
@@ -57,11 +59,11 @@ elif [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
 else
     ICON=":red_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — *${BLOCKING_COUNT}* blocking job(s) found."
-    MESSAGE+="\n• *Versions:* ${VERSIONS}"
-    MESSAGE+="\n• *Topologies:* ${TOPOLOGIES}"
+    MESSAGE+="${NL}• *Versions:* ${VERSIONS}"
+    MESSAGE+="${NL}• *Topologies:* ${TOPOLOGIES}"
 fi
 
-MESSAGE+="\n<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
+MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
 
 # ---------------------------------------------------------------------------
 # Send to Slack
