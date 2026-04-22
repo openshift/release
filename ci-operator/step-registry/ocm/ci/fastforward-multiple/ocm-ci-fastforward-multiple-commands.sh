@@ -286,8 +286,10 @@ create_tekton_files() {
 
     # Create PR using gh CLI
     log "INFO Creating PR"
-    local pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
-    local pr_body="This PR adds Tekton pipeline files for the following versions:
+    local pr_title
+    pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
+    local pr_body
+    pr_body="This PR adds Tekton pipeline files for the following versions:
 $(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
 
 Generated from existing ${product_prefix}-${highest_version} templates.
