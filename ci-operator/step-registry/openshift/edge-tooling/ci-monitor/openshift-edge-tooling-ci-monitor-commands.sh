@@ -130,12 +130,13 @@ copy_artifacts() {
         cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
     fi
 
-    # Share the analysis log with downstream steps (e.g. Slack notification)
+    # Extract blocking-jobs summary for downstream steps.
+    # SHARED_DIR is backed by a K8s Secret (1 MB limit) so only the extracted
+    # data is shared — not the full multi-MB stream-JSON log.
     if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
-        cp "${ARTIFACT_DIR}/claude-analysis.log" "${SHARED_DIR}/" || \
-            echo "ERROR: failed to copy claude-analysis.log to SHARED_DIR" >&2
-    else
-        echo "Warning: ${ARTIFACT_DIR}/claude-analysis.log not found or unreadable" >&2
+        sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
+            | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+' \
+            | sort -u > "${SHARED_DIR}/blocking-jobs.txt" || true
     fi
 
     # Archive Claude session for local continuation

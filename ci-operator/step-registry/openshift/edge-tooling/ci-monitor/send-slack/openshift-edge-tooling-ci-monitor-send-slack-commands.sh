@@ -14,27 +14,21 @@ GCS_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-
 DASHBOARD_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/ocp-ci-monitor/openshift-edge-tooling-ci-monitor/artifacts/edge-ci-monitor-summary.html"
 
 # ---------------------------------------------------------------------------
-# Extract blocking jobs from the analysis log (stream-JSON format)
+# Read pre-extracted blocking jobs from SHARED_DIR
 #
-# Entries between BLOCKING_JOBS_START/END delimiters, pipe-separated:
+# The monitor step extracts pipe-separated entries into blocking-jobs.txt:
 #   BLOCKING|<job_name>|<prow_url>|<topology>|<version>|<payload>
 # ---------------------------------------------------------------------------
-LOG_FILE="${SHARED_DIR}/claude-analysis.log"
+JOBS_FILE="${SHARED_DIR}/blocking-jobs.txt"
 
 BLOCKING_COUNT=0
 VERSIONS=""
 TOPOLOGIES=""
 DATA_AVAILABLE=false
 
-if [[ -f "${LOG_FILE}" ]]; then
-    if grep -q 'BLOCKING_JOBS_START' "${LOG_FILE}" && grep -q 'BLOCKING_JOBS_END' "${LOG_FILE}"; then
-        DATA_AVAILABLE=true
-    fi
-
-    # Scope to the delimited block, then extract structured entries from stream-JSON.
-    BLOCKING_LINES=$(sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${LOG_FILE}" \
-        | { grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+' || true; } \
-        | sort -u)
+if [[ -f "${JOBS_FILE}" ]]; then
+    DATA_AVAILABLE=true
+    BLOCKING_LINES=$(<"${JOBS_FILE}")
 
     if [[ -n "${BLOCKING_LINES}" ]]; then
         BLOCKING_COUNT=$(echo "${BLOCKING_LINES}" | wc -l)
@@ -42,7 +36,7 @@ if [[ -f "${LOG_FILE}" ]]; then
         TOPOLOGIES=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
     fi
 else
-    echo "Warning: ${LOG_FILE} not found."
+    echo "Warning: ${JOBS_FILE} not found."
 fi
 
 # ---------------------------------------------------------------------------
