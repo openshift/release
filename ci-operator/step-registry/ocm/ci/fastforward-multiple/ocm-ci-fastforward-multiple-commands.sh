@@ -212,15 +212,25 @@ create_tekton_files() {
 
       if [[ -z "$source_version" ]]; then
         log "WARNING Could not extract source version from template, using calculated version"
+        log "INFO [DEBUG] highest_version=${highest_version}"
         # Fallback: assume format like 217 = 2.17, 50 = 5.0
         if [[ $highest_version -ge 100 ]]; then
-          local source_major=$((highest_version / 100))
-          local source_minor=$((highest_version % 100))
+          log "INFO [DEBUG] Calculating from 3-digit version"
+          local source_major
+          local source_minor
+          source_major=$((highest_version / 100))
+          source_minor=$((highest_version % 100))
+          log "INFO [DEBUG] source_major=${source_major}, source_minor=${source_minor}"
         else
-          local source_major=$((highest_version / 10))
-          local source_minor=$((highest_version % 10))
+          log "INFO [DEBUG] Calculating from 2-digit version"
+          local source_major
+          local source_minor
+          source_major=$((highest_version / 10))
+          source_minor=$((highest_version % 10))
+          log "INFO [DEBUG] source_major=${source_major}, source_minor=${source_minor}"
         fi
         source_version="${source_major}.${source_minor}"
+        log "INFO [DEBUG] Calculated source_version=${source_version}"
       fi
 
       log "INFO Source version: ${branch_prefix}-${source_version}"
