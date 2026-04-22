@@ -103,49 +103,217 @@ function ipi_stream9_pick_latest_rpm() {
 		| grep -Ev -- '-(devel|static)' | LC_ALL=C sort -V | tail -n1
 }
 
+# Stream 9 libvirt-installer image has rpm2cpio but often no cpio(1); unpack newc cpio from rpm2cpio stdout.
+function ipi_write_newc_cpio_unpack_py() {
+	local out="$1"
+	cat >"${out}" <<'PY'
+import os, stat, sys
+
+ALIGN = lambda n: (n + 3) & ~3
+
+
+def readn(f, n):
+	b = f.read(n)
+	if len(b) != n:
+		raise EOFError("expected %d bytes, got %d" % (n, len(b)))
+	return b
+
+
+def main(root):
+	f = sys.stdin.buffer
+	while True:
+		magic = f.read(6)
+		if not magic:
+			return
+		if magic != b"070701":
+			raise SystemExit("cpiounpack: bad magic %r" % (magic,))
+		rest = readn(f, 104).decode("ascii")
+		nums = [int(rest[i : i + 8], 16) for i in range(0, 104, 8)]
+		(
+			_inode,
+			mode,
+			_uid,
+			_gid,
+			_nlink,
+			_mtime,
+			filesize,
+			_devmaj,
+			_devmin,
+			_rdevmaj,
+			_rdevmin,
+			namesize,
+			_chksum,
+		) = nums
+		namebuf = readn(f, namesize)
+		name = namebuf.split(b"\x00", 1)[0]
+		if name == b"TRAILER!!!":
+			return
+		pad = ALIGN(110 + namesize) - (110 + namesize)
+		if pad:
+			readn(f, pad)
+		data = readn(f, filesize) if filesize else b""
+		pad2 = ALIGN(filesize) - filesize
+		if pad2:
+			readn(f, pad2)
+		rel = name.decode("utf-8", "surrogateescape").lstrip("./")
+		if not rel or rel.startswith("../"):
+			continue
+		path = os.path.join(root, rel.replace("/", os.sep))
+		if stat.S_ISDIR(mode):
+			os.makedirs(path, exist_ok=True)
+		elif stat.S_ISREG(mode):
+			os.makedirs(os.path.dirname(path), exist_ok=True)
+			with open(path, "wb") as outf:
+				outf.write(data)
+			os.chmod(path, mode & 0o7777)
+		elif stat.S_ISLNK(mode):
+			os.makedirs(os.path.dirname(path), exist_ok=True)
+			tgt = data.split(b"\x00", 1)[0].decode("utf-8", "surrogateescape")
+			if os.path.lexists(path):
+				os.unlink(path)
+			os.symlink(tgt, path)
+
+
+if __name__ == "__main__":
+	main(sys.argv[1])
+PY
+}
+
+function ipi_extract_rpm_contents() {
+	local rpm="$1"
+	local dest="$2"
+	local unpack_py="$3"
+	if command -v cpio >/dev/null 2>&1; then
+		( cd "${dest}" && rpm2cpio "${rpm}" | cpio -idm 2>/dev/null ) || return 1
+	else
+		rpm2cpio "${rpm}" | python3 "${unpack_py}" "${dest}" || return 1
+	fi
+	return 0
+}
+
 function ipi_install_xsltproc_user_local_stream9() {
-	local arch base html tmpd root xml_rpm xsl_rpm curl_bin
+	local arch base html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py
 	# libvirt-installer sets PATH=/bin; common tools live under /usr/bin.
 	export PATH="/usr/bin:/bin:${PATH:-}"
-	command -v rpm2cpio >/dev/null 2>&1 || return 1
-	command -v cpio >/dev/null 2>&1 || return 1
-	command -v mktemp >/dev/null 2>&1 || return 1
+
+	command -v rpm2cpio >/dev/null 2>&1 || { echo "ERROR: rpm2cpio not found" >&2; return 1; }
+	command -v mktemp >/dev/null 2>&1 || { echo "ERROR: mktemp not found" >&2; return 1; }
+	if ! command -v cpio >/dev/null 2>&1; then
+		command -v python3 >/dev/null 2>&1 || {
+			echo "ERROR: cpio and python3 both missing; cannot unpack Stream 9 libxslt RPMs" >&2
+			return 1
+		}
+	fi
+
 	curl_bin="$(command -v curl 2>/dev/null || true)"
 	if [[ -z "${curl_bin}" && -x /usr/bin/curl ]]; then
 		curl_bin=/usr/bin/curl
 	fi
-	[[ -n "${curl_bin}" ]] || return 1
+	wget_bin="$(command -v wget 2>/dev/null || true)"
+	if [[ -z "${wget_bin}" && -x /usr/bin/wget ]]; then
+		wget_bin=/usr/bin/wget
+	fi
+
+	if [[ -z "${curl_bin}" && -z "${wget_bin}" ]]; then
+		echo "ERROR: Neither curl nor wget found" >&2
+		return 1
+	fi
+
 	arch="$(uname -m)"
 	tmpd="$(mktemp -d)"
+	unpack_py="${tmpd}/ipi-newc-unpack.py"
+	if ! command -v cpio >/dev/null 2>&1; then
+		ipi_write_newc_cpio_unpack_py "${unpack_py}"
+	fi
 	root="/tmp/ipi-libxslt-extract-$$"
 	mkdir -p "${root}"
+
+	local unpack_mode=python3
+	command -v cpio >/dev/null 2>&1 && unpack_mode=cpio
+	echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode})" >&2
+
 	for base in \
 			"https://mirror.stream.centos.org/9-stream/BaseOS/${arch}/os/Packages/" \
-			"https://vault.centos.org/9-stream/BaseOS/${arch}/os/Packages/"
+			"https://vault.centos.org/9-stream/BaseOS/${arch}/os/Packages/" \
+			"http://mirror.stream.centos.org/9-stream/BaseOS/${arch}/os/Packages/"
 	do
-		html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${base}" 2>/dev/null)" || continue
+		echo "INFO: Trying mirror: ${base}" >&2
+
+		if [[ -n "${curl_bin}" ]]; then
+			html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${base}" 2>/dev/null)" || {
+				echo "WARN: Failed to fetch from ${base} with curl" >&2
+				continue
+			}
+		else
+			html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${base}" 2>/dev/null)" || {
+				echo "WARN: Failed to fetch from ${base} with wget" >&2
+				continue
+			}
+		fi
+
 		xml_rpm="$(ipi_stream9_pick_latest_rpm libxml2 "${html}")"
 		xsl_rpm="$(ipi_stream9_pick_latest_rpm libxslt "${html}")"
+
 		if [[ -z "${xml_rpm}" || -z "${xsl_rpm}" ]]; then
+			echo "WARN: Could not find RPM packages in ${base}" >&2
 			continue
 		fi
-		if "${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" &&
-			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}"
-		then
-			if ( cd "${root}" && rpm2cpio "${tmpd}/${xml_rpm}" | cpio -idm 2>/dev/null ) &&
-				( cd "${root}" && rpm2cpio "${tmpd}/${xsl_rpm}" | cpio -idm 2>/dev/null )
-			then
-				export PATH="${root}/usr/bin:${PATH:-}"
-				export LD_LIBRARY_PATH="${root}/usr/lib64:${LD_LIBRARY_PATH:-}"
-				if xsltproc --version >/dev/null 2>&1; then
-					rm -rf "${tmpd}"
-					return 0
-				fi
+
+		echo "INFO: Found packages: ${xml_rpm}, ${xsl_rpm}" >&2
+
+		download_success=true
+		if [[ -n "${curl_bin}" ]]; then
+			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" 2>/dev/null || {
+				echo "WARN: Failed to download ${xml_rpm}" >&2
+				download_success=false
+			}
+			if [[ "${download_success}" == "true" ]]; then
+				"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}" 2>/dev/null || {
+					echo "WARN: Failed to download ${xsl_rpm}" >&2
+					download_success=false
+				}
+			fi
+		else
+			"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" 2>/dev/null || {
+				echo "WARN: Failed to download ${xml_rpm}" >&2
+				download_success=false
+			}
+			if [[ "${download_success}" == "true" ]]; then
+				"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}" 2>/dev/null || {
+					echo "WARN: Failed to download ${xsl_rpm}" >&2
+					download_success=false
+				}
 			fi
 		fi
+
+		if [[ "${download_success}" != "true" ]]; then
+			continue
+		fi
+
+		echo "INFO: Extracting RPM packages" >&2
+
+		if ipi_extract_rpm_contents "${tmpd}/${xml_rpm}" "${root}" "${unpack_py}" &&
+			ipi_extract_rpm_contents "${tmpd}/${xsl_rpm}" "${root}" "${unpack_py}"
+		then
+			echo "INFO: RPM extraction successful" >&2
+			export PATH="${root}/usr/bin:${PATH:-}"
+			export LD_LIBRARY_PATH="${root}/usr/lib64:${LD_LIBRARY_PATH:-}"
+
+			if xsltproc --version >/dev/null 2>&1; then
+				echo "INFO: xsltproc successfully installed and verified" >&2
+				rm -rf "${tmpd}"
+				return 0
+			fi
+			echo "WARN: xsltproc extracted but not functional (missing shared libs?)" >&2
+		else
+			echo "WARN: Failed to extract RPM packages" >&2
+		fi
+
 		rm -rf "${root}"
 		mkdir -p "${root}"
 	done
+
+	echo "ERROR: All mirror attempts failed" >&2
 	rm -rf "${tmpd}" "${root}"
 	return 1
 }
