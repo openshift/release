@@ -656,16 +656,11 @@ for product in mce acm; do
       continue
     fi
 
-    # EXCLUDED_REPOS use release-* branches, only process in ACM loop
-    if [[ "${product}" == "mce" ]]; then
-      echo "INFO: Skipping ${owner_repo} in MCE loop (uses release-* branches)"
-      continue
-    fi
-
     echo "INFO: Handling excluded repo ${owner_repo}"
 
-    # Override branch_prefix for specific repos (deprecated in ACM, moved to MCE)
-    repo_branch_prefix="${branch_prefix}"
+    # EXCLUDED_REPOS always use release-* branches (even when in MCE bundle)
+    # Exception: cluster-permission uses backplane-* when processed as ACM
+    repo_branch_prefix="release"
     if [[ "${repo}" == "cluster-permission" && "${product}" == "acm" ]]; then
       echo "INFO: cluster-permission deprecated in ACM, using backplane-* branches"
       repo_branch_prefix="backplane"
