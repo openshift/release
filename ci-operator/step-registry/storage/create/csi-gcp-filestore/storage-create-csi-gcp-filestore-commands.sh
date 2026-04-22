@@ -3,6 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "NOOP: DUMMY CHANGE"
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
