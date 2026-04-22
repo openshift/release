@@ -1,31 +1,22 @@
 presubmits:
-  openshift/app-netutil:
+  stackrox/stackrox:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-<<<<<<<< HEAD:ci-operator/jobs/openshift/app-netutil/openshift-app-netutil-release-5.1-presubmits.yaml
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build03
-    context: ci/prow/e2e-aws
-========
     - ^jv-run-perf-scale-using-comment-get-diagnostic-bundle$
     - ^jv-run-perf-scale-using-comment-get-diagnostic-bundle-
     cluster: build11
     context: ci/prow/perf-scale-24nodes-scale-test
->>>>>>>> f16d31e4939 (Trying to get diagnostic bundle for perf scale test):ci-operator/jobs/stackrox/stackrox/stackrox-stackrox-jv-run-perf-scale-using-comment-get-diagnostic-bundle-presubmits.yaml
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 14h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-stackrox
+      ci-operator.openshift.io/variant: perf-scale
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-<<<<<<<< HEAD:ci-operator/jobs/openshift/app-netutil/openshift-app-netutil-release-5.1-presubmits.yaml
-    name: pull-ci-openshift-app-netutil-release-5.1-e2e-aws
-    rerun_command: /test e2e-aws
-========
     name: pull-ci-stackrox-stackrox-jv-run-perf-scale-using-comment-get-diagnostic-bundle-perf-scale-24nodes-scale-test
     optional: true
     reporter_config:
@@ -40,7 +31,6 @@ presubmits:
           Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
           logs> {{end}}'
     rerun_command: /test perf-scale-24nodes-scale-test
->>>>>>>> f16d31e4939 (Trying to get diagnostic bundle for perf scale test):ci-operator/jobs/stackrox/stackrox/stackrox-stackrox-jv-run-perf-scale-using-comment-get-diagnostic-bundle-presubmits.yaml
     spec:
       containers:
       - args:
@@ -49,7 +39,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws
+        - --target=24nodes-scale-test
+        - --variant=perf-scale
         command:
         - ci-operator
         env:
@@ -105,4 +96,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )perf-scale-24nodes-scale-test,?($|\s.*)
