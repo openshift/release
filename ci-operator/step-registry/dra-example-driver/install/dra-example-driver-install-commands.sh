@@ -28,12 +28,19 @@ if ! command -v helm &> /dev/null; then
   HELM_VERSION="3.17.3"
   HELM_ARCHIVE="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
   curl -fsSL "https://get.helm.sh/${HELM_ARCHIVE}" -o "/tmp/${HELM_ARCHIVE}"
+  curl -fsSL "https://get.helm.sh/${HELM_ARCHIVE}.sha256sum" -o "/tmp/${HELM_ARCHIVE}.sha256sum"
+  echo "Verifying checksum..."
+  (cd /tmp && sha256sum --check --status "${HELM_ARCHIVE}.sha256sum") || {
+    echo "ERROR: Helm checksum verification failed"
+    rm -rf "/tmp/${HELM_ARCHIVE}" "/tmp/${HELM_ARCHIVE}.sha256sum"
+    exit 1
+  }
   tar -xzf "/tmp/${HELM_ARCHIVE}" -C /tmp
   mkdir -p /tmp/bin
   mv /tmp/linux-amd64/helm /tmp/bin/helm
   chmod +x /tmp/bin/helm
   export PATH="/tmp/bin:$PATH"
-  rm -rf "/tmp/${HELM_ARCHIVE}" /tmp/linux-amd64
+  rm -rf "/tmp/${HELM_ARCHIVE}" "/tmp/${HELM_ARCHIVE}.sha256sum" /tmp/linux-amd64
   echo "Helm installed: $(helm version --short)"
 else
   echo "Helm already installed: $(helm version --short)"
@@ -55,9 +62,9 @@ echo ""
 echo "Creating namespace ${DRA_EXAMPLE_DRIVER_NAMESPACE}..."
 oc create namespace "${DRA_EXAMPLE_DRIVER_NAMESPACE}" 2>/dev/null || true
 
-# Grant privileged SCC to all service accounts in the namespace (required for OpenShift)
-echo "Granting privileged SCC for dra-example-driver namespace..."
-oc adm policy add-scc-to-group privileged "system:serviceaccounts:${DRA_EXAMPLE_DRIVER_NAMESPACE}"
+# Grant privileged SCC for dra-example-driver service account (required for OpenShift)
+echo "Adding privileged SCC for dra-example-driver service account..."
+oc adm policy add-scc-to-user privileged -z dra-example-driver-service-account -n "${DRA_EXAMPLE_DRIVER_NAMESPACE}"
 
 echo ""
 
