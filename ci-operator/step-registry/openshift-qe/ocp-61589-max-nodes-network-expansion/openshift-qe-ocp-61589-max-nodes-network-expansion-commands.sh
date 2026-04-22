@@ -119,8 +119,8 @@ oc patch Network.config.openshift.io cluster --type='merge' --patch "{
     }
 }" | tee "$RESULTS_DIR/network-expansion-patch-result.txt"
 
-echo "$(date): Network expansion applied, waiting 30 minutes for reconfiguration" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-sleep 1800
+echo "$(date): Network expansion applied, waiting 20 minutes for reconfiguration (based on real test: 13.5 minutes)" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
+sleep 1200  # 20 minutes instead of 30
 
 # Verify cluster health after network expansion
 echo "$(date): Checking cluster health post-expansion" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
@@ -208,7 +208,20 @@ if [[ $notready_nodes -gt 0 ]]; then
     if [[ -n "$notready_node" ]]; then
         echo "Sample error from $notready_node:"
         oc describe node "$notready_node" | tee "$RESULTS_DIR/notready-node-details-$notready_node.txt"
-        oc describe node "$notready_node" | grep -A5 -B5 "k8s.ovn.org/node-subnets" | tee "$RESULTS_DIR/subnet-annotation-errors.txt" || true
+        
+        # Check for both types of subnet exhaustion errors
+        echo "Checking for subnet exhaustion evidence..."
+        
+        # Classic subnet annotation error
+        if oc describe node "$notready_node" | grep -A3 -B3 "k8s.ovn.org/node-subnets.*annotation" | tee "$RESULTS_DIR/subnet-annotation-errors.txt"; then
+            echo "✅ Found classic subnet annotation error"
+        # NetworkPluginNotReady with CNI config missing
+        elif oc describe node "$notready_node" | grep -A3 -B3 "NetworkPluginNotReady.*no CNI configuration" | tee "$RESULTS_DIR/network-plugin-errors.txt"; then
+            echo "✅ Found network plugin error indicating subnet exhaustion"
+        else
+            echo "⚠️  Unknown error type - saving full describe output for analysis"
+            oc describe node "$notready_node" | grep -A10 -B5 "Ready.*False" | tee "$RESULTS_DIR/unknown-error-analysis.txt"
+        fi
     fi
 fi
 
