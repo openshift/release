@@ -1,0 +1,46 @@
+ref:
+  as: ocp-61589-max-nodes-network-expansion
+  from_image:
+    namespace: ocp
+    name: "4.21" 
+    tag: cli
+  commands: ocp-61589-max-nodes-network-expansion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 8h0m0s
+  grace_period: 30m0s
+  env:
+  - name: CLUSTER_NETWORK_CIDR
+    default: "10.128.0.0/20"
+    documentation: "Original cluster network CIDR"
+  - name: CLUSTER_NETWORK_EXPANDED_CIDR
+    default: "10.128.0.0/14"
+    documentation: "Expanded cluster network CIDR for testing"
+  - name: CLUSTER_NETWORK_HOST_PREFIX
+    default: "23"
+    documentation: "Host prefix for cluster network"
+  - name: MAX_NODES_TARGET
+    default: "520"
+    documentation: "Target total number of nodes to provision"
+  - name: EXPECTED_READY_NODES
+    default: "510" 
+    documentation: "Expected number of nodes that should become Ready"
+  - name: TEST_TIMEOUT
+    default: "6h"
+    documentation: "Maximum time to wait for node provisioning"
+  documentation: |-
+    Tests OCP-61589: Maximum nodes post cluster network expansion.
+    
+    This test validates that after expanding the cluster network CIDR from /20 to /14,
+    the cluster can provision approximately 512 nodes before hitting subnet exhaustion.
+    
+    Test steps:
+    1. Verify initial cluster health and network configuration
+    2. Expand cluster network CIDR (10.128.0.0/20 -> 10.128.0.0/14)
+    3. Scale machinesets to provision 520 total nodes (200+200+120)
+    4. Validate that ~510 nodes become Ready before subnet exhaustion
+    5. Verify remaining nodes stay NotReady due to missing node-subnets annotation
+    
+    This test requires significant AWS resources and takes several hours to complete.
