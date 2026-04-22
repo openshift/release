@@ -1,8 +1,14 @@
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -10,37 +16,18 @@ resources:
       memory: 200Mi
 tests:
 - as: ocp-61589-max-nodes-post-network-expansion
-  cron: 0 8 * * 0  # Weekly on Sundays at 8 AM UTC
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 8h0m0s
-    version: "4.21"
+  cron: 0 8 * * 0
   steps:
-    cluster_profile: aws-qe-long-duration
+    cluster_profile: aws-perfscale-qe
     env:
-      AWS_REGION: us-east-2
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      MASTER_NODE_TYPE: m6a.8xlarge
-      WORKER_REPLICAS: "3"
-      MASTER_REPLICAS: "3"
-      # Custom network configuration for OVN test
-      CLUSTER_NETWORK_CIDR: "10.128.0.0/20"
-      CLUSTER_NETWORK_HOST_PREFIX: "23"  
-      SERVICE_NETWORK_CIDR: "172.30.0.0/16"
-      MACHINE_NETWORK_CIDR: "10.0.0.0/16"
-      NETWORK_TYPE: "OVNKubernetes"
-      # Test-specific settings
-      MAX_NODES_TARGET: "520"
       EXPECTED_READY_NODES: "510"
-      TEST_TIMEOUT: "6h"
+      MAX_NODES_TARGET: "520"
+      TEST_TIMEOUT: 2h
     test:
-    - ref: ocp-61589-max-nodes-network-expansion
-    workflow: ipi-aws-ovn-custom-network
+    - ref: openshift-qe-ocp-61589-max-nodes-network-expansion
+    workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
-  org: openshift-qe  
+  org: openshift-qe
   repo: network-performance-tests

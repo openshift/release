@@ -1,21 +1,21 @@
 periodics:
 - agent: kubernetes
   cluster: build03
-  cron: 0 8 * * 0  # Weekly on Sundays at 8 AM UTC  
+  cron: 0 8 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 8h0m0s
   extra_refs:
   - base_ref: main
     org: openshift-qe
     repo: network-performance-tests
-  interval: ""
   labels:
-    ci-operator.openshift.io/variant: ""
-    job-env: aws
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+    ci.openshift.io/generator: prowgen
     job-release: "4.21"
-    job-test: ocp-61589-max-nodes-post-network-expansion
-    prow.k8s.io/can-be-retried: "false"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ci-openshift-qe-network-performance-tests-main-ocp-61589-max-nodes-post-network-expansion
   reporter_config:
@@ -24,31 +24,39 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>.
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>.
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocp-61589-max-nodes-post-network-expansion
       command:
       - ci-operator
       env:
-      - name: CONFIG_SPEC
+      - name: HTTP_SERVER_IP
         valueFrom:
-          configMapKeyRef:
-            key: openshift-qe-network-performance-tests-main.yaml
-            name: ci-operator-main-configs
-      image: ci-operator:latest
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -70,9 +78,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: gcs-credentials
+    - name: ci-pull-credentials
       secret:
-        secretName: gce-sa-credentials-gcs-publisher
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
