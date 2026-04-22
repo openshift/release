@@ -543,7 +543,7 @@ for product in mce acm; do
   component_repos=$(yq '.components[] |
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
-      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}")
+      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}" | sort -u)
   for repo in ${component_repos}; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
@@ -642,7 +642,7 @@ for product in mce acm; do
   component_repos=$(yq '.components[] |
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
-      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}")
+      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}" | sort -u)
 
   branch_prefix="release"
   if [[ ${product} == "mce" ]]; then
