@@ -700,7 +700,7 @@ for product in mce acm; do
       echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
-      create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
+      create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${default_branch}" "${version}" "${tekton_log_file}"
       status=$?
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
@@ -749,7 +749,7 @@ for product in mce acm; do
         echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
         tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
-        create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
+        create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${default_branch}" "${version}" "${tekton_log_file}"
         status=$?
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
