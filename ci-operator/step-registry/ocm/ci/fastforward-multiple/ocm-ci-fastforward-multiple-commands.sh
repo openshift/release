@@ -511,6 +511,7 @@ done
 SKIPPED_REPOS=(
   "acm-operator-bundle"
   "mce-operator-bundle"
+  "cluster-proxy-addon"
 )
 
 # Repos with release-* default branch - exclude from main fast-forward
