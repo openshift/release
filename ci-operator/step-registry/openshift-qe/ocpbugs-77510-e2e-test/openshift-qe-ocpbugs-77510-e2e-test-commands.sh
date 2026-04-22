@@ -84,7 +84,6 @@ cleanup() {
     fi
     export CLEANUP_RUNNING=true
     
-    local exit_code=$?
     log "🧹 Cleaning up test resources..."
     
     # Stop monitoring processes
