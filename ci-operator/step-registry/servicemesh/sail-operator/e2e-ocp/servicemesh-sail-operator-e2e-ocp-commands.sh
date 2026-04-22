@@ -129,6 +129,22 @@ execute_and_collect_artifacts() {
   test_rc=$?
   echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
 
+  if [ "${test_rc}" -ne 0 ] && [ "${OLM:-true}" = "true" ]; then
+    echo "=== OLM Diagnostic Information ==="
+    oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" sh -c "
+      export KUBECONFIG=/work/ci-kubeconfig
+      echo '--- Pods in sail-operator namespace ---'
+      oc get pods -n sail-operator -o wide 2>/dev/null || true
+      echo '--- CatalogSource status ---'
+      oc get catalogsource -n sail-operator -o yaml 2>/dev/null || true
+      echo '--- Subscription status ---'
+      oc get subscription -n sail-operator -o yaml 2>/dev/null || true
+      echo '--- Events (sail-operator namespace) ---'
+      oc get events -n sail-operator --sort-by='.lastTimestamp' 2>/dev/null || true
+    " 2>/dev/null || true
+    echo "=== End OLM Diagnostic ==="
+  fi
+
   echo "Copying artifacts from test pod after attempt ${attempt}..."
   oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
 
