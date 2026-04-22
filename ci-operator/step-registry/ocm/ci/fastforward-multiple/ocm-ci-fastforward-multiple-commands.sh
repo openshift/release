@@ -507,15 +507,20 @@ for version in ${DESTINATION_VERSIONS}; do
   fi
 done
 
-# Repos with release-* default branch - exclude from fast-forward
-EXCLUDED_REPOS=(
+# Repos to completely skip (no fast-forward at all)
+SKIPPED_REPOS=(
   "acm-operator-bundle"
+  "mce-operator-bundle"
+)
+
+# Repos with release-* default branch - exclude from main fast-forward
+# These are processed separately to handle non-main default branches
+EXCLUDED_REPOS=(
   "cluster-permission"
   "grafana"
   "grafana-dashboard-loader"
   "kube-rbac-proxy"
   "kube-state-metrics"
-  "mce-operator-bundle"
   "memcached"
   "memcached_exporter"
   "metrics-collector"
@@ -538,8 +543,21 @@ for product in mce acm; do
     owner=${owner_repo%/*}
     repo=${owner_repo#*/}
 
-    # Check if repo is in exclusion list
+    # Check if repo should be completely skipped
     skip=false
+    for skipped in "${SKIPPED_REPOS[@]}"; do
+      if [[ "${repo}" == "${skipped}" ]]; then
+        skip=true
+        break
+      fi
+    done
+
+    if [[ "${skip}" == "true" ]]; then
+      echo "INFO: Skipping ${owner_repo} (bundle repo - no fast-forward needed)"
+      continue
+    fi
+
+    # Check if repo is in exclusion list (processed separately)
     for excluded in "${EXCLUDED_REPOS[@]}"; do
       if [[ "${repo}" == "${excluded}" ]]; then
         skip=true
@@ -616,6 +634,13 @@ for product in mce acm; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
     repo=${owner_repo#*/}
+
+    # Skip bundle repos entirely
+    for skipped in "${SKIPPED_REPOS[@]}"; do
+      if [[ "${repo}" == "${skipped}" ]]; then
+        continue 2  # Continue outer loop
+      fi
+    done
 
     # Only process repos in exclusion list
     skip=true
