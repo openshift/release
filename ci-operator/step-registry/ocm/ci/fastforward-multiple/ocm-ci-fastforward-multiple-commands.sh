@@ -659,7 +659,7 @@ for product in mce acm; do
     echo "INFO: Handling excluded repo ${owner_repo}"
 
     # Override branch_prefix for specific repos (deprecated in ACM, moved to MCE)
-    local repo_branch_prefix="${branch_prefix}"
+    repo_branch_prefix="${branch_prefix}"
     if [[ "${repo}" == "cluster-permission" && "${product}" == "acm" ]]; then
       echo "INFO: cluster-permission deprecated in ACM, using backplane-* branches"
       repo_branch_prefix="backplane"
