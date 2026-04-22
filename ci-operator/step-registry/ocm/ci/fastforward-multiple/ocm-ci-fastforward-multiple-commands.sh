@@ -678,22 +678,27 @@ for product in mce acm; do
     for version in ${DESTINATION_VERSIONS}; do
       dest_branch="${repo_branch_prefix}-${version}"
 
-      # Check if branch exists, create if not
-      echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
-      branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
+      # Skip if dest_branch same as default_branch (no fast-forward needed)
+      if [[ "${dest_branch}" == "${default_branch}" ]]; then
+        echo "INFO: Skipping ${dest_branch} for ${owner_repo} (same as default branch)"
+      else
+        # Check if branch exists, create if not
+        echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
+        branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
 
-      fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
-      status=$?
-      if [[ $status -ne 0 ]]; then
-        exit_code=$((exit_code | status))
-        echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
-        if [[ -f "${branch_log}" ]]; then
-          echo "Logs:"
-          sed 's/^/    /' "${branch_log}"
-        else
-          echo "ERROR: Log file not found: ${branch_log}"
+        fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+        status=$?
+        if [[ $status -ne 0 ]]; then
+          exit_code=$((exit_code | status))
+          echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
+          if [[ -f "${branch_log}" ]]; then
+            echo "Logs:"
+            sed 's/^/    /' "${branch_log}"
+          else
+            echo "ERROR: Log file not found: ${branch_log}"
+          fi
+          continue
         fi
-        continue
       fi
 
       # Create Tekton files on the destination branch
@@ -727,22 +732,27 @@ for product in mce acm; do
       for version in ${DESTINATION_VERSIONS}; do
         dest_branch="${alternate_prefix}-${version}"
 
-        # Check if branch exists, create if not
-        echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
-        branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
+        # Skip if dest_branch same as default_branch (no fast-forward needed)
+        if [[ "${dest_branch}" == "${default_branch}" ]]; then
+          echo "INFO: Skipping alternate ${dest_branch} for ${owner_repo} (same as default branch)"
+        else
+          # Check if branch exists, create if not
+          echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
+          branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
 
-        fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
-        status=$?
-        if [[ $status -ne 0 ]]; then
-          exit_code=$((exit_code | status))
-          echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
-          if [[ -f "${branch_log}" ]]; then
-            echo "Logs:"
-            sed 's/^/    /' "${branch_log}"
-          else
-            echo "ERROR: Log file not found: ${branch_log}"
+          fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+          status=$?
+          if [[ $status -ne 0 ]]; then
+            exit_code=$((exit_code | status))
+            echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
+            if [[ -f "${branch_log}" ]]; then
+              echo "Logs:"
+              sed 's/^/    /' "${branch_log}"
+            else
+              echo "ERROR: Log file not found: ${branch_log}"
+            fi
+            continue
           fi
-          continue
         fi
 
         # Create Tekton files on the alternate branch
