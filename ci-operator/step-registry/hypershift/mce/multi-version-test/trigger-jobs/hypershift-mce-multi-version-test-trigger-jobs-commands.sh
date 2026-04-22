@@ -37,7 +37,7 @@ function get_payload_list() {
     declare -A payload_list
 
     # Get all guest versions and the release image for each guest version
-    for version in $(echo "${mce_to_guest[@]}" | tr ' ' '\n' | sort -uV); do
+    for version in $(echo "${!hub_to_mce[@]}" | tr ' ' '\n' | sort -uV); do
         image=$(curl -s "https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/api/v1/releasestream/${version}.0-0.nightly/latest" | jq -r '.pullSpec')
         payload_list["$version"]=$image
     done
