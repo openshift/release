@@ -27,13 +27,16 @@ TOPOLOGIES=""
 DATA_AVAILABLE=false
 
 if [[ -f "${LOG_FILE}" ]]; then
+    if grep -q 'BLOCKING_JOBS_START' "${LOG_FILE}" && grep -q 'BLOCKING_JOBS_END' "${LOG_FILE}"; then
+        DATA_AVAILABLE=true
+    fi
+
     BLOCKING_LINES=$(sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${LOG_FILE}" \
         | { grep -v 'BLOCKING_JOBS_START\|BLOCKING_JOBS_END' || true; } \
         | sed 's/^[0-9]*\t//' \
         | sed '/^[[:space:]]*$/d')
 
     if [[ -n "${BLOCKING_LINES}" ]]; then
-        DATA_AVAILABLE=true
         BLOCKING_COUNT=$(echo "${BLOCKING_LINES}" | wc -l)
         VERSIONS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $5}' | sort -uV | paste -sd ', ')
         TOPOLOGIES=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | paste -sd ', ')
