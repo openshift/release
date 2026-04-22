@@ -145,6 +145,8 @@ create_tekton_files() {
       echo "$ts" "$@"
     }
 
+    log "INFO [DRY-RUN] Starting Tekton file creation for ${owner}/${repo}"
+    log "INFO [DRY-RUN] default_branch=${default_branch}, dest_versions=${dest_versions}"
     log "INFO Cloning ${default_branch} branch"
     if ! git clone -b "${default_branch}" "$repo_url" 2>&1; then
       log "ERROR Could not clone ${default_branch} branch"
