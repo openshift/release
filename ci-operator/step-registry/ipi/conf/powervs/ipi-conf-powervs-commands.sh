@@ -128,8 +128,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-PLATFORM_ARGS_COMPUTE=( "processors" "0.75" "procType" "shared" )
-PLATFORM_ARGS_WORKER=( "processors" "0.75" "procType" "shared" )
+PLATFORM_ARGS_COMPUTE=( "processors" "0.75" "procType" "Shared" )
+PLATFORM_ARGS_WORKER=( "processors" "0.75" "procType" "Shared" )
 POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
 PERSISTENT_VPC=""
@@ -319,8 +319,8 @@ echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
 echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
 # Are we performing a Single Node OpenShift cluster deploy?
 if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
-  PLATFORM_ARGS_COMPUTE+=( "procType" "Dedicated" )
-  PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
+  # Override default settings for SNO
+  PLATFORM_ARGS_COMPUTE=( "procType" "Dedicated" "processors" 6 )
 fi
 
 FILE=$(mktemp)
