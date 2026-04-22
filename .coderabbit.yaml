@@ -1,0 +1,124 @@
+language: en-US
+inheritance: true
+early_access: false
+enable_free_tier: false
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: true
+  pre_merge_checks:
+    custom_checks:
+      - name: "AI Tool Principle of Least Privilege"
+        mode: error
+        instructions: |
+          When AI-related steps, scripts, or configurations invoke Claude (or any AI tool),
+          verify that permissions are constrained to the absolute minimum required:
+
+          1. **Allowed tools must be explicitly listed.** Claude invocations MUST use
+             `--allowedTools` or restrictive configuration. Each allowed
+             tool should be justified by the task.
+
+          2. **No direct credential access.** Claude MUST NEVER be passed credentials
+             (passwords, tokens, API keys, kubeconfigs, certificates) as command-line
+             arguments, in prompt text, or via file contents piped to stdin. Credentials
+             may only be available to Claude indirectly through environment variables that
+             are consumed by tools Claude invokes (e.g., a CLI tool that reads `$JIRA_TOKEN`
+             internally). The AI agent itself must not be able to read, echo, or exfiltrate
+             the credential value.
+
+          3. **File system access should be scoped.** If Claude is given file read/write
+             permissions, they should be limited to the relevant directories (e.g.,
+             `${SHARED_DIR}`, `${ARTIFACT_DIR}`, the repo checkout).
+
+          4. **Network access should be scoped.** If Claude can make web requests, the
+             allowed URLs or domains should be constrained to only what the task requires
+             (e.g., specific Jira or GitHub API endpoints).
+
+          Flag any AI tool invocation that does not follow these constraints.
+      - name: "AI Tool Timeout and Bounded Execution"
+        mode: error
+        instructions: |
+          All Claude CLI invocations in scripts MUST be bounded in both time and turns:
+
+          1. **Timeout is required.** Claude must always be invoked via `timeout`, e.g.:
+             `timeout 600 claude -p "..."`. The timeout value should be proportional to
+             the task complexity but must always be present.
+
+          2. **Max turns must be set.** Every Claude invocation MUST include `--max-turns`
+             to cap the number of agentic tool-use turns and bound token consumption.
+             Appropriate values:
+             - Simple tasks: `--max-turns 10`
+             - Moderate multi-step tasks: `--max-turns 25-50`
+             - Complex investigation/triage: `--max-turns 50-100`
+             - Very large tasks: `--max-turns 100-200`
+             Values above 200 should be flagged for justification.
+
+          3. **Both constraints together.** A compliant invocation looks like:
+             `timeout 900 claude -p "..." --max-turns 50 --allowedTools "..."`.
+             Missing either timeout or --max-turns is an error.
+      - name: "AI Scope: Approved vs Unapproved Activities"
+        mode: error
+        instructions: |
+          The existing authorization covers these AI use cases:
+          - Reading public Jira cards
+          - Editing code via code assistant (human reviews all changes before merge)
+          - Examining CI and test results (read-only analysis of logs, artifacts, Sippy)
+          - Opening GitHub reviews that require human approval before action
+
+          Flag any AI tool usage that falls OUTSIDE these bounds.
+
+          If a new AI use case is introduced that is not in the approved list above,
+          flag it as requiring AIA review and approval before merging.
+      - name: "AI for Analytics Only, Not Deterministic Tasks"
+        mode: warning
+        instructions: |
+          Claude and other AI tools should be used for analytic, interpretive, and
+          judgment-based tasks -- not for deterministic operations that can be reliably
+          scripted.
+
+          If a script delegates a deterministic subtask to Claude instead of implementing
+          it in bash/python, flag it and suggest the scripted alternative.
+      - name: "Secret Leak Prevention in CI Scripts"
+        mode: error
+        instructions: |
+          CI step-registry scripts and any shell scripts in this repository MUST protect
+          credentials from leaking into CI logs.
+
+          1. **No `set -x` around credential handling.** If a script uses `set -x` (or
+             `set -o xtrace`), it MUST disable tracing before any operation that reads,
+             writes, or uses secrets.
+
+          2. **Never echo/print credentials.** Scripts must not `echo`, `printf`, `cat`,
+             or otherwise print passwords, tokens, API keys, kubeconfig contents, or
+             certificate data to stdout/stderr.
+
+          3. **No credentials in command-line arguments.** Avoid passing secrets as CLI
+             arguments (visible in `ps` output and trace logs).
+
+          4. **Default script header should be `set -euo pipefail`** (without `-x`).
+             If `-x` is added for debugging, it must be accompanied by the tracing
+             guard pattern above around any credential operations.
+
+          Flag any script that uses `set -x` globally without guarding credential
+          operations, or that echoes/prints values from sensitive variables.
+      - name: "Deprecated Template Usage"
+        mode: warning
+        instructions: |
+          The `ci-operator/templates/` directory contains legacy black-box test workflows.
+          All new test workflows must use the step registry (`ci-operator/step-registry/`)
+          instead.
+
+          Flag any PR that adds new files to `ci-operator/templates/` or adds new
+          references to templates in `ci-operator/config/` files. Suggest migrating to
+          a step-registry workflow instead.
+
+          Modifications to existing templates for bug fixes are acceptable but should
+          include a comment noting the template is legacy and encouraging future migration.
+chat:
+  auto_reply: true
