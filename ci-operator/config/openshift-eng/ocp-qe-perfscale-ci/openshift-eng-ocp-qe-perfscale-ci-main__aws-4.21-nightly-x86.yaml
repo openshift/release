@@ -146,7 +146,7 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
 - as: control-plane-fips-24nodes
-  cron: 0 4 7,19 * *
+  cron: 17 6 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -155,11 +155,33 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ENABLE_LAYER_3: "false"
       KB_FLAGS: --local-indexing
+      RUN_ORION: deferred
       UDN_ITERATION_MULTIPLIER: "3"
+      VERSION: "4.21"
       ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws-ovn-fips
+- as: control-plane-fips-6nodes
+  cron: 17 12 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --local-indexing
+      RUN_ORION: deferred
+      UDN_ITERATION_MULTIPLIER: "12"
+      VERSION: "4.21"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws-ovn-fips
 - always_run: false
   as: conc-builds-3nodes
