@@ -49,22 +49,22 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
-    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
-    export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
-    export ENABLE_JIRA_REPORTING=true
-    source /usr/local/cs-qe-credentials/ocm-tokens
-    source /usr/local/cs-qe-credentials/jira-cred
-    env | grep -v '^_='
-    EOF
+    PROW_GS_BUCKET="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.bucket')"
+    JOB_URL_PREFIX="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.job_url_prefix // empty')"
 
-    podman run \
-    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-    --env-file /tmp/podman.env \
-    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
-    --rm \
-    quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main --reportJiraTicket
+    if [[ "${JOB_URL_PREFIX}" == "" ]]; then
+      JOB_URL_PREFIX="https://prow.ci.openshift.org/view/"
+    fi
+
+    JOB_URL="${JOB_URL_PREFIX}gs/${PROW_GS_BUCKET}"
+
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_URL="${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_URL="${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    echo "JOB_URL=${JOB_URL}"
   container:
     from: nested-podman
     memory_backed_volume:
