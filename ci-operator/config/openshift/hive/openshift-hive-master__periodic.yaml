@@ -252,10 +252,21 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;HiveSDRosa&
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;HiveSDRosa&;
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "90"
     test:
+    - as: deploy-hive
+      cli: latest
+      commands: |
+        make deploy
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - chain: cucushift-installer-check-cluster-health
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
