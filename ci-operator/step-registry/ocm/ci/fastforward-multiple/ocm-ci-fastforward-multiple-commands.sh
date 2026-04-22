@@ -147,9 +147,26 @@ create_tekton_files() {
 
   local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
 
+  # Test log file creation before redirecting
+  if ! touch "${log_file}" 2>/dev/null; then
+    echo "ERROR: Cannot create log file: ${log_file}" >&2
+    return 1
+  fi
+
+  # Verify log file was created
+  if [[ ! -f "${log_file}" ]]; then
+    echo "ERROR: Log file does not exist after touch: ${log_file}" >&2
+    return 1
+  fi
+
   # Open log file early to capture all output
   exec 3>&1 4>&2
-  exec 1>>"${log_file}" 2>&1
+  exec 1>>"${log_file}" 2>&1 || {
+    echo "ERROR: Failed to redirect to log file: ${log_file}" >&4
+    exec 1>&3 2>&4
+    exec 3>&- 4>&-
+    return 1
+  }
 
   echo "INFO [DRY-RUN] Starting Tekton file creation for ${owner}/${repo}"
   echo "INFO [DRY-RUN] default_branch=${default_branch}, dest_versions=${dest_versions}"
