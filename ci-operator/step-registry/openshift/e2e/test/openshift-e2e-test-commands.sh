@@ -288,12 +288,16 @@ function upgrade_paused() {
     # Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
     # which is available from 4.21+
     installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+    # remove --disable-monitor=oc-adm-upgrade-status when https://redhat.atlassian.net/browse/OTA-1977 is fixed
+    # TODO: define it from the job like TEST_ARGS
+    TEST_ARGS_2="--disable-monitor=oc-adm-upgrade-status"
     echo "The installed version is $installed_version"
     if [[ $installed_version == "4.20."* ]]; then
         echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
         oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
         echo "Showing the ClusterVersion spec"
         oc get clusterversion version -o jsonpath='{.spec}{"\n"}'
+        TEST_ARGS_2="--disable-monitor=oc-adm-upgrade-status,legacy-cvo-invariants"
     fi
 
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
@@ -308,10 +312,9 @@ function upgrade_paused() {
     wait "$!"
     echo "Upgraded control-plane to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
 
-    # remove --disable-monitor=oc-adm-upgrade-status when https://redhat.atlassian.net/browse/OTA-1977 is fixed
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
-        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" --disable-monitor=oc-adm-upgrade-status \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" "${TEST_ARGS_2:-}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
