@@ -5,7 +5,9 @@ build_root:
     tag: go1.25-linux
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
     to: fleetshift-server
 resources:
   '*':
@@ -14,14 +16,18 @@ resources:
       memory: 200Mi
 tests:
 - as: pr-image-mirror
+  capabilities:
+  - arm64
   steps:
     dependencies:
       SOURCE_IMAGE_REF: fleetshift-server
     env:
       IMAGE_REPO: fleetshift-server
       REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: pr-merge-image-mirror
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-latest
+  capabilities:
+  - arm64
   postsubmit: true
   steps:
     dependencies:
@@ -30,7 +36,18 @@ tests:
       IMAGE_REPO: fleetshift-server
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-sha
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-server
+    env:
+      IMAGE_REPO: fleetshift-server
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: fleetshift
