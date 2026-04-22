@@ -94,16 +94,19 @@ EOF
 }
 
 # libvirt-installer runs as non-root (UID 1000); microdnf/yum cannot install packages. When we need
-# xsltproc for the s390x ACPI terraform workaround, unpack CentOS Stream 9 libxml2/libxslt RPMs
-# (same major userspace as the image) into /tmp and prepend PATH/LD_LIBRARY_PATH.
-function ipi_stream9_pick_latest_rpm() {
+# xsltproc for the s390x ACPI terraform workaround, unpack EL9 libxml2/libxslt RPMs (RHEL9-compatible
+# with the CentOS Stream 9-based image) into /tmp and prepend PATH/LD_LIBRARY_PATH.
+# CentOS Stream mirror "Packages/" pages are no longer plain directory indexes; use Rocky 9
+# BaseOS (libxml2) + AppStream (libxslt) letter buckets, which still expose href="*.rpm".
+function ipi_el9_pick_latest_rpm() {
 	local pkg="$1"
 	local html="$2"
-	echo "${html}" | grep -oE "href=\"${pkg}-[0-9][^\"]*\\.rpm\"" | sed 's/href="//;s/"$//' \
+	local arch="$3"
+	echo "${html}" | grep -oE "href=\"${pkg}-[0-9][^\"]*\\.${arch}\\.rpm\"" | sed 's/href="//;s/"$//' \
 		| grep -Ev -- '-(devel|static)' | LC_ALL=C sort -V | tail -n1
 }
 
-# Stream 9 libvirt-installer image has rpm2cpio but often no cpio(1); unpack newc cpio from rpm2cpio stdout.
+# EL9 libvirt-installer image has rpm2cpio but often no cpio(1); unpack newc cpio from rpm2cpio stdout.
 function ipi_write_newc_cpio_unpack_py() {
 	local out="$1"
 	cat >"${out}" <<'PY'
@@ -192,7 +195,7 @@ function ipi_extract_rpm_contents() {
 }
 
 function ipi_install_xsltproc_user_local_stream9() {
-	local arch base html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py
+	local arch xml_base xsl_base xml_html xsl_html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py label
 	# libvirt-installer sets PATH=/bin; common tools live under /usr/bin.
 	export PATH="/usr/bin:/bin:${PATH:-}"
 
@@ -200,7 +203,7 @@ function ipi_install_xsltproc_user_local_stream9() {
 	command -v mktemp >/dev/null 2>&1 || { echo "ERROR: mktemp not found" >&2; return 1; }
 	if ! command -v cpio >/dev/null 2>&1; then
 		command -v python3 >/dev/null 2>&1 || {
-			echo "ERROR: cpio and python3 both missing; cannot unpack Stream 9 libxslt RPMs" >&2
+			echo "ERROR: cpio and python3 both missing; cannot unpack EL9 libxslt RPMs" >&2
 			return 1
 		}
 	fi
@@ -232,54 +235,65 @@ function ipi_install_xsltproc_user_local_stream9() {
 	command -v cpio >/dev/null 2>&1 && unpack_mode=cpio
 	echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode})" >&2
 
-	for base in \
-			"https://mirror.stream.centos.org/9-stream/BaseOS/${arch}/os/Packages/" \
-			"https://vault.centos.org/9-stream/BaseOS/${arch}/os/Packages/" \
-			"http://mirror.stream.centos.org/9-stream/BaseOS/${arch}/os/Packages/"
-	do
-		echo "INFO: Trying mirror: ${base}" >&2
+	# Rocky 9: libxml2 in BaseOS .../Packages/l/, libxslt in AppStream .../Packages/l/
+	local mirror_rows=(
+		"rocky|https://download.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages/l/|https://download.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages/l/"
+		"rocky-dl|https://dl.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages/l/|https://dl.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages/l/"
+	)
+
+	for row in "${mirror_rows[@]}"; do
+		IFS='|' read -r label xml_base xsl_base <<<"${row}"
+		echo "INFO: Trying mirror set ${label}: xml=${xml_base} xsl=${xsl_base}" >&2
 
 		if [[ -n "${curl_bin}" ]]; then
-			html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${base}" 2>/dev/null)" || {
-				echo "WARN: Failed to fetch from ${base} with curl" >&2
+			xml_html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${xml_base}" 2>/dev/null)" || {
+				echo "WARN: ${label}: failed to fetch libxml2 index" >&2
+				continue
+			}
+			xsl_html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${xsl_base}" 2>/dev/null)" || {
+				echo "WARN: ${label}: failed to fetch libxslt index" >&2
 				continue
 			}
 		else
-			html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${base}" 2>/dev/null)" || {
-				echo "WARN: Failed to fetch from ${base} with wget" >&2
+			xml_html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${xml_base}" 2>/dev/null)" || {
+				echo "WARN: ${label}: failed to fetch libxml2 index (wget)" >&2
+				continue
+			}
+			xsl_html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${xsl_base}" 2>/dev/null)" || {
+				echo "WARN: ${label}: failed to fetch libxslt index (wget)" >&2
 				continue
 			}
 		fi
 
-		xml_rpm="$(ipi_stream9_pick_latest_rpm libxml2 "${html}")"
-		xsl_rpm="$(ipi_stream9_pick_latest_rpm libxslt "${html}")"
+		xml_rpm="$(ipi_el9_pick_latest_rpm libxml2 "${xml_html}" "${arch}")"
+		xsl_rpm="$(ipi_el9_pick_latest_rpm libxslt "${xsl_html}" "${arch}")"
 
 		if [[ -z "${xml_rpm}" || -z "${xsl_rpm}" ]]; then
-			echo "WARN: Could not find RPM packages in ${base}" >&2
+			echo "WARN: ${label}: could not parse libxml2/libxslt ${arch} RPM names from indexes" >&2
 			continue
 		fi
 
-		echo "INFO: Found packages: ${xml_rpm}, ${xsl_rpm}" >&2
+		echo "INFO: ${label}: picked ${xml_rpm} and ${xsl_rpm}" >&2
 
 		download_success=true
 		if [[ -n "${curl_bin}" ]]; then
-			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" 2>/dev/null || {
+			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${xml_base}${xml_rpm}" 2>/dev/null || {
 				echo "WARN: Failed to download ${xml_rpm}" >&2
 				download_success=false
 			}
 			if [[ "${download_success}" == "true" ]]; then
-				"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}" 2>/dev/null || {
+				"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${xsl_base}${xsl_rpm}" 2>/dev/null || {
 					echo "WARN: Failed to download ${xsl_rpm}" >&2
 					download_success=false
 				}
 			fi
 		else
-			"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xml_rpm}" "${base}${xml_rpm}" 2>/dev/null || {
+			"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xml_rpm}" "${xml_base}${xml_rpm}" 2>/dev/null || {
 				echo "WARN: Failed to download ${xml_rpm}" >&2
 				download_success=false
 			}
 			if [[ "${download_success}" == "true" ]]; then
-				"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xsl_rpm}" "${base}${xsl_rpm}" 2>/dev/null || {
+				"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xsl_rpm}" "${xsl_base}${xsl_rpm}" 2>/dev/null || {
 					echo "WARN: Failed to download ${xsl_rpm}" >&2
 					download_success=false
 				}
@@ -439,7 +453,7 @@ fi
 
 # terraform-provider-libvirt shells out to xsltproc when xml.xslt is set; libvirt-installer image
 # may not ship it. Install before openshift-install runs terraform (s390x ACPI workaround only).
-# The CI image runs as UID 1000, so prefer unpacking Stream 9 RPMs; package managers only work as root.
+# The CI image runs as UID 1000, so prefer unpacking EL9 RPMs (Rocky 9 indexes); package managers only work as root.
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
 	if ! command -v xsltproc >/dev/null 2>&1; then
 		set +e
