@@ -20,6 +20,7 @@ if [[ -f "${SHARED_DIR}/write-config-timestamp-rfc3339" ]]; then
   START_TIME_FALLBACK_ARGS="--start-time-fallback $(cat "${SHARED_DIR}/write-config-timestamp-rfc3339")"
 fi
 
+export AZURE_TOKEN_CREDENTIALS=prod
 test/aro-hcp-tests gather-observability \
   --timing-input "${SHARED_DIR}" \
   --output "${ARTIFACT_DIR}/" \
