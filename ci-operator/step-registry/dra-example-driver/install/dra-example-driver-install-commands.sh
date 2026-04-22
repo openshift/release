@@ -55,9 +55,9 @@ echo ""
 echo "Creating namespace ${DRA_EXAMPLE_DRIVER_NAMESPACE}..."
 oc create namespace "${DRA_EXAMPLE_DRIVER_NAMESPACE}" 2>/dev/null || true
 
-# Add privileged SCC for dra-example-driver service account (required for OpenShift)
-echo "Adding privileged SCC for dra-example-driver service account..."
-oc adm policy add-scc-to-user privileged -z dra-example-driver-service-account -n "${DRA_EXAMPLE_DRIVER_NAMESPACE}"
+# Grant privileged SCC to all service accounts in the namespace (required for OpenShift)
+echo "Granting privileged SCC for dra-example-driver namespace..."
+oc adm policy add-scc-to-group privileged "system:serviceaccounts:${DRA_EXAMPLE_DRIVER_NAMESPACE}"
 
 echo ""
 
