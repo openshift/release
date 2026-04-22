@@ -509,10 +509,12 @@ done
 
 # Repos with release-* default branch - exclude from fast-forward
 EXCLUDED_REPOS=(
+  "acm-operator-bundle"
   "grafana"
   "grafana-dashboard-loader"
   "kube-rbac-proxy"
   "kube-state-metrics"
+  "mce-operator-bundle"
   "metrics-collector"
   "node-exporter"
   "prometheus"
