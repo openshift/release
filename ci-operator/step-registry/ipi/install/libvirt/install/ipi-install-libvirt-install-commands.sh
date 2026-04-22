@@ -212,6 +212,29 @@ if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
 	find "$dir" -type f -exec sed -i -E "s/${pattern}/${LEASED_RESOURCE}/g" {} +
 fi
 
+# terraform-provider-libvirt shells out to xsltproc when xml.xslt is set; libvirt-installer image
+# may not ship it. Install before openshift-install runs terraform (s390x ACPI workaround only).
+if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
+	if ! command -v xsltproc >/dev/null 2>&1; then
+		set +e
+		if command -v microdnf >/dev/null 2>&1; then
+			microdnf install -y libxslt
+		elif command -v dnf >/dev/null 2>&1; then
+			dnf install -y libxslt
+		elif command -v yum >/dev/null 2>&1; then
+			yum install -y libxslt
+		elif command -v apt-get >/dev/null 2>&1; then
+			export DEBIAN_FRONTEND=noninteractive
+			apt-get update && apt-get install -y xsltproc
+		fi
+		set -e
+	fi
+	if ! command -v xsltproc >/dev/null 2>&1; then
+		echo "ERROR: xsltproc is required when IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true but could not be installed." >&2
+		exit 1
+	fi
+fi
+
 # CI workaround: inject xml.xslt before terraform init (see comment above).
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
 	xsl="${dir}/s390x-strip-acpi.xsl"
