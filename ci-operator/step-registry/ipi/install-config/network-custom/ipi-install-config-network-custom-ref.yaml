@@ -1,0 +1,41 @@
+ref:
+  as: ipi-install-config-network-custom
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: ipi-install-config-network-custom-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CLUSTER_NETWORK_CIDR
+    default: "10.128.0.0/20"
+    documentation: "CIDR for the cluster network"
+  - name: CLUSTER_NETWORK_HOST_PREFIX
+    default: "23"
+    documentation: "Host prefix for cluster network subnets"
+  - name: SERVICE_NETWORK_CIDR
+    default: "172.30.0.0/16"
+    documentation: "CIDR for the service network"
+  - name: MACHINE_NETWORK_CIDR
+    default: "10.0.0.0/16"
+    documentation: "CIDR for the machine network"
+  - name: NETWORK_TYPE
+    default: "OVNKubernetes"
+    documentation: "Network plugin type"
+  documentation: |-
+    Configures custom network settings in the install-config.yaml for large scale testing.
+    
+    This step patches the install-config.yaml with custom network CIDRs optimized
+    for testing maximum node capacity after network expansion scenarios.
+    
+    The default configuration uses:
+    - Cluster network: 10.128.0.0/20 with /23 host prefix
+    - Service network: 172.30.0.0/16  
+    - Machine network: 10.0.0.0/16
+    - Network type: OVNKubernetes
+    
+    These settings allow for network expansion testing where the cluster network
+    can be expanded from /20 to /14 to accommodate more nodes.
