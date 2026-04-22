@@ -658,9 +658,9 @@ for product in mce acm; do
 
     echo "INFO: Handling excluded repo ${owner_repo}"
 
-    # EXCLUDED_REPOS always use release-* branches (even when in MCE bundle)
-    # Exception: cluster-permission uses backplane-* when processed as ACM
-    repo_branch_prefix="release"
+    # Use natural branch prefix for product (release for ACM, backplane for MCE)
+    # Exception: cluster-permission in ACM uses backplane (deprecated, moved to MCE)
+    repo_branch_prefix="${branch_prefix}"
     if [[ "${repo}" == "cluster-permission" && "${product}" == "acm" ]]; then
       echo "INFO: cluster-permission deprecated in ACM, using backplane-* branches"
       repo_branch_prefix="backplane"
