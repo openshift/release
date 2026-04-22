@@ -16,7 +16,7 @@ base64 -d /var/run/osac-installer-aap/license > /tmp/license.zip
 
 timeout -s 9 10m scp -F "${SHARED_DIR}/ssh_config" /tmp/license.zip ci_machine:/tmp/license.zip
 
-timeout -s 9 60m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - << EOF|& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+timeout -s 9 120m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - << EOF|& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 export KUBECONFIG=\$(find \${KUBECONFIG} -type f -print -quit)
 
@@ -29,6 +29,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
 -e INSTALLER_NAMESPACE=${E2E_NAMESPACE} \
 -e INSTALLER_KUSTOMIZE_OVERLAY=${E2E_KUSTOMIZE_OVERLAY} \
 -e INSTALLER_VM_TEMPLATE=${E2E_VM_TEMPLATE} \
+-e VIRT_SERVICE=true \
 ${OSAC_INSTALLER_IMAGE} sh /installer/scripts/setup.sh
 
 EOF
