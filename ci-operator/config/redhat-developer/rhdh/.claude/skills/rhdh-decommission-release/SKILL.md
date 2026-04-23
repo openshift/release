@@ -4,7 +4,7 @@ description: >-
   Use when decommissioning an end-of-life RHDH release branch by removing CI
   config, generated Prow jobs, and branch protection from the openshift/release
   repository
-allowed-tools: Glob, Read, Edit, Bash(rm *redhat-developer-rhdh-*), AskUserQuestion
+allowed-tools: Read, Edit, Bash(ls ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-release-*), Bash(find ci-operator/config/redhat-developer/rhdh -name 'redhat-developer-rhdh-release-*'), Bash(rm ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-release-*), Bash(rm ci-operator/jobs/redhat-developer/rhdh/redhat-developer-rhdh-release-*), AskUserQuestion
 ---
 # Decommission RHDH Release Branch Jobs
 
@@ -20,7 +20,7 @@ Decommissioning removes all CI configuration for a given RHDH release branch. Th
    - If the user provided a version (e.g., "1.7", "1.8"), use it directly
    - If no version was provided, ask the user for the RHDH release version to decommission
    - List existing release configs to help the user choose:
-     - Glob for `ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-release-*.yaml`
+     - `ls ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-release-*.yaml`
 
 2. **Verify the files to be removed**:
    Show the user what will be deleted and ask for confirmation:

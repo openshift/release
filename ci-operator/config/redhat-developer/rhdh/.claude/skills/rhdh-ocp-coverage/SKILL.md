@@ -4,7 +4,7 @@ description: >-
   Analyze RHDH OCP version coverage by cross-referencing cluster pools and CI
   test configs against both RHDH and OCP lifecycle APIs to find gaps, stale
   configurations, and compatibility mismatches
-allowed-tools: Bash(bash *analyze-coverage.sh*)
+allowed-tools: Read, Bash(bash *analyze-coverage.sh*)
 ---
 # RHDH OCP Coverage Analysis
 
