@@ -92,6 +92,35 @@ get_default_branch() {
   echo "$default_branch"
 }
 
+# Check if we have push permission to repo
+can_push_to_repo() {
+  local owner=$1
+  local repo=$2
+  local token
+
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    return 1
+  fi
+
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  if [[ -z "${token}" ]]; then
+    return 1
+  fi
+
+  # Check repo permissions via GitHub API
+  local permissions
+  permissions=$(curl -s \
+    -H "Authorization: token ${token}" \
+    "https://api.github.com/repos/${owner}/${repo}" \
+    | jq -r '.permissions.push // "false"')
+
+  if [[ "$permissions" == "true" ]]; then
+    return 0  # Has push access
+  else
+    return 1  # No push access
+  fi
+}
+
 # Check if branch is protected
 is_branch_protected() {
   local owner=$1
@@ -759,6 +788,7 @@ SKIPPED_REPOS=(
   "acm-operator-bundle"
   "mce-operator-bundle"
   "cluster-proxy-addon"
+  "grafana"
   "grafana-dashboard-loader"
   "memcached"
 )
@@ -767,7 +797,6 @@ SKIPPED_REPOS=(
 # These are processed separately to handle non-main default branches
 EXCLUDED_REPOS=(
   "cluster-permission"
-  "grafana"
   "kube-rbac-proxy"
   "kube-state-metrics"
   "memcached_exporter"
@@ -806,6 +835,9 @@ for product in mce acm; do
         cluster-proxy-addon)
           echo "INFO: Skipping ${owner_repo} (deprecated MCE 2.11)"
           ;;
+        grafana)
+          echo "INFO: Skipping ${owner_repo} (fork/external repo - no write access)"
+          ;;
         grafana-dashboard-loader)
           echo "INFO: Skipping ${owner_repo} (deprecated, moved to multicluster-observability-operator)"
           ;;
@@ -833,6 +865,12 @@ for product in mce acm; do
     fi
 
     echo "INFO: Handling ${owner_repo}"
+
+    # Check if we have push access to repo
+    if ! can_push_to_repo "${owner}" "${repo}"; then
+      echo "INFO: Skipping ${owner_repo} (no write access - likely fork/external repo)"
+      continue
+    fi
 
     branch_prefix="release"
     if [[ ${product} == "mce" ]]; then
@@ -918,6 +956,12 @@ for product in mce acm; do
     fi
 
     echo "INFO: Handling excluded repo ${owner_repo}"
+
+    # Check if we have push access to repo
+    if ! can_push_to_repo "${owner}" "${repo}"; then
+      echo "INFO: Skipping ${owner_repo} (no write access - likely fork/external repo)"
+      continue
+    fi
 
     # Use natural branch prefix for product (release for ACM, backplane for MCE)
     # Exception: cluster-permission in ACM uses backplane (deprecated, moved to MCE)
