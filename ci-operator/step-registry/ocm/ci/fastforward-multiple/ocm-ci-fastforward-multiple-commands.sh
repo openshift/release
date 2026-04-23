@@ -741,6 +741,7 @@ SKIPPED_REPOS=(
   "acm-operator-bundle"
   "mce-operator-bundle"
   "cluster-proxy-addon"
+  "grafana-dashboard-loader"
   "memcached"
 )
 
@@ -786,6 +787,9 @@ for product in mce acm; do
           ;;
         cluster-proxy-addon)
           echo "INFO: Skipping ${owner_repo} (deprecated MCE 2.11)"
+          ;;
+        grafana-dashboard-loader)
+          echo "INFO: Skipping ${owner_repo} (deprecated, moved to multicluster-observability-operator)"
           ;;
         memcached)
           echo "INFO: Skipping ${owner_repo} (deprecated, not in current manifest)"
