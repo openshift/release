@@ -522,39 +522,68 @@ WaitForClusterProvisioned() {
     typeset cluster_name="$1"
     typeset cluster_idx="$2"
 
-    # Wait for the Provisioned condition using oc wait
-    echo "[INFO] Waiting for ClusterDeployment '${cluster_name}' to reach Provisioned=True (timeout=${ACM_SPOKE_INSTALL_TIMEOUT_MINUTES}m)"
-    oc -n "${cluster_name}" wait "ClusterDeployment/${cluster_name}" \
-        --for condition=Provisioned \
-        --timeout "${ACM_SPOKE_INSTALL_TIMEOUT_MINUTES}m"
+    typeset -i poll_interval=30
+    typeset -i timeout_seconds=$(( ACM_SPOKE_INSTALL_TIMEOUT_MINUTES * 60 ))
+    typeset -i deadline=$(( $(date +%s) + timeout_seconds ))
 
-    # Verify the final status by checking conditions directly
-    echo "[INFO] Verifying cluster ${cluster_idx} provisioning status"
-    typeset cd_json
-    cd_json="$(JsonGet "${cluster_name}" clusterdeployment "${cluster_name}")"
+    echo "[INFO] Polling ClusterDeployment '${cluster_name}' for Provisioned=True" \
+         "(timeout=${ACM_SPOKE_INSTALL_TIMEOUT_MINUTES}m, poll every ${poll_interval}s)"
 
-    # Extract the Provisioned condition status
-    typeset provisioned
-    provisioned="$(echo "${cd_json}" | jq -r '
-        .status.conditions[]?
-        | select(.type=="Provisioned" and .status=="True")
-        | .type
-    ')"
+    typeset cd_json provisioned stop_reason stop_message elapsed
 
-    if [[ "${provisioned}" == "Provisioned" ]]; then
-        echo "[SUCCESS] Cluster ${cluster_idx} (${cluster_name}) - ClusterDeployment status Provisioned is True"
-    else
-        # If not provisioned, check for ProvisionStopped condition for error details
-        typeset stop_reason
+    while true; do
+        cd_json="$(JsonGet "${cluster_name}" clusterdeployment "${cluster_name}" 2>/dev/null)" || {
+            echo "[WARN] Failed to fetch ClusterDeployment '${cluster_name}', will retry..." >&2
+            sleep "${poll_interval}"
+            continue
+        }
+
+        # Check for ProvisionStopped=True first — Hive sets this when installation
+        # has permanently failed, so we can fail fast without waiting for the timeout.
         stop_reason="$(echo "${cd_json}" | jq -r '
             .status.conditions[]?
             | select(.type=="ProvisionStopped" and .status=="True")
             | .reason // "N/A"
         ')"
-        echo "[FATAL] Cluster ${cluster_idx} (${cluster_name}) - Installation failed. ProvisionStopped reason: ${stop_reason}" >&2
-        exit 3
-    fi
-    true
+        if [[ -n "${stop_reason}" ]]; then
+            stop_message="$(echo "${cd_json}" | jq -r '
+                .status.conditions[]?
+                | select(.type=="ProvisionStopped" and .status=="True")
+                | .message // "N/A"
+            ')"
+            echo "[FATAL] Cluster ${cluster_idx} (${cluster_name}) - ProvisionStopped=True" >&2
+            echo "[FATAL] Reason:  ${stop_reason}" >&2
+            echo "[FATAL] Message: ${stop_message}" >&2
+            exit 3
+        fi
+
+        # Check Provisioned=True — success path.
+        provisioned="$(echo "${cd_json}" | jq -r '
+            .status.conditions[]?
+            | select(.type=="Provisioned" and .status=="True")
+            | .type
+        ')"
+        if [[ "${provisioned}" == "Provisioned" ]]; then
+            echo "[SUCCESS] Cluster ${cluster_idx} (${cluster_name}) - ClusterDeployment Provisioned=True"
+            true
+            return
+        fi
+
+        # Neither condition met yet — check if we have exceeded the deadline.
+        if (( $(date +%s) >= deadline )); then
+            elapsed=$(( $(date +%s) - (deadline - timeout_seconds) ))
+            echo "[FATAL] Cluster ${cluster_idx} (${cluster_name}) - Timed out after ${elapsed}s" \
+                 "waiting for Provisioned=True (limit=${ACM_SPOKE_INSTALL_TIMEOUT_MINUTES}m)" >&2
+            # Log last known conditions for post-mortem
+            echo "[FATAL] Last ClusterDeployment conditions:" >&2
+            echo "${cd_json}" | jq -r '.status.conditions[]? | "  \(.type)=\(.status) reason=\(.reason // "N/A")"' >&2
+            exit 3
+        fi
+
+        elapsed=$(( $(date +%s) - (deadline - timeout_seconds) ))
+        echo "[INFO] Cluster ${cluster_idx} (${cluster_name}) - still provisioning (${elapsed}s elapsed), retrying in ${poll_interval}s..."
+        sleep "${poll_interval}"
+    done
 }
 
 #=====================
@@ -613,7 +642,9 @@ ExtractClusterCredentials() {
                 > "${metadata_file}"
             echo "[INFO] Cluster ${cluster_idx} metadata extracted to ${metadata_file}"
         else
-            echo "[ERROR] Secret '${metadata_secret}' not found in namespace '${cluster_name}'" >&2
+            echo "[ERROR] Secret '${metadata_secret}' not found in namespace '${cluster_name}';" \
+                 "managed-cluster-metadata-${cluster_idx}.json will not be written" >&2
+            exit 1
         fi
     fi
     true
@@ -663,7 +694,7 @@ done
 # Create symlinks for backward compatibility with single-cluster workflows
 # This allows existing steps that expect 'managed-cluster-kubeconfig' to work
 ln -sf "managed-cluster-kubeconfig-1" "${SHARED_DIR}/managed-cluster-kubeconfig"
-ln -sf "managed-cluster-metadata-1.json" "${SHARED_DIR}/managed.cluster.metadata.json"
+ln -sf "managed-cluster-metadata-1.json" "${SHARED_DIR}/managed-cluster-metadata.json"
 
 # Print summary of created resources
 echo "[INFO] =========================================="

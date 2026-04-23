@@ -83,7 +83,8 @@ UninstallCluster() {
 
     # Check if namespace exists
     if ! oc get ns "${namespace}" >/dev/null 2>&1; then
-        echo "[WARN] Namespace '${namespace}' not found; cluster may already be removed. Cleaning up cluster-scoped ManagedClusterSet if it remains." >&2
+        echo "[WARN] Namespace '${namespace}' not found; cluster may already be removed. Cleaning up cluster-scoped resources if they remain." >&2
+        oc delete managedcluster "${cluster_name}" --ignore-not-found=true
         typeset mc_set_orphan="${cluster_name}-set"
         oc delete managedclusterset "${mc_set_orphan}" --ignore-not-found=true
         return 0
@@ -109,44 +110,54 @@ UninstallCluster() {
 
     # Ensure ClusterDeployment triggers infrastructure deprovisioning
     echo "[INFO] Ensuring ClusterDeployment triggers infrastructure deprovisioning for '${cluster_name}'"
+    typeset deprov_name=""
     if oc -n "${namespace}" get clusterdeployment "${cluster_name}" >/dev/null 2>&1; then
         echo "[INFO] Patching ClusterDeployment '${cluster_name}' to ensure preserveOnDelete=false"
         oc -n "${namespace}" patch clusterdeployment "${cluster_name}" --type=merge -p '{"spec":{"preserveOnDelete":false}}'
         echo "[INFO] Deleting ClusterDeployment '${cluster_name}' to initiate deprovisioning"
         oc -n "${namespace}" delete clusterdeployment "${cluster_name}" --wait=false
     else
-        echo "[INFO] ClusterDeployment '${cluster_name}' already gone, proceeding to check deprovision status."
+        echo "[INFO] ClusterDeployment '${cluster_name}' already gone, checking for existing ClusterDeprovision."
+        deprov_name="$(PickLatestDeprovName "${namespace}")"
+        if [[ -z "${deprov_name}" ]]; then
+            echo "[INFO] No ClusterDeprovision found for '${cluster_name}'; infrastructure already cleaned up, skipping deprovision wait."
+        else
+            echo "[INFO] Found existing ClusterDeprovision '${deprov_name}', waiting for completion."
+        fi
     fi
 
-    # Watch deprovision progress (ClusterDeprovision resource)
-    echo "[INFO] Watching deprovision progress for '${cluster_name}'"
-    typeset start_time
-    start_time="$(date +%s)"
-    typeset deadline
-    deadline=$((start_time + timeout_minutes * 60))
-    typeset deprov_name=""
+    # Watch deprovision progress only when there is a ClusterDeprovision to track.
+    # When deprov_name is empty (infrastructure already gone) we skip the wait and
+    # fall through to the ManagedClusterSet/ManagedClusterSetBinding cleanup below.
+    if [[ -n "${deprov_name}" ]]; then
+        echo "[INFO] Watching deprovision progress for '${cluster_name}'"
+        typeset start_time
+        start_time="$(date +%s)"
+        typeset deadline
+        deadline=$((start_time + timeout_minutes * 60))
 
-    echo "[INFO] Waiting for ClusterDeprovision object to be created for '${cluster_name}'..."
-    while [[ -z "${deprov_name}" ]]; do
-        deprov_name="$(PickLatestDeprovName "${namespace}")"
-        if [[ -n "${deprov_name}" ]]; then
-            echo "[INFO] Found ClusterDeprovision: ${deprov_name}"
-            break
-        fi
-        if (( $(date +%s) > deadline )); then
-            echo "[ERROR] Timeout waiting for ClusterDeprovision object creation for '${cluster_name}'." >&2
-            return 3
-        fi
-        sleep "${poll_seconds}"
-    done
+        echo "[INFO] Waiting for ClusterDeprovision object to be created for '${cluster_name}'..."
+        while [[ -z "${deprov_name}" ]]; do
+            deprov_name="$(PickLatestDeprovName "${namespace}")"
+            if [[ -n "${deprov_name}" ]]; then
+                echo "[INFO] Found ClusterDeprovision: ${deprov_name}"
+                break
+            fi
+            if (( $(date +%s) > deadline )); then
+                echo "[ERROR] Timeout waiting for ClusterDeprovision object creation for '${cluster_name}'." >&2
+                return 3
+            fi
+            sleep "${poll_seconds}"
+        done
 
-    echo "[INFO] Waiting for ClusterDeprovision '${deprov_name}'.status.completed=true (timeout=${timeout_minutes}m)"
-    oc -n "${namespace}" wait \
-        --for=jsonpath='{.status.completed}'=true \
-        "clusterdeprovision/${deprov_name}" \
-        --timeout="${timeout_minutes}m"
+        echo "[INFO] Waiting for ClusterDeprovision '${deprov_name}'.status.completed=true (timeout=${timeout_minutes}m)"
+        oc -n "${namespace}" wait \
+            --for=jsonpath='{.status.completed}'=true \
+            "clusterdeprovision/${deprov_name}" \
+            --timeout="${timeout_minutes}m"
 
-    echo "[INFO] Cluster '${cluster_name}' deprovisioning completed successfully."
+        echo "[INFO] Cluster '${cluster_name}' deprovisioning completed successfully."
+    fi
 
     # Remove binding before ManagedClusterSet (install creates ManagedClusterSetBinding in namespace)
     typeset mc_set_name="${cluster_name}-set"
