@@ -92,6 +92,35 @@ get_default_branch() {
   echo "$default_branch"
 }
 
+# Check if branch is protected
+is_branch_protected() {
+  local owner=$1
+  local repo=$2
+  local branch=$3
+  local token
+
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    return 1
+  fi
+
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  if [[ -z "${token}" ]]; then
+    return 1
+  fi
+
+  # Check branch protection via GitHub API
+  local http_code
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: token ${token}" \
+    "https://api.github.com/repos/${owner}/${repo}/branches/${branch}/protection")
+
+  if [[ "$http_code" == "200" ]]; then
+    return 0  # Protected
+  else
+    return 1  # Not protected or doesn't exist
+  fi
+}
+
 # Find highest semantic version in Tekton files
 # Returns version number (e.g., "217", "50") or "main" if only -main- files exist
 get_highest_tekton_version() {
@@ -482,6 +511,13 @@ fastforward_repo() {
   token=$(cat "${GITHUB_TOKEN_FILE}")
   local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
 
+  # Check if destination branch is protected
+  local is_protected=false
+  if is_branch_protected "${owner}" "${repo}" "${dest_branch}"; then
+    is_protected=true
+    echo "INFO: ${owner}/${repo} ${dest_branch} is protected, will use PR workflow"
+  fi
+
   (
     cd "$ocm_dir" || exit 1
     export HOME="$ocm_dir"
@@ -511,10 +547,52 @@ fastforward_repo() {
         exit 1
       fi
 
-      log "INFO Pushing DESTINATION_BRANCH to origin"
-      if ! git push -u origin "$dest_branch" 2>&1; then
-        log "ERROR Could not push to origin DESTINATION_BRANCH"
-        exit 1
+      if [[ "${is_protected}" == "true" ]]; then
+        # For protected branches, create PR instead of direct push
+        local pr_branch
+        pr_branch="ff-${dest_branch}-$(date +%s)"
+        log "INFO Branch is protected, creating PR branch ${pr_branch}"
+
+        if ! git checkout -b "${pr_branch}" 2>&1; then
+          log "ERROR Could not create PR branch ${pr_branch}"
+          exit 1
+        fi
+
+        log "INFO Pushing PR branch ${pr_branch} to origin"
+        if ! git push -u origin "${pr_branch}" 2>&1; then
+          log "ERROR Could not push PR branch ${pr_branch}"
+          exit 1
+        fi
+
+        # Create PR using gh CLI
+        if command -v gh >/dev/null 2>&1; then
+          export GH_TOKEN="${token}"
+
+          log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
+          local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
+          local pr_body="This PR fast-forwards \`${source_branch}\` to create the new branch \`${dest_branch}\`.
+
+/cc @stolostron/acm-cicd"
+
+          if ! gh pr create \
+            --title "${pr_title}" \
+            --body "${pr_body}" \
+            --base "${dest_branch}" \
+            --head "${pr_branch}" 2>&1; then
+            log "WARNING PR creation failed, branch pushed but PR not created"
+            log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+          fi
+        else
+          log "WARNING gh CLI not available, branch pushed but PR not created"
+          log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+        fi
+      else
+        # Direct push for non-protected branches
+        log "INFO Pushing DESTINATION_BRANCH to origin"
+        if ! git push -u origin "$dest_branch" 2>&1; then
+          log "ERROR Could not push to origin DESTINATION_BRANCH"
+          exit 1
+        fi
       fi
 
       log "INFO Fast forward complete"
@@ -530,10 +608,52 @@ fastforward_repo() {
       exit 1
     fi
 
-    log "INFO Pushing to origin/DESTINATION_BRANCH"
-    if ! git push 2>&1; then
-      log "ERROR Could not push to DESTINATION_BRANCH"
-      exit 1
+    if [[ "${is_protected}" == "true" ]]; then
+      # For protected branches, create PR instead of direct push
+      local pr_branch
+      pr_branch="ff-${dest_branch}-$(date +%s)"
+      log "INFO Branch is protected, creating PR branch ${pr_branch}"
+
+      if ! git checkout -b "${pr_branch}" 2>&1; then
+        log "ERROR Could not create PR branch ${pr_branch}"
+        exit 1
+      fi
+
+      log "INFO Pushing PR branch ${pr_branch} to origin"
+      if ! git push -u origin "${pr_branch}" 2>&1; then
+        log "ERROR Could not push PR branch ${pr_branch}"
+        exit 1
+      fi
+
+      # Create PR using gh CLI
+      if command -v gh >/dev/null 2>&1; then
+        export GH_TOKEN="${token}"
+
+        log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
+        local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
+        local pr_body="This PR fast-forwards \`${source_branch}\` to \`${dest_branch}\`.
+
+/cc @stolostron/acm-cicd"
+
+        if ! gh pr create \
+          --title "${pr_title}" \
+          --body "${pr_body}" \
+          --base "${dest_branch}" \
+          --head "${pr_branch}" 2>&1; then
+          log "WARNING PR creation failed, branch pushed but PR not created"
+          log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+        fi
+      else
+        log "WARNING gh CLI not available, branch pushed but PR not created"
+        log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+      fi
+    else
+      # Direct push for non-protected branches
+      log "INFO Pushing to origin/DESTINATION_BRANCH"
+      if ! git push 2>&1; then
+        log "ERROR Could not push to DESTINATION_BRANCH"
+        exit 1
+      fi
     fi
 
     log "INFO Fast forward complete"
