@@ -44,13 +44,24 @@ if [[ -n "${SLACK_WEBHOOK_SECRET_FILE:-}" ]] && [[ -f "${SLACK_WEBHOOK_SECRET_FI
 fi
 
 echo "Working directory: ${PWD}"
-sleep 3000
+
+job_base="https://prow.ci.openshift.org/view/gs/test-platform-results"
+if [[ -n "${PULL_NUMBER:-}" ]]; then
+  PROW_JOB_URL="${job_base}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+else
+  PROW_JOB_URL="${job_base}/logs/${JOB_NAME}/${BUILD_ID}"
+fi
+export PROW_JOB_URL
+
 GH_NOTIFIER_INVOKE="${GH_NOTIFIER_INVOKE:-python3 gh-notifier/gh-notifier.py}"
 bash -c "set -euo pipefail; ${GH_NOTIFIER_INVOKE}"
 
 # ---------------------------------------------------------------------------
-# Prow / GCS: publish pr-dashboard.html (ci-operator sets ARTIFACT_DIR)
+# Prow / GCS: publish dashboard HTML (ci-operator sets ARTIFACT_DIR).
+# Spyglass html lens only picks up paths matching deck's required_files regex
+# (see core-services/prow/02_config _config.yaml), e.g. *-summary*.html — same
+# idea as openshift-edge-tooling-ci-monitor (edge-ci-monitor-summary.html).
 # ---------------------------------------------------------------------------
-cp -f "./gh-notifier/pr-dashboard.html" "${ARTIFACT_DIR}/pr-dashboard.html"
-echo "Copied ./gh-notifier/pr-dashboard.html to ${ARTIFACT_DIR}/pr-dashboard.html (job artifacts / GCS)."
+cp -f "./gh-notifier/pr-dashboard.html" "${ARTIFACT_DIR}/edge-tooling-pr-summary.html"
+echo "Copied ./gh-notifier/pr-dashboard.html to ${ARTIFACT_DIR}/edge-tooling-pr-summary.html (Spyglass + GCS)."
 
