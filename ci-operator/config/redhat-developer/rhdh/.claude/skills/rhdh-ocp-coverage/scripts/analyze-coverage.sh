@@ -111,6 +111,10 @@ echo ""
 echo "--- Test Configs ---"
 # shellcheck disable=SC2206  # Intentional word-splitting on path separators (no spaces in paths)
 dir_parts=(${CI_CONFIG_DIR//\// })
+if [[ ${#dir_parts[@]} -lt 2 ]]; then
+  echo "ERROR: --config-dir must contain at least two path components (got: ${CI_CONFIG_DIR})" >&2
+  exit 1
+fi
 CONFIG_PREFIX="${dir_parts[-2]}-${dir_parts[-1]}-"
 
 declare -A BRANCH_VERSIONS  # branch -> space-separated versions
@@ -149,6 +153,7 @@ echo "--- RHDH Lifecycle ---"
 echo "  Fetching from Red Hat Product Life Cycles API..."
 
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+TODAY="${NOW%%T*}"
 
 RHDH_RESPONSE=$(curl -s --fail \
   "${LIFECYCLE_API_URL}?name=Red+Hat+Developer+Hub" \
@@ -210,7 +215,7 @@ if [[ -z "$OCP_RESPONSE" ]]; then
 fi
 
 # Use shared jq filter for OCP phase classification
-OCP_LIFECYCLE=$(echo "$OCP_RESPONSE" | jq --arg now "$NOW" -f "${OCP_LIFECYCLE_JQ}")
+OCP_LIFECYCLE=$(echo "$OCP_RESPONSE" | jq --arg today "$TODAY" -f "${OCP_LIFECYCLE_JQ}")
 
 OCP_SUPPORTED=$(echo "$OCP_LIFECYCLE" | jq -r '[.[] | select(.ocp_supported) | .version] | .[]')
 OCP_EOL=$(echo "$OCP_LIFECYCLE" | jq -r '[.[] | select(.ocp_supported | not) | .version] | .[]')

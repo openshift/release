@@ -60,6 +60,10 @@ fi
 # Derive config file path
 # shellcheck disable=SC2206  # Intentional word-splitting on path separators (no spaces in paths)
 dir_parts=(${CI_CONFIG_DIR//\// })
+if [[ ${#dir_parts[@]} -lt 2 ]]; then
+  echo "ERROR: --config-dir must contain at least two path components (got: ${CI_CONFIG_DIR})" >&2
+  exit 1
+fi
 CONFIG_PREFIX="${dir_parts[-2]}-${dir_parts[-1]}-"
 CONFIG_FILE="${CI_CONFIG_DIR}/${CONFIG_PREFIX}${BRANCH}.yaml"
 
@@ -120,7 +124,7 @@ echo "#   cluster_claim.version: \"${REFERENCE_VERSION}\" -> \"${OCP_VERSION}\""
 echo "#   steps.env.OC_CLIENT_VERSION: stable-${REFERENCE_VERSION} -> stable-${OCP_VERSION}"
 echo ""
 
-yq -o=yaml ".tests[] | select(.as == \"${REF_TEST_NAME}\")" "$CONFIG_FILE" | \
+yq -o=yaml "[.tests[] | select(.as == \"${REF_TEST_NAME}\")]" "$CONFIG_FILE" | \
   sed "s|as: ${REF_TEST_NAME}|as: ${NEW_TEST_NAME}|g" | \
   sed "s|version: \"${REFERENCE_VERSION}\"|version: \"${OCP_VERSION}\"|g" | \
   sed "s|OC_CLIENT_VERSION: stable-${REFERENCE_VERSION}|OC_CLIENT_VERSION: stable-${OCP_VERSION}|g"

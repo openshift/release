@@ -40,6 +40,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+TODAY="${NOW%%T*}"
 
 # ---------------------------------------------------------------
 # 1. Fetch RHDH lifecycle data
@@ -71,6 +72,11 @@ RHDH_DATA=$(echo "$RHDH_RESPONSE" | jq --arg now "$NOW" --arg filter "$FILTER_RH
   | if $filter != "" then map(select(.version == $filter)) else . end
   | sort_by(.version | split(".") | map(tonumber))
 ')
+
+if [[ -n "$FILTER_RHDH_VERSION" ]] && jq -e 'length == 0' <<<"$RHDH_DATA" >/dev/null; then
+  echo "ERROR: RHDH version '${FILTER_RHDH_VERSION}' not found in lifecycle data" >&2
+  exit 1
+fi
 
 # Print RHDH lifecycle table
 echo "=== RHDH Lifecycle ==="
@@ -126,7 +132,7 @@ if ! $RHDH_ONLY; then
   fi
 
   # Use shared jq filter for OCP phase classification
-  OCP_DATA=$(echo "$OCP_RESPONSE" | jq --arg now "$NOW" -f "${SCRIPT_DIR}/ocp-lifecycle.jq")
+  OCP_DATA=$(echo "$OCP_RESPONSE" | jq --arg today "$TODAY" -f "${SCRIPT_DIR}/ocp-lifecycle.jq")
 
   # Apply version filter if specified
   if [[ -n "$FILTER_OCP_VERSION" ]]; then

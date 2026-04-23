@@ -4,7 +4,7 @@ description: >-
   List existing RHDH OCP Hive ClusterPool configurations and generate new pool
   YAML for a target OCP version, with imageSetRef aligned from other pools in
   the openshift/release repository. Covers OCP pools only, not K8s platforms
-allowed-tools: Read, Bash(bash *list-cluster-pools.sh*), Bash(bash *generate-cluster-pool.sh*), Bash(rm *_clusterpool.yaml)
+allowed-tools: Read, Bash(bash *list-cluster-pools.sh*), Bash(bash *generate-cluster-pool.sh*), Bash(rm clusters/hosted-mgmt/hive/pools/rhdh/*_clusterpool.yaml)
 ---
 # RHDH OCP Cluster Pool Management
 
