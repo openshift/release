@@ -16,8 +16,7 @@ images:
     to: e2e-test-registry
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - e2e-test-registry
     name: 4.22-priv
     namespace: ocp-private
@@ -56,7 +55,9 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: commitchecker --start ${PULL_BASE_SHA:-main}
+  commands: |
+    commitchecker --start "$(git merge-base ${PULL_BASE_SHA:-main} ${PULL_PULL_SHA:-HEAD})" \
+                  --end "${PULL_PULL_SHA:-HEAD}"
   container:
     from: commitchecker
 - as: check-sync-pr-valid

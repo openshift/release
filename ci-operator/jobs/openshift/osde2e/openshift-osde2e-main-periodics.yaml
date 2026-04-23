@@ -623,6 +623,79 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
+  cron: 0 3 * * 0
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-int-clusters-cleanup
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/osde2e-common
+      - --secret-dir=/secrets/osde2e-credentials
+      - --target=int-clusters-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /secrets/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /secrets/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -1109,7 +1182,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 30 2 * * 2
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1190,7 +1263,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 30 4 * * 3
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1271,7 +1344,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 30 0 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1352,7 +1425,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 8 12 * * 6
+  cron: 15 12 * * 4
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1433,7 +1506,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 15 2 * * 3
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1514,7 +1587,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 15 4 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1595,7 +1668,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 5 3 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1676,7 +1749,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 5 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1757,7 +1830,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 5 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1838,7 +1911,88 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 5 20 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    ci-operator.openshift.io/variant: nightly-4.20
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-nightly-4.20-rosa-hcp
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=rosa-hcp
+      - --variant=nightly-4.20
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
+  cron: 10 23 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1919,7 +2073,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 10 0 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2000,7 +2154,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 10 21 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2081,7 +2235,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 22 * * *
+  cron: 10 20 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2162,7 +2316,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 20 6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2243,7 +2397,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 20 3 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2324,7 +2478,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 1 1 *
+  cron: 20 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2405,7 +2559,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 20 * * *
+  cron: 20 20 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2729,7 +2883,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 19 * * *
+  cron: 0 0 1 1 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3389,7 +3543,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 45 0 * * 2
+  cron: 0 2 * * 0
   decorate: true
   extra_refs:
   - base_ref: main
@@ -3656,7 +3810,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 0 * * 2
+  cron: 0 1 * * 0
   decorate: true
   extra_refs:
   - base_ref: main

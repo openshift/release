@@ -353,10 +353,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260408-3bbc91829
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260408-3bbc91829
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260408-3bbc91829
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260408-3bbc91829
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260421-d25a17867
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260421-d25a17867
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260421-d25a17867
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260421-d25a17867
   - config:
       censoring_options:
         exclude_directories:
@@ -596,6 +596,18 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
+presets:
+- env: null
+  labels:
+    presets.ci.openshift.io/registry-pull: "true"
+  volumeMounts:
+  - mountPath: /etc/pull-secret
+    name: pull-secret
+    readOnly: true
+  volumes:
+  - name: pull-secret
+    secret:
+      secretName: registry-pull-credentials
 prowjob_default_entries:
 - cluster: '*'
   config:
@@ -703,8 +715,6 @@ tide:
       opendatahub-io:
         repos:
           odh-dashboard:
-            required-if-present-contexts:
-            - Tests
             skip-unknown-contexts: true
           opendatahub-operator:
             optional-regex-contexts:
@@ -745,6 +755,8 @@ tide:
             branches:
               master:
                 skip-unknown-contexts: true
+          vector:
+            skip-unknown-contexts: true
       operator-framework:
         repos:
           api:
