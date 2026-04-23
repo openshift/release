@@ -900,6 +900,7 @@ EXCLUDED_REPOS=(
   "kube-rbac-proxy"
   "kube-state-metrics"
   "memcached_exporter"
+  "obo-prometheus-operator"
   "node-exporter"
   "prometheus"
   "prometheus-alertmanager"
