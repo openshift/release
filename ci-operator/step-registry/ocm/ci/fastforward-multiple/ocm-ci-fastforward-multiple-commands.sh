@@ -788,7 +788,6 @@ SKIPPED_REPOS=(
   "acm-operator-bundle"
   "mce-operator-bundle"
   "cluster-proxy-addon"
-  "grafana"
   "grafana-dashboard-loader"
   "memcached"
 )
@@ -797,6 +796,7 @@ SKIPPED_REPOS=(
 # These are processed separately to handle non-main default branches
 EXCLUDED_REPOS=(
   "cluster-permission"
+  "grafana"
   "kube-rbac-proxy"
   "kube-state-metrics"
   "memcached_exporter"
@@ -834,9 +834,6 @@ for product in mce acm; do
           ;;
         cluster-proxy-addon)
           echo "INFO: Skipping ${owner_repo} (deprecated MCE 2.11)"
-          ;;
-        grafana)
-          echo "INFO: Skipping ${owner_repo} (fork/external repo - no write access)"
           ;;
         grafana-dashboard-loader)
           echo "INFO: Skipping ${owner_repo} (deprecated, moved to multicluster-observability-operator)"
