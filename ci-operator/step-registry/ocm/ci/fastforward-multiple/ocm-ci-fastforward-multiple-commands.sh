@@ -809,6 +809,15 @@ EXCLUDED_REPOS=(
 )
 
 for product in mce acm; do
+  # Print section header
+  echo ""
+  if [[ "${product}" == "mce" ]]; then
+    echo "=== Processing MCE repos (main → backplane-*) ==="
+  else
+    echo "=== Processing ACM repos (main → release-*) ==="
+  fi
+  echo ""
+
   component_repos=$(yq '.components[] |
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
@@ -914,7 +923,8 @@ done
 
 # Handle excluded repos with release-* default branch
 echo ""
-echo "INFO: Processing excluded repos with release-* default branch"
+echo "=== Processing excluded repos with release-* default branch ==="
+echo ""
 
 for product in mce acm; do
   component_repos=$(yq '.components[] |
