@@ -154,7 +154,7 @@ is_branch_protected() {
 # Returns version number (e.g., "217", "50") or "main" if only -main- files exist
 get_highest_tekton_version() {
   local repo_dir=$1
-  local product_prefix=$2  # "acm" or "mce"
+  local product_prefix=$2  # "acm", "mce", or "globalhub"
   local branch_prefix=$3   # "release" or "backplane"
 
   if [[ ! -d "${repo_dir}/.tekton" ]]; then
@@ -224,7 +224,7 @@ get_highest_tekton_version() {
 create_tekton_files() {
   local owner=$1
   local repo=$2
-  local product=$3  # "acm" or "mce"
+  local product=$3  # "acm", "mce", or "globalhub"
   local branch_prefix=$4  # "release" or "backplane"
   local default_branch=$5
   local dest_versions=$6  # Space-separated list like "5.0 5.1"
@@ -233,6 +233,8 @@ create_tekton_files() {
   local product_prefix="acm"
   if [[ "${product}" == "mce" ]]; then
     product_prefix="mce"
+  elif [[ "${product}" == "globalhub" ]]; then
+    product_prefix="globalhub"
   fi
 
   local ocm_dir
@@ -874,11 +876,13 @@ EXCLUDED_REPOS=(
   "thanos-receive-controller"
 )
 
-for product in mce acm; do
+for product in mce acm globalhub; do
   # Print section header
   echo ""
   if [[ "${product}" == "mce" ]]; then
     echo "=== Processing MCE repos (main → backplane-*) ==="
+  elif [[ "${product}" == "globalhub" ]]; then
+    echo "=== Processing Global Hub repos (main → release-*) ==="
   else
     echo "=== Processing ACM repos (main → release-*) ==="
   fi
@@ -947,6 +951,8 @@ for product in mce acm; do
     branch_prefix="release"
     if [[ ${product} == "mce" ]]; then
       branch_prefix="backplane"
+    elif [[ ${product} == "globalhub" ]]; then
+      branch_prefix="release"
     fi
 
     for version in ${DESTINATION_VERSIONS}; do
@@ -992,7 +998,7 @@ echo ""
 echo "=== Processing excluded repos with release-* default branch ==="
 echo ""
 
-for product in mce acm; do
+for product in mce acm globalhub; do
   component_repos=$(yq '.components[] |
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
@@ -1001,6 +1007,8 @@ for product in mce acm; do
   branch_prefix="release"
   if [[ ${product} == "mce" ]]; then
     branch_prefix="backplane"
+  elif [[ ${product} == "globalhub" ]]; then
+    branch_prefix="release"
   fi
 
   for repo in ${component_repos}; do
