@@ -196,32 +196,40 @@ echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
 
 # Execute `make clean-all` on hypervisor with comprehensive logging
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf && mkdir -p ${REMOTE_LOGS_DIR} && make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+  ls -ltr; \
+  env; \
+  cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
+  mkdir -p ${REMOTE_LOGS_DIR} ; \
+  make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
   
-  CLEAN_ALL_SUCCESS=true
-  echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
+    CLEAN_ALL_SUCCESS=true
+    echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
 
-  echo "Sleeping for 300 seconds ...."
-  sleep 300
+    echo "Sleeping for 300 seconds ...."
+    sleep 300
 
-  # Execute make all on hypervisor with comprehensive logging
-  echo "Execute make all on hypervisor with comprehensive logging"
+    # Execute make all on hypervisor with comprehensive logging
+    echo "Execute make all on hypervisor with comprehensive logging"
 
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf && mkdir -p ${REMOTE_LOGS_DIR} && make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+    if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+       cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
+       mkdir -p ${REMOTE_LOGS_DIR} ; \
+       make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
 
-    DEPLOYMENT_SUCCESS=true
+       DEPLOYMENT_SUCCESS=true
 
-    ## Note:  here we often get here but make all failed, so we need to ssh again 
-    ## and run oc commands to confirm the deployment is success and we got the DPU workers ready
+       ## Note:  here we often get here but make all failed, so we need to ssh again 
+       ## and run oc commands to confirm the deployment is success and we got the DPU workers ready
     
-    echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+       echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
 
-  else
-    DEPLOYMENT_SUCCESS=false
-    echo "ERROR: DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
-    echo "Check deployment logs at: ${DEPLOYMENT_LOG}"
-    exit 1
-  fi
+    else
+        DEPLOYMENT_SUCCESS=false
+        echo "ERROR: DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+        echo "Check deployment logs at: ${DEPLOYMENT_LOG}"
+        exit 1
+    fi
 
 else
   CLEAN_ALL_SUCCESS=false
