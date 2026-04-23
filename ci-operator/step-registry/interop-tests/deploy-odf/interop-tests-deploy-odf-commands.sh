@@ -6,6 +6,14 @@
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
+# Collect ODF must-gather on any failure so diagnostics are always available in ARTIFACT_DIR.
+trap '
+    (($?)) &&
+    oc adm must-gather \
+        --image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}" \
+        --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
+' EXIT
+
 # MonitorProgress - polls StorageCluster phase until Ready, then exits 0.
 # Runs in background (&); exit terminates only this subprocess.
 MonitorProgress() {
@@ -15,7 +23,7 @@ MonitorProgress() {
             -n "${odfInstallNamespace}" \
             -o jsonpath='{range .status.conditions[*]}{@}{"\n"}{end}'
         storagePhase="$(oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" \
-            -n openshift-storage -o jsonpath='{.status.phase}')"
+            -n ${ODF_STORAGE_CLUSTER_NAME} -o jsonpath='{.status.phase}')"
         [[ "${storagePhase}" == "Ready" ]] && {
             echo "[SUCCESS] StorageCluster is Ready"
             exit 0
@@ -25,39 +33,13 @@ MonitorProgress() {
     true
 }
 
-# RunMustGatherAndAbortOnFail - waits 30m for StorageCluster Available; runs must-gather on failure.
-# Runs in background (&).
-RunMustGatherAndAbortOnFail() {
-    typeset odfMustGatherImage="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
-    oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" \
-        -n "${odfInstallNamespace}" --for=condition='Available' --timeout='30m' || \
-    oc adm must-gather --image="${odfMustGatherImage}" --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
-    true
-}
-
-# WaitMcpForUpdated - polls all MCPs for the Updated condition, exits 1 on timeout.
-# $1=attempts (default 60)
+# WaitMcpForUpdated - waits for all MCPs to finish updating after an ICSP/MachineConfig change.
+# First waits for at least one MCP to leave the Updated state (proving the rollout has started),
+# then waits for all MCPs to return to Updated. No polling sleeps needed.
 WaitMcpForUpdated() {
-    typeset -i attempts="${1:-60}"; (($#)) && shift
-    typeset mcpUpdated="false"
-    typeset -i i=0
-
-    sleep 30
-
-    for ((i=1; i<=attempts; i++)); do
-        echo "Attempt ${i}/${attempts}" >&2
-        sleep 30
-        if oc wait mcp --all --for condition=updated --timeout=1m; then
-            echo "[INFO] MCP is Updated" >&2
-            mcpUpdated="true"
-            break
-        fi
-    done
-
-    [[ "${mcpUpdated}" == "false" ]] && {
-        echo "[ERROR] MCP did not reach Updated state after ${attempts} attempts" >&2
-        exit 1
-    }
+    # Allow failure: if all MCPs are already Updated and no rollout ever starts this times out harmlessly.
+    oc wait mcp --all --for=condition=Updated=false --timeout=2m || true
+    oc wait mcp --all --for=condition=Updated --timeout=30m
     true
 }
 
@@ -120,8 +102,7 @@ EOF
 oc image extract "${odfCatalogImage}" --file /icsp.yaml
 if [ -e "icsp.yaml" ] ; then
     oc apply --filename="icsp.yaml"
-    sleep 30
-    WaitMcpForUpdated 60
+    WaitMcpForUpdated
 fi
 
 oc apply -f - <<__EOF__
@@ -140,9 +121,8 @@ spec:
   sourceType: grpc
 __EOF__
 
-sleep 30
 oc wait "catalogSource/${odfCatalogName}" -n openshift-marketplace \
-    --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout='5m'
+    --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout='10m'
 
 # Label required for ocs-ci tests.
 oc label "CatalogSource/${odfCatalogName}" -n openshift-marketplace ocs-operator-internal=true
@@ -164,22 +144,21 @@ spec:
 EOF
 )"
 
-# Poll until the subscription's installed CSV reaches Succeeded phase.
+# Wait for OLM to resolve the CSV name from the catalog (catalog is READY so this is fast).
+# currentCSV is populated before installedCSV; poll tightly since resolution takes only seconds.
 typeset csvName=''
-for _ in {1..60}; do
+until [[ -n "${csvName}" ]]; do
     csvName="$(oc -n "${odfInstallNamespace}" get subscription "${subscriptionName}" \
-        -o jsonpath='{.status.installedCSV}' || true)"
-    if [[ -n "${csvName}" ]]; then
-        if [[ "$(oc -n "${odfInstallNamespace}" get csv "${csvName}" \
-                -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "[INFO] ClusterServiceVersion ${csvName} ready"
-            break
-        fi
-    fi
-    sleep 10
+        -o jsonpath='{.status.currentCSV}' 2>/dev/null || true)"
+    [[ -z "${csvName}" ]] && sleep 5
 done
 
-sleep 90
+# Wait for CSV to reach Succeeded phase (OLM installs all operator components).
+oc wait csv "${csvName}" -n "${odfInstallNamespace}" \
+    --for=jsonpath='{.status.phase}=Succeeded' --timeout=10m
+echo "[INFO] ClusterServiceVersion ${csvName} ready"
+
+# CSV Succeeded guarantees the ocs-operator Deployment exists; wait for it to become Available.
 oc wait deployment ocs-operator \
     --namespace="${odfInstallNamespace}" \
     --for=condition='Available' \
@@ -213,9 +192,7 @@ spec:
     resources: {}
 EOF
 
-sleep 30
 MonitorProgress &
-RunMustGatherAndAbortOnFail &
 
 oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" \
     -n "${odfInstallNamespace}" --for=condition='Available' --timeout='180m'
