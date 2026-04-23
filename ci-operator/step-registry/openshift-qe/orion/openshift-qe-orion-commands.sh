@@ -5,6 +5,8 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+MAX_RETRIES=5
+
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -15,7 +17,18 @@ if [[ $TAG == "latest" ]]; then
 else
     LATEST_TAG=$TAG
 fi
-git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
+
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
+    break
+  fi
+  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+    exit 1
+  fi
+  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+  sleep 10
+done
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -25,7 +38,17 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git switch ${PULL_NUMBER}
 fi
 
-pip install -q -r requirements.txt
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  if pip install -q -r requirements.txt && pip install -q .; then
+    break
+  fi
+  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+    echo "orion failed to install after $MAX_RETRIES attempts, exiting..." >&2
+    exit 1
+  fi
+  echo "orion failed to install (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+  sleep 10
+done
 
 case "$ES_TYPE" in
   qe)
@@ -64,8 +87,6 @@ case "$ES_TYPE" in
 esac
 
 export ES_SERVER
-
-pip install -q .
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
@@ -288,11 +309,34 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
     EXP_DIR="/tmp/orion-original-edivisive"
     mkdir -p "$EXP_DIR"
     pushd "$EXP_DIR"
-    git clone -q --branch orig-edivisive-exp $ORION_REPO --depth 1
-    pushd orion
-    pip install -q -r requirements.txt
-    pip install -q .
+    python -m virtualenv ./venv_exp
+    source ./venv_exp/bin/activate
+    
+    for attempt in $(seq 1 "$MAX_RETRIES"); do
+      if git clone -q --branch orig-edivisive-exp "$ORION_REPO" --depth 1; then
+        break
+      fi
+      if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+        echo "experimental git clone failed after $MAX_RETRIES attempts, skipping..." >&2
+        exit 1
+      fi
+      echo "experimental git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+      sleep 10
+    done
 
+    pushd orion
+
+    for attempt in $(seq 1 "$MAX_RETRIES"); do
+      if pip install -q -r requirements.txt && pip install -q .; then
+        break
+      fi
+      if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+        echo "experimental orion failed to install after $MAX_RETRIES attempts, skipping..." >&2
+        exit 1
+      fi
+      echo "experimental orion failed to install (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+      sleep 10
+    done
 
     echo "Running experimental orion (original e-divisive)..."
     # Strip JIRA flags for experimental run
@@ -302,6 +346,7 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
     # Copy all results except .xml files into the experimental artifacts subdirectory
     mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
     cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
+    deactivate
     popd
     popd
     echo "Experimental orion run complete."
