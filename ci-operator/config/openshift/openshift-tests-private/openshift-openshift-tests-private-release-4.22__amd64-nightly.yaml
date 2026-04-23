@@ -3547,6 +3547,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
       TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
     test:
+    - ref: wait
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-gcp
 - as: gcp-ocm-osd-ccs-marketplace-f7
@@ -5425,6 +5426,200 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: ibmcloud-cloud-mapi
+  cron: 32 13 10 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: mapi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: ibmcloud-cloud-ccm
+  cron: 32 13 10 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: aws-cloud-ccm
+  cron: 32 13 10 * *
+  steps:
+    cluster_profile: aws-3
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-cloud-cpms
+  cron: 32 13 10 * *
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: cpms&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CPMS
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-mapi
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@mapi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: mapi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-mapi-debug
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_SCENARIOS: 39639|33058
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: ibmcloud-cloud-mapi-debug
+  cron: 32 13 10 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_SCENARIOS: 47177|47201
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: azure-ipi-capi
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@capi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-ccm
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@ccm'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-cpms
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: cpms&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CPMS
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: nutanix-ipi-mapi
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: mapi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+- as: nutanix-ipi-ccm
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+- as: vsphere-ipi-mapi
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      E2E_RUN_TAGS: '@mapi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: mapi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-capi
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      E2E_RUN_TAGS: '@capi'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: capi&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-ccm
+  cron: 2 20 15 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!dev-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: azure-ipi-ovn-hypershift-arm-nodepool-guest-f7
   cron: 3 20 7,4,13,20 * *
   steps:
