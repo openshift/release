@@ -2,7 +2,7 @@
 
 CI workflows for **Agent-based Installer (ABI)** on bare metal in RDU2 (**`metal-redhat-gs`**) without a bastion.
 
-**ABI behavior (phases, pointers):** **[`../abi/README.md`](../abi/README.md)** — step parameters live in **`abi/bm/*/*-ref.yaml`** and on the Step Registry; implementation detail in **`abi/bm/*/*-commands.sh`**.
+**ABI behavior (phases, pointers):** **[`../abi/README.md`](../abi/README.md)** — step parameters live in **`abi/conf/bm/*-ref.yaml`**, **`abi/install/bmc/*-ref.yaml`**, and the Step Registry; implementation detail in the matching **`*-commands.sh`** files.
 
 ## Workflow `gs-baremetal-agent-install`
 

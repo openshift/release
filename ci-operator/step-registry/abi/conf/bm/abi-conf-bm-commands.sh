@@ -1,5 +1,5 @@
 #!/bin/bash
-# abi-bm-conf — Agent-based installer configuration (bare metal).
+# abi-conf-bm — Agent-based installer configuration (bare metal; **conf** phase).
 #
 # Logic in this Step:
 # - Bare-minimum `install-config.yaml` scaffold -> OCP-version-aware defaults -> `baremetal` platform -> `agent-config.yaml` template.
