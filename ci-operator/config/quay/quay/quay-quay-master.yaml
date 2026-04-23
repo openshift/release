@@ -27,6 +27,21 @@ images:
       RUN npx playwright install chromium
     from: src
     to: quay-playwright-runner
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf module enable -y nodejs:20 && \
+          dnf install -y nodejs \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      WORKDIR /go/src/github.com/quay/quay/web
+      RUN npm ci
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN npx playwright install firefox
+    from: src
+    to: quay-playwright-firefox-runner
 releases:
   latest:
     candidate:
@@ -65,6 +80,31 @@ tests:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-deploy-quay-custom-image
     - ref: quay-tests-test-quay-playwright
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 4h0m0s
+- always_run: false
+  as: playwright-e2e-firefox
+  steps:
+    cluster_profile: aws-quay-qe
+    dependencies:
+      QUAY_CI_IMAGE: pipeline:quay-server
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_REPO_MIRROR: true
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: redhat-operators
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-deploy-quay-custom-image
+    - ref: quay-tests-test-quay-playwright-firefox
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 4h0m0s
 zz_generated_metadata:
