@@ -280,4 +280,5 @@ EOF
 
 echo ""
 echo "JUnit XML written to ${JUNIT_FILE}"
+touch "${SHARED_DIR}/monitor-completed"
 echo "=== Edge CI Monitor complete ==="

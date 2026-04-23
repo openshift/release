@@ -4,6 +4,11 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Read webhook URL (tracing disabled — secret handling)
 # ---------------------------------------------------------------------------
+if [[ ! -f "${SHARED_DIR}/monitor-completed" ]]; then
+    echo "Monitor step did not complete — skipping Slack notification."
+    exit 0
+fi
+
 WEBHOOK_URL=$(cat /var/run/slack-webhook/ocp-ci-monitor)
 
 # ---------------------------------------------------------------------------
