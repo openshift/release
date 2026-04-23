@@ -335,8 +335,10 @@ create_tekton_files() {
     local pr_branch="add-tekton-files-${dest_versions// /-}"
 
     # Check if PR branch already exists on remote
+    local branch_existed_on_remote=false
     log "INFO Checking if PR branch ${pr_branch} exists on remote"
     if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+      branch_existed_on_remote=true
       log "INFO PR branch ${pr_branch} already exists on remote"
       log "INFO Fetching and checking out existing branch"
       if ! git fetch origin "${pr_branch}" 2>&1; then
@@ -454,8 +456,8 @@ Generated from existing ${product_prefix}-${highest_version} templates.
     if [[ "$files_created" == "false" ]]; then
       log "INFO No new files to create"
 
-      # Create PR if branch exists but no PR
-      if [[ "$pr_exists" == "false" ]] && command -v gh >/dev/null 2>&1; then
+      # Create PR if branch existed on remote (has commits) but no PR
+      if [[ "$pr_exists" == "false" ]] && [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
         log "INFO Creating PR for existing branch"
 
         if ! gh pr create \
