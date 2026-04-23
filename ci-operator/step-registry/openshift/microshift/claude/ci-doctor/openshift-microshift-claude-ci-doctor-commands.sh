@@ -12,11 +12,10 @@ mkdir -p "${CLAUDE_HOME}"
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
-        echo "Copying reports to artifact and shared directories..."
+        echo "Copying report files to the artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${SHARED_DIR}/"   \; || true
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
@@ -189,7 +188,9 @@ configure_claude() {
       "Read(//tmp/**)",
       "Write(//tmp/**)",
       "Bash(bash plugins/microshift-ci/scripts/*)",
+      "Bash(bash /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
+      "Bash(python3 /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(curl:*)",
       "Bash(date:*)",
       "Bash(cat:*)",
