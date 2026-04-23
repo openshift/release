@@ -347,6 +347,22 @@ create_tekton_files() {
         log "ERROR Could not checkout ${pr_branch}"
         exit 1
       fi
+
+      # Check if HEAD commit has DCO sign-off, amend if missing
+      log "INFO Checking DCO sign-off on existing commit"
+      if ! git log -1 --pretty=%B | grep -q "^Signed-off-by:"; then
+        log "INFO Missing DCO sign-off, amending commit"
+        git config user.name "OpenShift CI Robot"
+        git config user.email "noreply@openshift.io"
+        if ! git commit --amend -s --no-edit 2>&1; then
+          log "WARNING Could not amend commit with DCO"
+        else
+          log "INFO Force pushing amended commit"
+          if ! git push --force 2>&1; then
+            log "WARNING Could not force push amended commit"
+          fi
+        fi
+      fi
     else
       log "INFO Creating new PR branch ${pr_branch}"
       if ! git checkout -b "${pr_branch}" 2>&1; then
