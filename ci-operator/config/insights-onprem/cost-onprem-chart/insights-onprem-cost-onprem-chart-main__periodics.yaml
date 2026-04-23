@@ -1,6 +1,6 @@
 build_root:
   project_image:
-    dockerfile_literal: |-
+    dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi
       RUN dnf install -y git && dnf clean all
 images:
@@ -8,8 +8,8 @@ images:
   - dockerfile_literal: |-
       FROM src
       USER root
-      # Install base packages and Python
-      RUN dnf install -y python3.11 python3.11-pip jq && dnf clean all && \
+      # Install base packages, Python, and git (for RC tag fallback)
+      RUN dnf install -y python3.11 python3.11-pip jq git && dnf clean all && \
           alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
       # Install Playwright system dependencies (browser libraries)
       RUN dnf install -y \
@@ -43,58 +43,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.20"
-  run_if_changed: ^(cost-onprem/|scripts/|tests/|openshift-values\.yaml)
-  steps:
-    env:
-      IQE_PROFILE: smoke
-      RUN_IQE: "true"
-    test:
-    - ref: insights-onprem-cost-onprem-chart-e2e
-    workflow: insights-onprem-cost-onprem-chart-claim
-- always_run: false
-  as: e2e-iqe-extended
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.20"
-  optional: true
-  steps:
-    env:
-      IQE_PROFILE: extended
-      RUN_IQE: "true"
-    test:
-    - ref: insights-onprem-cost-onprem-chart-e2e
-    workflow: insights-onprem-cost-onprem-chart-claim
-- always_run: false
-  as: e2e-iqe-stable
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.20"
-  optional: true
-  steps:
-    env:
-      IQE_PROFILE: stable
-      RUN_IQE: "true"
-    test:
-    - ref: insights-onprem-cost-onprem-chart-e2e
-    workflow: insights-onprem-cost-onprem-chart-claim
-- always_run: false
-  as: e2e-iqe-full
+- as: nightly-release
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -102,9 +51,27 @@ tests:
     product: ocp
     timeout: 3h0m0s
     version: "4.20"
-  optional: true
+  cron: 0 2 * * *
   steps:
     env:
+      CHART_REF: release
+      IQE_PROFILE: full
+      RUN_IQE: "true"
+    test:
+    - ref: insights-onprem-cost-onprem-chart-e2e
+    workflow: insights-onprem-cost-onprem-chart-claim
+- as: nightly-rc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.20"
+  cron: 0 5 * * *
+  steps:
+    env:
+      CHART_REF: rc
       IQE_PROFILE: full
       RUN_IQE: "true"
     test:
@@ -114,3 +81,4 @@ zz_generated_metadata:
   branch: main
   org: insights-onprem
   repo: cost-onprem-chart
+  variant: periodics
