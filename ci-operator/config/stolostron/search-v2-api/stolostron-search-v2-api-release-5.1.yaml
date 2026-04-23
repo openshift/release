@@ -21,10 +21,11 @@ images:
       stolostron_builder_go1.25-linux:
         as:
         - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-    to: search-indexer
+    to: search-v2-api
 promotion:
   to:
-  - name: "2.17"
+  - disabled: true
+    name: "5.1"
     namespace: stolostron
 resources:
   '*':
@@ -35,9 +36,9 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: search-v2-api
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: search-v2-api
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: lint
@@ -64,14 +65,14 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: search-v2-api
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: search-v2-api
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_VERSION="2.17"
+        export OSCI_COMPONENT_VERSION="5.1"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
@@ -96,6 +97,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: release-2.17
+  branch: release-5.1
   org: stolostron
-  repo: search-indexer
+  repo: search-v2-api

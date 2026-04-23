@@ -21,10 +21,11 @@ images:
       stolostron_builder_go1.25-linux:
         as:
         - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-    to: search-indexer
+    to: insights-metrics
 promotion:
   to:
-  - name: "2.17"
+  - disabled: true
+    name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -35,16 +36,11 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: insights-metrics
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: insights-metrics
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -60,18 +56,27 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: insights-metrics
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: insights-metrics
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_VERSION="2.17"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
@@ -85,17 +90,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: release-2.17
+  branch: release-5.0
   org: stolostron
-  repo: search-indexer
+  repo: insights-metrics
