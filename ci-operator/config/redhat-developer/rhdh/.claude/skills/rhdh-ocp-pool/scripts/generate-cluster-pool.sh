@@ -20,6 +20,7 @@ POOL_DIR="clusters/hosted-mgmt/hive/pools/rhdh"
 ALL_POOLS_DIR="clusters/hosted-mgmt/hive/pools"
 OCP_VERSION=""
 REFERENCE_VERSION=""
+DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,8 +40,12 @@ while [[ $# -gt 0 ]]; do
       ALL_POOLS_DIR="$2"
       shift 2
       ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
     *)
-      echo "Usage: $0 --version X.Y [--reference X.Y] [--pool-dir <path>] [--all-pools-dir <path>]" >&2
+      echo "Usage: $0 --version X.Y [--reference X.Y] [--dry-run] [--pool-dir <path>] [--all-pools-dir <path>]" >&2
       exit 1
       ;;
   esac
@@ -133,8 +138,15 @@ echo "Using reference pool: $(basename "$REF_FILE") (OCP ${REFERENCE_VERSION})" 
 # 3. Generate the new pool YAML
 # ---------------------------------------------------------------
 
-# Start with a copy of the reference
-cp "$REF_FILE" "$TARGET_FILE"
+if $DRY_RUN; then
+  # Dry-run: transform in a temp file, print to stdout, don't write to target
+  WORK_FILE=$(mktemp)
+  trap 'rm -f "$WORK_FILE"' EXIT
+  cp "$REF_FILE" "$WORK_FILE"
+else
+  cp "$REF_FILE" "$TARGET_FILE"
+  WORK_FILE="$TARGET_FILE"
+fi
 
 # Update version-specific fields
 yq -i "
@@ -146,10 +158,15 @@ yq -i "
   .spec.size = 1 |
   .spec.maxSize = 2 |
   del(.spec.runningCount)
-" "$TARGET_FILE"
+" "$WORK_FILE"
 
 echo "" >&2
-echo "Generated: ${TARGET_FILE}" >&2
+if $DRY_RUN; then
+  echo "Dry-run: showing generated YAML (no file written)" >&2
+  echo "Target would be: ${TARGET_FILE}" >&2
+else
+  echo "Generated: ${TARGET_FILE}" >&2
+fi
 echo "" >&2
 echo "Fields set:" >&2
 echo "  metadata.labels.version:      ${OCP_VERSION}" >&2
@@ -163,5 +180,5 @@ echo "  spec.runningCount:            (removed — lean start)" >&2
 echo "" >&2
 echo "imageSetRef aligned with other pools in the repo." >&2
 
-# Print the generated file to stdout
-cat "$TARGET_FILE"
+# Print the generated YAML to stdout
+cat "$WORK_FILE"

@@ -8,6 +8,12 @@
 #
 # Requires --arg now "<ISO8601 timestamp>" to be passed to jq.
 #
+# This filter is the single source of truth for OCP phase classification.
+# It is used by:
+#   - rhdh-ocp-lifecycle/scripts/check-ocp-lifecycle.sh (same skill)
+#   - rhdh-ocp-coverage/scripts/analyze-coverage.sh (sibling skill)
+# If this file is moved or renamed, update both consumers.
+#
 # Usage:
 #   jq --arg now "$NOW" -f ocp-lifecycle.jq <<< "$API_RESPONSE"
 

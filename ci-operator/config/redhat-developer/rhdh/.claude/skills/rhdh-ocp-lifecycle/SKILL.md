@@ -4,6 +4,7 @@ description: >-
   Check which OCP versions are supported by active RHDH releases and which are
   end-of-life, using the Red Hat Product Life Cycles API for both RHDH and OCP
   lifecycle data including EUS phases. Supports OCP 4.x and future 5.x+
+allowed-tools: Bash(bash *check-ocp-lifecycle.sh*)
 ---
 # Check RHDH and OCP Lifecycle Status
 
@@ -24,6 +25,7 @@ Use this skill when you need to check version support status before:
 
 - `curl` and `jq` must be available
 - Internet connectivity to reach `https://access.redhat.com`
+- `CLAUDE_SKILL_DIR` is set automatically by the Claude Code skill loader. For manual invocation, set it to this skill's directory (e.g., `CLAUDE_SKILL_DIR=ci-operator/config/redhat-developer/rhdh/.claude/skills/rhdh-ocp-lifecycle`)
 
 ## Usage
 
@@ -97,7 +99,7 @@ A JSON object is written to stderr with:
 - **RHDH lifecycle**: `https://access.redhat.com/product-life-cycles/api/v1/products?name=Red+Hat+Developer+Hub`
   - Provides `openshift_compatibility` field per RHDH version (the authoritative source for which OCP versions RHDH supports)
   - Provides lifecycle phase and dates per RHDH version
-- **OCP lifecycle**: `https://access.redhat.com/product-life-cycles/api/v1/products?name=OpenShift+Container+Platform+4`
+- **OCP lifecycle**: `https://access.redhat.com/product-life-cycles/api/v1/products?name=Red+Hat+OpenShift+Container+Platform`
   - Provides lifecycle phase and dates per OCP version (Full, Maintenance, EUS Term 1/2)
 
 ## Key Concepts

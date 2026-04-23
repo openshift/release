@@ -4,6 +4,7 @@ description: >-
   List existing RHDH OCP Hive ClusterPool configurations and generate new pool
   YAML for a target OCP version, with imageSetRef aligned from other pools in
   the openshift/release repository. Covers OCP pools only, not K8s platforms
+allowed-tools: Read, Bash(bash *list-cluster-pools.sh*), Bash(bash *generate-cluster-pool.sh*), Bash(rm *_clusterpool.yaml)
 ---
 # RHDH OCP Cluster Pool Management
 
@@ -21,6 +22,7 @@ Use this skill when you need to:
 
 - `yq` (v4+) must be available for YAML parsing
 - Working directory must be the root of the `openshift/release` repository
+- `CLAUDE_SKILL_DIR` is set automatically by the Claude Code skill loader. For manual invocation, set it to this skill's directory (e.g., `CLAUDE_SKILL_DIR=ci-operator/config/redhat-developer/rhdh/.claude/skills/rhdh-ocp-pool`)
 
 ## Listing Cluster Pools
 
@@ -57,6 +59,14 @@ bash "${CLAUDE_SKILL_DIR}/scripts/generate-cluster-pool.sh" --version 4.22
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/generate-cluster-pool.sh" --version 4.22 --reference 4.21
 ```
+
+### Preview without writing (dry-run)
+
+```bash
+bash "${CLAUDE_SKILL_DIR}/scripts/generate-cluster-pool.sh" --version 4.22 --dry-run
+```
+
+With `--dry-run`, the script outputs the generated YAML to stdout but does not write the file to disk. Use this to review the output before committing to the change.
 
 ### What the script does
 

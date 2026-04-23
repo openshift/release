@@ -4,6 +4,7 @@ description: >-
   Use when decommissioning an end-of-life RHDH release branch by removing CI
   config, generated Prow jobs, and branch protection from the openshift/release
   repository
+allowed-tools: Glob, Read, Edit, Bash(rm *redhat-developer-rhdh-*), AskUserQuestion
 ---
 # Decommission RHDH Release Branch Jobs
 

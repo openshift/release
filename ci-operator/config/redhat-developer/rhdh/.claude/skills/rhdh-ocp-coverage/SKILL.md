@@ -4,6 +4,7 @@ description: >-
   Analyze RHDH OCP version coverage by cross-referencing cluster pools and CI
   test configs against both RHDH and OCP lifecycle APIs to find gaps, stale
   configurations, and compatibility mismatches
+allowed-tools: Bash(bash *analyze-coverage.sh*)
 ---
 # RHDH OCP Coverage Analysis
 
@@ -22,6 +23,7 @@ Use this skill when you need to:
 - `curl`, `jq`, and `yq` (v4+) must be available
 - Internet connectivity to reach `https://access.redhat.com`
 - Working directory must be the root of the `openshift/release` repository
+- `CLAUDE_SKILL_DIR` is set automatically by the Claude Code skill loader. For manual invocation, set it to this skill's directory (e.g., `CLAUDE_SKILL_DIR=ci-operator/config/redhat-developer/rhdh/.claude/skills/rhdh-ocp-coverage`)
 
 ## Usage
 

@@ -4,6 +4,7 @@ description: >-
   List, generate, add, and remove OCP-versioned test entries (e2e-ocp-*) in RHDH
   ci-operator config files. Covers only OCP cluster-claim tests, not K8s platform
   tests (AKS, EKS, GKE, OSD)
+allowed-tools: Read, Edit, Bash(bash *list-ocp-test-configs.sh*), Bash(bash *generate-test-entry.sh*), Bash(*make update*)
 ---
 # RHDH OCP Test Management
 
@@ -21,6 +22,7 @@ Use this skill when you need to:
 
 - `yq` (v4+) must be available for YAML parsing
 - Working directory must be the root of the `openshift/release` repository
+- `CLAUDE_SKILL_DIR` is set automatically by the Claude Code skill loader. For manual invocation, set it to this skill's directory (e.g., `CLAUDE_SKILL_DIR=ci-operator/config/redhat-developer/rhdh/.claude/skills/rhdh-ocp-tests`)
 
 ## Important: Branch Terminology
 

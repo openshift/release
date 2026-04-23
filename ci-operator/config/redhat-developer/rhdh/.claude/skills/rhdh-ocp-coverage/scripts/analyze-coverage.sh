@@ -22,7 +22,11 @@
 
 set -euo pipefail
 
-# Resolve path to shared jq filter for OCP lifecycle classification
+# Resolve path to the shared jq filter for OCP lifecycle classification.
+# This filter lives in the rhdh-ocp-lifecycle skill and is the single source
+# of truth for OCP phase classification. If that skill is moved or renamed,
+# this path must be updated.
+# See: rhdh-ocp-lifecycle/scripts/ocp-lifecycle.jq
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OCP_LIFECYCLE_JQ="${SCRIPT_DIR}/../../rhdh-ocp-lifecycle/scripts/ocp-lifecycle.jq"
 
@@ -57,6 +61,13 @@ for cmd in curl jq yq; do
     exit 1
   fi
 done
+
+# Associative arrays require bash 4+; macOS ships bash 3.2 by default.
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+  echo "ERROR: bash 4+ is required (associative arrays). Found: ${BASH_VERSION}" >&2
+  echo "On macOS, install a newer bash: brew install bash" >&2
+  exit 1
+fi
 
 if [[ ! -d "$POOL_DIR" ]]; then
   echo "ERROR: Pool directory not found: ${POOL_DIR}" >&2
