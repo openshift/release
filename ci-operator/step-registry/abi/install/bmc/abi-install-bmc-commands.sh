@@ -1,5 +1,5 @@
 #!/bin/bash
-# abi-bm-install — Agent-based installer install phase (bare metal).
+# abi-install-bmc — Agent-based installer **install** phase (BMC / virtual media; **install** phase).
 #
 # **Chisel:** OpenShift Secret `test-credentials/chisel-creds` is mounted at `/secret/chisel`.
 # Basic-auth filenames use the `chisel-usr--…` / `chisel-pwd--…` pattern (suffix from `OCP__ABI__TEAM_NAME`).

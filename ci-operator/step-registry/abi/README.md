@@ -1,12 +1,14 @@
 # Agent-based Installer (ABI)
 
+**Layout (step-registry paths):** `conf/<platform>/` holds manifest / image-input work; `install/<mechanism>/` holds boot and cluster bring-up (e.g. **BMC** virtual media today; **PXE** or other targets can be added alongside without colliding with bare-metal **conf**). See `conf/bm` and `install/bmc` below.
+
 **Step Inputs Parameters (names, defaults, semantics):**
 | Step                | Reference (source of truth)                                                 | Registry Documentation                                                      |
 |---------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| **abi-bm-conf**     | [`bm/conf/abi-bm-conf-ref.yaml`](bm/conf/abi-bm-conf-ref.yaml)              | [`abi-bm-conf`](https://steps.ci.openshift.org/reference/abi-bm-conf)       |
-| **abi-bm-install**  | [`bm/install/abi-bm-install-ref.yaml`](bm/install/abi-bm-install-ref.yaml)  | [`abi-bm-install`](https://steps.ci.openshift.org/reference/abi-bm-install) |
+| **abi-conf-bm**     | [`conf/bm/abi-conf-bm-ref.yaml`](conf/bm/abi-conf-bm-ref.yaml)              | [`abi-conf-bm`](https://steps.ci.openshift.org/reference/abi-conf-bm)       |
+| **abi-install-bmc**  | [`install/bmc/abi-install-bmc-ref.yaml`](install/bmc/abi-install-bmc-ref.yaml)  | [`abi-install-bmc`](https://steps.ci.openshift.org/reference/abi-install-bmc) |
 
-**Steps Execution Order:** [`abi-bm-conf-commands.sh`](bm/conf/abi-bm-conf-commands.sh) → [`abi-bm-install-commands.sh`](bm/install/abi-bm-install-commands.sh)
+**Steps Execution Order:** [`abi-conf-bm-commands.sh`](conf/bm/abi-conf-bm-commands.sh) → [`abi-install-bmc-commands.sh`](install/bmc/abi-install-bmc-commands.sh)
 
 **Official Documentation:** [Preparing to install with the Agent-based Installer](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installing_an_on-premise_cluster_with_the_agent-based_installer/preparing-to-install-with-the-agent-based-installer).
 
@@ -94,7 +96,7 @@ Step Input Parameters: `OCP__ABI__TUN_SVC__*` / `OCP__ABI__TEAM_NAME`
 
 ## BMC / Redfish
 
-**abi-bm-conf** emits `ocp--bmc--info.json`; **abi-bm-install** drives virtual media and power via Redfish. Details live in `abi-bm-install-commands.sh` (maintainer-oriented).
+**abi-conf-bm** emits `ocp--bmc--info.json`; **abi-install-bmc** drives virtual media and power via Redfish. Details live in `abi-install-bmc-commands.sh` (maintainer-oriented).
 
 ## Phase Customization Scripts
 

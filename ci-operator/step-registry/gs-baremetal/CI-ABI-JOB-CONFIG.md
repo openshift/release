@@ -2,23 +2,23 @@
 
 Jobs using workflow `gs-baremetal-agent-install` (variant e.g. `gs-bm--ocp-4.19--lp-interop`) set **`OCP__ABI_*`** in Job Conf. YAML **`.tests[*].steps.env`**.
 
-**Semantics and defaults:** step **`*-ref.yaml`** files (published on the Step Registry: [`abi-bm-conf`](https://steps.ci.openshift.org/reference/abi-bm-conf), [`abi-bm-install`](https://steps.ci.openshift.org/reference/abi-bm-install)). **Chisel / NGINX** topology and port table: [WebApp Services — Chisel Tunneling Service](https://redhat.atlassian.net/wiki/spaces/MPEXIENG/pages/254804070/WebApp+Services#Chisel-Tunneling-Service).
+**Semantics and defaults:** step **`*-ref.yaml`** files (published on the Step Registry: [`abi-conf-bm`](https://steps.ci.openshift.org/reference/abi-conf-bm), [`abi-install-bmc`](https://steps.ci.openshift.org/reference/abi-install-bmc)). **Chisel / NGINX** topology and port table: [WebApp Services — Chisel Tunneling Service](https://redhat.atlassian.net/wiki/spaces/MPEXIENG/pages/254804070/WebApp+Services#Chisel-Tunneling-Service).
 
 | Env                              | Step that consumes it           | Source of truth |
 |----------------------------------|---------------------------------|-----------------|
-| `OCP__ABI__BM__CLS_NAME`         | `abi-bm-conf`                 | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml) |
-| `OCP__ABI__BM__BASE_DOM`         | `abi-bm-conf`                 | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml) |
-| `OCP__ABI__DAY0_SCRIPTS_YAML`    | `abi-bm-conf`                 | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml) |
-| `OCP__ABI__DAY1_SCRIPTS_YAML`    | `abi-bm-conf`                 | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml) |
-| `OCP__ABI__CLUSTER_DIR`          | `abi-bm-conf`, `abi-bm-install` | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml), [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__INSTLR_LOG_LEVEL`     | `abi-bm-conf`, `abi-bm-install` | [`abi-bm-conf-ref.yaml`](../abi/bm/conf/abi-bm-conf-ref.yaml), [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__WAIT__BOOTSTRAP__H`    | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__WAIT__CLUSTER__H`      | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__DAY2_SCRIPTS_YAML`    | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__TEAM_NAME`            | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__TUN_SVC__DP_BASE_URL` | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__TUN_SVC__DP_PORT`     | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
-| `OCP__ABI__TUN_SVC__CP_URL`      | `abi-bm-install`              | [`abi-bm-install-ref.yaml`](../abi/bm/install/abi-bm-install-ref.yaml) |
+| `OCP__ABI__BM__CLS_NAME`         | `abi-conf-bm`                 | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml) |
+| `OCP__ABI__BM__BASE_DOM`         | `abi-conf-bm`                 | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml) |
+| `OCP__ABI__DAY0_SCRIPTS_YAML`    | `abi-conf-bm`                 | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml) |
+| `OCP__ABI__DAY1_SCRIPTS_YAML`    | `abi-conf-bm`                 | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml) |
+| `OCP__ABI__CLUSTER_DIR`          | `abi-conf-bm`, `abi-install-bmc` | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml), [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__INSTLR_LOG_LEVEL`     | `abi-conf-bm`, `abi-install-bmc` | [`abi-conf-bm-ref.yaml`](../abi/conf/bm/abi-conf-bm-ref.yaml), [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__WAIT__BOOTSTRAP__H`    | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__WAIT__CLUSTER__H`      | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__DAY2_SCRIPTS_YAML`    | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__TEAM_NAME`            | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__TUN_SVC__DP_BASE_URL` | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__TUN_SVC__DP_PORT`     | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
+| `OCP__ABI__TUN_SVC__CP_URL`      | `abi-install-bmc`              | [`abi-install-bmc-ref.yaml`](../abi/install/bmc/abi-install-bmc-ref.yaml) |
 
 YAML script schema (DAY0/DAY1/DAY2 hooks): [BuildCustomScriptsFromYAML.sh](https://github.com/RedHatQE/OpenShift-LP-QE--Tools/blob/HEAD/libs/bash/common/BuildCustomScriptsFromYAML.sh).
 
