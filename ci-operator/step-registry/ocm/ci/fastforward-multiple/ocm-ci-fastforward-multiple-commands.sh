@@ -1163,7 +1163,7 @@ for product in mce acm globalhub; do
     done
 
     # Now create all Tekton file versions on each branch (including default)
-    local all_branches="${default_branch}"
+    all_branches="${default_branch}"
     for version in ${DESTINATION_VERSIONS}; do
       dest_branch="${repo_branch_prefix}-${version}"
       if [[ "${dest_branch}" != "${default_branch}" ]] && branch_exists "${owner}" "${repo}" "${dest_branch}"; then
