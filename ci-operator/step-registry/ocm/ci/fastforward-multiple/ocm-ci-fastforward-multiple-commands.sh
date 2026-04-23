@@ -121,6 +121,35 @@ can_push_to_repo() {
   fi
 }
 
+# Check if branch exists
+branch_exists() {
+  local owner=$1
+  local repo=$2
+  local branch=$3
+  local token
+
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    return 1
+  fi
+
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  if [[ -z "${token}" ]]; then
+    return 1
+  fi
+
+  # Check branch via GitHub API
+  local http_code
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: token ${token}" \
+    "https://api.github.com/repos/${owner}/${repo}/branches/${branch}")
+
+  if [[ "$http_code" == "200" ]]; then
+    return 0  # Exists
+  else
+    return 1  # Doesn't exist
+  fi
+}
+
 # Check if branch is protected
 is_branch_protected() {
   local owner=$1
@@ -1098,49 +1127,70 @@ for product in mce acm globalhub; do
 
     echo "INFO: Default branch for ${owner_repo} is ${default_branch}"
 
-    # For each destination version, ensure branch exists and create Tekton files
+    # For EXCLUDED_REPOS: Create all Tekton versions on each branch to avoid divergence
+    # This allows fast-forward to work since branches stay identical
+
+    # First, ensure all destination branches exist (fast-forward from default)
     for version in ${DESTINATION_VERSIONS}; do
       dest_branch="${repo_branch_prefix}-${version}"
 
-      # Skip if dest_branch same as default_branch (no fast-forward needed)
+      # Skip if dest_branch same as default_branch
       if [[ "${dest_branch}" == "${default_branch}" ]]; then
-        echo "INFO: Skipping ${dest_branch} for ${owner_repo} (same as default branch)"
-      else
-        # Check if branch exists, create if not
-        echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
-        branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
+        echo "INFO: Skipping fast-forward for ${dest_branch} (same as default branch)"
+        continue
+      fi
 
-        fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+      # Check if branch exists
+      if ! branch_exists "${owner}" "${repo}" "${dest_branch}"; then
+        echo "WARNING: Branch ${dest_branch} does not exist for ${owner_repo}"
+        echo "         EXCLUDED_REPOS branches are manually managed - skipping"
+        continue
+      fi
+
+      # Fast-forward from default branch
+      echo "INFO: Fast-forwarding ${default_branch} → ${dest_branch} for ${owner_repo}"
+      branch_log="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${dest_branch}.log"
+
+      fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
+      status=$?
+      if [[ $status -ne 0 ]]; then
+        echo "WARNING: Could not fast-forward ${dest_branch}, may have diverged (this is OK for excluded repos)"
+        if [[ -f "${branch_log}" ]]; then
+          echo "Logs:"
+          sed 's/^/    /' "${branch_log}"
+        fi
+      fi
+    done
+
+    # Now create all Tekton file versions on each branch (including default)
+    local all_branches="${default_branch}"
+    for version in ${DESTINATION_VERSIONS}; do
+      dest_branch="${repo_branch_prefix}-${version}"
+      if [[ "${dest_branch}" != "${default_branch}" ]] && branch_exists "${owner}" "${repo}" "${dest_branch}"; then
+        all_branches="${all_branches} ${dest_branch}"
+      fi
+    done
+
+    for branch in ${all_branches}; do
+      echo "INFO: Creating Tekton files for ALL versions on ${branch} for ${owner_repo}"
+
+      for version in ${DESTINATION_VERSIONS}; do
+        echo "INFO: Creating Tekton files for version ${version} on ${branch}"
+        tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${branch}-v${version}.log"
+
+        create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${branch}" "${version}" "${tekton_log_file}"
         status=$?
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
-          echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
-          if [[ -f "${branch_log}" ]]; then
+          echo "WARNING: Failed to create Tekton files for version ${version} on ${branch}"
+          if [[ -f "${tekton_log_file}" ]]; then
             echo "Logs:"
-            sed 's/^/    /' "${branch_log}"
+            sed 's/^/    /' "${tekton_log_file}"
           else
-            echo "ERROR: Log file not found: ${branch_log}"
+            echo "ERROR: Log file not found: ${tekton_log_file}"
           fi
-          continue
         fi
-      fi
-
-      # Create Tekton files on the destination branch
-      echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
-      tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
-
-      create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
-      status=$?
-      if [[ $status -ne 0 ]]; then
-        exit_code=$((exit_code | status))
-        echo "WARNING: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
-        if [[ -f "${tekton_log_file}" ]]; then
-          echo "Logs:"
-          sed 's/^/    /' "${tekton_log_file}"
-        else
-          echo "ERROR: Log file not found: ${tekton_log_file}"
-        fi
-      fi
+      done
     done
 
     # Special case: kube-rbac-proxy needs Tekton files on BOTH branch sets
