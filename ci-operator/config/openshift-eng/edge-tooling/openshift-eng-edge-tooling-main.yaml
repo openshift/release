@@ -3,6 +3,22 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      USER 0:0
+      RUN GH_TOKEN_VER=2.0.8 && GH_TOKEN_SHA=867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f && \
+          curl -sSL --connect-timeout 10 --max-time 120 --fail \
+            "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" \
+            -o /usr/local/bin/gh-token && \
+          echo "${GH_TOKEN_SHA}  /usr/local/bin/gh-token" | sha256sum -c - && \
+          chmod +x /usr/local/bin/gh-token
+      RUN dnf install -y --nodocs jq python3 python3-pip && dnf clean all
+      COPY . /opt/app-root/src/
+      WORKDIR /opt/app-root/src/edge-tooling
+    from: src
+    to: edge-tooling
 resources:
   '*':
     requests:
@@ -13,6 +29,15 @@ tests:
   cron: 0 9 * * *
   steps:
     workflow: openshift-edge-tooling-ci-monitor
+- as: pr-notifier
+  cron: 0 3 * * 0-5
+  restrict_network_access: false
+  steps:
+    env:
+      FORBIDDEN_LABELS: jira/invalid-bug
+      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling
+      REQUIRED_LABELS: lgtm,approved,verified
+    workflow: openshift-edge-tooling-gh-notifier
 zz_generated_metadata:
   branch: main
   org: openshift-eng

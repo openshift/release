@@ -1,0 +1,56 @@
+ref:
+  as: openshift-edge-tooling-gh-notifier
+  from: edge-tooling
+  commands: openshift-edge-tooling-gh-notifier-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: pr-creds
+    mount_path: /var/run/pr-creds
+  - namespace: test-credentials
+    name: edge-tooling-ci-monitor-slack-webhook
+    mount_path: /var/run/slack-notifier/team-ocp-edge
+  env:
+  - name: GITHUB_APP_ID_PATH
+    default: /var/run/pr-creds/app_id
+    documentation: Path to GitHub App ID file for gh-token.
+  - name: GITHUB_KEY_PATH
+    default: /var/run/pr-creds/key.pem
+    documentation: Path to GitHub App private key for gh-token.
+  - name: GITHUB_REPOS
+    default: openshift-eng/edge-tooling
+    documentation: |-
+      Comma- or whitespace-separated GitHub repositories to consider, each as org/repo (for example openshift/foo).
+      Optional; defaults to openshift-eng/edge-tooling.
+  - name: SLACK_WEBHOOK_SECRET_FILE
+    default: /var/run/slack-notifier/team-ocp-edge
+    documentation: |-
+      File containing Slack incoming webhook URL (plain text). Exported as SLACK_WEBHOOK_URL
+      for the notifier script if this file exists.
+  - name: EXCLUDE_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests missing any of these labels are flagged. Optional;
+      empty means this check will default to, "do-not-merge/hold,do-not-merge/work-in-progress,wip,work in progress".
+  - name: REQUIRED_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests missing any of these labels are flagged. Optional;
+      empty means this check is disabled.
+  - name: FORBIDDEN_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests that have any of these labels are flagged. Optional;
+      empty means this check is disabled.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  timeout: 30m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs the gh-notifier image built from openshift-eng/edge-tooling (pipeline image gh-notifier via
+    dockerfile_literal in ci-operator config), exports GitHub App and Slack credentials, and executes
+    GH_NOTIFIER_INVOKE. No runtime git clone—the src checkout is in the image; optional pip install of ./gh-notifier
+    runs at image build when pyproject.toml or setup.py exists. gh-token is installed in the image at build time.
+    After the notifier succeeds, if ./gh-notifier/pr-dashboard.html exists, it is copied to
+    "${ARTIFACT_DIR}/pr-dashboard.html" for Prow GCS artifacts (link from reporter_config or the job artifacts browser).
