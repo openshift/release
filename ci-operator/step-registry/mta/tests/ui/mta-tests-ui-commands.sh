@@ -96,7 +96,7 @@ fi
 # Set the scope (tag filter, e.g. @interop)
 export CYPRESS_INCLUDE_TAGS="${MTA_TESTS_UI_SCOPE:-@interop}"
 
-# Run only tier files for the scope when findTierFiles.mjs exists (image is built from cypress context).
+# Run only tier files for the scope when findTierFiles.mjs exists (image uses repo root context; cwd is cypress workspace).
 typeset cypress_spec="${CYPRESS_SPEC:-}"
 if [ -f "scripts/findTierFiles.mjs" ]; then
     cypress_spec="$(node scripts/findTierFiles.mjs "${MTA_TESTS_UI_SCOPE:-@interop}" || true)"

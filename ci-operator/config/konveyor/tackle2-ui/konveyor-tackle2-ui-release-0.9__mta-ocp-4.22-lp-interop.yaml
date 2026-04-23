@@ -1,0 +1,229 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: cypress/dockerfiles/interop/Dockerfile
+    to: mta-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 2Gi
+tests:
+- as: cr-mta-aws
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "mta-prepare-operator-catalog", "failure_type": "all", "classification": "Infrastructure Provisioning - OLM catalog", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
+              {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
+              {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","mta-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sshveta@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MTA
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      OCP_VERSION: "4.22"
+      OPERATORS: |
+        [
+            {"name": "mta-operator", "source": "mta-421-test-catalog", "channel": "stable-v8.0", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
+        ]
+      REPORTPORTAL_CMP: MTA-lp-interop
+      USER_TAGS: |
+        scenario mta
+    test:
+    - as: mta-prepare-operator-catalog
+      commands: |
+        set -euxo pipefail
+        shopt -s inherit_errexit
+        # RHBK / MTA deps may be missing from default catalog for this OCP minor; RHOI v4.21 is used per channel guidance.
+        CS_NAME=mta-421-test-catalog
+        CS_NS=openshift-marketplace
+        cat <<'APPLY' | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          annotations:
+            target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+          name: mta-421-test-catalog
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: registry.redhat.io/redhat/redhat-operator-index:v4.21
+          displayName: "RHOI v4.21 for MTA deps (e.g. RHBK) on OCP 4.22"
+          publisher: Red Hat
+          updateStrategy:
+            registryPoll:
+              interval: 10m
+          grpcPodConfig:
+            nodeSelector:
+              kubernetes.io/os: linux
+            priorityClassName: system-cluster-critical
+            securityContextConfig: restricted
+            tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/master
+              operator: Exists
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/control-plane
+              operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/unreachable
+              operator: Exists
+              tolerationSeconds: 120
+            - effect: NoExecute
+              key: node.kubernetes.io/not-ready
+              operator: Exists
+              tolerationSeconds: 120
+            memoryTarget: 4Gi
+        APPLY
+        : "mta-prepare-operator-catalog: polling connectionState + catalog pod (45m step timeout, ~30m loop max)"
+        for i in $(seq 1 180); do
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' || true)
+          : "poll i=${i} connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
+            : "catalog gRPC / pod ready"
+            exit 0
+          fi
+          sleep 10
+        done
+        oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o yaml || true
+        oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o wide || true
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 45m0s
+    - ref: install-operators
+    - ref: mta-deploy-tackle
+    - ref: mta-tests-ui
+    workflow: firewatch-ipi-aws-cr
+- as: mta-aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "mta-prepare-operator-catalog", "failure_type": "all", "classification": "Infrastructure Provisioning - OLM catalog", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
+              {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests","test-initialization"]},
+              {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","mta-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sshveta@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MTA
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+            {"name": "mta-operator", "source": "mta-421-test-catalog", "channel": "stable-v8.0", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
+        ]
+      USER_TAGS: |
+        scenario mta
+    test:
+    - as: mta-prepare-operator-catalog
+      commands: |
+        set -euxo pipefail
+        shopt -s inherit_errexit
+        CS_NAME=mta-421-test-catalog
+        CS_NS=openshift-marketplace
+        cat <<'APPLY' | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          annotations:
+            target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+          name: mta-421-test-catalog
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: registry.redhat.io/redhat/redhat-operator-index:v4.21
+          displayName: "RHOI v4.21 for MTA deps (e.g. RHBK) on OCP 4.22"
+          publisher: Red Hat
+          updateStrategy:
+            registryPoll:
+              interval: 10m
+          grpcPodConfig:
+            nodeSelector:
+              kubernetes.io/os: linux
+            priorityClassName: system-cluster-critical
+            securityContextConfig: restricted
+            tolerations:
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/master
+              operator: Exists
+            - effect: NoSchedule
+              key: node-role.kubernetes.io/control-plane
+              operator: Exists
+            - effect: NoExecute
+              key: node.kubernetes.io/unreachable
+              operator: Exists
+              tolerationSeconds: 120
+            - effect: NoExecute
+              key: node.kubernetes.io/not-ready
+              operator: Exists
+              tolerationSeconds: 120
+            memoryTarget: 4Gi
+        APPLY
+        : "mta-prepare-operator-catalog: polling connectionState + catalog pod (45m step timeout, ~30m loop max)"
+        for i in $(seq 1 180); do
+          state=$(oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' || true)
+          pod_ready=$(oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o jsonpath='{.items[0].status.containerStatuses[0].ready}' || true)
+          : "poll i=${i} connectionState=${state:-unknown} podContainerReady=${pod_ready:-n/a}"
+          if [[ "${state}" == "READY" ]] || [[ "${pod_ready}" == "true" ]]; then
+            : "catalog gRPC / pod ready"
+            exit 0
+          fi
+          sleep 10
+        done
+        oc get "catalogsources/${CS_NAME}" -n "${CS_NS}" -o yaml || true
+        oc get pods -n "${CS_NS}" -l "olm.catalogSource=${CS_NAME}" -o wide || true
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 45m0s
+    - ref: install-operators
+    - ref: mta-deploy-tackle
+    - ref: mta-tests-ui
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: release-0.9
+  org: konveyor
+  repo: tackle2-ui
+  variant: mta-ocp-4.22-lp-interop
