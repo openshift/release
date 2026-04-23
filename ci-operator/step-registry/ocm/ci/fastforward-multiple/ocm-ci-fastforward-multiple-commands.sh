@@ -618,37 +618,70 @@ fastforward_repo() {
       if [[ "${is_protected}" == "true" ]]; then
         # For protected branches, create PR instead of direct push
         local pr_branch
-        pr_branch="ff-${dest_branch}-$(date +%s)"
-        log "INFO Branch is protected, creating PR branch ${pr_branch}"
+        pr_branch="ff-${dest_branch}"
+        log "INFO Branch is protected, using PR workflow with branch ${pr_branch}"
 
-        if ! git checkout -b "${pr_branch}" 2>&1; then
-          log "ERROR Could not create PR branch ${pr_branch}"
-          exit 1
+        # Check if PR branch already exists on remote
+        if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+          log "INFO PR branch ${pr_branch} exists, fetching and updating"
+          if ! git fetch origin "${pr_branch}" 2>&1; then
+            log "ERROR Could not fetch ${pr_branch}"
+            exit 1
+          fi
+          if ! git checkout "${pr_branch}" 2>&1; then
+            log "ERROR Could not checkout ${pr_branch}"
+            exit 1
+          fi
+          # Reset to current state (new dest branch)
+          if ! git reset --hard "${dest_branch}" 2>&1; then
+            log "ERROR Could not reset to ${dest_branch}"
+            exit 1
+          fi
+        else
+          log "INFO Creating new PR branch ${pr_branch}"
+          if ! git checkout -b "${pr_branch}" 2>&1; then
+            log "ERROR Could not create PR branch ${pr_branch}"
+            exit 1
+          fi
         fi
 
-        log "INFO Pushing PR branch ${pr_branch} to origin"
-        if ! git push -u origin "${pr_branch}" 2>&1; then
-          log "ERROR Could not push PR branch ${pr_branch}"
-          exit 1
+        # Push to origin (force if exists, normal if new)
+        if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+          log "INFO Force pushing PR branch ${pr_branch} to origin"
+          if ! git push --force origin "${pr_branch}" 2>&1; then
+            log "ERROR Could not force push PR branch ${pr_branch}"
+            exit 1
+          fi
+        else
+          log "INFO Pushing PR branch ${pr_branch} to origin"
+          if ! git push -u origin "${pr_branch}" 2>&1; then
+            log "ERROR Could not push PR branch ${pr_branch}"
+            exit 1
+          fi
         fi
 
-        # Create PR using gh CLI
+        # Create PR using gh CLI (only if doesn't exist)
         if command -v gh >/dev/null 2>&1; then
           export GH_TOKEN="${token}"
 
-          log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
-          local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
-          local pr_body="This PR fast-forwards \`${source_branch}\` to create the new branch \`${dest_branch}\`.
+          # Check if PR already exists
+          if gh pr list --head "${pr_branch}" --base "${dest_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+            log "INFO PR already exists for ${pr_branch} -> ${dest_branch}, updated via force push"
+          else
+            log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
+            local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
+            local pr_body="This PR fast-forwards \`${source_branch}\` to create the new branch \`${dest_branch}\`.
 
 /cc @stolostron/acm-cicd"
 
-          if ! gh pr create \
-            --title "${pr_title}" \
-            --body "${pr_body}" \
-            --base "${dest_branch}" \
-            --head "${pr_branch}" 2>&1; then
-            log "WARNING PR creation failed, branch pushed but PR not created"
-            log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+            if ! gh pr create \
+              --title "${pr_title}" \
+              --body "${pr_body}" \
+              --base "${dest_branch}" \
+              --head "${pr_branch}" 2>&1; then
+              log "WARNING PR creation failed, branch pushed but PR not created"
+              log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+            fi
           fi
         else
           log "WARNING gh CLI not available, branch pushed but PR not created"
@@ -679,37 +712,70 @@ fastforward_repo() {
     if [[ "${is_protected}" == "true" ]]; then
       # For protected branches, create PR instead of direct push
       local pr_branch
-      pr_branch="ff-${dest_branch}-$(date +%s)"
-      log "INFO Branch is protected, creating PR branch ${pr_branch}"
+      pr_branch="ff-${dest_branch}"
+      log "INFO Branch is protected, using PR workflow with branch ${pr_branch}"
 
-      if ! git checkout -b "${pr_branch}" 2>&1; then
-        log "ERROR Could not create PR branch ${pr_branch}"
-        exit 1
+      # Check if PR branch already exists on remote
+      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+        log "INFO PR branch ${pr_branch} exists, fetching and updating"
+        if ! git fetch origin "${pr_branch}" 2>&1; then
+          log "ERROR Could not fetch ${pr_branch}"
+          exit 1
+        fi
+        if ! git checkout "${pr_branch}" 2>&1; then
+          log "ERROR Could not checkout ${pr_branch}"
+          exit 1
+        fi
+        # Reset to current state (updated dest branch)
+        if ! git reset --hard "${dest_branch}" 2>&1; then
+          log "ERROR Could not reset to ${dest_branch}"
+          exit 1
+        fi
+      else
+        log "INFO Creating new PR branch ${pr_branch}"
+        if ! git checkout -b "${pr_branch}" 2>&1; then
+          log "ERROR Could not create PR branch ${pr_branch}"
+          exit 1
+        fi
       fi
 
-      log "INFO Pushing PR branch ${pr_branch} to origin"
-      if ! git push -u origin "${pr_branch}" 2>&1; then
-        log "ERROR Could not push PR branch ${pr_branch}"
-        exit 1
+      # Push to origin (force if exists, normal if new)
+      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+        log "INFO Force pushing PR branch ${pr_branch} to origin"
+        if ! git push --force origin "${pr_branch}" 2>&1; then
+          log "ERROR Could not force push PR branch ${pr_branch}"
+          exit 1
+        fi
+      else
+        log "INFO Pushing PR branch ${pr_branch} to origin"
+        if ! git push -u origin "${pr_branch}" 2>&1; then
+          log "ERROR Could not push PR branch ${pr_branch}"
+          exit 1
+        fi
       fi
 
-      # Create PR using gh CLI
+      # Create PR using gh CLI (only if doesn't exist)
       if command -v gh >/dev/null 2>&1; then
         export GH_TOKEN="${token}"
 
-        log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
-        local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
-        local pr_body="This PR fast-forwards \`${source_branch}\` to \`${dest_branch}\`.
+        # Check if PR already exists
+        if gh pr list --head "${pr_branch}" --base "${dest_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+          log "INFO PR already exists for ${pr_branch} -> ${dest_branch}, updated via force push"
+        else
+          log "INFO Creating PR: ${pr_branch} -> ${dest_branch}"
+          local pr_title="Fast-forward ${source_branch} to ${dest_branch}"
+          local pr_body="This PR fast-forwards \`${source_branch}\` to \`${dest_branch}\`.
 
 /cc @stolostron/acm-cicd"
 
-        if ! gh pr create \
-          --title "${pr_title}" \
-          --body "${pr_body}" \
-          --base "${dest_branch}" \
-          --head "${pr_branch}" 2>&1; then
-          log "WARNING PR creation failed, branch pushed but PR not created"
-          log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+          if ! gh pr create \
+            --title "${pr_title}" \
+            --body "${pr_body}" \
+            --base "${dest_branch}" \
+            --head "${pr_branch}" 2>&1; then
+            log "WARNING PR creation failed, branch pushed but PR not created"
+            log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${dest_branch}...${pr_branch}"
+          fi
         fi
       else
         log "WARNING gh CLI not available, branch pushed but PR not created"
