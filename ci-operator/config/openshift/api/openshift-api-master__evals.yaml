@@ -1,0 +1,32 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: eval
+  optional: true
+  steps:
+    env:
+      EVAL_GOLDEN_MODEL: sonnet
+      EVAL_INTEGRATION_MODEL: opus
+      EVAL_JUDGE_MODEL: haiku
+      EVAL_RUNS: "3"
+    test:
+    - ref: openshift-api-eval
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: api
+  variant: evals
