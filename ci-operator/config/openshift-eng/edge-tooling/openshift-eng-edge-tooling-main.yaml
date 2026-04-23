@@ -1,3 +1,8 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -14,11 +19,27 @@ images:
             -o /usr/local/bin/gh-token && \
           echo "${GH_TOKEN_SHA}  /usr/local/bin/gh-token" | sha256sum -c - && \
           chmod +x /usr/local/bin/gh-token
-      RUN dnf install -y --nodocs jq python3 python3-pip && dnf clean all
       COPY . /opt/app-root/src/
       WORKDIR /opt/app-root/src/edge-tooling
     from: src
     to: edge-tooling
+  - dockerfile_literal: |
+      FROM pipeline:claude-ai-helpers
+      COPY gotoken/gh-token /usr/local/bin/gh-token
+      RUN chmod +x /usr/local/bin/gh-token
+      COPY repo/ /opt/app-root/src/edge-tooling
+      WORKDIR /opt/app-root/src/edge-tooling
+    from: claude-ai-helpers
+    inputs:
+      edge-tooling:
+        paths:
+        - destination_dir: gotoken
+          source_path: /usr/local/bin/gh-token
+      src:
+        paths:
+        - destination_dir: repo
+          source_path: /go/src/github.com/openshift-eng/edge-tooling/.
+    to: edge-tooling-ai-helpers
 resources:
   '*':
     requests:
