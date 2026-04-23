@@ -413,8 +413,44 @@ create_tekton_files() {
       fi
     done
 
+    # Check if PR exists for branch (even if no new files)
+    local pr_title
+    pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
+    local pr_body
+    pr_body="This PR adds Tekton pipeline files for the following versions:
+$(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
+
+Generated from existing ${product_prefix}-${highest_version} templates.
+
+/cc @stolostron/acm-cicd"
+
+    local pr_exists=false
+    if command -v gh >/dev/null 2>&1; then
+      export GH_TOKEN="${token}"
+
+      log "INFO Checking if PR already exists for ${pr_branch}"
+      if gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+        pr_exists=true
+        log "INFO PR already exists for ${pr_branch}"
+      fi
+    fi
+
     if [[ "$files_created" == "false" ]]; then
       log "INFO No new files to create"
+
+      # Create PR if branch exists but no PR
+      if [[ "$pr_exists" == "false" ]] && command -v gh >/dev/null 2>&1; then
+        log "INFO Creating PR for existing branch"
+
+        if ! gh pr create \
+          --title "${pr_title}" \
+          --body "${pr_body}" \
+          --base "${default_branch}" \
+          --head "${pr_branch}" 2>&1; then
+          log "WARNING PR creation failed"
+        fi
+      fi
+
       exit 0
     fi
 
@@ -442,26 +478,9 @@ create_tekton_files() {
       fi
     fi
 
-    # Create PR using gh CLI (check if PR already exists)
-    local pr_title
-    pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
-    local pr_body
-    pr_body="This PR adds Tekton pipeline files for the following versions:
-$(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
-
-Generated from existing ${product_prefix}-${highest_version} templates.
-
-/cc @stolostron/acm-cicd"
-
+    # Create PR if needed
     if command -v gh >/dev/null 2>&1; then
-      export GH_TOKEN="${token}"
-
-      # Check if PR already exists for this branch
-      log "INFO Checking if PR already exists for ${pr_branch}"
-      if gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
-        log "INFO PR already exists for ${pr_branch}, skipping PR creation"
-        log "INFO Updated files pushed to existing PR"
-      else
+      if [[ "$pr_exists" == "false" ]]; then
         log "INFO Creating new PR"
         log "INFO PR title: ${pr_title}"
         log "INFO PR base: ${default_branch}"
@@ -475,6 +494,8 @@ Generated from existing ${product_prefix}-${highest_version} templates.
           log "WARNING: PR creation failed, branch pushed but PR not created"
           exit 1
         fi
+      else
+        log "INFO Updated files pushed to existing PR"
       fi
     else
       log "WARNING: gh CLI not available, branch pushed but PR not created"
