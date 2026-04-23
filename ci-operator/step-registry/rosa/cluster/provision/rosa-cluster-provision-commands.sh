@@ -259,6 +259,13 @@ fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
 
+# If account-roles-create fell back to a different version, use it. This overrides
+# release:latest resolution so the cluster version matches the account roles.
+if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
+  OPENSHIFT_VERSION=$(cat "${SHARED_DIR}/openshift_version")
+  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step (fallback)"
+fi
+
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
 # supplied by CI for the payload to use. This only really works for nightlies. ROSA
 # SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
