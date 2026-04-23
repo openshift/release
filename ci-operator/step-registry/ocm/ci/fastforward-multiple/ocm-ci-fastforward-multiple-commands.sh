@@ -151,7 +151,7 @@ is_branch_protected() {
 }
 
 # Find highest semantic version in Tekton files
-# Returns version number (e.g., "217", "50") or "main" if only -main- files exist
+# Returns version number (e.g., "217", "50", "5-0") or "main" if only -main- files exist
 get_highest_tekton_version() {
   local repo_dir=$1
   local product_prefix=$2  # "acm", "mce", or "globalhub"
@@ -162,18 +162,32 @@ get_highest_tekton_version() {
     return
   fi
 
-  local highest_compact=0
+  local highest_compact=""
   local highest_major=0
   local highest_minor=0
   local has_main_files=false
 
-  # First pass: look for versioned files (acm-X, mce-X)
+  # First pass: look for versioned files (acm-X, mce-X, globalhub-X-Y)
   for file in "${repo_dir}"/.tekton/*-${product_prefix}-*-*.yaml; do
     [[ -f "$file" ]] || continue
 
-    # Extract compact version like "217" from "acm-217" or "mce-217"
-    if [[ $(basename "$file") =~ ${product_prefix}-([0-9]+)- ]]; then
-      local ver_compact="${BASH_REMATCH[1]}"
+    # Extract compact version:
+    # - "50" from "acm-50-" or "mce-50-"
+    # - "5-0" from "globalhub-5-0-"
+    local ver_compact=""
+    if [[ "${product_prefix}" == "globalhub" ]]; then
+      # Match globalhub-5-0- pattern (hyphenated version)
+      if [[ $(basename "$file") =~ ${product_prefix}-([0-9]+-[0-9]+)- ]]; then
+        ver_compact="${BASH_REMATCH[1]}"
+      fi
+    else
+      # Match acm-50- or mce-50- pattern (compact version)
+      if [[ $(basename "$file") =~ ${product_prefix}-([0-9]+)- ]]; then
+        ver_compact="${BASH_REMATCH[1]}"
+      fi
+    fi
+
+    if [[ -n "$ver_compact" ]]; then
 
       # Extract semantic version from file content (e.g., "2.17" from "release-2.17")
       local semantic_version=""
@@ -192,16 +206,29 @@ get_highest_tekton_version() {
           highest_compact=$ver_compact
         fi
       else
-        # Fallback to numeric comparison if can't extract semantic version
-        if [[ $ver_compact -gt $highest_compact ]]; then
-          highest_compact=$ver_compact
+        # Fallback to comparison if can't extract semantic version
+        if [[ "${product_prefix}" == "globalhub" ]]; then
+          # For globalhub, convert hyphenated version to comparable number
+          # 5-0 -> 50, 5-1 -> 51 for comparison
+          local ver_num="${ver_compact//-/}"
+          local highest_num="${highest_compact//-/}"
+          highest_num="${highest_num:-0}"  # Default to 0 if empty
+          if [[ $ver_num -gt $highest_num ]]; then
+            highest_compact=$ver_compact
+          fi
+        else
+          # Numeric comparison for acm/mce compact versions
+          local curr_highest="${highest_compact:-0}"
+          if [[ $ver_compact -gt $curr_highest ]]; then
+            highest_compact=$ver_compact
+          fi
         fi
       fi
     fi
   done
 
   # If versioned files found, return highest
-  if [[ $highest_compact -gt 0 ]]; then
+  if [[ -n "$highest_compact" ]]; then
     echo "$highest_compact"
     return
   fi
@@ -408,8 +435,13 @@ create_tekton_files() {
 
     # For each destination version
     for dest_version in ${dest_versions}; do
-      # Convert 5.0 -> 50, 5.1 -> 51
-      local dest_ver_compact="${dest_version//./}"
+      # Convert version: ACM/MCE: 5.0 -> 50, Global Hub: 5.0 -> 5-0
+      local dest_ver_compact
+      if [[ "${product}" == "globalhub" ]]; then
+        dest_ver_compact="${dest_version//./-}"  # 5.0 -> 5-0
+      else
+        dest_ver_compact="${dest_version//./}"   # 5.0 -> 50
+      fi
 
       # Check if files already exist
       if compgen -G ".tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml" >/dev/null; then
