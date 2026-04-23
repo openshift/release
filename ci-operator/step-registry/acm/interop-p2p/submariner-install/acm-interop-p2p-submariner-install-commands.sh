@@ -237,12 +237,14 @@ DeployBroker() {
         echo "[INFO] Globalnet enabled (overlapping CIDR support)"
     fi
 
+    # Run in a subshell with cwd=/tmp so broker-info.subm lands in /tmp.
+    # --output-dir was removed in recent subctl releases; the file is always
+    # written to the current working directory.
     # shellcheck disable=SC2086
-    "${subctlBin}" deploy-broker \
+    ( cd /tmp && "${subctlBin}" deploy-broker \
         --kubeconfig "${KUBECONFIG}" \
         --namespace "${SUBMARINER_BROKER_NAMESPACE:-submariner-k8s-broker}" \
-        ${globalnetFlag} \
-        --output-dir /tmp
+        ${globalnetFlag} )
 
     if [[ ! -f "${brokerInfoFile}" ]]; then
         echo "[ERROR] broker-info.subm not found after deploy-broker at ${brokerInfoFile}" >&2
