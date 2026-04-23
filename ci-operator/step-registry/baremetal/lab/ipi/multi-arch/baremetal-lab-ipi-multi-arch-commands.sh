@@ -52,9 +52,12 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     bmhlist+=("${name}")
     if check_prov_vmedia; then
       prov_address="${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-    else
+    elif [[ "${name}" == *-a-01* ]]; then
       prov_address="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+    else
+      prov_address="redfish+https://${bmc_address}${bmc_base_uri}"
     fi
+
     cat > "${DIR}/${name}.yaml" <<EOF
 ---
 apiVersion: v1
