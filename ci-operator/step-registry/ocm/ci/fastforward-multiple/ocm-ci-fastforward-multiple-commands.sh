@@ -264,7 +264,27 @@ create_tekton_files() {
 
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
-    git checkout -b "${pr_branch}" 2>&1
+
+    # Check if PR branch already exists on remote
+    log "INFO Checking if PR branch ${pr_branch} exists on remote"
+    if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+      log "INFO PR branch ${pr_branch} already exists on remote"
+      log "INFO Fetching and checking out existing branch"
+      if ! git fetch origin "${pr_branch}" 2>&1; then
+        log "ERROR Could not fetch ${pr_branch}"
+        exit 1
+      fi
+      if ! git checkout "${pr_branch}" 2>&1; then
+        log "ERROR Could not checkout ${pr_branch}"
+        exit 1
+      fi
+    else
+      log "INFO Creating new PR branch ${pr_branch}"
+      if ! git checkout -b "${pr_branch}" 2>&1; then
+        log "ERROR Could not create branch ${pr_branch}"
+        exit 1
+      fi
+    fi
 
     local files_created=false
 
@@ -337,14 +357,23 @@ create_tekton_files() {
     log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
     git commit -m "Add Tekton files for versions: ${dest_versions}" 2>&1
 
-    # Push branch
+    # Push branch (use -u only if new branch)
     log "INFO Pushing ${pr_branch} to origin"
-    if ! git push -u origin "${pr_branch}" 2>&1; then
-      log "ERROR Could not push ${pr_branch}"
-      exit 1
+    if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+      # Branch exists, just push
+      if ! git push 2>&1; then
+        log "ERROR Could not push ${pr_branch}"
+        exit 1
+      fi
+    else
+      # New branch, set upstream
+      if ! git push -u origin "${pr_branch}" 2>&1; then
+        log "ERROR Could not push ${pr_branch}"
+        exit 1
+      fi
     fi
 
-    # Create PR using gh CLI
+    # Create PR using gh CLI (check if PR already exists)
     local pr_title
     pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
     local pr_body
@@ -355,20 +384,28 @@ Generated from existing ${product_prefix}-${highest_version} templates.
 
 /cc @stolostron/acm-cicd"
 
-    log "INFO Creating PR"
-    log "INFO PR title: ${pr_title}"
-    log "INFO PR base: ${default_branch}"
-    log "INFO PR head: ${pr_branch}"
-
     if command -v gh >/dev/null 2>&1; then
       export GH_TOKEN="${token}"
-      if ! gh pr create \
-        --title "${pr_title}" \
-        --body "${pr_body}" \
-        --base "${default_branch}" \
-        --head "${pr_branch}" 2>&1; then
-        log "WARNING: PR creation failed, branch pushed but PR not created"
-        exit 1
+
+      # Check if PR already exists for this branch
+      log "INFO Checking if PR already exists for ${pr_branch}"
+      if gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+        log "INFO PR already exists for ${pr_branch}, skipping PR creation"
+        log "INFO Updated files pushed to existing PR"
+      else
+        log "INFO Creating new PR"
+        log "INFO PR title: ${pr_title}"
+        log "INFO PR base: ${default_branch}"
+        log "INFO PR head: ${pr_branch}"
+
+        if ! gh pr create \
+          --title "${pr_title}" \
+          --body "${pr_body}" \
+          --base "${default_branch}" \
+          --head "${pr_branch}" 2>&1; then
+          log "WARNING: PR creation failed, branch pushed but PR not created"
+          exit 1
+        fi
       fi
     else
       log "WARNING: gh CLI not available, branch pushed but PR not created"
