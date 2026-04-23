@@ -5,6 +5,46 @@ shopt -s extglob
 
 exit_code=0
 
+# Install gh CLI if not available
+install_gh_cli() {
+  if command -v gh >/dev/null 2>&1; then
+    echo "INFO: gh CLI already available"
+    return 0
+  fi
+
+  echo "INFO: Installing gh CLI"
+  local gh_version="2.62.0"
+  local gh_tarball="gh_${gh_version}_linux_amd64.tar.gz"
+  local gh_url="https://github.com/cli/cli/releases/download/v${gh_version}/${gh_tarball}"
+
+  if ! curl -sL "${gh_url}" -o "/tmp/${gh_tarball}"; then
+    echo "WARNING: Could not download gh CLI"
+    return 1
+  fi
+
+  if ! tar -xzf "/tmp/${gh_tarball}" -C /tmp; then
+    echo "WARNING: Could not extract gh CLI"
+    return 1
+  fi
+
+  if ! mv "/tmp/gh_${gh_version}_linux_amd64/bin/gh" /tmp/gh; then
+    echo "WARNING: Could not move gh binary"
+    return 1
+  fi
+
+  chmod +x /tmp/gh
+  export PATH="/tmp:${PATH}"
+
+  if command -v gh >/dev/null 2>&1; then
+    echo "INFO: gh CLI installed successfully"
+    gh --version
+    return 0
+  else
+    echo "WARNING: gh CLI installation failed"
+    return 1
+  fi
+}
+
 # Get default branch for a repo
 get_default_branch() {
   local owner=$1
@@ -506,6 +546,9 @@ fastforward_repo() {
 
   return $result
 }
+
+# Install gh CLI for PR creation
+install_gh_cli
 
 echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
