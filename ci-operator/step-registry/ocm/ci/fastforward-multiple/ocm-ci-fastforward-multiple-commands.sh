@@ -460,7 +460,7 @@ Generated from existing ${product_prefix}-${highest_version} templates.
     git config user.email "noreply@openshift.io"
 
     log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
-    git commit -m "Add Tekton files for versions: ${dest_versions}" 2>&1
+    git commit -s -m "Add Tekton files for versions: ${dest_versions}" 2>&1
 
     # Push branch (use -u only if new branch)
     log "INFO Pushing ${pr_branch} to origin"
