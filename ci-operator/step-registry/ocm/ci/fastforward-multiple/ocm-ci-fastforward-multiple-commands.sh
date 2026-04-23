@@ -176,9 +176,9 @@ create_tekton_files() {
     return 1
   }
 
-  echo "INFO [DRY-RUN] Starting Tekton file creation for ${owner}/${repo}"
-  echo "INFO [DRY-RUN] default_branch=${default_branch}, dest_versions=${dest_versions}"
-  echo "INFO [DRY-RUN] log_file=${log_file}"
+  echo "INFO Starting Tekton file creation for ${owner}/${repo}"
+  echo "INFO default_branch=${default_branch}, dest_versions=${dest_versions}"
+  echo "INFO log_file=${log_file}"
 
   (
     cd "$ocm_dir" || exit 1
@@ -190,7 +190,7 @@ create_tekton_files() {
       echo "$ts" "$@"
     }
 
-    log "INFO [DRY-RUN] Inside subshell"
+    log "INFO Inside subshell"
     log "INFO Cloning ${default_branch} branch"
     if ! git clone -b "${default_branch}" "$repo_url" 2>&1; then
       log "ERROR Could not clone ${default_branch} branch"
@@ -299,9 +299,9 @@ create_tekton_files() {
               -e "s/target_branch == \"main\"/target_branch == \"main\" || target_branch == \"${dest_branch}\"/g" \
               "$template_file" > "$new_file"
 
-          # DRY-RUN: git add "$new_file"
+          git add "$new_file"
           files_created=true
-          log "INFO [DRY-RUN] Would create $(basename "$new_file")"
+          log "INFO Created $(basename "$new_file")"
         done
       else
         log "INFO Creating ${product_prefix}-${dest_ver_compact} files from ${product_prefix}-${highest_version}"
@@ -317,9 +317,9 @@ create_tekton_files() {
               -e "s/${branch_prefix}-${source_version}/${dest_branch}/g" \
               "$template_file" > "$new_file"
 
-          # DRY-RUN: git add "$new_file"
+          git add "$new_file"
           files_created=true
-          log "INFO [DRY-RUN] Would create $(basename "$new_file")"
+          log "INFO Created $(basename "$new_file")"
         done
       fi
     done
@@ -329,22 +329,22 @@ create_tekton_files() {
       exit 0
     fi
 
-    # DRY-RUN: Commit changes
-    log "INFO [DRY-RUN] Would configure git user"
-    log "INFO [DRY-RUN] Would commit: Add Tekton files for versions: ${dest_versions}"
-    # git config user.name "OpenShift CI Robot"
-    # git config user.email "noreply@openshift.io"
-    # git commit -m "Add Tekton files for versions: ${dest_versions}" 2>&1
+    # Commit changes
+    log "INFO Configuring git user"
+    git config user.name "OpenShift CI Robot"
+    git config user.email "noreply@openshift.io"
 
-    # DRY-RUN: Push branch
-    log "INFO [DRY-RUN] Would push ${pr_branch} to origin"
-    # if ! git push -u origin "${pr_branch}" 2>&1; then
-    #   log "ERROR Could not push ${pr_branch}"
-    #   exit 1
-    # fi
+    log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
+    git commit -m "Add Tekton files for versions: ${dest_versions}" 2>&1
 
-    # DRY-RUN: Create PR using gh CLI
-    log "INFO [DRY-RUN] Would create PR"
+    # Push branch
+    log "INFO Pushing ${pr_branch} to origin"
+    if ! git push -u origin "${pr_branch}" 2>&1; then
+      log "ERROR Could not push ${pr_branch}"
+      exit 1
+    fi
+
+    # Create PR using gh CLI
     local pr_title
     pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
     local pr_body
@@ -355,26 +355,26 @@ Generated from existing ${product_prefix}-${highest_version} templates.
 
 /cc @stolostron/acm-cicd"
 
-    log "INFO [DRY-RUN] PR title: ${pr_title}"
-    log "INFO [DRY-RUN] PR body: ${pr_body}"
-    log "INFO [DRY-RUN] PR base: ${default_branch}"
-    log "INFO [DRY-RUN] PR head: ${pr_branch}"
+    log "INFO Creating PR"
+    log "INFO PR title: ${pr_title}"
+    log "INFO PR base: ${default_branch}"
+    log "INFO PR head: ${pr_branch}"
 
-    # if command -v gh >/dev/null 2>&1; then
-    #   export GH_TOKEN="${token}"
-    #   if ! gh pr create \
-    #     --title "${pr_title}" \
-    #     --body "${pr_body}" \
-    #     --base "${default_branch}" \
-    #     --head "${pr_branch}" 2>&1; then
-    #     log "WARNING: PR creation failed, branch pushed but PR not created"
-    #     exit 1
-    #   fi
-    # else
-    #   log "WARNING: gh CLI not available, branch pushed but PR not created"
-    #   log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${default_branch}...${pr_branch}"
-    #   exit 1
-    # fi
+    if command -v gh >/dev/null 2>&1; then
+      export GH_TOKEN="${token}"
+      if ! gh pr create \
+        --title "${pr_title}" \
+        --body "${pr_body}" \
+        --base "${default_branch}" \
+        --head "${pr_branch}" 2>&1; then
+        log "WARNING: PR creation failed, branch pushed but PR not created"
+        exit 1
+      fi
+    else
+      log "WARNING: gh CLI not available, branch pushed but PR not created"
+      log "INFO Create PR manually: https://github.com/${owner}/${repo}/compare/${default_branch}...${pr_branch}"
+      exit 1
+    fi
 
     log "INFO Tekton file creation complete"
   )
@@ -434,13 +434,13 @@ fastforward_repo() {
         exit 1
       fi
 
-      log "INFO [DRY-RUN] Would push DESTINATION_BRANCH to origin"
-      # if ! git push -u origin "$dest_branch" 2>&1; then
-      #   log "ERROR Could not push to origin DESTINATION_BRANCH"
-      #   exit 1
-      # fi
+      log "INFO Pushing DESTINATION_BRANCH to origin"
+      if ! git push -u origin "$dest_branch" 2>&1; then
+        log "ERROR Could not push to origin DESTINATION_BRANCH"
+        exit 1
+      fi
 
-      log "INFO [DRY-RUN] Fast forward complete"
+      log "INFO Fast forward complete"
       exit 0
     fi
 
@@ -453,13 +453,13 @@ fastforward_repo() {
       exit 1
     fi
 
-    log "INFO [DRY-RUN] Would push to origin/DESTINATION_BRANCH"
-    # if ! git push 2>&1; then
-    #   log "ERROR Could not push to DESTINATION_BRANCH"
-    #   exit 1
-    # fi
+    log "INFO Pushing to origin/DESTINATION_BRANCH"
+    if ! git push 2>&1; then
+      log "ERROR Could not push to DESTINATION_BRANCH"
+      exit 1
+    fi
 
-    log "INFO [DRY-RUN] Fast forward complete"
+    log "INFO Fast forward complete"
   ) >"${log_file}" 2>&1
 
   local result=$?
