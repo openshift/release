@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -59,10 +58,27 @@ else
 fi
 
 # MIRROR IMAGES
-oc adm release -a "${new_pull_secret}" mirror ${mirror_options} \
- --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
- --to=${target_release_image_repo} \
- --to-release-image=${target_release_image} | tee "${mirror_output}"
+MAX_ATTEMPTS=5
+ATTEMPT=0
+SUCCESS=false
+while [[ "${SUCCESS}" == "false" ]] && (( ATTEMPT++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
+  if oc adm release -a "${new_pull_secret}" mirror ${mirror_options} \
+   --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
+   --to=${target_release_image_repo} \
+   --to-release-image=${target_release_image} | tee "${mirror_output}"; then
+    echo "Mirroring images succeeded on attempt ${ATTEMPT}"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt ${ATTEMPT} failed, retrying in 120s..."
+    sleep 120
+  fi
+done
+
+if [[ "${SUCCESS}" == "false" ]]; then
+  echo "Mirroring images failed after ${MAX_ATTEMPTS} attempts"
+  exit 1
+fi
 
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
