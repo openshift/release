@@ -45,13 +45,12 @@ fi
 
 echo "Working directory: ${PWD}"
 
+# Presubmit/rehearse jobs set PULL_NUMBER; omit PROW_JOB_URL so the notifier does not
+# surface a deck link (noise). Periodics and other non-PR jobs get a logs URL.
 job_base="https://prow.ci.openshift.org/view/gs/test-platform-results"
-if [[ -n "${PULL_NUMBER:-}" ]]; then
-  PROW_JOB_URL="${job_base}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-else
-  PROW_JOB_URL="${job_base}/logs/${JOB_NAME}/${BUILD_ID}"
+if [[ -z "${PULL_NUMBER:-}" ]]; then
+  export PROW_JOB_URL="${job_base}/logs/${JOB_NAME}/${BUILD_ID}"
 fi
-export PROW_JOB_URL
 
 GH_NOTIFIER_INVOKE="${GH_NOTIFIER_INVOKE:-python3 gh-notifier/gh-notifier.py}"
 bash -c "set -euo pipefail; ${GH_NOTIFIER_INVOKE}"
