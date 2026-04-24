@@ -47,7 +47,7 @@ scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.en
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
-  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" << 'EOF'
+  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" "${MANUALLY_RESERVED_NODES}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -62,6 +62,7 @@ JOB_URL="${6}"
 ADDITIONAL_WORKERS="${7}"
 ADDITIONAL_WORKER_ARCHITECTURE="${8}"
 VENDOR="${9:-}"
+MANUALLY_RESERVED_NODES="${10:-}"
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
 # shellcheck disable=SC2174
@@ -73,7 +74,7 @@ systemd-cat -t "${BUILD_ID}" -p7 cat /var/builds/${BUILD_ID}/prow.env
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
 N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
-  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" VENDOR="${VENDOR}" /usr/bin/reserve-hosts.sh
+  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" VENDOR="${VENDOR}" MANUALLY_RESERVED_NODES="${MANUALLY_RESERVED_NODES}" /opt/html/bmanzari/reserve-hosts.sh
 # If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
   N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 REQUEST_BOOTSTRAP_HOST=false \

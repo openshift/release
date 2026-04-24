@@ -1,12 +1,14 @@
 #!/bin/bash
 
-set -o errtrace
-set -o errexit
-set -o pipefail
 set -o nounset
 
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
+
+if [ "${PATCH_ISO:-true}" = "false" ]; then
+    echo "Skipping OVE ISO patching"
+    exit 0
+fi
 
 yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 

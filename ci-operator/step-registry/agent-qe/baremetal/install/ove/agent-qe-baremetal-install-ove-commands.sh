@@ -71,3 +71,5 @@ if [ -f /tmp/virtual_media_mount_failed ]; then
   echo "Failed to mount the ISO image in one or more hosts"
   exit 1
 fi
+
+cp /var/run/idrac-vnc-password/idrac-vnc-password "${SHARED_DIR}/"
