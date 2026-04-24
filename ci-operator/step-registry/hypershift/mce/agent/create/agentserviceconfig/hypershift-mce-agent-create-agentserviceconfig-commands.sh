@@ -91,6 +91,12 @@ spec:
   - mirrors:
     - ${mirror}/rhel9/postgresql-13
     source: registry.redhat.io/rhel9/postgresql-13
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-15
+    source: registry.redhat.io/rhel9/postgresql-15
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-16
+    source: registry.redhat.io/rhel9/postgresql-16
 END
 }
 
