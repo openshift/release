@@ -1,12 +1,11 @@
 presubmits:
-  openshift-priv/cluster-api-provider-libvirt:
+  openshift-priv/downstream-ptp-operator-monorepo:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
-    context: ci/prow/actuator-pkg-staleness
+    - ^release-4\.14$
+    - ^release-4\.14-
+    context: ci/prow/ci-index
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -16,10 +15,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-actuator-pkg-staleness
-    optional: true
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
-    rerun_command: /test actuator-pkg-staleness
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-ci-index
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
+    rerun_command: /test ci-index
     spec:
       containers:
       - args:
@@ -27,20 +25,12 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=actuator-pkg-staleness
+        - --target=ci-index
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
@@ -71,14 +61,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )actuator-pkg-staleness,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build04
-    context: ci/prow/e2e-libvirt
+    - ^release-4\.14$
+    - ^release-4\.14-
+    context: ci/prow/e2e-aws-cep
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -86,24 +75,22 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-e2e-libvirt
-    optional: true
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
-    rerun_command: /test e2e-libvirt
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-e2e-aws-cep
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
+    rerun_command: /test e2e-aws-cep
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-libvirt
+        - --target=e2e-aws-cep
         command:
         - ci-operator
         env:
@@ -133,6 +120,9 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -153,6 +143,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -162,13 +155,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-libvirt,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-cep,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
+    - ^release-4\.14$
+    - ^release-4\.14-
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -179,8 +171,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-gofmt
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-gofmt
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
     rerun_command: /test gofmt
     spec:
       containers:
@@ -237,80 +229,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
-    context: ci/prow/golint
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-golint
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
-    rerun_command: /test golint
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=golint
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )golint,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
+    - ^release-4\.14$
+    - ^release-4\.14-
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -321,8 +241,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-govet
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-govet
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
     rerun_command: /test govet
     spec:
       containers:
@@ -379,9 +299,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
+    - ^release-4\.14$
+    - ^release-4\.14-
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -392,8 +311,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-images
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-images
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
     rerun_command: /test images
     spec:
       containers:
@@ -442,10 +361,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
-    context: ci/prow/unit
+    - ^release-4\.14$
+    - ^release-4\.14-
+    context: ci/prow/operator-e2e
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -453,82 +371,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-unit
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
-    rerun_command: /test unit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build08
-    context: ci/prow/verify-deps
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-libvirt-release-4.20-verify-deps
-    path_alias: github.com/openshift/cluster-api-provider-libvirt
-    rerun_command: /test verify-deps
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-operator-e2e
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
+    rerun_command: /test operator-e2e
     spec:
       containers:
       - args:
@@ -538,7 +387,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=verify-deps
+        - --target=operator-e2e
         command:
         - ci-operator
         env:
@@ -597,4 +446,93 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
+    trigger: (?m)^/test( | .* )operator-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    context: ci/prow/security
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-downstream-ptp-operator-monorepo-release-4.14-security
+    optional: true
+    path_alias: github.com/redhat-cne/downstream-ptp-operator-monorepo
+    rerun_command: /test security
+    skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=security
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
