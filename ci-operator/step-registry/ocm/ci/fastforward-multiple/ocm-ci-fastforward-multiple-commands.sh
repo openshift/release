@@ -8,10 +8,13 @@ exit_code=0
 # Track failures for summary report
 declare -a FAILED_FASTFORWARDS
 declare -a FAILED_TEKTON
+declare -a SKIPPED_NO_ACCESS
 TOTAL_FASTFORWARDS=0
 SUCCESSFUL_FASTFORWARDS=0
 TOTAL_TEKTON=0
 SUCCESSFUL_TEKTON=0
+TOTAL_REPOS=0
+PROCESSED_REPOS=0
 
 # Install gh CLI if not available
 install_gh_cli() {
@@ -859,12 +862,16 @@ for product in mce acm globalhub; do
     fi
 
     echo "INFO: Handling ${owner_repo}"
+    TOTAL_REPOS=$((TOTAL_REPOS + 1))
 
     # Check if we have push access to repo
     if ! can_push_to_repo "${owner}" "${repo}"; then
+      SKIPPED_NO_ACCESS+=("${owner_repo}")
       echo "INFO: Skipping ${owner_repo} (no write access - likely fork/external repo)"
       continue
     fi
+
+    PROCESSED_REPOS=$((PROCESSED_REPOS + 1))
 
     branch_prefix="release"
     if [[ ${product} == "mce" ]]; then
@@ -977,12 +984,16 @@ for product in mce acm globalhub; do
     fi
 
     echo "INFO: Handling excluded repo ${owner_repo}"
+    TOTAL_REPOS=$((TOTAL_REPOS + 1))
 
     # Check if we have push access to repo
     if ! can_push_to_repo "${owner}" "${repo}"; then
+      SKIPPED_NO_ACCESS+=("${owner_repo}")
       echo "INFO: Skipping ${owner_repo} (no write access - likely fork/external repo)"
       continue
     fi
+
+    PROCESSED_REPOS=$((PROCESSED_REPOS + 1))
 
     # Use natural branch prefix for product (release for ACM, backplane for MCE)
     # Exception: cluster-permission in ACM uses backplane (deprecated, moved to MCE)
@@ -1174,6 +1185,13 @@ echo "                    FAST-FORWARD WORKFLOW SUMMARY"
 echo "================================================================="
 echo ""
 
+# Repository summary
+echo "Repositories:"
+echo "  Total:        ${TOTAL_REPOS}"
+echo "  Processed:    ${PROCESSED_REPOS}"
+echo "  Skipped:      ${#SKIPPED_NO_ACCESS[@]}"
+echo ""
+
 # Fast-forward summary
 echo "Fast-Forward Operations:"
 echo "  Total:      ${TOTAL_FASTFORWARDS}"
@@ -1187,6 +1205,15 @@ echo "  Total:      ${TOTAL_TEKTON}"
 echo "  Successful: ${SUCCESSFUL_TEKTON}"
 echo "  Failed:     $((TOTAL_TEKTON - SUCCESSFUL_TEKTON))"
 echo ""
+
+# List skipped repos
+if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
+  echo "Skipped Repositories (No Write Access):"
+  for repo in "${SKIPPED_NO_ACCESS[@]}"; do
+    echo "  - ${repo}"
+  done
+  echo ""
+fi
 
 # List failures if any
 if [[ ${#FAILED_FASTFORWARDS[@]} -gt 0 ]]; then
