@@ -17,7 +17,7 @@ export TEST_TIMEOUT="${TEST_TIMEOUT:-6h}"
 # Function to check cluster health
 check_cluster_health() {
     echo "Checking cluster operator health..."
-    oc get co --no-headers | while read name version available progressing degraded since message; do
+    oc get co --no-headers | while read name _ available progressing degraded _ _; do
         if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
             echo "ERROR: Cluster operator $name is not healthy: available=$available, progressing=$progressing, degraded=$degraded"
             return 1
@@ -32,8 +32,10 @@ wait_for_nodes() {
     local timeout=$2
     echo "Waiting for $target_ready nodes to be ready (timeout: $timeout)"
     
-    local start_time=$(date +%s)
-    local timeout_seconds=$(echo "$timeout" | sed 's/h/*3600/g; s/m/*60/g; s/s//g' | bc)
+    local start_time
+    start_time=$(date +%s)
+    local timeout_seconds
+    timeout_seconds=$(echo "$timeout" | sed 's/h/*3600/g; s/m/*60/g; s/s//g' | bc)
     
     # Create node provisioning progress log
     echo "timestamp,elapsed_seconds,total_nodes,ready_nodes,notready_nodes,pending_nodes" > "$RESULTS_DIR/node-provisioning-progress.csv"
