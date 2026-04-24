@@ -41,11 +41,15 @@ wait_for_nodes() {
     echo "timestamp,elapsed_seconds,total_nodes,ready_nodes,notready_nodes,pending_nodes" > "$RESULTS_DIR/node-provisioning-progress.csv"
     
     while true; do
-        local ready_count=$(oc get nodes --no-headers | grep " Ready " | wc -l)
-        local notready_count=$(oc get nodes --no-headers | grep "NotReady" | wc -l)
-        local total_count=$(oc get nodes --no-headers | wc -l)
+        local ready_count
+        ready_count=$(oc get nodes --no-headers | grep " Ready " | wc -l)
+        local notready_count
+        notready_count=$(oc get nodes --no-headers | grep "NotReady" | wc -l)
+        local total_count
+        total_count=$(oc get nodes --no-headers | wc -l)
         local pending_count=$((target_ready + 10 - total_count))  # Estimate pending
-        local current_time=$(date +%s)
+        local current_time
+        current_time=$(date +%s)
         local elapsed=$((current_time - start_time))
         
         # Log progress to CSV
