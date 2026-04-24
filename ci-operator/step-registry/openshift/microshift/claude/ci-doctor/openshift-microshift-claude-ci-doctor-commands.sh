@@ -268,14 +268,6 @@ timeout 3600 claude \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
 
-# After the analysis, run automatic approval of rebase PRs with all tests passing
-echo "Running automatic approval of rebase PRs with all tests passing..."
-"${EXE_DIR}/prow-jobs-for-pull-requests.sh" \
-    --mode approve \
-    --execute \
-    --author 'microshift-rebase-script[bot]'
-echo "Automatic approval of rebase PRs with all tests passing completed"
-
 # After the analysis, attempt to restart failed rebase PRs tests. If the
 # restarted tests complete successfully, the PR will be automatically
 # approved next time the analysis runs.
