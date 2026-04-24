@@ -181,7 +181,7 @@ For EACH PR in the list above, do the following steps IN ORDER:
 3. **Run make verify**: Regenerate all necessary files
    - Run: `make verify 2>&1 | tee /tmp/make-verify-pr.log; VERIFY_EXIT=${PIPESTATUS[0]}`
    - If VERIFY_EXIT is non-zero, determine if gitlint is the ONLY failure by running:
-     `NON_GITLINT=$(grep 'make:.*\*\*\*' /tmp/make-verify-pr.log | grep -vi 'gitlint' || true)`
+     `NON_GITLINT=$(grep 'make:.*\*\*\*' /tmp/make-verify-pr.log | grep -viE 'gitlint|: verify\]' || true)`
    - If NON_GITLINT is empty: gitlint is the only failure, ignore it and continue
    - If NON_GITLINT is NOT empty: there are real failures. Record PR as failed with the NON_GITLINT output as reason, run `git reset --hard <saved_sha> && git clean -fd` to fully revert all changes, continue to next PR
 
@@ -440,7 +440,8 @@ VERIFY_LOG=$(mktemp /tmp/make-verify.XXXXXX)
 if ! make verify 2>&1 | tee "$VERIFY_LOG"; then
   # Check if any make target OTHER than run-gitlint failed
   # make failure lines look like: make: *** [Makefile:394: run-gitlint] Error 254
-  NON_GITLINT_FAILURES=$(grep 'make:.*\*\*\*' "$VERIFY_LOG" | grep -vi 'gitlint' || true)
+  # Also filter the parent 'verify' target which cascades from gitlint failures
+  NON_GITLINT_FAILURES=$(grep 'make:.*\*\*\*' "$VERIFY_LOG" | grep -viE 'gitlint|: verify\]' || true)
   if [ -z "$NON_GITLINT_FAILURES" ]; then
     echo "make verify failed due to gitlint only - ignoring"
   else
