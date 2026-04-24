@@ -141,11 +141,17 @@ oc get co -o wide | tee "$RESULTS_DIR/post-expansion-cluster-operators.txt"
 # Step 3: Scale machinesets to maximum capacity
 echo "=== STEP 3: Scale machinesets to test maximum node capacity ==="
 
-# Get all machinesets
-mapfile -t machinesets < <(oc get machineset -n openshift-machine-api --no-headers -o custom-columns=NAME:.metadata.name)
+# Get worker machinesets only (exclude infra)
+mapfile -t machinesets < <(oc get machineset -n openshift-machine-api --no-headers -o custom-columns=NAME:.metadata.name | grep -v infra)
 
 if [[ ${#machinesets[@]} -ne 3 ]]; then
-    echo "ERROR: Expected 3 machinesets, found ${#machinesets[@]}"
+    echo "ERROR: Expected 3 worker machinesets, found ${#machinesets[@]}"
+    echo "Worker machinesets found:"
+    for ms in "${machinesets[@]}"; do
+        echo "  - $ms"
+    done
+    echo "All machinesets in cluster:"
+    oc get machineset -n openshift-machine-api --no-headers -o custom-columns=NAME:.metadata.name
     exit 1
 fi
 
