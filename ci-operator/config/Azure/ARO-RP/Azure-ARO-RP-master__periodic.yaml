@@ -8,11 +8,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.25
-releases:
-  latest:
-    integration:
-      name: "4.22"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -25,25 +20,37 @@ tests:
   as: integration-e2e-parallel
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: aro-classic-int
     env:
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-classic-int-quota-slice
     workflow: aro-classic-e2e
 - always_run: false
   as: stage-e2e-parallel
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: aro-classic-stg
     env:
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-classic-stg-quota-slice
     workflow: aro-classic-e2e
 - always_run: false
   as: prod-e2e-parallel
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: aro-classic-prod
     env:
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-classic-prod-quota-slice
     workflow: aro-classic-e2e
 zz_generated_metadata:
   branch: master
