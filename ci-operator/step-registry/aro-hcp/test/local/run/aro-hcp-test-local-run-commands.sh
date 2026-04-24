@@ -13,18 +13,25 @@ export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR
 export DEPLOY_ENV="prow"
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
-az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 
-# TODO: Remove kubeconfig setup once exporter_metrics.go no longer requires direct svc cluster access.
 unset GOFLAGS
+
+# This block prepares the environment to run the tests in.
+# It runs against INFRA_SUBSCRIPTION.
+az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
 export KUBECONFIG=kubeconfig
 export AZURE_TOKEN_CREDENTIALS=prod
+FRONTEND_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')"
+ADMIN_API_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')"
+make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
 
+# This block runs the tests against CUSTOMER_SUBSCRIPTION.
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 make e2e-local/run -o test/aro-hcp-tests \
-  FRONTEND_ADDRESS="$(cat "${SHARED_DIR}/frontend-address")" \
-  ADMIN_API_ADDRESS="$(cat "${SHARED_DIR}/admin-api-address")" \
+  FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
+  ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}" \
   SKIP_CERT_VERIFICATION=true
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
