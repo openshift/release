@@ -1,6 +1,6 @@
 base_images:
-  aro-hcp-e2e-tools:
-    name: aro-hcp-e2e-tools
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
     namespace: aro-hcp
     tag: latest
 resources:
@@ -18,6 +18,20 @@ tests:
   steps:
     test:
     - ref: aro-hcp-deprovision-kusto-role-assignments
+- as: delete-expired-red-hat-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: red-hat-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
+- as: delete-expired-msft-test-tenant-app-registrations
+  cron: 0 5 * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: msft-test-tenant
+    test:
+    - ref: aro-hcp-deprovision-expired-app-registrations
 - as: delete-expired-dev-prow-resource-groups
   cron: 7,37 * * * *
   steps:
