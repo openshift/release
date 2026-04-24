@@ -35,21 +35,21 @@ else
     exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# Slack credential → env (script reads env; do not log values)
-# ---------------------------------------------------------------------------
-if [[ -n "${SLACK_WEBHOOK_SECRET_FILE:-}" ]] && [[ -f "${SLACK_WEBHOOK_SECRET_FILE}" ]]; then
-    SLACK_WEBHOOK_URL="$(<"${SLACK_WEBHOOK_SECRET_FILE}")"
-    export SLACK_WEBHOOK_URL
-fi
-
 echo "Working directory: ${PWD}"
 
-# Presubmit/rehearse jobs set PULL_NUMBER; omit PROW_JOB_URL so the notifier does not
-# surface a deck link (noise). Periodics and other non-PR jobs get a logs URL.
+# Presubmit and pj-rehearse set PULL_NUMBER: no prow job URL and no Slack
+# webhook so rehearsals cannot notify the channel.
+# Periodics leave PULL_NUMBER unset and get both.
 job_base="https://prow.ci.openshift.org/view/gs/test-platform-results"
 if [[ -z "${PULL_NUMBER:-}" ]]; then
   export PROW_JOB_URL="${job_base}/logs/${JOB_NAME}/${BUILD_ID}"
+  if [[ -n "${SLACK_WEBHOOK_SECRET_FILE:-}" ]] && [[ -f "${SLACK_WEBHOOK_SECRET_FILE}" ]]; then
+    SLACK_WEBHOOK_URL="$(<"${SLACK_WEBHOOK_SECRET_FILE}")"
+    export SLACK_WEBHOOK_URL
+  fi
+else
+  unset PROW_JOB_URL
+  unset SLACK_WEBHOOK_URL
 fi
 
 GH_NOTIFIER_INVOKE="${GH_NOTIFIER_INVOKE:-python3 gh-notifier/gh-notifier.py}"
