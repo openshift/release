@@ -69,59 +69,28 @@ K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluste
 export K8S_CLUSTER_URL
 
 echo "========== Cluster Service Account and Token Management =========="
-# Create a service account and assign cluster url and token
+# Create a service account and acquire a short-lived token (4h) via TokenRequest API
 sa_namespace="default"
 sa_name="tester-sa-2"
 sa_binding_name="${sa_name}-binding"
-sa_secret_name="${sa_name}-secret"
 
-if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
-  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
-  echo "Acquired existing token for the service account into K8S_CLUSTER_TOKEN"
+echo "Creating service account"
+if ! kubectl get serviceaccount ${sa_name} -n ${sa_namespace} &> /dev/null; then
+  echo "Creating service account ${sa_name}..."
+  kubectl create serviceaccount ${sa_name} -n ${sa_namespace}
+  echo "Creating cluster role binding..."
+  kubectl create clusterrolebinding ${sa_binding_name} \
+      --clusterrole=cluster-admin \
+      --serviceaccount=${sa_namespace}:${sa_name}
+  echo "Service account and binding created successfully"
 else
-  echo "Creating service account"
-  if ! kubectl get serviceaccount ${sa_name} -n ${sa_namespace} &> /dev/null; then
-    echo "Creating service account ${sa_name}..."
-    kubectl create serviceaccount ${sa_name} -n ${sa_namespace}
-    echo "Creating cluster role binding..."
-    kubectl create clusterrolebinding ${sa_binding_name} \
-        --clusterrole=cluster-admin \
-        --serviceaccount=${sa_namespace}:${sa_name}
-    echo "Service account and binding created successfully"
-  else
-    echo "Service account ${sa_name} already exists in namespace ${sa_namespace}"
-  fi
-  echo "Creating secret for service account"
-  kubectl apply --namespace="${sa_namespace}" -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ${sa_secret_name}
-  namespace: ${sa_namespace}
-  annotations:
-    kubernetes.io/service-account.name: ${sa_name}
-type: kubernetes.io/service-account-token
-EOF
-
-  retries=12
-  sleep_time=5
-  for ((i=1; i <= retries; i++)); do
-    if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
-      echo "Successfully got token on attempt $i."
-      break
-    elif [ $i -eq $retries ]; then
-      echo "Failed to get token after $i attempts. Exiting..."
-      exit 1
-    else
-      echo "Failed to get token on attempt $i, retrying..."
-    fi
-    sleep $sleep_time
-  done
-  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
-  echo "Acquired token for the service account into K8S_CLUSTER_TOKEN"
+  echo "Service account ${sa_name} already exists in namespace ${sa_namespace}"
 fi
-K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
+
+echo "Creating short-lived token for service account (4h TTL)"
+K8S_CLUSTER_TOKEN=$(kubectl create token ${sa_name} -n ${sa_namespace} --duration=4h)
+echo "Acquired short-lived token for the service account into K8S_CLUSTER_TOKEN"
+export K8S_CLUSTER_TOKEN
 
 echo "========== Platform Environment Variables =========="
 echo "Setting platform environment variables:"
@@ -133,6 +102,9 @@ echo "Getting container platform version"
 CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
+echo "========== Cluster kubeadmin logout =========="
+kubectl config unset current-context
 
 echo "========== Git Repository Setup & Checkout =========="
 # Clone and checkout the specific PR

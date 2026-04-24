@@ -281,7 +281,7 @@ presubmits:
     - ^release-4\.23$
     - ^release-4\.23-
     cluster: build01
-    context: ci/prow/e2e-aks-4-21
+    context: ci/prow/e2e-aks-4-22
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -293,9 +293,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-release-4.23-e2e-aks-4-21
+    name: pull-ci-openshift-priv-hypershift-release-4.23-e2e-aks-4-22
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-aks-4-21
+    rerun_command: /test e2e-aks-4-22
     spec:
       containers:
       - args:
@@ -305,7 +305,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aks-4-21
+        - --target=e2e-aks-4-22
         command:
         - ci-operator
         env:
@@ -364,7 +364,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aks-4-21,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aks-4-22,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -557,7 +557,7 @@ presubmits:
     - ^release-4\.23$
     - ^release-4\.23-
     cluster: build01
-    context: ci/prow/e2e-aws-4-21
+    context: ci/prow/e2e-aws-4-22
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -570,9 +570,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-release-4.23-e2e-aws-4-21
+    name: pull-ci-openshift-priv-hypershift-release-4.23-e2e-aws-4-22
     path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-aws-4-21
+    rerun_command: /test e2e-aws-4-22
     spec:
       containers:
       - args:
@@ -582,7 +582,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-4-21
+        - --target=e2e-aws-4-22
         command:
         - ci-operator
         env:
@@ -641,7 +641,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-4-21,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-4-22,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2561,6 +2561,99 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-v2-aws-backuprestore,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build01
+    context: ci/prow/e2e-v2-gke
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      capability/build-tmpfs: build-tmpfs
+      ci-operator.openshift.io/cloud: hypershift-gcp
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-hypershift-release-4.23-e2e-v2-gke
+    optional: true
+    path_alias: github.com/openshift/hypershift
+    rerun_command: /test e2e-v2-gke
+    run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-v2-gke
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-v2-gke,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

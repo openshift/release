@@ -22,6 +22,8 @@ EOF
 fi
 # DNS query is blocked on s390x yellow zone for 4.9 & above
 # Also adding some loadbalancer tests that won't function on s390x
+# Ephemeral-storage limit eviction is not reliably observed on s390x libvirt CI until
+# https://issues.redhat.com/browse/OCPBUGS-81118 and https://issues.redhat.com/browse/OCPBUGS-81119 are fixed.
 if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 9 )) { exit 0 } else {exit 1} }' && [ "${ARCH}" == "s390x" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
@@ -41,6 +43,8 @@ if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >=
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Services should be rejected for evicted pods (no endpoints exist)"
+"[sig-node] Pods Extended Pod Container lifecycle evicted pods should be terminal"
 EOF
 # List of exclude tests from conformance/parallel suite for 4.7 & 4.6
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
@@ -302,6 +306,13 @@ EOF
 "[sig-etcd] etcd should not log excessive took too long messages"
 "[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
+       # Skip the PodObservedGenerationTracking test for 4.21 only until https://redhat.atlassian.net/browse/OCPBUGS-83561 is fixed
+       # This test has timeout issues while pulling non-existent image on PowerVS for 4.21 (fixed in 4.22 with K8s 1.35)
+       if [ "${BRANCH}" == "4.21" ]; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
+EOF
+       fi
     fi
 else
     echo "Executing all tests"

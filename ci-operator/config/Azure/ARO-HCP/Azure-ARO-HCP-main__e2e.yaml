@@ -5,43 +5,15 @@ build_root:
     tag: aro-hcp-e2e-base-ci
 images:
   items:
-  - dockerfile_literal: |
-      FROM src
-      USER root
-      COPY /src /opt/app-root/src/github.com/Azure
-      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-      ENV GOBIN="/usr/local/bin"
-      ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-      # Install Python for grafana tests
-      RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
-      RUN pip3 install black
-      ENV GOFLAGS='-mod=readonly'
-      RUN make install-tools && \
-          make -C tooling/templatize templatize && \
-          make -C test/ aro-hcp-tests prow-job-executor
-      RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
-      RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
-      RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
-      RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-      RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP && rm -f go.work.sum
+  - dockerfile_path: test/Containerfile.e2e
     from: src
-    inputs:
-      src:
-        paths:
-        - destination_dir: src
-          source_path: /go/src/github.com/Azure/ARO-HCP
-    to: aro-hcp-e2e-tools
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.20"
+    to: aro-hcp-e2e-tests
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-  aro-hcp-e2e-tools:
+  aro-hcp-e2e-tests:
     limits:
       cpu: "8"
       memory: 10Gi
@@ -53,13 +25,16 @@ tests:
   postsubmit: true
   run_if_changed: ^$
   steps:
-    cluster_profile: aro-hcp-int
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
     - count: 20
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-int
@@ -68,13 +43,16 @@ tests:
   postsubmit: true
   run_if_changed: ^$
   steps:
-    cluster_profile: aro-hcp-stg
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
     - count: 30
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-stg
@@ -83,13 +61,16 @@ tests:
   postsubmit: true
   run_if_changed: ^$
   steps:
-    cluster_profile: aro-hcp-prod
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
     - count: 15
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-prod

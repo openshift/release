@@ -19,6 +19,7 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -32,7 +33,6 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    disabled: true
     name: "4.22"
     namespace: ocp
 releases:
@@ -93,6 +93,36 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: aws-e2e-operator-windows-server-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- as: aws-e2e-olmv1-install
+  cron: 0 9 * * 1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      FEATURE_SET: TechPreviewNoUpgrade
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest
+    - chain: ipi-install
+    test:
+    - ref: windows-conf-operator-olmv1
+- always_run: false
   as: vsphere-disconnected-e2e-operator
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
@@ -115,7 +145,7 @@ tests:
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
-      WINDOWS_SERVER_VERSION: "2019"
+      WINDOWS_SERVER_VERSION: "2025"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
@@ -123,10 +153,23 @@ tests:
   as: gcp-e2e-operator
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
+      WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
+  as: gcp-e2e-operator-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
       WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
     test:
     - ref: windows-e2e-operator-test
@@ -139,6 +182,33 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-operator-fips
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIPS_ENABLED: "true"
+      VM_TEMPLATE: windows-golden-images/windows-server-2022-template-ipv6-disabled-fips
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: vsphere-e2e-operator-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 38 14 * * 2
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$

@@ -101,65 +101,17 @@ tests:
     pre:
     - chain: ipi-aws-pre
     test:
-    - as: test-install
-      cli: latest
-      commands: |
-        oc create ns keda
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n keda "$OO_BUNDLE"
-        oc wait --for condition=Available -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
-      dependencies:
-      - env: OO_BUNDLE
-        name: custom-metrics-autoscaler-operator-bundle
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-apply-kedacontroller
-      cli: latest
-      commands: |
-        oc apply -n keda -f config/samples/keda_v1alpha1_kedacontroller.yaml
-        # there is no 'wait --for=exists' yet, and we return if it's not there yet, so wait a bit
-        sleep 30
-        oc get deployment -n keda
-        oc wait --for condition=Available -n keda deployment keda-admission --timeout 10m
-        oc wait --for condition=Available -n keda deployment keda-metrics-apiserver --timeout 10m
-        oc wait --for condition=Available -n keda deployment keda-operator --timeout 10m
-        oc get deployment -n keda
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-setup
-      cli: latest
-      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-setup
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-run
-      cli: latest
-      commands: make e2e-test-openshift
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-clean
-      cli: latest
-      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-clean
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-teardown
-      cli: latest
-      commands: |
-        oc get deployment -n keda
-        operator-sdk cleanup -n keda keda
-        oc wait --for=delete -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
+    - chain: keda-e2e-cma
+- as: cma-e2e-gcp-ovn
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    test:
+    - chain: keda-e2e-cma
 zz_generated_metadata:
   branch: release-4.23
   org: openshift-priv
