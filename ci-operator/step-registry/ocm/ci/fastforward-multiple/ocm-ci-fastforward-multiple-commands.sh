@@ -5,6 +5,14 @@ shopt -s extglob
 
 exit_code=0
 
+# Track failures for summary report
+declare -a FAILED_FASTFORWARDS
+declare -a FAILED_TEKTON
+TOTAL_FASTFORWARDS=0
+SUCCESSFUL_FASTFORWARDS=0
+TOTAL_TEKTON=0
+SUCCESSFUL_TEKTON=0
+
 # Install gh CLI if not available
 install_gh_cli() {
   if command -v gh >/dev/null 2>&1; then
@@ -867,20 +875,25 @@ for product in mce acm globalhub; do
 
     for version in ${DESTINATION_VERSIONS}; do
       branch="${branch_prefix}-${version}"
-      echo "INFO: Fast-forwarding ${owner_repo} main to branch: ${branch}"
+      echo "INFO: Fast-forwarding ${owner_repo} main → ${branch}"
       log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
 
+      TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
       fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"
       status=$?
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
-        echo "ERROR: Failed to fast-forward ${owner_repo} to branch: ${branch}"
+        FAILED_FASTFORWARDS+=("${owner_repo} main → ${branch}")
+        echo "ERROR: Failed to fast-forward ${owner_repo} main → ${branch}"
         if [[ -f "${log_file}" ]]; then
-          echo "Logs:"
-          sed 's/^/    /' "${log_file}"
+          echo "  Last 10 lines of log:"
+          tail -10 "${log_file}" | sed 's/^/    /'
         else
-          echo "ERROR: Log file not found: ${log_file}"
+          echo "  ERROR: Log file not found: ${log_file}"
         fi
+      else
+        SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
+        echo "SUCCESS: Fast-forwarded ${owner_repo} main → ${branch}"
       fi
     done
 
@@ -888,17 +901,22 @@ for product in mce acm globalhub; do
     echo "INFO: Creating Tekton files for ${owner_repo}"
     tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
+    TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
     create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "main" "${DESTINATION_VERSIONS}" "${tekton_log_file}"
     status=$?
     if [[ $status -ne 0 ]]; then
       exit_code=$((exit_code | status))
-      echo "WARNING: Failed to create Tekton files for ${owner_repo}"
+      FAILED_TEKTON+=("${owner_repo} (main branch)")
+      echo "ERROR: Failed to create Tekton files for ${owner_repo}"
       if [[ -f "${tekton_log_file}" ]]; then
-        echo "Logs:"
-        sed 's/^/    /' "${tekton_log_file}"
+        echo "  Last 10 lines of log:"
+        tail -10 "${tekton_log_file}" | sed 's/^/    /'
       else
-        echo "ERROR: Log file not found: ${tekton_log_file}"
+        echo "  ERROR: Log file not found: ${tekton_log_file}"
       fi
+    else
+      SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+      echo "SUCCESS: Created Tekton files for ${owner_repo}"
     fi
   done
 done
@@ -999,14 +1017,19 @@ for product in mce acm globalhub; do
       echo "INFO: Fast-forwarding ${default_branch} → ${dest_branch} for ${owner_repo}"
       branch_log="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${dest_branch}.log"
 
+      TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
       fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
       status=$?
       if [[ $status -ne 0 ]]; then
+        FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (excluded repo - may have diverged)")
         echo "WARNING: Could not fast-forward ${dest_branch}, may have diverged (this is OK for excluded repos)"
         if [[ -f "${branch_log}" ]]; then
-          echo "Logs:"
-          sed 's/^/    /' "${branch_log}"
+          echo "  Last 10 lines of log:"
+          tail -10 "${branch_log}" | sed 's/^/    /'
         fi
+      else
+        SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
+        echo "SUCCESS: Fast-forwarded ${owner_repo} ${default_branch} → ${dest_branch}"
       fi
     done
 
@@ -1026,17 +1049,22 @@ for product in mce acm globalhub; do
         echo "INFO: Creating Tekton files for version ${version} on ${branch}"
         tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${branch}-v${version}.log"
 
+        TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
         create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${branch}" "${version}" "${tekton_log_file}"
         status=$?
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
-          echo "WARNING: Failed to create Tekton files for version ${version} on ${branch}"
+          FAILED_TEKTON+=("${owner_repo} (${branch}, version ${version})")
+          echo "ERROR: Failed to create Tekton files for version ${version} on ${branch}"
           if [[ -f "${tekton_log_file}" ]]; then
-            echo "Logs:"
-            sed 's/^/    /' "${tekton_log_file}"
+            echo "  Last 10 lines of log:"
+            tail -10 "${tekton_log_file}" | sed 's/^/    /'
           else
-            echo "ERROR: Log file not found: ${tekton_log_file}"
+            echo "  ERROR: Log file not found: ${tekton_log_file}"
           fi
+        else
+          SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+          echo "SUCCESS: Created Tekton files for ${owner_repo} (${branch}, version ${version})"
         fi
       done
     done
@@ -1062,18 +1090,23 @@ for product in mce acm globalhub; do
           echo "INFO: Ensuring ${dest_branch} exists for ${owner_repo}"
           branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
 
+          TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
           fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
           status=$?
           if [[ $status -ne 0 ]]; then
             exit_code=$((exit_code | status))
+            FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (kube-rbac-proxy alternate)")
             echo "ERROR: Failed to ensure branch ${dest_branch} for ${owner_repo}"
             if [[ -f "${branch_log}" ]]; then
-              echo "Logs:"
-              sed 's/^/    /' "${branch_log}"
+              echo "  Last 10 lines of log:"
+              tail -10 "${branch_log}" | sed 's/^/    /'
             else
-              echo "ERROR: Log file not found: ${branch_log}"
+              echo "  ERROR: Log file not found: ${branch_log}"
             fi
             continue
+          else
+            SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
+            echo "SUCCESS: Ensured branch ${dest_branch} exists for ${owner_repo}"
           fi
         fi
 
@@ -1081,21 +1114,77 @@ for product in mce acm globalhub; do
         echo "INFO: Creating Tekton files on ${dest_branch} for ${owner_repo}"
         tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
+        TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
         create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
         status=$?
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
-          echo "WARNING: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
+          FAILED_TEKTON+=("${owner_repo} (${dest_branch}, kube-rbac-proxy alternate)")
+          echo "ERROR: Failed to create Tekton files on ${dest_branch} for ${owner_repo}"
           if [[ -f "${tekton_log_file}" ]]; then
-            echo "Logs:"
-            sed 's/^/    /' "${tekton_log_file}"
+            echo "  Last 10 lines of log:"
+            tail -10 "${tekton_log_file}" | sed 's/^/    /'
           else
-            echo "ERROR: Log file not found: ${tekton_log_file}"
+            echo "  ERROR: Log file not found: ${tekton_log_file}"
           fi
+        else
+          SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+          echo "SUCCESS: Created Tekton files on ${dest_branch} for ${owner_repo}"
         fi
       done
     fi
   done
 done
+
+echo ""
+echo "================================================================="
+echo "                    FAST-FORWARD WORKFLOW SUMMARY"
+echo "================================================================="
+echo ""
+
+# Fast-forward summary
+echo "Fast-Forward Operations:"
+echo "  Total:      ${TOTAL_FASTFORWARDS}"
+echo "  Successful: ${SUCCESSFUL_FASTFORWARDS}"
+echo "  Failed:     $((TOTAL_FASTFORWARDS - SUCCESSFUL_FASTFORWARDS))"
+echo ""
+
+# Tekton summary
+echo "Tekton File Creation:"
+echo "  Total:      ${TOTAL_TEKTON}"
+echo "  Successful: ${SUCCESSFUL_TEKTON}"
+echo "  Failed:     $((TOTAL_TEKTON - SUCCESSFUL_TEKTON))"
+echo ""
+
+# List failures if any
+if [[ ${#FAILED_FASTFORWARDS[@]} -gt 0 ]]; then
+  echo "Failed Fast-Forward Operations:"
+  for failure in "${FAILED_FASTFORWARDS[@]}"; do
+    echo "  - ${failure}"
+  done
+  echo ""
+fi
+
+if [[ ${#FAILED_TEKTON[@]} -gt 0 ]]; then
+  echo "Failed Tekton File Creations:"
+  for failure in "${FAILED_TEKTON[@]}"; do
+    echo "  - ${failure}"
+  done
+  echo ""
+fi
+
+if [[ ${exit_code} -eq 0 ]]; then
+  echo "================================================================="
+  echo "                     ALL OPERATIONS SUCCESSFUL"
+  echo "================================================================="
+else
+  echo "================================================================="
+  echo "            WORKFLOW COMPLETED WITH FAILURES (exit ${exit_code})"
+  echo "================================================================="
+  echo ""
+  echo "Check logs in ${ARTIFACT_DIR}/ for details"
+fi
+
+echo ""
 
 exit ${exit_code}
