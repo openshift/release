@@ -128,7 +128,7 @@ resource "aws_security_group" "quaybuilder" {
 resource "aws_instance" "quaybuilder" {
   key_name      = aws_key_pair.quaybuilder0710.key_name
   ami           = "${ami_id}"
-  instance_type = "m4.xlarge"
+  instance_type = "m6i.xlarge"
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.quaybuilder.id]
   subnet_id = "${PublicSubnet}"
