@@ -1,0 +1,33 @@
+ref:
+  as: openshift-qe-ocpbugs-45891-egress-ip-scale
+  from_image:
+    namespace: ocp
+    name: tools
+    tag: "4.22"
+  commands: openshift-qe-ocpbugs-45891-egress-ip-scale-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  documentation: |-
+    Tests OCPBUGS-45891: EgressIP scale testing with minimal AWS cluster using large VMs.
+    
+    This test validates the maximum egress IP capacity with 2 m6a.16xlarge worker nodes,
+    creating 100 EgressIP objects and verifying that 98 are successfully assigned with
+    optimal load distribution.
+    
+    The test follows Jean's validation methodology:
+    - Verifies node egress IP configuration and capacity
+    - Labels worker nodes as egress-assignable  
+    - Creates 100 EgressIP objects
+    - Validates 98 successful assignments
+    - Verifies CloudPrivateIPConfig count matches
+    - Checks load balancing across nodes
+    
+    Environment variables:
+    - EXPECTED_WORKER_NODES: Expected number of worker nodes (default: 2)
+    - WORKER_VM_TYPE: Expected worker VM type (default: m6a.16xlarge)
+    - TOTAL_EGRESSIP_OBJECTS: Number of EgressIP objects to create (default: 100)
+    - EXPECTED_ASSIGNED_EGRESSIPS: Expected number of assigned EgressIPs (default: 98)
+    - EGRESSIP_NAME_PREFIX: Prefix for EgressIP object names (default: egressip-45891)
+    - TEST_TIMEOUT: Maximum time to wait for assignments (default: 30m)
