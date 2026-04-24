@@ -189,7 +189,9 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
+      commands: |
+        export BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")
+        GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -219,7 +221,9 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 2h30m0s
     workflow: ipi-azure
+  timeout: 4h30m0s
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
