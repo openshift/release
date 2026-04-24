@@ -1430,7 +1430,7 @@ echo ""
 # List skipped repos
 if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
   echo "Skipped Repositories (No Write Access):"
-  for repo in "${SKIPPED_NO_ACCESS[@]}"; do
+  for repo in "${SKIPPED_NO_ACCESS[@]+"${SKIPPED_NO_ACCESS[@]}"}"; do
     echo "  - ${repo}"
   done
   echo ""
@@ -1439,7 +1439,7 @@ fi
 # List failures if any
 if [[ ${#FAILED_FASTFORWARDS[@]} -gt 0 ]]; then
   echo "Failed Fast-Forward Operations:"
-  for failure in "${FAILED_FASTFORWARDS[@]}"; do
+  for failure in "${FAILED_FASTFORWARDS[@]+"${FAILED_FASTFORWARDS[@]}"}"; do
     echo "  - ${failure}"
   done
   echo ""
@@ -1447,7 +1447,7 @@ fi
 
 if [[ ${#FAILED_TEKTON[@]} -gt 0 ]]; then
   echo "Failed Tekton File Creations:"
-  for failure in "${FAILED_TEKTON[@]}"; do
+  for failure in "${FAILED_TEKTON[@]+"${FAILED_TEKTON[@]}"}"; do
     echo "  - ${failure}"
   done
   echo ""
@@ -1456,7 +1456,7 @@ fi
 # List cleaned branches
 if [[ ${#CLEANED_BRANCHES[@]} -gt 0 ]]; then
   echo "Cleaned Stale Branches:"
-  for cleaned in "${CLEANED_BRANCHES[@]}"; do
+  for cleaned in "${CLEANED_BRANCHES[@]+"${CLEANED_BRANCHES[@]}"}"; do
     echo "  - ${cleaned}"
   done
   echo ""
