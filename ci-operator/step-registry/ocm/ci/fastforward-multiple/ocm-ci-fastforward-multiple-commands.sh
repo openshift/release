@@ -1251,18 +1251,23 @@ for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
     [[ -z "${branch}" ]] && continue
 
     # Check if branch has open PR
-    pr_count=$(gh pr list --repo "${owner}/${repo}" --head "${branch}" --json number --jq 'length' 2>/dev/null || echo "0")
+    pr_number=$(gh pr list --repo "${owner}/${repo}" --head "${branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
-    if [[ "${pr_count}" == "0" ]]; then
-      echo "INFO: Deleting stale branch ${branch} from ${owner_repo} (no open PR)"
-      if gh api -X DELETE "repos/${owner}/${repo}/git/refs/heads/${branch}" 2>/dev/null; then
-        CLEANED_BRANCHES+=("${owner_repo}:${branch}")
-        TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
-      else
-        echo "WARNING: Failed to delete ${branch} from ${owner_repo}"
-      fi
+    if [[ -n "${pr_number}" ]]; then
+      # Close the PR first
+      echo "INFO: Closing obsolete PR #${pr_number} for ${branch} in ${owner_repo}"
+      gh pr close "${pr_number}" --repo "${owner}/${repo}" \
+        --comment "Closing obsolete PR. Fast-forward workflow now pushes directly to release branches instead of creating PRs. This branch and PR are no longer needed." \
+        2>/dev/null || echo "WARNING: Failed to close PR #${pr_number}"
+    fi
+
+    # Delete the branch
+    echo "INFO: Deleting stale branch ${branch} from ${owner_repo}"
+    if gh api -X DELETE "repos/${owner}/${repo}/git/refs/heads/${branch}" 2>/dev/null; then
+      CLEANED_BRANCHES+=("${owner_repo}:${branch}")
+      TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
     else
-      echo "INFO: Keeping ${branch} from ${owner_repo} (has open PR)"
+      echo "WARNING: Failed to delete ${branch} from ${owner_repo}"
     fi
   done <<< "${stale_branches}"
 done
