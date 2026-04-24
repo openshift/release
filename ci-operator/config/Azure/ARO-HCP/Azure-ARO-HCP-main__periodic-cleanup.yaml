@@ -1,0 +1,79 @@
+base_images:
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tests:
+- as: delete-expired-kusto-role-assignments
+  cron: 0 4 * * *
+  steps:
+    test:
+    - ref: aro-hcp-deprovision-kusto-role-assignments
+- as: delete-expired-dev-prow-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO HCP E2E Hosted Clusters (EA Subscription)
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-dev-pers-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-integration-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: int
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-stage-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: stg
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-prod-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    env:
+      VAULT_SECRET_PROFILE: prod
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: sweeper-rg-ordered
+  cron: 5 * * * *
+  steps:
+    env:
+      CLEANUP_SWEEPER_POLICY: tooling/cleanup-sweeper/resourcegroups.policy.yaml
+      CLEANUP_SWEEPER_WAIT: "false"
+      CLEANUP_SWEEPER_WORKFLOW: rg-ordered
+    test:
+    - ref: aro-hcp-deprovision-cleanup-sweeper
+- as: sweeper-shared-leftovers-dev
+  cron: 35 * * * *
+  steps:
+    env:
+      CLEANUP_SWEEPER_VERBOSITY: "1"
+      CLEANUP_SWEEPER_WORKFLOW: shared-leftovers
+    test:
+    - ref: aro-hcp-deprovision-cleanup-sweeper
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: periodic-cleanup
