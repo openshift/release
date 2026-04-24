@@ -41,6 +41,8 @@ monitor_body = ""
 dash_body = ""
 
 for name, blocked in clusters:
+    if blocked:
+        continue
     console = CONSOLE_URLS[name]
     monitor_body += f"""\
   - component_slug: "build-farm"
@@ -55,9 +57,6 @@ for name, blocked in clusters:
           duration: "5m"
           step: "30s"
           severity: "Down"
-"""
-    if not blocked:
-        monitor_body += f"""\
         - query: "rate(prowjob_state_transitions{{cluster=\\"{name}\\",state=\\"success\\"}}[2h]) > 0"
           duration: "2h"
           step: "5m"
@@ -65,10 +64,7 @@ for name, blocked in clusters:
 """
 
     display = "Build" + name[5:]
-    desc = f"Build cluster {name}" + (" (out of rotation)" if blocked else "")
-    dash_body += f'      - name: "{display}"\n        description: "{desc}"\n'
-    if blocked:
-        dash_body += f'        long_description: "{display} is blocked and out of rotation. Console reachability is still monitored. See core-services/sanitize-prow-jobs/_clusters.yaml."\n'
+    dash_body += f'      - name: "{display}"\n        description: "Build cluster {name}"\n'
     dash_body += """\
         monitoring:
           frequency: 5m
