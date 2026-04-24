@@ -381,8 +381,8 @@ def _add_osd_rc_deployment(gendoc):
                                         "--jira-username=brawilli@redhat.com",
                                         "--jira-password-file=/etc/jira/password",
                                         '--verify-jira',
-                                        '--plugin-config=/etc/plugins/plugins.yaml',
-                                        '--supplemental-plugin-config-dir=/etc/plugins',
+                                        '--plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml',
+                                        '--supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
                                         "--manifest-list-mode"
