@@ -56,11 +56,6 @@ def get_rc_volume_mounts():
             'mountPath': '/etc/jira',
             'name': 'jira',
             'readOnly': True
-        },
-        {
-            'mountPath': '/etc/plugins',
-            'name': 'plugins',
-            'readOnly': True
         }] + get_kubeconfig_volume_mounts() + get_oc_volume_mounts()
 
 
@@ -146,13 +141,6 @@ def get_rc_volumes(context):
                 'defaultMode': 420,
                 'secretName': 'jira-credentials-openshift-jira-robot'
             }
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'plugins'
-            },
-            'name': 'plugins'
         }] + get_kubeconfig_volumes(context, secret_name=context.secret_name_tls) + get_oc_volumes()
 
 
