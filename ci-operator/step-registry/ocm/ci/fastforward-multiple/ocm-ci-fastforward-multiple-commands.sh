@@ -103,6 +103,158 @@ get_default_branch() {
   echo "$default_branch"
 }
 
+# Extract version from branch name
+# Examples: release-5.0 → 5.0, backplane-2.17 → 2.17
+extract_version_from_branch() {
+  local branch=$1
+
+  if [[ "$branch" =~ ^(release|backplane)-([0-9]+\.[0-9]+)$ ]]; then
+    echo "${BASH_REMATCH[2]}"
+    return 0
+  fi
+
+  # Not a versioned branch
+  return 1
+}
+
+# Transform Tekton files from source version to destination version
+# After fast-forward, renames and updates Tekton files for new branch
+transform_tekton_files() {
+  local owner=$1
+  local repo=$2
+  local product=$3
+  local branch_prefix=$4
+  local dest_branch=$5
+  local source_version=$6  # e.g., "5.0"
+  local dest_version=$7    # e.g., "5.1"
+  local log_file=$8
+
+  local product_prefix="acm"
+  if [[ "${product}" == "mce" ]]; then
+    product_prefix="mce"
+  elif [[ "${product}" == "globalhub" ]]; then
+    product_prefix="globalhub"
+  fi
+
+  # Convert versions to filename format
+  # 5.0 → 50 for acm/mce, 5.0 → 5-0 for globalhub
+  local source_file_version="${source_version//./}"
+  local dest_file_version="${dest_version//./}"
+
+  if [[ "${product}" == "globalhub" ]]; then
+    source_file_version="${source_version//./-}"
+    dest_file_version="${dest_version//./-}"
+  fi
+
+  local ocm_dir
+  ocm_dir=$(mktemp -d -t ocm-transform-XXXXX)
+
+  if [[ ! -f "${GITHUB_TOKEN_FILE}" ]]; then
+    echo "ERROR: GITHUB_TOKEN_FILE not found: ${GITHUB_TOKEN_FILE}" >&2
+    return 1
+  fi
+
+  local token
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  local repo_url="https://${GITHUB_USER}:${token}@github.com/${owner}/${repo}.git"
+
+  # Test log file creation
+  if ! touch "${log_file}" 2>/dev/null; then
+    echo "ERROR: Cannot create log file: ${log_file}" >&2
+    return 1
+  fi
+
+  exec 3>&1 4>&2
+  exec 1>>"${log_file}" 2>&1 || {
+    echo "ERROR: Failed to redirect to log file: ${log_file}" >&4
+    exec 1>&3 2>&4
+    exec 3>&- 4>&-
+    return 1
+  }
+
+  echo "INFO: Transforming Tekton files: ${source_version} → ${dest_version} on ${dest_branch}"
+
+  (
+    cd "$ocm_dir" || exit 1
+    export HOME="$ocm_dir"
+
+    echo "INFO: Cloning ${dest_branch}"
+    if ! git clone -b "${dest_branch}" "$repo_url" 2>&1; then
+      echo "ERROR: Could not clone ${dest_branch}"
+      exit 1
+    fi
+
+    cd "$repo" || exit 1
+
+    if [[ ! -d .tekton ]]; then
+      echo "INFO: No .tekton directory, skipping"
+      exit 0
+    fi
+
+    # Find files to transform
+    local source_pattern="${product_prefix}-${source_file_version}-"
+    local dest_pattern="${product_prefix}-${dest_file_version}-"
+
+    local files_found=false
+    local files_transformed=0
+
+    for source_file in .tekton/${source_pattern}*.yaml; do
+      if [[ ! -f "$source_file" ]]; then
+        continue
+      fi
+
+      files_found=true
+      local filename
+      filename=$(basename "$source_file")
+      local new_filename="${filename/${source_pattern}/${dest_pattern}}"
+      local dest_file=".tekton/${new_filename}"
+
+      echo "INFO: Transforming: $filename → $new_filename"
+
+      # Rename file
+      git mv "$source_file" "$dest_file"
+
+      # Update content: version strings and branch references
+      sed -i "s/${source_pattern}/${dest_pattern}/g" "$dest_file"
+      sed -i "s/${branch_prefix}-${source_version}/${branch_prefix}-${dest_version}/g" "$dest_file"
+
+      files_transformed=$((files_transformed + 1))
+    done
+
+    if [[ "$files_found" == "false" ]]; then
+      echo "INFO: No ${source_pattern}*.yaml files found to transform"
+      exit 0
+    fi
+
+    echo "INFO: Transformed ${files_transformed} files"
+
+    # Commit transformation
+    git config user.email "${GITHUB_USER}@users.noreply.github.com"
+    git config user.name "${GITHUB_USER}"
+
+    git commit -m "Transform Tekton files from ${source_version} to ${dest_version}
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+    # Push
+    if git push origin "${dest_branch}" 2>&1; then
+      echo "SUCCESS: Pushed Tekton transformation"
+      exit 0
+    else
+      echo "ERROR: Failed to push transformation"
+      exit 1
+    fi
+  )
+
+  local result=$?
+
+  exec 1>&3 2>&4
+  exec 3>&- 4>&-
+
+  rm -rf "$ocm_dir"
+  return $result
+}
+
 # Check if we have push permission to repo
 can_push_to_repo() {
   local owner=$1
@@ -976,16 +1128,86 @@ for product in mce acm globalhub; do
         repo_branch_prefix="backplane"
       fi
 
-      # For EXCLUDED_REPOS: Create all Tekton versions on each branch to avoid divergence
-      # This allows fast-forward to work since branches stay identical
+      # Extract version from default branch name
+      default_version=$(extract_version_from_branch "${default_branch}")
+      if [[ -z "$default_version" ]]; then
+        echo "WARNING: Could not extract version from ${default_branch}, skipping ${owner_repo}"
+        continue
+      fi
 
-      # First, ensure all destination branches exist (fast-forward from default)
+      echo "INFO: Default branch version: ${default_version}"
+
+      # Create Tekton files ONLY on default branch for default version ONLY
+      echo "INFO: Creating Tekton files for ${owner_repo} on ${default_branch} (version ${default_version})"
+      tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${default_branch}.log"
+
+      TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
+
+      if create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${default_branch}" "${default_version}" "${tekton_log_file}"; then
+        status=0
+      else
+        status=$?
+      fi
+
+      if [[ $status -ne 0 ]]; then
+        exit_code=$((exit_code | status))
+        FAILED_TEKTON+=("${owner_repo} (${default_branch}, version ${default_version})")
+        echo "ERROR: Failed to create Tekton files for ${owner_repo}"
+        if [[ -f "${tekton_log_file}" ]]; then
+          echo "  Last 10 lines of log:"
+          tail -10 "${tekton_log_file}" | sed 's/^/    /'
+        else
+          echo "  ERROR: Log file not found: ${tekton_log_file}"
+        fi
+      else
+        SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+        echo "SUCCESS: Created Tekton files for ${owner_repo} on ${default_branch}"
+      fi
+
+      # Special case: kube-rbac-proxy needs BOTH ACM and MCE Tekton files on same branch
+      if [[ "${repo}" == "kube-rbac-proxy" ]]; then
+        # Determine alternate product and prefix
+        alternate_product="mce"
+        alternate_prefix="backplane"
+        if [[ "${product}" == "mce" ]]; then
+          alternate_product="acm"
+          alternate_prefix="release"
+        fi
+
+        echo "INFO: kube-rbac-proxy - also creating ${alternate_product} Tekton files on ${default_branch}"
+        tekton_log_file_alt="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${default_branch}-alt.log"
+
+        TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
+
+        if create_tekton_files "${owner}" "${repo}" "${alternate_product}" "${alternate_prefix}" "${default_branch}" "${default_version}" "${tekton_log_file_alt}"; then
+          status=0
+        else
+          status=$?
+        fi
+
+        if [[ $status -ne 0 ]]; then
+          exit_code=$((exit_code | status))
+          FAILED_TEKTON+=("${owner_repo} (${default_branch}, ${alternate_product}, version ${default_version})")
+          echo "ERROR: Failed to create ${alternate_product} Tekton files for ${owner_repo}"
+          if [[ -f "${tekton_log_file_alt}" ]]; then
+            echo "  Last 10 lines of log:"
+            tail -10 "${tekton_log_file_alt}" | sed 's/^/    /'
+          else
+            echo "  ERROR: Log file not found: ${tekton_log_file_alt}"
+          fi
+        else
+          SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+          echo "SUCCESS: Created ${alternate_product} Tekton files for ${owner_repo} on ${default_branch}"
+        fi
+      fi
+
+      # Fast-forward to destination branches and transform Tekton files
       for version in ${DESTINATION_VERSIONS}; do
         dest_branch="${repo_branch_prefix}-${version}"
 
         # Skip if dest_branch same as default_branch
         if [[ "${dest_branch}" == "${default_branch}" ]]; then
-          echo "INFO: Skipping fast-forward for ${dest_branch} (same as default branch)"
+          echo "INFO: Skipping ${dest_branch} (same as default branch)"
           continue
         fi
 
@@ -1002,39 +1224,61 @@ for product in mce acm globalhub; do
         fi
 
         if [[ $status -ne 0 ]]; then
-          FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (excluded repo - may have diverged)")
-          echo "WARNING: Could not fast-forward ${dest_branch}, may have diverged (this is OK for excluded repos)"
+          FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch}")
+          echo "ERROR: Failed to fast-forward ${owner_repo} ${default_branch} → ${dest_branch}"
           if [[ -f "${branch_log}" ]]; then
             echo "  Last 10 lines of log:"
             tail -10 "${branch_log}" | sed 's/^/    /'
           fi
+          continue
+        fi
+
+        SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
+        echo "SUCCESS: Fast-forwarded ${owner_repo} ${default_branch} → ${dest_branch}"
+
+        # Transform Tekton files from default_version to version
+        echo "INFO: Transforming Tekton files ${default_version} → ${version} on ${dest_branch}"
+        transform_log="${ARTIFACT_DIR}/transform-${owner_repo//\//-}-${dest_branch}.log"
+
+        TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
+
+        if transform_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log}"; then
+          status=0
         else
-          SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
-          echo "SUCCESS: Fast-forwarded ${owner_repo} ${default_branch} → ${dest_branch}"
+          status=$?
         fi
-      done
 
-      # Now create all Tekton file versions on each branch (including default)
-      # After fast-forward, all destination branches should exist (unless fast-forward failed)
-      all_branches="${default_branch}"
-      for version in ${DESTINATION_VERSIONS}; do
-        dest_branch="${repo_branch_prefix}-${version}"
-        if [[ "${dest_branch}" != "${default_branch}" ]]; then
-          # Add all destination branches - fast-forward created them
-          all_branches="${all_branches} ${dest_branch}"
+        if [[ $status -ne 0 ]]; then
+          exit_code=$((exit_code | status))
+          FAILED_TEKTON+=("${owner_repo} (transform ${default_version} → ${version} on ${dest_branch})")
+          echo "ERROR: Failed to transform Tekton files for ${owner_repo}"
+          if [[ -f "${transform_log}" ]]; then
+            echo "  Last 10 lines of log:"
+            tail -10 "${transform_log}" | sed 's/^/    /'
+          else
+            echo "  ERROR: Log file not found: ${transform_log}"
+          fi
+        else
+          SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
+          echo "SUCCESS: Transformed Tekton files for ${owner_repo} on ${dest_branch}"
         fi
-      done
 
-      for branch in ${all_branches}; do
-        echo "INFO: Creating Tekton files for ALL versions on ${branch} for ${owner_repo}"
+        # Special case: kube-rbac-proxy also transform alternate product files
+        if [[ "${repo}" == "kube-rbac-proxy" ]]; then
+          # Determine alternate product and prefix
+          alternate_product="mce"
+          alternate_prefix="backplane"
+          if [[ "${product}" == "mce" ]]; then
+            alternate_product="acm"
+            alternate_prefix="release"
+          fi
 
-        for version in ${DESTINATION_VERSIONS}; do
-          echo "INFO: Creating Tekton files for version ${version} on ${branch}"
-          tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${branch}-v${version}.log"
+          echo "INFO: kube-rbac-proxy - transforming ${alternate_product} files ${default_version} → ${version} on ${dest_branch}"
+          transform_log_alt="${ARTIFACT_DIR}/transform-${owner_repo//\//-}-${dest_branch}-alt.log"
 
           TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-          if create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${branch}" "${version}" "${tekton_log_file}"; then
+          if transform_tekton_files "${owner}" "${repo}" "${alternate_product}" "${alternate_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log_alt}"; then
             status=0
           else
             status=$?
@@ -1042,109 +1286,20 @@ for product in mce acm globalhub; do
 
           if [[ $status -ne 0 ]]; then
             exit_code=$((exit_code | status))
-            FAILED_TEKTON+=("${owner_repo} (${branch}, version ${version})")
-            echo "ERROR: Failed to create Tekton files for version ${version} on ${branch}"
-            if [[ -f "${tekton_log_file}" ]]; then
+            FAILED_TEKTON+=("${owner_repo} (transform ${alternate_product} ${default_version} → ${version} on ${dest_branch})")
+            echo "ERROR: Failed to transform ${alternate_product} Tekton files for ${owner_repo}"
+            if [[ -f "${transform_log_alt}" ]]; then
               echo "  Last 10 lines of log:"
-              tail -10 "${tekton_log_file}" | sed 's/^/    /'
+              tail -10 "${transform_log_alt}" | sed 's/^/    /'
             else
-              echo "  ERROR: Log file not found: ${tekton_log_file}"
+              echo "  ERROR: Log file not found: ${transform_log_alt}"
             fi
           else
             SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
-            echo "SUCCESS: Created Tekton files for ${owner_repo} (${branch}, version ${version})"
+            echo "SUCCESS: Transformed ${alternate_product} Tekton files for ${owner_repo} on ${dest_branch}"
           fi
-        done
-      done
-
-      # Special case: kube-rbac-proxy needs Tekton files on BOTH branch sets
-      if [[ "${repo}" == "kube-rbac-proxy" ]]; then
-        # Determine alternate prefix (release <-> backplane)
-        alternate_prefix="release"
-        if [[ "${branch_prefix}" == "release" ]]; then
-          alternate_prefix="backplane"
         fi
-
-        echo "INFO: kube-rbac-proxy special case - also processing ${alternate_prefix}-* branches"
-
-        for version in ${DESTINATION_VERSIONS}; do
-          dest_branch="${alternate_prefix}-${version}"
-
-          # Skip if dest_branch same as default_branch (no fast-forward needed)
-          if [[ "${dest_branch}" == "${default_branch}" ]]; then
-            echo "INFO: Skipping fast-forward for ${dest_branch} (same as default branch)"
-            continue
-          fi
-
-          # Check if branch exists
-          if ! branch_exists "${owner}" "${repo}" "${dest_branch}"; then
-            echo "WARNING: Branch ${dest_branch} does not exist for ${owner_repo}"
-            continue
-          fi
-
-          # Fast-forward from default branch
-          echo "INFO: Fast-forwarding ${default_branch} → ${dest_branch} for ${owner_repo} (alternate prefix)"
-          branch_log="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${dest_branch}.log"
-
-          TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
-
-          if fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"; then
-            status=0
-          else
-            status=$?
-          fi
-
-          if [[ $status -ne 0 ]]; then
-            FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (kube-rbac-proxy alternate)")
-            echo "WARNING: Could not fast-forward ${dest_branch}"
-            if [[ -f "${branch_log}" ]]; then
-              echo "  Last 10 lines of log:"
-              tail -10 "${branch_log}" | sed 's/^/    /'
-            fi
-          else
-            SUCCESSFUL_FASTFORWARDS=$((SUCCESSFUL_FASTFORWARDS + 1))
-            echo "SUCCESS: Fast-forwarded ${owner_repo} ${default_branch} → ${dest_branch}"
-          fi
-        done
-
-        # Create Tekton files for alternate prefix branches
-        for version in ${DESTINATION_VERSIONS}; do
-          dest_branch="${alternate_prefix}-${version}"
-          if ! branch_exists "${owner}" "${repo}" "${dest_branch}"; then
-            continue
-          fi
-
-          echo "INFO: Creating Tekton files for ALL versions on ${dest_branch} (alternate prefix)"
-
-          for tekton_version in ${DESTINATION_VERSIONS}; do
-            echo "INFO: Creating Tekton files for version ${tekton_version} on ${dest_branch}"
-            tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}-v${tekton_version}-alt.log"
-
-            TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
-
-            if create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${tekton_version}" "${tekton_log_file}"; then
-              status=0
-            else
-              status=$?
-            fi
-
-            if [[ $status -ne 0 ]]; then
-              exit_code=$((exit_code | status))
-              FAILED_TEKTON+=("${owner_repo} (${dest_branch}, version ${tekton_version}, alternate)")
-              echo "ERROR: Failed to create Tekton files for version ${tekton_version} on ${dest_branch}"
-              if [[ -f "${tekton_log_file}" ]]; then
-                echo "  Last 10 lines of log:"
-                tail -10 "${tekton_log_file}" | sed 's/^/    /'
-              else
-                echo "  ERROR: Log file not found: ${tekton_log_file}"
-              fi
-            else
-              SUCCESSFUL_TEKTON=$((SUCCESSFUL_TEKTON + 1))
-              echo "SUCCESS: Created Tekton files for ${owner_repo} (${dest_branch}, version ${tekton_version}, alternate)"
-            fi
-          done
-        done
-      fi
+      done
     fi
   done
 done
