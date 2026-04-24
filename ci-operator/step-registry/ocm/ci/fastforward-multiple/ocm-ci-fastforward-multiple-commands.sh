@@ -879,8 +879,15 @@ for product in mce acm globalhub; do
       log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
 
       TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
-      fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"
-      status=$?
+
+      # Call fastforward_repo and capture status
+      # Explicitly handle to prevent any exit propagation
+      if fastforward_repo "${owner}" "${repo}" "main" "${branch}" "${log_file}"; then
+        status=0
+      else
+        status=$?
+      fi
+
       if [[ $status -ne 0 ]]; then
         exit_code=$((exit_code | status))
         FAILED_FASTFORWARDS+=("${owner_repo} main → ${branch}")
@@ -902,8 +909,13 @@ for product in mce acm globalhub; do
     tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
     TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
-    create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "main" "${DESTINATION_VERSIONS}" "${tekton_log_file}"
-    status=$?
+
+    if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "main" "${DESTINATION_VERSIONS}" "${tekton_log_file}"; then
+      status=0
+    else
+      status=$?
+    fi
+
     if [[ $status -ne 0 ]]; then
       exit_code=$((exit_code | status))
       FAILED_TEKTON+=("${owner_repo} (main branch)")
@@ -1018,8 +1030,13 @@ for product in mce acm globalhub; do
       branch_log="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${dest_branch}.log"
 
       TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
-      fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
-      status=$?
+      
+      if fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"; then
+        status=0
+      else
+        status=$?
+      fi
+
       if [[ $status -ne 0 ]]; then
         FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (excluded repo - may have diverged)")
         echo "WARNING: Could not fast-forward ${dest_branch}, may have diverged (this is OK for excluded repos)"
@@ -1050,8 +1067,13 @@ for product in mce acm globalhub; do
         tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${branch}-v${version}.log"
 
         TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
-        create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${branch}" "${version}" "${tekton_log_file}"
-        status=$?
+
+        if create_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${branch}" "${version}" "${tekton_log_file}"; then
+          status=0
+        else
+          status=$?
+        fi
+
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
           FAILED_TEKTON+=("${owner_repo} (${branch}, version ${version})")
@@ -1091,8 +1113,13 @@ for product in mce acm globalhub; do
           branch_log="${ARTIFACT_DIR}/create-branch-${owner_repo//\//-}-${dest_branch}.log"
 
           TOTAL_FASTFORWARDS=$((TOTAL_FASTFORWARDS + 1))
-          fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"
-          status=$?
+
+          if fastforward_repo "${owner}" "${repo}" "${default_branch}" "${dest_branch}" "${branch_log}"; then
+            status=0
+          else
+            status=$?
+          fi
+
           if [[ $status -ne 0 ]]; then
             exit_code=$((exit_code | status))
             FAILED_FASTFORWARDS+=("${owner_repo} ${default_branch} → ${dest_branch} (kube-rbac-proxy alternate)")
@@ -1115,8 +1142,13 @@ for product in mce acm globalhub; do
         tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}-${dest_branch}.log"
 
         TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
-        create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"
-        status=$?
+
+        if create_tekton_files "${owner}" "${repo}" "${product}" "${alternate_prefix}" "${dest_branch}" "${version}" "${tekton_log_file}"; then
+          status=0
+        else
+          status=$?
+        fi
+
         if [[ $status -ne 0 ]]; then
           exit_code=$((exit_code | status))
           FAILED_TEKTON+=("${owner_repo} (${dest_branch}, kube-rbac-proxy alternate)")
