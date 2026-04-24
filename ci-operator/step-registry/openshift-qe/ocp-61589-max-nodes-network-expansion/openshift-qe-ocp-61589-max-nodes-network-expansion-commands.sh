@@ -35,7 +35,15 @@ wait_for_nodes() {
     local start_time
     start_time=$(date +%s)
     local timeout_seconds
-    timeout_seconds=$(echo "$timeout" | sed 's/h/*3600/g; s/m/*60/g; s/s//g' | bc)
+    if [[ "$timeout" =~ ([0-9]+)h ]]; then
+        timeout_seconds=$((${BASH_REMATCH[1]} * 3600))
+    elif [[ "$timeout" =~ ([0-9]+)m ]]; then
+        timeout_seconds=$((${BASH_REMATCH[1]} * 60))
+    elif [[ "$timeout" =~ ([0-9]+)s ]]; then
+        timeout_seconds=${BASH_REMATCH[1]}
+    else
+        timeout_seconds=7200  # Default 2 hours
+    fi
     
     # Create node provisioning progress log
     echo "timestamp,elapsed_seconds,total_nodes,ready_nodes,notready_nodes,pending_nodes" > "$RESULTS_DIR/node-provisioning-progress.csv"
