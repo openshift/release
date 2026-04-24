@@ -7,11 +7,13 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 # Collect ODF must-gather on any failure so diagnostics are always available in ARTIFACT_DIR.
+# timeout 8m keeps must-gather inside the 10m grace_period defined in the ref; || true prevents
+# a timeout or gather failure from masking the original exit code.
 trap '
     (($?)) &&
-    oc adm must-gather \
+    timeout 8m oc adm must-gather \
         --image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}" \
-        --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
+        --dest-dir="${ARTIFACT_DIR}/ocs_must_gather" || true
 ' EXIT
 
 # MonitorProgress - polls StorageCluster phase until Ready, then exits 0.
@@ -23,7 +25,7 @@ MonitorProgress() {
             -n "${odfInstallNamespace}" \
             -o jsonpath='{range .status.conditions[*]}{@}{"\n"}{end}'
         storagePhase="$(oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" \
-            -n ${ODF_STORAGE_CLUSTER_NAME} -o jsonpath='{.status.phase}')"
+            -n "${odfInstallNamespace}" -o jsonpath='{.status.phase}')"
         [[ "${storagePhase}" == "Ready" ]] && {
             echo "[SUCCESS] StorageCluster is Ready"
             exit 0
@@ -43,7 +45,11 @@ WaitMcpForUpdated() {
     true
 }
 
-if [[ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+if [[ "${ODF_DEPLOY_ON_SPOKE}" == "true" ]]; then
+    [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]] && {
+        echo "[ERROR] ODF_DEPLOY_ON_SPOKE=true but managed-cluster-kubeconfig not found in SHARED_DIR" >&2
+        exit 1
+    }
     export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 fi
 
