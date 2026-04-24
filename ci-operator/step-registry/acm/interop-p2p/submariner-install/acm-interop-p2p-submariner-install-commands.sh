@@ -28,7 +28,6 @@
 #
 # Environment Variables (from ref.yaml):
 #   SUBMARINER_GLOBALNET        : enable Globalnet (default: true)
-#   SUBMARINER_GATEWAY_COUNT    : gateways per cluster (default: 1)
 #   SUBMARINER_CABLE_DRIVER     : cable driver (default: libreswan)
 #   SUBMARINER_BROKER_NAMESPACE : namespace on hub (default: submariner-k8s-broker)
 #   SUBMARINER_VERIFY_TIMEOUT   : subctl verify --connection-timeout seconds (default: 300)
@@ -126,8 +125,22 @@ InstallYq() {
 #=====================
 # SetAwsCredentials
 #   Exports AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from the cluster
-#   profile credential file. Tracing is disabled during extraction to prevent
-#   credential leakage into CI logs.
+#   profile credential file, then writes credentials to three locations so that
+#   subctl's AWS Go SDK finds them regardless of which lookup path it uses:
+#
+#   1. env vars (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+#      — covers SDK implementations that check env vars first.
+#   2. AWS_SHARED_CREDENTIALS_FILE → temp file with [default] profile
+#      — covers SDK credential-file lookups that honour the override env var.
+#   3. ~/.aws/credentials + ~/.aws/config with [default] profile
+#      — covers config.WithSharedConfigProfile("default") calls (AWS Go SDK v2)
+#        which look for the profile in the shared *config* file (~/.aws/config),
+#        NOT in the credentials file. Without ~/.aws/config the SDK throws:
+#          "failed to load AWS configuration: failed to get shared config profile, default"
+#        even when AWS_SHARED_CREDENTIALS_FILE is correctly set.
+#        This was the exact failure observed in rehearse-74415 build-log.txt.
+#
+#   Tracing is disabled during extraction to prevent credential leakage into CI logs.
 #=====================
 SetAwsCredentials() {
     echo "[INFO] Loading AWS credentials from cluster profile"
@@ -145,8 +158,31 @@ SetAwsCredentials() {
     )"
     export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 
+    # Build the INI block once; reuse it for all three destinations.
+    typeset credBlock
+    credBlock="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
+        "${AWS_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY}")"
+
+    # 2. AWS_SHARED_CREDENTIALS_FILE — overrides the default credentials file path.
+    typeset awsTmpCreds
+    awsTmpCreds="$(mktemp)"
+    printf '%s\n' "${credBlock}" > "${awsTmpCreds}"
+    export AWS_SHARED_CREDENTIALS_FILE="${awsTmpCreds}"
+
+    # 3a. ~/.aws/credentials — standard fallback location for the credentials file.
+    # 3b. ~/.aws/config     — required by config.WithSharedConfigProfile("default")
+    #     in the AWS Go SDK v2; without this the SDK throws
+    #     "failed to get shared config profile, default" even when
+    #     AWS_SHARED_CREDENTIALS_FILE is set and the env vars are exported.
+    mkdir -p "${HOME}/.aws"
+    printf '%s\n' "${credBlock}" > "${HOME}/.aws/credentials"
+    # The config file uses [default] (not [profile default]) for the default profile.
+    printf '%s\n' "${credBlock}" > "${HOME}/.aws/config"
+
     ${wasTracing} && set -x
     echo "[INFO] AWS credentials loaded (key ID ends: ...${AWS_ACCESS_KEY_ID: -4})"
+    echo "[INFO] AWS_SHARED_CREDENTIALS_FILE=${AWS_SHARED_CREDENTIALS_FILE}"
+    echo "[INFO] ~/.aws/credentials and ~/.aws/config written for subctl AWS Go SDK"
     true
 }
 
@@ -183,11 +219,19 @@ LoadSpokeConfig() {
 #=====================
 # PrepareAwsCluster
 #   Runs 'subctl cloud prepare aws' on a cluster to open the required
-#   Submariner UDP ports in the node security groups.
+#   Submariner UDP ports (4500, 4490, 4800) and TCP port 8080 in the node
+#   security groups, and to configure gateway nodes with elastic public IPs.
+#
+#   Uses --ocp-metadata to pass the OCP installer metadata.json directly to
+#   subctl, which extracts infraID and region from it automatically.
+#   AWS credentials are read from the AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+#   environment variables exported by SetAwsCredentials.
+#
+# Reference: https://submariner.io/getting-started/quickstart/openshift/globalnet/
 #
 # Arguments:
 #   $1 - kubeconfig file path
-#   $2 - cluster metadata JSON file (contains infraID and aws.region)
+#   $2 - OCP installer metadata.json file (contains infraID and aws.region)
 #   $3 - cluster name (for logging)
 #=====================
 PrepareAwsCluster() {
@@ -195,30 +239,15 @@ PrepareAwsCluster() {
     typeset metaFile="$2"
     typeset clusterName="$3"
 
-    typeset infraID
-    infraID="$(jq -r '.infraID' "${metaFile}")"
-    if [[ -z "${infraID}" || "${infraID}" == "null" ]]; then
-        echo "[ERROR] infraID not found in ${metaFile}" >&2
-        exit 1
-    fi
-
-    typeset region
-    region="$(jq -r '.aws.region' "${metaFile}")"
-    if [[ -z "${region}" || "${region}" == "null" ]]; then
-        echo "[ERROR] aws.region not found in ${metaFile}" >&2
-        exit 1
-    fi
-
-    echo "[INFO] Preparing AWS security groups for spoke '${clusterName}'"
-    echo "[INFO]   infraID=${infraID}  region=${region}"
+    echo "[INFO] Preparing AWS cluster '${clusterName}' for Submariner"
+    echo "[INFO]   kubeconfig : ${kc}"
+    echo "[INFO]   ocp-metadata: ${metaFile}"
 
     "${subctlBin}" cloud prepare aws \
         --kubeconfig "${kc}" \
-        --infra-id "${infraID}" \
-        --region "${region}" \
-        --credentials "${CLUSTER_PROFILE_DIR}/.awscred"
+        --ocp-metadata "${metaFile}"
 
-    echo "[INFO] AWS security group preparation complete for '${clusterName}'"
+    echo "[INFO] AWS preparation complete for '${clusterName}'"
     true
 }
 
@@ -256,8 +285,49 @@ DeployBroker() {
 }
 
 #=====================
+# LabelGatewayNode
+#   Labels one worker node on a spoke cluster with submariner.io/gateway=true.
+#
+#   subctl join interactively prompts "Which node should be used as the gateway?"
+#   when no node carries that label. In a non-interactive CI pod, stdin returns
+#   EOF immediately, causing the failure:
+#     ✗ Error getting gateway node: EOF
+#   Pre-labeling a node before calling subctl join suppresses the prompt entirely.
+#
+# Arguments:
+#   $1 - spoke kubeconfig file path
+#   $2 - spoke cluster name (for logging)
+#=====================
+LabelGatewayNode() {
+    typeset kc="$1"
+    typeset clusterName="$2"
+
+    echo "[INFO] Pre-labeling a gateway node on '${clusterName}'"
+
+    typeset gatewayNode
+    gatewayNode="$(
+        KUBECONFIG="${kc}" oc get nodes \
+            --selector='node-role.kubernetes.io/worker' \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+    )"
+
+    if [[ -z "${gatewayNode}" ]]; then
+        echo "[ERROR] No worker node found to label as gateway on '${clusterName}'" >&2
+        KUBECONFIG="${kc}" oc get nodes -o wide >&2 || true
+        exit 1
+    fi
+
+    echo "[INFO] Labeling '${gatewayNode}' as Submariner gateway on '${clusterName}'"
+    KUBECONFIG="${kc}" oc label node "${gatewayNode}" submariner.io/gateway=true --overwrite
+    echo "[INFO] Gateway node labeled successfully: ${gatewayNode}"
+    true
+}
+
+#=====================
 # JoinCluster
 #   Joins a spoke cluster to the Submariner broker.
+#   Requires that LabelGatewayNode has already been called for this cluster so
+#   that subctl join does not prompt interactively for the gateway node selection.
 #
 # Arguments:
 #   $1 - spoke kubeconfig file path
@@ -269,13 +339,16 @@ JoinCluster() {
 
     echo "[INFO] Joining cluster '${clusterName}' to Submariner broker"
 
+    # Argument order matches the docs:
+    # subctl join --kubeconfig <kc> broker-info.subm --clusterid <name>
+    # NAT traversal is intentionally left at its default (enabled) since
+    # both spoke clusters reside in separate AWS VPCs and require NATT for
+    # cross-VPC tunnel establishment.
     "${subctlBin}" join \
         --kubeconfig "${kc}" \
+        "${brokerInfoFile}" \
         --clusterid "${clusterName}" \
-        --natt=false \
-        --cable-driver "${SUBMARINER_CABLE_DRIVER:-libreswan}" \
-        --gateway-count "${SUBMARINER_GATEWAY_COUNT:-1}" \
-        "${brokerInfoFile}"
+        --cable-driver "${SUBMARINER_CABLE_DRIVER:-libreswan}"
 
     echo "[INFO] Cluster '${clusterName}' joined broker successfully"
     true
@@ -284,7 +357,27 @@ JoinCluster() {
 #=====================
 # WaitSubmarinerReady
 #   Polls until the Submariner gateway on a cluster reports 'active' haStatus,
-#   or exits with an error after a 10-minute timeout.
+#   or exits with an error after a 30-minute timeout.
+#
+#   Key implementation notes:
+#
+#   1. TIMEOUT: 1800s (30 min) instead of 600s.
+#      c5n.metal bare-metal nodes have longer image-pull and pod-scheduling
+#      times than VM-based workers. The previous 10-minute window was too
+#      short; the gateway engine pod never started before the timeout fired,
+#      producing 'items: []' for the full poll period (observed in build
+#      rehearse-74415 / run 2049098477048172544).
+#
+#   2. RESOURCE: 'gateways.submariner.io' (fully qualified) instead of 'gateway'.
+#      If Gateway API (gateways.gateway.networking.k8s.io) or Istio
+#      (gateways.networking.istio.io) is installed, the unqualified short name
+#      'gateway' can resolve to the wrong CRD and silently return empty items
+#      even when Submariner Gateway CRs exist.
+#
+#   3. DIAGNOSTICS: on timeout, dump DaemonSet status, pod status, and recent
+#      pod events in addition to the Gateway list. These are the fields that
+#      reveal whether the pod is Pending (scheduling), ImagePullBackOff (registry),
+#      or CrashLoopBackOff (runtime error) — all invisible from the Gateway CR alone.
 #
 # Arguments:
 #   $1 - spoke kubeconfig file path
@@ -293,16 +386,16 @@ JoinCluster() {
 WaitSubmarinerReady() {
     typeset kc="$1"
     typeset clusterName="$2"
-    typeset -i maxWait=600
+    typeset -i maxWait=1800
     typeset -i interval=15
     typeset -i elapsed=0
 
-    echo "[INFO] Waiting for Submariner gateway to be active on '${clusterName}'"
+    echo "[INFO] Waiting for Submariner gateway to be active on '${clusterName}' (timeout=${maxWait}s)"
 
     while true; do
         typeset status
         status="$(
-            KUBECONFIG="${kc}" oc get gateway \
+            KUBECONFIG="${kc}" oc get gateways.submariner.io \
                 -n submariner-operator \
                 -o jsonpath='{.items[0].status.haStatus}' 2>/dev/null || echo ""
         )"
@@ -313,8 +406,36 @@ WaitSubmarinerReady() {
         fi
 
         if (( elapsed >= maxWait )); then
-            echo "[ERROR] Timed out waiting for Submariner gateway on '${clusterName}' (status='${status}')" >&2
-            KUBECONFIG="${kc}" oc get gateway -n submariner-operator -o yaml 2>/dev/null || true
+            echo "[ERROR] Timed out (${maxWait}s) waiting for Submariner gateway on '${clusterName}' (last status='${status}')" >&2
+
+            echo "[DEBUG] --- gateways.submariner.io (yaml) ---" >&2
+            KUBECONFIG="${kc}" oc get gateways.submariner.io -n submariner-operator -o yaml 2>&1 || true
+
+            echo "[DEBUG] --- submariner-operator DaemonSets ---" >&2
+            KUBECONFIG="${kc}" oc get daemonset -n submariner-operator -o wide 2>&1 || true
+
+            echo "[DEBUG] --- submariner-operator pods ---" >&2
+            KUBECONFIG="${kc}" oc get pods -n submariner-operator -o wide 2>&1 || true
+
+            echo "[DEBUG] --- submariner-gateway pod events ---" >&2
+            KUBECONFIG="${kc}" oc get events -n submariner-operator \
+                --field-selector reason!=Scheduled \
+                --sort-by='.lastTimestamp' 2>&1 | tail -40 || true
+
+            echo "[DEBUG] --- submariner-gateway pod logs (last 50 lines) ---" >&2
+            typeset gwPod
+            gwPod="$(
+                KUBECONFIG="${kc}" oc get pods -n submariner-operator \
+                    -l app=submariner-gateway \
+                    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo ""
+            )"
+            if [[ -n "${gwPod}" ]]; then
+                KUBECONFIG="${kc}" oc logs "${gwPod}" \
+                    -n submariner-operator --tail=50 2>&1 || true
+            else
+                echo "[DEBUG] No submariner-gateway pod found" >&2
+            fi
+
             exit 1
         fi
 
@@ -322,6 +443,80 @@ WaitSubmarinerReady() {
         sleep "${interval}"
         (( elapsed += interval ))
     done
+    true
+}
+
+#=====================
+# WaitAllSubmarinerComponentsReady
+#   Waits for the three Submariner components that enable Globalnet service
+#   discovery to reach their rollout-ready state on a given cluster.
+#
+#   WHY THIS IS REQUIRED:
+#   WaitSubmarinerReady only polls 'gateways.submariner.io' haStatus, which
+#   reflects the submariner-gateway DaemonSet (the IPsec tunnel). Three other
+#   components start independently and are not captured by that check:
+#
+#   1. submariner-globalnet (DaemonSet)
+#      Watches ServiceImport objects and assigns GlobalIngressIP VIPs so that
+#      Lighthouse CoreDNS can return a Globalnet IP (242.x.x.x) for remote
+#      services. Without this running, 'dig *.svc.clusterset.local' always
+#      returns "" — the exact failure seen in the submriner.logs run.
+#
+#   2. submariner-lighthouse-agent (Deployment)
+#      Propagates ServiceExport/ServiceImport objects through the broker to
+#      peer clusters. Without this, the remote cluster never learns about
+#      exported services.
+#
+#   3. submariner-lighthouse-coredns (Deployment)
+#      Serves the *.svc.clusterset.local DNS zone. Without this running, all
+#      cross-cluster DNS queries silently return NXDOMAIN / empty.
+#
+#   On c5n.metal bare-metal nodes, image pulls and pod scheduling take
+#   significantly longer than on VM-based workers. subctl verify was being
+#   launched while these three components were still initialising, causing
+#   all service-discovery test cases to fail with 'context deadline exceeded'
+#   after exhausting their 300-second connection-timeout.
+#
+# Arguments:
+#   $1 - spoke kubeconfig file path
+#   $2 - spoke cluster name (for logging)
+#=====================
+WaitAllSubmarinerComponentsReady() {
+    typeset kc="$1"
+    typeset clusterName="$2"
+
+    echo "[INFO] Waiting for all Submariner components on '${clusterName}'"
+
+    # 1. Globalnet controller — must be Running before any ServiceImport gets
+    #    a GlobalIngressIP and before service-discovery tests will pass.
+    echo "[INFO]   submariner-globalnet DaemonSet"
+    KUBECONFIG="${kc}" oc rollout status daemonset/submariner-globalnet \
+        -n submariner-operator --timeout=10m || {
+        echo "[ERROR] submariner-globalnet DaemonSet not ready on '${clusterName}'" >&2
+        KUBECONFIG="${kc}" oc get pods -n submariner-operator -o wide >&2 || true
+        KUBECONFIG="${kc}" oc get globalingressips -n submariner-operator -o wide 2>&1 || true
+        exit 1
+    }
+
+    # 2. Lighthouse agent — propagates ServiceExport/ServiceImport through broker.
+    echo "[INFO]   submariner-lighthouse-agent Deployment"
+    KUBECONFIG="${kc}" oc rollout status deployment/submariner-lighthouse-agent \
+        -n submariner-operator --timeout=5m || {
+        echo "[ERROR] submariner-lighthouse-agent not ready on '${clusterName}'" >&2
+        KUBECONFIG="${kc}" oc get pods -n submariner-operator -o wide >&2 || true
+        exit 1
+    }
+
+    # 3. Lighthouse CoreDNS — serves *.svc.clusterset.local DNS zone.
+    echo "[INFO]   submariner-lighthouse-coredns Deployment"
+    KUBECONFIG="${kc}" oc rollout status deployment/submariner-lighthouse-coredns \
+        -n submariner-operator --timeout=5m || {
+        echo "[ERROR] submariner-lighthouse-coredns not ready on '${clusterName}'" >&2
+        KUBECONFIG="${kc}" oc get pods -n submariner-operator -o wide >&2 || true
+        exit 1
+    }
+
+    echo "[INFO] All Submariner components ready on '${clusterName}'"
     true
 }
 
@@ -433,9 +628,32 @@ VerifyNginxConnectivity() {
     echo "[INFO] Exporting nginx service on '${sourceCluster}'"
     KUBECONFIG="${kcSource}" "${subctlBin}" export service --namespace default nginx
 
-    # Allow time for ServiceExport to propagate to the remote cluster
-    echo "[INFO] Waiting 30s for service export to propagate..."
-    sleep 30
+    # Poll until the ServiceImport appears on the target cluster instead of
+    # using a blind sleep. The propagation chain is:
+    #   ServiceExport (source) → lighthouse-agent → broker → lighthouse-agent
+    #   (target) → ServiceImport (target) → globalnet → GlobalIngressIP (target)
+    # On c5n.metal nodes this chain can take 60-120 s; a fixed 30 s sleep
+    # under-waits and causes the nettest curl to fail before DNS resolves.
+    typeset -i siWait=0
+    typeset -i siMax=180
+    echo "[INFO] Waiting for ServiceImport 'nginx' to appear on '${targetCluster}' (timeout=${siMax}s)"
+    while (( siWait < siMax )); do
+        if KUBECONFIG="${kcTarget}" oc get serviceimport nginx -n default &>/dev/null 2>&1; then
+            echo "[INFO] ServiceImport 'nginx' found on '${targetCluster}' after ${siWait}s"
+            break
+        fi
+        echo "[INFO]   ServiceImport not yet available (${siWait}/${siMax}s elapsed)"
+        sleep 10
+        (( siWait += 10 ))
+    done
+    if (( siWait >= siMax )); then
+        echo "[ERROR] ServiceImport 'nginx' not found on '${targetCluster}' after ${siMax}s" >&2
+        echo "[DEBUG] ServiceImports in default namespace on '${targetCluster}':" >&2
+        KUBECONFIG="${kcTarget}" oc get serviceimports -n default -o wide 2>&1 || true
+        echo "[DEBUG] GlobalIngressIPs on '${targetCluster}':" >&2
+        KUBECONFIG="${kcTarget}" oc get globalingressips -n default -o wide 2>&1 || true
+        exit 1
+    fi
 
     # Clean up any previous nettest pod before running
     KUBECONFIG="${kcTarget}" oc -n default delete pod submariner-nettest \
@@ -516,6 +734,15 @@ done
 
 DeployBroker
 
+# Pre-label one gateway node on each spoke before joining.
+# subctl join asks interactively which node to use as the gateway;
+# in a non-interactive CI pod stdin is closed (EOF), causing:
+#   ✗ Error getting gateway node: EOF
+# Labeling the node first suppresses the prompt entirely.
+for ((i = 0; i < spokeCount; i++)); do
+    LabelGatewayNode "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
+done
+
 # Join each spoke to the broker
 for ((i = 0; i < spokeCount; i++)); do
     JoinCluster "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
@@ -524,6 +751,16 @@ done
 # Wait for gateways to become active on both spokes
 for ((i = 0; i < spokeCount; i++)); do
     WaitSubmarinerReady "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
+done
+
+# Wait for Globalnet, Lighthouse agent, and Lighthouse CoreDNS to be fully
+# ready before running subctl verify. The gateway haStatus being 'active'
+# only confirms the IPsec tunnel is up — it does NOT guarantee that
+# GlobalIngressIPs will be assigned for remote ServiceImports or that
+# *.svc.clusterset.local DNS will resolve. Skipping this wait causes all
+# service-discovery tests in subctl verify to fail with empty dig results.
+for ((i = 0; i < spokeCount; i++)); do
+    WaitAllSubmarinerComponentsReady "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
 done
 
 # Step 6: subctl verify — automated tunnel and service-discovery validation
