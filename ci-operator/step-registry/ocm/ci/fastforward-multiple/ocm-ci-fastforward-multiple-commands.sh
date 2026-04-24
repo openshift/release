@@ -783,10 +783,12 @@ SKIPPED_REPOS=(
 # Repos with release-* default branch - exclude from main fast-forward
 # These are processed separately to handle non-main default branches
 EXCLUDED_REPOS=(
+  "cloudevents-conductor"
   "cluster-permission"
   "grafana"
   "kube-rbac-proxy"
   "kube-state-metrics"
+  "maestro"
   "memcached_exporter"
   "obo-prometheus-operator"
   "node-exporter"
