@@ -1189,7 +1189,7 @@ echo ""
 echo "Repositories:"
 echo "  Total:        ${TOTAL_REPOS}"
 echo "  Processed:    ${PROCESSED_REPOS}"
-echo "  Skipped:      ${#SKIPPED_NO_ACCESS[@]}"
+echo "  Skipped:      ${#SKIPPED_NO_ACCESS[@]:-0}"
 echo ""
 
 # Fast-forward summary
@@ -1207,7 +1207,7 @@ echo "  Failed:     $((TOTAL_TEKTON - SUCCESSFUL_TEKTON))"
 echo ""
 
 # List skipped repos
-if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
+if [[ ${#SKIPPED_NO_ACCESS[@]:-0} -gt 0 ]]; then
   echo "Skipped Repositories (No Write Access):"
   for repo in "${SKIPPED_NO_ACCESS[@]}"; do
     echo "  - ${repo}"
@@ -1216,7 +1216,7 @@ if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
 fi
 
 # List failures if any
-if [[ ${#FAILED_FASTFORWARDS[@]} -gt 0 ]]; then
+if [[ ${#FAILED_FASTFORWARDS[@]:-0} -gt 0 ]]; then
   echo "Failed Fast-Forward Operations:"
   for failure in "${FAILED_FASTFORWARDS[@]}"; do
     echo "  - ${failure}"
@@ -1224,7 +1224,7 @@ if [[ ${#FAILED_FASTFORWARDS[@]} -gt 0 ]]; then
   echo ""
 fi
 
-if [[ ${#FAILED_TEKTON[@]} -gt 0 ]]; then
+if [[ ${#FAILED_TEKTON[@]:-0} -gt 0 ]]; then
   echo "Failed Tekton File Creations:"
   for failure in "${FAILED_TEKTON[@]}"; do
     echo "  - ${failure}"
