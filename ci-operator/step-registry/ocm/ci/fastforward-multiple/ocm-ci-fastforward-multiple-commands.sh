@@ -865,52 +865,8 @@ fastforward_repo() {
       # Push new branch to origin
       log "INFO Pushing DESTINATION_BRANCH to origin"
       if ! git push -u origin "$dest_branch" 2>&1; then
-        log "WARNING Could not push to origin DESTINATION_BRANCH (likely protected)"
-        log "INFO Creating PR as fallback"
-
-        # PR fallback
-        local pr_branch="ff-${dest_branch}"
-
-        # Check if PR branch exists on remote
-        if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
-          log "INFO PR branch ${pr_branch} exists, fetching and resetting"
-          git fetch origin "${pr_branch}"
-          git checkout "${pr_branch}"
-          git reset --hard HEAD  # Current state (new dest branch)
-        else
-          log "INFO Renaming branch to ${pr_branch}"
-          git branch -m "${dest_branch}" "${pr_branch}"
-        fi
-
-        # Force push (updates existing PR or creates new branch)
-        log "INFO Force pushing ${pr_branch}"
-        if ! git push --force origin "${pr_branch}" 2>&1; then
-          log "ERROR Could not push PR branch ${pr_branch}"
-          exit 1
-        fi
-
-        # Check if PR exists
-        log "INFO Checking for existing PR"
-        if gh pr list --head "${pr_branch}" --base "${dest_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
-          log "INFO PR already exists for ${pr_branch} → ${dest_branch}, updated via force push"
-        else
-          log "INFO Creating PR ${pr_branch} → ${dest_branch}"
-          if ! gh pr create \
-            --title "Fast-forward ${source_branch} to ${dest_branch}" \
-            --body "Automated fast-forward from ${source_branch} to ${dest_branch}.
-
-This PR was created because direct push to ${dest_branch} was blocked (protected branch).
-
-Co-Authored-By: OpenShift CI Robot <noreply@openshift.io>" \
-            --base "${dest_branch}" \
-            --head "${pr_branch}" 2>&1; then
-            log "ERROR Could not create PR"
-            exit 1
-          fi
-        fi
-
-        log "INFO Fast forward complete (via PR)"
-        exit 0
+        log "ERROR Could not push to origin DESTINATION_BRANCH"
+        exit 1
       fi
 
       log "INFO Fast forward complete"
@@ -929,52 +885,8 @@ Co-Authored-By: OpenShift CI Robot <noreply@openshift.io>" \
     # Push to origin
     log "INFO Pushing to origin/DESTINATION_BRANCH"
     if ! git push 2>&1; then
-      log "WARNING Could not push to DESTINATION_BRANCH (likely protected)"
-      log "INFO Creating PR as fallback"
-
-      # PR fallback
-      local pr_branch="ff-${dest_branch}"
-
-      # Check if PR branch exists on remote
-      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
-        log "INFO PR branch ${pr_branch} exists, fetching and resetting"
-        git fetch origin "${pr_branch}"
-        git checkout "${pr_branch}"
-        git reset --hard HEAD  # Current state (after ff-only pull)
-      else
-        log "INFO Creating PR branch ${pr_branch}"
-        git checkout -b "${pr_branch}"
-      fi
-
-      # Force push (updates existing PR or creates new branch)
-      log "INFO Force pushing ${pr_branch}"
-      if ! git push --force origin "${pr_branch}" 2>&1; then
-        log "ERROR Could not push PR branch ${pr_branch}"
-        exit 1
-      fi
-
-      # Check if PR exists
-      log "INFO Checking for existing PR"
-      if gh pr list --head "${pr_branch}" --base "${dest_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
-        log "INFO PR already exists for ${pr_branch} → ${dest_branch}, updated via force push"
-      else
-        log "INFO Creating PR ${pr_branch} → ${dest_branch}"
-        if ! gh pr create \
-          --title "Fast-forward ${source_branch} to ${dest_branch}" \
-          --body "Automated fast-forward from ${source_branch} to ${dest_branch}.
-
-This PR was created because direct push to ${dest_branch} was blocked (protected branch).
-
-Co-Authored-By: OpenShift CI Robot <noreply@openshift.io>" \
-          --base "${dest_branch}" \
-          --head "${pr_branch}" 2>&1; then
-          log "ERROR Could not create PR"
-          exit 1
-        fi
-      fi
-
-      log "INFO Fast forward complete (via PR)"
-      exit 0
+      log "ERROR Could not push to DESTINATION_BRANCH"
+      exit 1
     fi
 
     log "INFO Fast forward complete"
