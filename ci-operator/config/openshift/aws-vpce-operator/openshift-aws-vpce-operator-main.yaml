@@ -1,9 +1,22 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: build/Dockerfile
-    to: unused
+    to: aws-vpce-operator
+  - dockerfile_path: test/e2e/Containerfile.prow
+    to: operator-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -53,6 +66,28 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: avo-e2e-presubmit
+  run_if_changed: ^(test/e2e/.*|pkg/.*|api/.*|cmd/.*|deploy/.*|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: staging
+      OPERATOR_IMAGE: quay.io/redhat-services-prod/openshift/aws-vpce-operator:latest
+      OPERATOR_NAME: aws-vpce-operator
+      OPERATOR_PKO_IMAGE: quay.io/redhat-services-prod/openshift/aws-vpce-operator-pko:latest
+    workflow: rosa-operator-e2e-workflow
+- as: avo-e2e-postsubmit
+  postsubmit: true
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: staging
+      OPERATOR_IMAGE: quay.io/redhat-services-prod/openshift/aws-vpce-operator:latest
+      OPERATOR_NAME: aws-vpce-operator
+      OPERATOR_PKO_IMAGE: quay.io/redhat-services-prod/openshift/aws-vpce-operator-pko:latest
+    workflow: rosa-operator-e2e-workflow
 zz_generated_metadata:
   branch: main
   org: openshift
