@@ -518,13 +518,7 @@ create_tekton_files() {
 
     cd "$repo" || exit 1
 
-    # Check if .tekton directory exists
-    if [[ ! -d .tekton ]]; then
-      log "INFO No .tekton directory found, skipping"
-      exit 0
-    fi
-
-    # Find highest existing version
+    # Find highest existing version (returns "0" if no .tekton directory)
     local highest_version
     highest_version=$(get_highest_tekton_version "." "${product_prefix}" "${branch_prefix}")
 
