@@ -123,6 +123,8 @@ for sp_type in ${sp_list}; do
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
     create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
+    echo "sleep 4 minutes"
+    sleep 240
     sp_app_id=$(jq -r .appId "${sp_output}")
     sp_id=$(az ad sp show --id ${sp_app_id} --query id -otsv)
     sp_password=$(jq -r .password "${sp_output}")
