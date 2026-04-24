@@ -64,7 +64,7 @@ function create_secret_file_for_aws()
     local key_id=$3
     local key_sec=$4
     local output_file=$5
-    cat <<EOF >${output_file}
+    cat <<EOF >"${output_file}"
 apiVersion: v1
 kind: Secret
 metadata:
