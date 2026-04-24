@@ -77,7 +77,7 @@ fi
 # Verify worker node VM types
 echo ""
 echo "Verifying worker VM types..."
-worker_nodes=($(oc get nodes --no-headers -l node-role.kubernetes.io/worker= -o custom-columns=NAME:.metadata.name))
+mapfile -t worker_nodes < <(oc get nodes --no-headers -l node-role.kubernetes.io/worker= -o custom-columns=NAME:.metadata.name)
 
 for node in "${worker_nodes[@]}"; do
     vm_type=$(oc get node "$node" -o jsonpath='{.metadata.labels.beta\.kubernetes\.io/instance-type}')
