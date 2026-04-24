@@ -17,12 +17,18 @@ export TEST_TIMEOUT="${TEST_TIMEOUT:-6h}"
 # Function to check cluster health
 check_cluster_health() {
     echo "Checking cluster operator health..."
-    oc get co --no-headers | while read name _ available progressing degraded _ _; do
+    local unhealthy_operators=0
+    while read -r name _ available progressing degraded _ _; do
         if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
             echo "ERROR: Cluster operator $name is not healthy: available=$available, progressing=$progressing, degraded=$degraded"
-            return 1
+            ((unhealthy_operators++))
         fi
-    done
+    done < <(oc get co --no-headers)
+    
+    if [[ $unhealthy_operators -gt 0 ]]; then
+        echo "ERROR: Found $unhealthy_operators unhealthy cluster operators"
+        return 1
+    fi
     echo "All cluster operators are healthy"
 }
 
