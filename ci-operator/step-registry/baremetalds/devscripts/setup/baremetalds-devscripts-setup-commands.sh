@@ -296,7 +296,14 @@ EOF2
         virtualenv-3.6 --python python3.9 venv
         ./venv/bin/pip install git+https://github.com/derekhiggins/sushy-tools.git@esi python-openstackclient python-ironicclient
         echo -e "SUSHY_EMULATOR_IRONIC_CLOUD = 'openstack'" >> ~/.sushy-tools/conf.py
-        cat ~/esi_cloud_yaml | base64 -d > clouds.yaml
+        # cat ~/esi_cloud_yaml | base64 -d > clouds.yaml
+        umask 077
+        base64 -d < ~/esi_cloud_yaml > clouds.yaml
+        # Copy clouds.yaml to the location expected by dev-scripts
+        install -d -m 700 /opt/metal3/auth
+        install -m 600 clouds.yaml /opt/metal3/auth/clouds.yaml
+        # If no local copy is needed after install, clean it up:
+        # rm -f clouds.yaml
         nohup ./venv/bin/sushy-emulator --config /root/.sushy-tools/conf.py -i :: >> sushy-emulator.log 2>&1 &
     fi
 
