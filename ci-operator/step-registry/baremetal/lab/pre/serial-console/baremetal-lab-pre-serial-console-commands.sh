@@ -23,9 +23,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 
     case "${model}" in
       "PowerEdge R740")
-        if [[ $(echo "$bios_attributes" | jq -r '.SerialPortAddress') != "Serial1Com2Serial2Com1" ]] || [[ $(echo "$bios_attributes" | jq -r '.ExtSerialConnector') != "Serial2" ]]; then
+        if [[ $(echo "$bios_attributes" | jq -r '.SerialComm') != "OnConRedirAuto" ]] || $(echo "$bios_attributes" | jq -r '.SerialPortAddress') != "Serial1Com2Serial2Com1" ]] || [[ $(echo "$bios_attributes" | jq -r '.ExtSerialConnector') != "Serial2" ]]; then
           echo "Applying serial console settings to $bmc_address"
-          curl -k -u "$bmc_user:$bmc_pass" -H "Content-Type: application/json" -X PATCH https://$bmc_address/redfish/v1/Systems/System.Embedded.1/Bios/Settings --data '{"Attributes":{"SerialPortAddress": "Serial1Com2Serial2Com1", "ExtSerialConnector": "Serial2"}}'
+          curl -k -u "$bmc_user:$bmc_pass" -H "Content-Type: application/json" -X PATCH https://$bmc_address/redfish/v1/Systems/System.Embedded.1/Bios/Settings --data '{"Attributes":{"SerialComm": "OnConRedirAuto", "SerialPortAddress": "Serial1Com2Serial2Com1", "ExtSerialConnector": "Serial2"}}'
         fi
         ;;
       "PowerEdge R650")
