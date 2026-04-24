@@ -96,8 +96,23 @@ mkdir -p "$RESULTS_DIR"
 echo "=== STEP 1: Verify initial cluster state ==="
 check_cluster_health
 
-echo "Initial cluster network configuration:"
+echo "Expected initial cluster network configuration:"
+echo "  Original CIDR: $CLUSTER_NETWORK_ORIGINAL_CIDR"
+echo "  Expanded CIDR: $CLUSTER_NETWORK_EXPANDED_CIDR"
+
+echo "Actual initial cluster network configuration:"
 oc get network.config.openshift.io cluster -o yaml | tee "$RESULTS_DIR/initial-network-config.yaml"
+
+# Verify the cluster started with the expected initial CIDR
+actual_cidr=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+echo "Actual initial CIDR: $actual_cidr"
+if [[ "$actual_cidr" != "$CLUSTER_NETWORK_ORIGINAL_CIDR" ]]; then
+    echo "⚠️  WARNING: Cluster started with CIDR $actual_cidr instead of expected $CLUSTER_NETWORK_ORIGINAL_CIDR"
+    echo "This means the cluster install-config was not configured correctly for network expansion testing"
+    echo "The test should start with $CLUSTER_NETWORK_ORIGINAL_CIDR and expand to $CLUSTER_NETWORK_EXPANDED_CIDR"
+else
+    echo "✅ SUCCESS: Cluster started with correct initial CIDR $actual_cidr"
+fi
 
 echo "Initial node count:"
 initial_node_count=$(oc get nodes --no-headers | wc -l)
@@ -142,6 +157,17 @@ check_cluster_health
 
 echo "Updated cluster network configuration:"
 oc get network.config.openshift.io cluster -o yaml | tee "$RESULTS_DIR/post-expansion-network-config.yaml"
+
+# Verify the network expansion was successful
+updated_cidr=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+echo "Post-expansion CIDR: $updated_cidr"
+if [[ "$updated_cidr" == "$CLUSTER_NETWORK_EXPANDED_CIDR" ]]; then
+    echo "✅ SUCCESS: Network successfully expanded from $CLUSTER_NETWORK_ORIGINAL_CIDR to $updated_cidr"
+else
+    echo "❌ ERROR: Network expansion failed. Expected $CLUSTER_NETWORK_EXPANDED_CIDR but got $updated_cidr"
+    echo "Initial CIDR was: $CLUSTER_NETWORK_ORIGINAL_CIDR"
+    exit 1
+fi
 
 echo "Post-expansion cluster operators status:"
 oc get co -o wide | tee "$RESULTS_DIR/post-expansion-cluster-operators.txt"
