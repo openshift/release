@@ -1179,6 +1179,98 @@ for product in mce acm globalhub; do
   done
 done
 
+# Cleanup stale ff-* branches from old PR fallback code
+echo ""
+echo "=== Cleaning up stale ff-* branches ==="
+echo ""
+
+declare -a CLEANED_BRANCHES
+TOTAL_CLEANED=0
+
+# Get unique repos we processed
+declare -A PROCESSED_REPO_MAP
+for product in mce acm globalhub; do
+  component_repos=$(yq '.components[] |
+      select((.bundle == "'"${product}-operator-bundle"'" or
+      .name == "'"${product}-operator-bundle"'") and
+      (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}" | sort -u)
+
+  for repo in ${component_repos}; do
+    owner_repo=${repo#https://github.com/}
+    owner=${owner_repo%/*}
+    repo_name=${owner_repo#*/}
+
+    # Skip if not stolostron or if in skip lists
+    if [[ ! "${owner_repo}" =~ ^stolostron/ ]]; then
+      continue
+    fi
+
+    skip_repo=false
+    for skipped in "${SKIPPED_REPOS[@]}"; do
+      if [[ "${repo_name}" == "${skipped}" ]]; then
+        skip_repo=true
+        break
+      fi
+    done
+
+    if [[ "${skip_repo}" == "true" ]]; then
+      continue
+    fi
+
+    # Check if we have access
+    if ! can_push_to_repo "${owner}" "${repo_name}"; then
+      continue
+    fi
+
+    PROCESSED_REPO_MAP["${owner}/${repo_name}"]=1
+  done
+done
+
+# For each processed repo, clean up stale ff-* branches
+for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
+  owner=${owner_repo%/*}
+  repo=${owner_repo#*/}
+
+  echo "INFO: Checking ${owner_repo} for stale ff-* branches"
+
+  # Get all ff-* branches for this repo
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "WARNING: gh CLI not available, skipping cleanup"
+    break
+  fi
+
+  # List all branches matching ff-release-* or ff-backplane-*
+  stale_branches=$(gh api "repos/${owner}/${repo}/branches" --paginate --jq '.[].name | select(test("^ff-(release|backplane)-"))' 2>/dev/null || true)
+
+  if [[ -z "${stale_branches}" ]]; then
+    continue
+  fi
+
+  # Check each branch
+  while IFS= read -r branch; do
+    [[ -z "${branch}" ]] && continue
+
+    # Check if branch has open PR
+    pr_count=$(gh pr list --repo "${owner}/${repo}" --head "${branch}" --json number --jq 'length' 2>/dev/null || echo "0")
+
+    if [[ "${pr_count}" == "0" ]]; then
+      echo "INFO: Deleting stale branch ${branch} from ${owner_repo} (no open PR)"
+      if gh api -X DELETE "repos/${owner}/${repo}/git/refs/heads/${branch}" 2>/dev/null; then
+        CLEANED_BRANCHES+=("${owner_repo}:${branch}")
+        TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
+      else
+        echo "WARNING: Failed to delete ${branch} from ${owner_repo}"
+      fi
+    else
+      echo "INFO: Keeping ${branch} from ${owner_repo} (has open PR)"
+    fi
+  done <<< "${stale_branches}"
+done
+
+if [[ ${TOTAL_CLEANED} -gt 0 ]]; then
+  echo "INFO: Cleaned ${TOTAL_CLEANED} stale branches"
+fi
+
 echo ""
 echo "================================================================="
 echo "                    FAST-FORWARD WORKFLOW SUMMARY"
@@ -1206,6 +1298,11 @@ echo "  Successful: ${SUCCESSFUL_TEKTON}"
 echo "  Failed:     $((TOTAL_TEKTON - SUCCESSFUL_TEKTON))"
 echo ""
 
+# Cleanup summary
+echo "Branch Cleanup:"
+echo "  Stale ff-* branches deleted: ${TOTAL_CLEANED}"
+echo ""
+
 # List skipped repos
 if [[ ${#SKIPPED_NO_ACCESS[@]:-0} -gt 0 ]]; then
   echo "Skipped Repositories (No Write Access):"
@@ -1228,6 +1325,15 @@ if [[ ${#FAILED_TEKTON[@]:-0} -gt 0 ]]; then
   echo "Failed Tekton File Creations:"
   for failure in "${FAILED_TEKTON[@]}"; do
     echo "  - ${failure}"
+  done
+  echo ""
+fi
+
+# List cleaned branches
+if [[ ${#CLEANED_BRANCHES[@]:-0} -gt 0 ]]; then
+  echo "Cleaned Stale Branches:"
+  for cleaned in "${CLEANED_BRANCHES[@]}"; do
+    echo "  - ${cleaned}"
   done
   echo ""
 fi
