@@ -112,12 +112,19 @@ DEPENDABOT_PRS=$(gh pr list \
   --json number,title,headRefName \
   --limit 50)
 
-# Filter out PRs that bump k8s.io or sigs.k8s.io dependencies (managed manually)
-echo "Filtering out k8s.io and sigs.k8s.io dependency bumps..."
+# Filter out PRs that are not Go module dependency bumps
+echo "Filtering out non-Go-module and k8s.io/sigs.k8s.io dependency bumps..."
 FILTERED_PRS="[]"
 while IFS= read -r pr_json; do
   pr_num=$(echo "$pr_json" | jq -r '.number')
   pr_title=$(echo "$pr_json" | jq -r '.title')
+  pr_branch=$(echo "$pr_json" | jq -r '.headRefName')
+  # Skip GitHub Actions dependency bumps (not Go modules, and workflow file pushes
+  # require the 'workflows' permission which the GitHub App token does not have)
+  if [[ "$pr_branch" == dependabot/github_actions/* ]]; then
+    echo "  Skipping PR #${pr_num}: ${pr_title} (GitHub Actions bump)"
+    continue
+  fi
   pr_diff=$(gh api "repos/openshift/hypershift/pulls/${pr_num}/files" \
     --jq '.[] | select(.filename == "go.mod" or .filename == "api/go.mod") | .patch' 2>/dev/null || true)
   if echo "$pr_diff" | grep -vE '// indirect' | grep -qE '^\+[^+].*\b(k8s\.io|sigs\.k8s\.io)/'; then
@@ -220,7 +227,7 @@ echo "$CLAUDE_PROMPT" | claude --print \
   --allowedTools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,Skill,Task,TodoWrite" \
   --verbose \
   --output-format stream-json \
-  --max-turns 100 \
+  --max-turns 200 \
   2> "/tmp/claude-dependabot-output.log" \
   | tee "$CLAUDE_OUTPUT_FILE"
 CLAUDE_EXIT_CODE=$?
