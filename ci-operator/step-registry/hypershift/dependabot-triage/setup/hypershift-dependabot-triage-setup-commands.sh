@@ -15,8 +15,7 @@ if [ ! -f "$CLAUDE_CONFIG" ]; then
     echo "WARNING: Claude config missing, restoring from backup: $LATEST_BACKUP"
     cp "$LATEST_BACKUP" "$CLAUDE_CONFIG"
   else
-    echo "ERROR: Claude config missing and no backup found"
-    exit 1
+    echo "WARNING: Claude config missing and no backup found, continuing anyway"
   fi
 fi
 
