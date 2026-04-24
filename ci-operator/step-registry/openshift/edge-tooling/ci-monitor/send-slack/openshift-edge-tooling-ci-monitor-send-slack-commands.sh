@@ -2,14 +2,18 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Read webhook URL (tracing disabled — secret handling)
+# Guards — skip sending in certain conditions
 # ---------------------------------------------------------------------------
 if [[ ! -f "${SHARED_DIR}/monitor-completed" ]]; then
     echo "Monitor step did not complete — skipping Slack notification."
     exit 0
 fi
 
-WEBHOOK_URL=$(cat /var/run/slack-webhook/ocp-ci-monitor)
+DRY_RUN=false
+if [[ "${JOB_TYPE:-}" != "periodic" ]]; then
+    echo "Non-periodic job (${JOB_TYPE:-unknown}) — will dry-run only."
+    DRY_RUN=true
+fi
 
 # ---------------------------------------------------------------------------
 # Build URLs
@@ -87,11 +91,17 @@ elif [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
     ICON=":large_yellow_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing blocking jobs."
     INFORMING_SUMMARY=$(version_summary "${INFORMING_LINES}" "${ALL_LINES}")
-    MESSAGE+="${NL}:warning: *${INFORMING_COUNT}* failing informing job(s): ${INFORMING_SUMMARY}"
+    INFORMING_TOPOS=$(echo "${INFORMING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
+    MESSAGE+="${NL}:warning: *${INFORMING_COUNT}* failing informing job(s)"
+    MESSAGE+="${NL}• *Versions:* ${INFORMING_SUMMARY}"
+    MESSAGE+="${NL}• *Topologies:* ${INFORMING_TOPOS}"
 else
     ICON=":red_circle:"
     BLOCKING_SUMMARY=$(version_summary "${BLOCKING_LINES}" "${ALL_LINES}")
-    MESSAGE="${ICON} *Edge OCP CI Monitor* — *${BLOCKING_COUNT}* failing blocking job(s): ${BLOCKING_SUMMARY}"
+    BLOCKING_TOPOS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
+    MESSAGE="${ICON} *Edge OCP CI Monitor* — *${BLOCKING_COUNT}* failing blocking job(s)."
+    MESSAGE+="${NL}• *Versions:* ${BLOCKING_SUMMARY}"
+    MESSAGE+="${NL}• *Topologies:* ${BLOCKING_TOPOS}"
     if [[ "${INFORMING_COUNT}" -gt 0 ]]; then
         MESSAGE+="${NL}:warning: *${INFORMING_COUNT}* failing informing job(s)"
     fi
@@ -100,12 +110,21 @@ fi
 MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
 
 # ---------------------------------------------------------------------------
-# Send to Slack
+# Send to Slack (or dry-run on PRs)
 # ---------------------------------------------------------------------------
-PAYLOAD=$(jq -nc --arg text "${MESSAGE}" '{"text": $text}')
+echo "--- Slack message preview ---"
+echo "${MESSAGE}"
+echo "-----------------------------"
 
-curl -sf -X POST -H 'Content-type: application/json' \
-    --data "${PAYLOAD}" \
-    "${WEBHOOK_URL}"
+if [[ "${DRY_RUN}" == "true" ]]; then
+    echo "Dry-run complete — message NOT sent since this is not a periodic job."
+else
+    WEBHOOK_URL=$(cat /var/run/slack-webhook/ocp-ci-monitor)
+    PAYLOAD=$(jq -nc --arg text "${MESSAGE}" '{"text": $text}')
 
-echo "Slack notification sent (${BLOCKING_COUNT} blocking, ${INFORMING_COUNT} informing)."
+    curl -sf -X POST -H 'Content-type: application/json' \
+        --data "${PAYLOAD}" \
+        "${WEBHOOK_URL}"
+
+    echo "Slack notification sent (${BLOCKING_COUNT} blocking, ${INFORMING_COUNT} informing)."
+fi
