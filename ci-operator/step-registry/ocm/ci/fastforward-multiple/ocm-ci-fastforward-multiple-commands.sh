@@ -530,9 +530,7 @@ create_tekton_files() {
     pr_body="This PR adds Tekton pipeline files for the following versions:
 $(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
 
-Generated from existing ${product_prefix}-${highest_version} templates.
-
-/cc @stolostron/acm-cicd"
+Generated from existing ${product_prefix}-${highest_version} templates."
 
     local pr_exists=false
     if command -v gh >/dev/null 2>&1; then
