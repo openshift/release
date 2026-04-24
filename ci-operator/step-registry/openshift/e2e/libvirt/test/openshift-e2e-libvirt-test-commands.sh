@@ -284,6 +284,42 @@ function oc_adm_top_nodes_loop() {
 	done
 }
 
+function oc_describe_nodes_loop() {
+	log_to_file "${ARTIFACT_DIR}/oc-describe-nodes.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+
+		oc describe nodes
+
+		sleep 2m
+	done
+}
+
+function monitor_test_pods_loop() {
+	log_to_file "${ARTIFACT_DIR}/monitor-test-pods.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+
+		# Get all disruption-poller pods
+		echo "=== Disruption Poller Pods ==="
+		oc get pods -A | grep -E "disruption-poller|disruption-target" || echo "No disruption pods found"
+
+		echo ""
+		echo "=== Describe Disruption Pods ==="
+		for pod in $(oc get pods -A -o json | jq -r '.items[] | select(.metadata.name | contains("disruption")) | "\(.metadata.namespace)/\(.metadata.name)"'); do
+			echo "--- Pod: $pod ---"
+			oc describe pod -n ${pod%/*} ${pod##*/} 2>&1 | grep -A 30 "Events:" || echo "No events"
+			echo ""
+		done
+
+		sleep 1m
+	done
+}
+
 function suite() {
     if [ -f "${SHARED_DIR}/excluded_tests" ]; then
         cat > ${SHARED_DIR}/invert_excluded.py <<EOSCRIPT
@@ -383,6 +419,12 @@ else
 fi
 
 oc_adm_top_nodes_loop &
+WATCHERS+=( "$!" )
+
+oc_describe_nodes_loop &
+WATCHERS+=( "$!" )
+
+monitor_test_pods_loop &
 WATCHERS+=( "$!" )
 
 case "${TEST_TYPE}" in
