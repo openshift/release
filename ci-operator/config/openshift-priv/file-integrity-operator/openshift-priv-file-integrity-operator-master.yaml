@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: latest
   operator-sdk:
-    name: "4.22"
+    name: "5.0"
     namespace: origin
     tag: operator-sdk
   rosa-aws-cli:
@@ -13,13 +13,14 @@ base_images:
     tag: release
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.25-openshift-4.22
 canonical_go_repository: github.com/openshift/file-integrity-operator
 images:
-- dockerfile_path: Dockerfile.ci
-  to: file-integrity-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: file-integrity-operator
 operator:
   bundles:
   - as: file-integrity-operator-bundle
@@ -32,17 +33,17 @@ operator:
     with: pipeline:file-integrity-operator
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':

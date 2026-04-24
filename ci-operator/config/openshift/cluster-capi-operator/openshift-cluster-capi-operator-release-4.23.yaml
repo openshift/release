@@ -15,8 +15,9 @@ binary_build_commands: go build -o bin/cluster-capi-operator cmd/cluster-capi-op
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-capi-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-capi-operator
 promotion:
   to:
   - name: "4.23"
@@ -119,7 +120,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -127,7 +128,7 @@ tests:
   as: e2e-gcp-capi-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -140,6 +141,8 @@ tests:
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-openstack-ovn-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: openstack-vexxhost
     env:

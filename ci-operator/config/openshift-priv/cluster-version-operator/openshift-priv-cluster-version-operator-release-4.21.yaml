@@ -23,8 +23,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-version-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-version-operator
 promotion:
   to:
   - name: 4.21-priv
@@ -93,6 +94,13 @@ tests:
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: e2e-agnostic-ovn-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-azure
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

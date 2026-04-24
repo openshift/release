@@ -10,124 +10,129 @@ build_root:
     namespace: aro-hcp
     tag: aro-hcp-e2e-base-ci
 images:
-- dockerfile_literal: |
-    FROM nested-podman
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    USER root
-    # allow anyone to create content in GOPATH so we can go install stuff
-    RUN chmod 777 /opt/app-root
-    RUN dnf install -y git go make
-    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-    RUN dnf install -y pass || true
-    RUN dnf install -y qrencode || true
-    RUN dnf install -y net-tools || true
-    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
-    RUN dnf clean all
-  from: nested-podman
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
-  to: nested-podman-src
-- build_args:
-  - name: PLATFORM
-    value: linux/amd64
-  - name: ARO_HCP_REVISION
-    value: ci-sha
-  - name: ARO_HCP_IMAGE_TAG
-    value: ci-test-img
-  dockerfile_path: backend/Dockerfile
-  from: src
-  to: aro-hcp-backend
-- build_args:
-  - name: PLATFORM
-    value: linux/amd64
-  - name: ARO_HCP_REVISION
-    value: ci-sha
-  - name: ARO_HCP_IMAGE_TAG
-    value: ci-test-img
-  dockerfile_path: frontend/Dockerfile
-  from: src
-  to: aro-hcp-frontend
-- build_args:
-  - name: PLATFORM
-    value: linux/amd64
-  - name: ARO_HCP_REVISION
-    value: ci-sha
-  - name: ARO_HCP_IMAGE_TAG
-    value: ci-test-img
-  dockerfile_path: admin/Dockerfile
-  from: src
-  to: aro-hcp-admin-api
-- build_args:
-  - name: PLATFORM
-    value: linux/amd64
-  - name: ARO_HCP_REVISION
-    value: ci-sha
-  - name: ARO_HCP_IMAGE_TAG
-    value: ci-test-img
-  dockerfile_path: sessiongate/Dockerfile
-  from: src
-  to: aro-hcp-sessiongate
-- dockerfile_literal: |
-    FROM src
-    USER root
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    ENV GOBIN="/usr/local/bin"
-    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-    ENV GOFLAGS='-mod=readonly'
-    RUN make install-tools && \
-        make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests prow-job-executor && \
-        go clean -cache -modcache && \
-        rm -f go.work.sum
-    RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
-    RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
-    RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
-    RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
-  from: src
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
-  to: aro-hcp-e2e-tools
-- dockerfile_literal: |
-    FROM src
-    USER root
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    # Install official Node.js binary from nodejs.org (pinned version)
-    RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
-        tar -xJ -C /usr/local --strip-components=1 && \
-        node --version && npm --version
-    # Install npm dependencies
-    RUN cd api && npm ci --legacy-peer-deps
-  from: src
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
-  to: aro-hcp-api-tools
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY /src /opt/app-root/src/github.com/Azure
+      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+      USER root
+      # allow anyone to create content in GOPATH so we can go install stuff
+      RUN chmod 777 /opt/app-root
+      RUN dnf install -y git go make
+      RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+      RUN dnf install -y pass || true
+      RUN dnf install -y qrencode || true
+      RUN dnf install -y net-tools || true
+      RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
+      RUN dnf clean all
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/Azure/ARO-HCP
+    to: nested-podman-src
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: backend/Dockerfile
+    to: aro-hcp-backend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: frontend/Dockerfile
+    to: aro-hcp-frontend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: admin/Dockerfile
+    to: aro-hcp-admin-api
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: sessiongate/Dockerfile
+    to: aro-hcp-sessiongate
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: hcp-recovery/Dockerfile
+    from: src
+    to: aro-hcp-hcp-recovery
+  - context_dir: image-sync/oc-mirror
+    dockerfile_path: Dockerfile
+    to: aro-hcp-oc-mirror
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    context_dir: tooling
+    dockerfile_path: aro-hcp-exporter/Dockerfile
+    to: aro-hcp-exporter
+  - dockerfile_literal: |
+      FROM src
+      USER root
+      COPY /src /opt/app-root/src/github.com/Azure
+      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+      ENV GOFLAGS='-mod=readonly'
+      RUN make -C tooling/templatize templatize && \
+          go clean -cache -modcache && rm -f go.work.sum
+      RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+    from: src
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/Azure/ARO-HCP
+    to: aro-hcp-e2e-tools
+  - dockerfile_path: test/Containerfile.e2e
+    from: src
+    to: aro-hcp-e2e-tests
+  - dockerfile_literal: |
+      FROM src
+      USER root
+      COPY /src /opt/app-root/src/github.com/Azure
+      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+      # Install official Node.js binary from nodejs.org (pinned version)
+      RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
+          tar -xJ -C /usr/local --strip-components=1 && \
+          node --version && npm --version
+      # Install npm dependencies
+      RUN cd api && npm ci --legacy-peer-deps
+    from: src
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/Azure/ARO-HCP
+    to: aro-hcp-api-tools
 promotion:
   to:
   - additional_images:
-      aro-hcp-e2e-tools: aro-hcp-e2e-tools
+      aro-hcp-e2e-tests: aro-hcp-e2e-tests
     excluded_images:
     - '*'
     namespace: aro-hcp
     tag: latest
     tag_by_commit: true
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.20"
 resources:
   '*':
     limits:
@@ -135,6 +140,13 @@ resources:
     requests:
       cpu: "3"
       memory: 4Gi
+  aro-hcp-e2e-tests:
+    limits:
+      cpu: "8"
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 10Gi
   aro-hcp-e2e-tools:
     limits:
       cpu: "8"
@@ -151,7 +163,6 @@ tests:
 - as: secrets-validation
   run_if_changed: ^(tooling/secret-sync|dev-infrastructure/data)/
   steps:
-    cluster_profile: aro-hcp-dev
     test:
     - ref: aro-hcp-secrets-validation
 - as: verify
@@ -173,6 +184,11 @@ tests:
   steps:
     test:
     - ref: aro-hcp-mega-lint
+- as: observability-verify
+  run_if_changed: ^observability/
+  steps:
+    test:
+    - ref: aro-hcp-observability-verify
 - as: observability-prometheus
   run_if_changed: ^observability/(alerts|prometheus)/
   steps:
@@ -200,13 +216,76 @@ tests:
   as: integration-e2e-parallel
   optional: true
   steps:
-    cluster_profile: aro-hcp-int
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: integration-e2e-parallel-ocp-stable
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: stable
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: integration-e2e-parallel-ocp-fast
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: fast
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: integration-e2e-parallel-ocp-nightly
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: int
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-int-quota-slice
     - count: 20
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-int
@@ -215,13 +294,76 @@ tests:
   as: stage-e2e-parallel
   optional: true
   steps:
-    cluster_profile: aro-hcp-stg
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: stage-e2e-parallel-ocp-stable
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: stable
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: stage-e2e-parallel-ocp-fast
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: fast
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: stage-e2e-parallel-ocp-nightly
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
     - count: 30
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-stg
@@ -230,32 +372,98 @@ tests:
   as: prod-e2e-parallel
   optional: true
   steps:
-    cluster_profile: aro-hcp-prod
     env:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
     leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: prod-e2e-parallel-ocp-stable
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: stable
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: prod-e2e-parallel-ocp-fast
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: fast
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: prod-e2e-parallel-ocp-nightly
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
     - count: 15
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-prod
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
-  skip_if_only_changed: ^(?:action\.yml|CODEOWNERS|docs/|LICENSE|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:editorconfig|gitattributes|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
+  skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
   steps:
-    cluster_profile: aro-hcp-dev
     env:
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: prow
       LOCATION: westus3
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-dev-quota-slice
     workflow: aro-hcp-local-e2e
+  timeout: 10h0m0s
 - as: global-pipeline-postsubmit
   postsubmit: true
   run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
   steps:
-    cluster_profile: aro-hcp-dev
     env:
       LOCATION: westus3
     leases:
@@ -264,6 +472,21 @@ tests:
       resource_type: aro-hcp-dev-global-pipeline-quota-slice
     test:
     - ref: aro-hcp-provision-global-pipeline
+- as: images-push
+  postsubmit: true
+  steps:
+    test:
+    - ref: aro-hcp-images-push
+- as: cspr
+  postsubmit: true
+  steps:
+    env:
+      DEPLOY_ENV: cspr
+    leases:
+    - count: 1
+      env: LEASED_CSPR_PIPELINE_RESOURCE
+      resource_type: aro-hcp-dev-cspr-pipeline-quota-slice
+    workflow: aro-hcp-cspr
 zz_generated_metadata:
   branch: main
   org: Azure

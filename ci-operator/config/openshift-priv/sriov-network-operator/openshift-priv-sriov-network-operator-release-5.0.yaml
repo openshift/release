@@ -35,14 +35,15 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.ocp
-  to: sriov-network-webhook
-- dockerfile_path: bundleci.Dockerfile
-  to: sriov-network-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.ocp
+    to: sriov-network-webhook
+  - dockerfile_path: bundleci.Dockerfile
+    to: sriov-network-operator-bundle
 operator:
   bundles:
   - as: operator-bundle
@@ -73,7 +74,8 @@ promotion:
   - disabled: true
     name: sriov-5.0
     namespace: origin
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
@@ -305,7 +307,9 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sno-ztp-cnf
-- as: operator-e2e-sriov-sno
+- always_run: false
+  as: operator-e2e-sriov-sno
+  optional: true
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

@@ -6,15 +6,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: monitoring-plugin
-- dockerfile_path: Dockerfile.test
-  to: monitoring-plugin-test
-- dockerfile_path: Dockerfile.mcp
-  to: monitoring-console-plugin
-- context_dir: .
-  dockerfile_path: web/cypress/Dockerfile
-  to: monitoring-ui-tests-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: monitoring-plugin
+  - dockerfile_path: Dockerfile.test
+    to: monitoring-plugin-test
+  - dockerfile_path: Dockerfile.mcp
+    to: monitoring-console-plugin
+  - context_dir: .
+    dockerfile_path: web/cypress/Dockerfile
+    to: monitoring-ui-tests-runner
 releases:
   initial:
     integration:
@@ -194,12 +195,28 @@ tests:
     - ref: monitoring-plugin-tests-virtualization-ui
     workflow: generic-claim
 - always_run: false
+  as: e2e-perses
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui
+    workflow: ipi-aws
+- always_run: false
   as: e2e-monitoring-dev
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-perses-dev
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-dev-ui
     workflow: ipi-aws
 zz_generated_metadata:
   branch: release-coo-0.5

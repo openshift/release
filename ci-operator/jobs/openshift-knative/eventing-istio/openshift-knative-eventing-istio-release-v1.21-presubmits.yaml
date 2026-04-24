@@ -6,18 +6,18 @@ presubmits:
     - ^release-v1\.21$
     - ^release-v1\.21-
     cluster: build10
-    context: ci/prow/414-e2e-tests
+    context: ci/prow/416-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-      ci-operator.openshift.io/variant: "414"
+      ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-414-e2e-tests
-    rerun_command: /test 414-e2e-tests
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-416-e2e-tests
+    rerun_command: /test 416-e2e-tests
     spec:
       containers:
       - args:
@@ -27,7 +27,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-tests
-        - --variant=414
+        - --variant=416
         command:
         - ci-operator
         env:
@@ -83,23 +83,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(414-e2e-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(416-e2e-tests|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
     cluster: build03
-    context: ci/prow/414-images
+    context: ci/prow/416-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "414"
+      ci-operator.openshift.io/variant: "416"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-414-images
-    rerun_command: /test 414-images
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-416-images
+    rerun_command: /test 416-images
     run_if_changed: ^non-existing$
     spec:
       containers:
@@ -109,7 +109,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=414
+        - --variant=416
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -142,23 +142,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )414-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )416-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
     cluster: build03
-    context: ci/prow/420-e2e-tests
+    context: ci/prow/421-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "420"
+      ci-operator.openshift.io/variant: "421"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-420-e2e-tests
-    rerun_command: /test 420-e2e-tests
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-421-e2e-tests
+    rerun_command: /test 421-e2e-tests
     skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
@@ -166,10 +166,11 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-tests
-        - --variant=420
+        - --variant=421
         command:
         - ci-operator
         env:
@@ -187,6 +188,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -207,6 +211,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -222,23 +232,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )420-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )421-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-v1\.21$
     - ^release-v1\.21-
     cluster: build03
-    context: ci/prow/420-images
+    context: ci/prow/421-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "420"
+      ci-operator.openshift.io/variant: "421"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-420-images
-    rerun_command: /test 420-images
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.21-421-images
+    rerun_command: /test 421-images
     skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
@@ -248,7 +258,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=420
+        - --variant=421
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -281,4 +291,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )420-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )421-images,?($|\s.*)

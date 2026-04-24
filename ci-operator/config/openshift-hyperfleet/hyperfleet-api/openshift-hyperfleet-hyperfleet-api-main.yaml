@@ -5,24 +5,25 @@ base_images:
     tag: latest
 build_root:
   image_stream_tag:
-    name: openshift-build
-    namespace: jasee
-    tag: rhel-9-golang-1.25
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
-- dockerfile_literal: |
-    FROM nested-podman
-    COPY src/ /opt/app-root/src
-    WORKDIR /opt/app-root/src/hyperfleet-api
-    USER root
-    RUN dnf install -y make go
-    RUN dnf clean all
-  from: nested-podman
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-api
-  to: podman-test
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/hyperfleet-api
+      USER root
+      RUN dnf install -y make go
+      RUN dnf clean all
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-api
+    to: podman-test
 resources:
   '*':
     requests:

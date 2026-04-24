@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^backplane-2\.0$
     - ^backplane-2\.0-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-cluster
     decorate: true
     decoration_config:
@@ -20,6 +20,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-cluster
         command:
@@ -39,6 +40,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -53,6 +57,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -68,7 +78,7 @@ presubmits:
     branches:
     - ^backplane-2\.0$
     - ^backplane-2\.0-
-    cluster: build11
+    cluster: build06
     context: ci/prow/e2e-kind
     decorate: true
     decoration_config:
@@ -83,6 +93,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-kind
         command:
@@ -102,6 +113,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -116,6 +130,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -131,7 +151,7 @@ presubmits:
     branches:
     - ^backplane-2\.0$
     - ^backplane-2\.0-
-    cluster: build11
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -186,7 +206,7 @@ presubmits:
     branches:
     - ^backplane-2\.0$
     - ^backplane-2\.0-
-    cluster: build11
+    cluster: build06
     context: ci/prow/premerge-image-mirror
     decorate: true
     decoration_config:
@@ -201,6 +221,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=premerge-image-mirror
         command:
@@ -220,6 +241,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -234,6 +258,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -249,7 +279,7 @@ presubmits:
     branches:
     - ^backplane-2\.0$
     - ^backplane-2\.0-
-    cluster: build11
+    cluster: build06
     context: ci/prow/sonar-pre-submit
     decorate: true
     decoration_config:

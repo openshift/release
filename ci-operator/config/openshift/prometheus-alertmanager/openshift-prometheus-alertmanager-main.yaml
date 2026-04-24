@@ -1,21 +1,22 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: prometheus-alertmanager
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: prometheus-alertmanager
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -29,7 +30,7 @@ tests:
     from: src
 - as: test
   commands: |
-    nodejs_version=v20.12.2
+    nodejs_version=v24.15.0
     nodejs_platform=linux-x64
     nodejs="node-${nodejs_version}-${nodejs_platform}"
 
@@ -45,6 +46,7 @@ tests:
     cd -
 
     export npm_config_cache="/tmp/.npm"
+    export ELM_HOME="/tmp/.elm"
     make build && make test
   container:
     from: src

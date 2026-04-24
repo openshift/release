@@ -7,41 +7,42 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-runtime-extractor
 images:
-- dockerfile_literal: |-
-    FROM registry.access.redhat.com/ubi9:latest AS rust-builder
-    ARG TARGETARCH
+  items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9:latest AS rust-builder
+      ARG TARGETARCH
 
-    RUN echo Target architecture: ${TARGETARCH}
+      RUN echo Target architecture: ${TARGETARCH}
 
-    COPY . /opt/app-root/src/
-    WORKDIR /opt/app-root/src/insights-runtime-extractor
+      COPY . /opt/app-root/src/
+      WORKDIR /opt/app-root/src/insights-runtime-extractor
 
-    USER 0
-    ENV HOME="/root"
-    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+      USER 0
+      ENV HOME="/root"
+      ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
 
-    RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
-        chmod g+w /opt/app-root/src/insights-runtime-extractor && \
-        dnf install -y gcc make rust-toolset rustfmt
+      RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
+          chmod g+w /opt/app-root/src/insights-runtime-extractor && \
+          dnf install -y gcc make rust-toolset rustfmt
 
-    RUN mkdir -p $HOME/.cargo/git/ && \
-        find $HOME/. -type d -exec chmod 777 {} \; && \
-        find $HOME/. -type f -exec chmod ugo+rw {} \;
+      RUN mkdir -p $HOME/.cargo/git/ && \
+          find $HOME/. -type d -exec chmod 777 {} \; && \
+          find $HOME/. -type f -exec chmod ugo+rw {} \;
 
-    USER 1001
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/insights-runtime-extractor
-    ubi9:
-      as:
-      - registry.access.redhat.com/ubi9:latest
-  to: src-rust
-- dockerfile_path: ./Containerfile-extractor
-  to: insights-runtime-extractor
-- dockerfile_path: ./Containerfile-exporter
-  to: insights-runtime-exporter
+      USER 1001
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/insights-runtime-extractor
+      ubi9:
+        as:
+        - registry.access.redhat.com/ubi9:latest
+    to: src-rust
+  - dockerfile_path: ./Containerfile-extractor
+    to: insights-runtime-extractor
+  - dockerfile_path: ./Containerfile-exporter
+    to: insights-runtime-exporter
 promotion:
   to:
   - name: 4.19-priv

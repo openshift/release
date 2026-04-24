@@ -4,23 +4,25 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.22_base-rhel9:
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
     tag: base-rhel9
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ironic-agent-image
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: ironic-agent-base
-  inputs:
-    ironic-agent-base:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-  to: ironic-agent
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: ironic-agent-base
+    inputs:
+      ironic-agent-base:
+        as:
+        - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    to: ironic-agent
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|Dockerfile.okd|main-packages-list.okd)$
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -32,12 +34,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':

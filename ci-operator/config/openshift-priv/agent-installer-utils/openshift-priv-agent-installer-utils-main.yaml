@@ -7,31 +7,32 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/agent-installer-utils
 images:
-- dockerfile_path: images/Dockerfile.ocp
-  to: agent-installer-utils
-- dockerfile_literal: |
-    FROM src AS source
-    FROM scratch
-    COPY --from=source /go/src/github.com/openshift/agent-installer-utils/tools/iso_builder /src
-    WORKDIR /src
-  inputs:
-    src:
-      as:
-      - src
-  to: agent-iso-builder
+  items:
+  - dockerfile_path: images/Dockerfile.ocp
+    to: agent-installer-utils
+  - dockerfile_literal: |
+      FROM src AS source
+      FROM scratch
+      COPY --from=source /go/src/github.com/openshift/agent-installer-utils/tools/iso_builder /src
+      WORKDIR /src
+    inputs:
+      src:
+        as:
+        - src
+    to: agent-iso-builder
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':

@@ -11,11 +11,12 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
 images:
-- dockerfile_path: Dockerfile
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
-  to: console-plugin-demo
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    to: console-plugin-demo
 promotion:
   to:
   - additional_images:
@@ -81,11 +82,17 @@ tests:
 - as: e2e-gcp-console
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
       dependencies:
       - env: CYPRESS_PLUGIN_PULL_SPEC
         name: console-plugin-demo

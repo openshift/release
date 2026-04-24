@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 
+import argparse
+import json
 import yaml
 
+parser = argparse.ArgumentParser(description="Boskos config generator")
+parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
+args = parser.parse_args()
 
 CONFIG = {
     'aws-quota-slice': {
@@ -275,7 +280,7 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 5,
+        'default': 1,
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
@@ -284,6 +289,12 @@ CONFIG = {
         'default': 15,
     },
     'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-cspr-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
@@ -316,7 +327,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
         'us-central1': 30,
@@ -464,6 +475,7 @@ CONFIG = {
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
+    'powervs-9-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -734,6 +746,9 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
+for i in range(2):
+    CONFIG['powervs-9-quota-slice']['sao04-powervs-9-quota-slice-{}'.format(i)] = 1
+
 for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
 for i in range(150):
@@ -776,31 +791,26 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
-    }
+    },
+    'openshift-org-gcp': {
+        'gcp': {
+            'install': 50,
+            'quota': CONFIG['gcp-quota-slice'],
+        },
+        'gcp-arm64': {
+            'install': 20,
+            'quota': CONFIG['gcp-arm64-quota-slice'],
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': CONFIG['gcp-3-quota-slice'],
+        },
+    },
 }
-
-config = {
-    'resources': [],
-}
-
-for typeName, data in sorted(CONFIG.items()):
-    resource = {
-        'type': typeName,
-        'state': 'free',
-    }
-    if set(data.keys()) == {'default'}:
-        resource['min-count'] = resource['max-count'] = data['default']
-    else:
-        resource['names'] = []
-        for name, count in sorted(data.items()):
-            if '--' in name:
-                raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
-            if count > 1:
-                width = len(str(count-1))
-                resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
-            else:
-                resource['names'].append(name)
-    config['resources'].append(resource)
 
 def cluster_profile_set_resources(clusterProfileSets):
     def profile_set_resource(profileSet, profileSetData):
@@ -843,9 +853,47 @@ def cluster_profile_set_resources(clusterProfileSets):
 
     return resources
 
-config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+def generate_config():
+    config = {
+        'resources': [],
+    }
 
-with open('_boskos.yaml', 'w') as f:
-    f.write('# generated with generate-boskos.py; do not edit directly\n')
-    yaml.dump(config, f, default_flow_style=False)
+    for typeName, data in sorted(CONFIG.items()):
+        resource = {
+            'type': typeName,
+            'state': 'free',
+        }
+        if set(data.keys()) == {'default'}:
+            resource['min-count'] = resource['max-count'] = data['default']
+        else:
+            resource['names'] = []
+            for name, count in sorted(data.items()):
+                if '--' in name:
+                    raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
+                if count > 1:
+                    width = len(str(count-1))
+                    resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
+                else:
+                    resource['names'].append(name)
+        config['resources'].append(resource)
 
+    config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+
+    with open('_boskos.yaml', 'w') as f:
+        f.write('# generated with generate-boskos.py; do not edit directly\n')
+        yaml.dump(config, f, default_flow_style=False)
+
+def print_cluster_profile_set_details():
+    # Do not dump the following cps. Useful when a new profile is about to be introduced
+    # and it is not fully defined yet.
+    ignore_list = []
+    cps = {}
+    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
+        if not cps_name in ignore_list:
+            cps[cps_name] = list(cps_data.keys())
+    print(json.dumps(cps, indent=2))
+
+if args.print_cps:
+    print_cluster_profile_set_details()
+else:
+    generate_config()

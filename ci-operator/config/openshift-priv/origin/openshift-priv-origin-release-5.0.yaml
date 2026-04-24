@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.64.8
+    tag: v2.10.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -24,14 +24,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/origin
 images:
-- dockerfile_path: images/tests/Dockerfile.rhel
-  from: tools-openstack
-  to: tests
-- dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  to: hello-openshift
+  items:
+  - dockerfile_path: images/tests/Dockerfile.rhel
+    from: tools-openstack
+    to: tests
+  - dockerfile_path: images/hello-openshift/Dockerfile.rhel
+    to: hello-openshift
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -99,7 +101,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -109,7 +111,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -145,7 +147,7 @@ tests:
   as: e2e-gcp-ovn-kube-apiserver-rollout
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -189,7 +191,7 @@ tests:
   as: e2e-gcp-ovn-builds
   pipeline_run_if_changed: ^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-builds
 - always_run: false
   as: e2e-aws-disruptive
@@ -209,7 +211,7 @@ tests:
   as: e2e-gcp-disruptive
   optional: true
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -235,7 +237,7 @@ tests:
   as: e2e-gcp-ovn-image-ecosystem
   pipeline_run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-image-ecosystem
 - always_run: false
   as: e2e-aws-ovn-image-registry
@@ -248,7 +250,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -257,7 +259,7 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -265,7 +267,7 @@ tests:
 - always_run: false
   as: e2e-gcp-csi
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -412,6 +414,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
@@ -420,10 +423,19 @@ tests:
   capabilities:
   - intranet
   optional: true
-  pipeline_run_if_changed: (baremetal|metal3|ironic)
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
+- always_run: false
+  as: e2e-metal-ovn-two-node-fencing-recovery
+  capabilities:
+  - intranet
+  optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-recovery
 - always_run: false
   as: e2e-metal-ipi-ovn
   capabilities:
@@ -652,7 +664,7 @@ tests:
     OPENSHIFT_SKIP_EXTERNAL_TESTS=1 openshift-tests images \
       --to-repository=quay.io/openshift/e2e-verify-image-manifest-lists \
       --verify-manifest-lists \
-      --allow-missing-architectures=e2e-22-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
+      --allow-missing-architectures=e2e-19-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
       --allow-missing-architectures=registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
       --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
       --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
@@ -671,7 +683,7 @@ tests:
   as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-etcd-scaling
 - always_run: false
   as: e2e-azure-ovn-etcd-scaling
@@ -706,14 +718,12 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-certrotation
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -725,7 +735,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -737,7 +747,7 @@ tests:
   as: e2e-gcp-ovn-usernamespace
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace

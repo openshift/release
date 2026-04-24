@@ -14,17 +14,19 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
-- dockerfile_literal: |
-    FROM ubi9-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
-  to: ubi9-minimal-entitled
-- build_args:
-  - name: DNF
-    value: microdnf
-  dockerfile_path: Dockerfile
-  from: ubi9-minimal-entitled
-  to: hive
+  items:
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+    to: ubi9-minimal-entitled
+  - build_args:
+    - name: DNF
+      value: microdnf
+    dockerfile_path: Dockerfile
+    from: ubi9-minimal-entitled
+    to: hive
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - name: hive-v4.0
@@ -183,11 +185,13 @@ tests:
 - as: e2e-gcp
   run_if_changed: gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
+      commands: |
+        export BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")
+        GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -217,12 +221,15 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 2h30m0s
     workflow: ipi-azure
+  timeout: 4h30m0s
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
+      NETWORK_TYPE: single-tenant
       VSPHERE_ADDITIONAL_CLUSTER: "true"
     test:
     - as: test

@@ -203,11 +203,6 @@ function ci_get_clonerefs() {
 function ci_clone_src() {
     local force_clone="${1:-false}"
 
-    # Clusterbot variables override force_clone - they require explicit branch selection
-    if [ -n "${MICROSHIFT_PR:-}" ] || [ -n "${MICROSHIFT_GIT:-}" ] || [ -n "${MICROSHIFT_NIGHTLY:-}" ]; then
-        force_clone="true"
-    fi
-
     fails=0
     for _ in $(seq 3) ; do
         if ci_get_clonerefs; then
@@ -231,7 +226,7 @@ function ci_clone_src() {
             pr_number="${MICROSHIFT_PR}"
         elif [ -n "${MICROSHIFT_GIT:-}" ]; then
             branch="${MICROSHIFT_GIT}"
-        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] && [ -n "${OCP_VERSION:-}" ]; then
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] || [ -n "${OCP_VERSION:-}" ]; then
             branch="release-${OCP_VERSION}"
         else
             branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')

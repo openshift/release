@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ "${AWS_PUBLIC_IPV4_POOL_ID}" == "none" ]]; then
@@ -19,11 +26,9 @@ fi
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_major_version < 4 || ( ocp_major_version == 4 && ocp_minor_version < 16 ))); then
+if version_lt "${ocp_version}" "4.16"; then
   echo "BYOIP custom IP pool is not supported in target latest version ${ocp_version}; bypassing configuration"
   exit 0
 fi

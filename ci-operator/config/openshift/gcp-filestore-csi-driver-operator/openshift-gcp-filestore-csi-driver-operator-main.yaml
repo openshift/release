@@ -1,14 +1,14 @@
 base_images:
   attacher-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-external-attacher
   driver-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: gcp-filestore-csi-driver
   livenessprobe-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-livenessprobe
   operator-index:
@@ -16,23 +16,23 @@ base_images:
     namespace: ci
     tag: v4.10
   provisioner-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-external-provisioner
   proxy-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: kube-rbac-proxy
   registrar-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-node-driver-registrar
   resizer-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-external-resizer
   snapshotter-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-external-snapshotter
   tests-private:
@@ -43,8 +43,9 @@ binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: gcp-filestore-csi-driver-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: gcp-filestore-csi-driver-operator
 operator:
   bundles:
   - as: gcp-filestore-csi-driver-operator-bundle
@@ -73,17 +74,17 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -104,7 +105,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     env:
@@ -143,7 +144,7 @@ tests:
   as: e2e-gcp-manual-oidc-filestore
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity-filestore

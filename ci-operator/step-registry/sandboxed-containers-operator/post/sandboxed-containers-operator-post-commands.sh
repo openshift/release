@@ -24,8 +24,77 @@ cleanup_kata() {
 	exit 0
 }
 
-# Delete AMI/snapshot if not provided manually, fall-backs to
-# kata-config cleanup if something goes wrong
+# Security groups created by the operator contain cross-references and can not
+# be deleted by "openshift-install destroy". Prune the rules and leave them
+# present.
+prune_aws_security_groups() {
+	local aws_region="$1"
+	local infra_id sg_ids sg_id
+
+	# Get infrastructure name (used in resource tags)
+	infra_id=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null) || true
+	if [[ -z "${infra_id}" ]]; then
+		echo "Could not get infrastructure name, skipping security group cleanup"
+		return 0
+	fi
+
+	echo "Cleaning up security groups for cluster ${infra_id} in region ${aws_region}..."
+
+	# Find security groups tagged with the cluster's infrastructure name
+	sg_ids=$(aws ec2 describe-security-groups \
+		--region "${aws_region}" \
+		--filters "Name=tag-key,Values=kubernetes.io/cluster/${infra_id}" \
+		--query 'SecurityGroups[*].GroupId' \
+		--output text 2>/dev/null) || true
+
+	if [[ -z "${sg_ids}" ]]; then
+		echo "No tagged security groups found for cluster ${infra_id}"
+		return 0
+	fi
+
+	echo "Found security groups: ${sg_ids}"
+
+	# Revoke all ingress and egress rules to remove cross-references
+	for sg_id in ${sg_ids}; do
+		echo "Revoking rules from security group ${sg_id}..."
+
+		# Get and revoke all ingress rules
+		local ingress_rules
+		ingress_rules=$(aws ec2 describe-security-groups \
+			--region "${aws_region}" \
+			--group-ids "${sg_id}" \
+			--query 'SecurityGroups[0].IpPermissions' \
+			--output json 2>/dev/null) || true
+
+		if [[ -n "${ingress_rules}" && "${ingress_rules}" != "[]" && "${ingress_rules}" != "null" ]]; then
+			aws ec2 revoke-security-group-ingress \
+				--region "${aws_region}" \
+				--group-id "${sg_id}" \
+				--ip-permissions "${ingress_rules}" 2>/dev/null || echo "Note: Could not revoke some ingress rules from ${sg_id}"
+		fi
+
+		# Get and revoke all egress rules
+		local egress_rules
+		egress_rules=$(aws ec2 describe-security-groups \
+			--region "${aws_region}" \
+			--group-ids "${sg_id}" \
+			--query 'SecurityGroups[0].IpPermissionsEgress' \
+			--output json 2>/dev/null) || true
+
+		if [[ -n "${egress_rules}" && "${egress_rules}" != "[]" && "${egress_rules}" != "null" ]]; then
+			aws ec2 revoke-security-group-egress \
+				--region "${aws_region}" \
+				--group-id "${sg_id}" \
+				--ip-permissions "${egress_rules}" 2>/dev/null || echo "Note: Could not revoke some egress rules from ${sg_id}"
+		fi
+	done
+
+	echo "Security group rules revoked, cross-references removed"
+}
+
+# Cleanup persistent AWS resources
+# * AMI/snapshot (on failure just delete kata-config)
+# * prune aws security groups (they contain cross-references and can not be removed otherwised)
 cleanup_aws() {
 	local ami_id aws_region aws_creds cm_data snapshot_id
 
@@ -43,7 +112,6 @@ cleanup_aws() {
 		cleanup_kata
 	fi
 
-	# Get peer-pods-cm once, extract PODVM_AMI_ID and AWS_REGION
 	cm_data=$(oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o jsonpath='{.data}')
 	ami_id=$(echo "${cm_data}" | jq -r '.PODVM_AMI_ID')
 	aws_region=$(echo "${cm_data}" | jq -r '.AWS_REGION')
@@ -54,6 +122,10 @@ cleanup_aws() {
 		cleanup_kata
 	fi
 
+	# Clean up security group cross-references
+	prune_aws_security_groups "${aws_region}"
+
+	# Delete AMI/snapshot if possible
 	if [[ -z "${ami_id}" ]]; then
 		echo
 		echo "No ami_id in cm/peer-pods-cm:"

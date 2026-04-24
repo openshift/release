@@ -2,32 +2,33 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-actuator-pkg
 images:
-- dockerfile_path: Dockerfile.ci
-  to: cluster-api-actuator-pkg-test
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
     excluded_images:
     - cluster-api-actuator-pkg-test
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   multi-initial:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -124,7 +125,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -141,7 +142,7 @@ tests:
   optional: true
   run_if_changed: pkg/capi/gcp\.go
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -222,7 +223,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

@@ -7,15 +7,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-olm
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  from: base
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  from: base
-  to: operator-registry
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    from: base
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    from: base
+    to: operator-registry
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
   to:
   - excluded_images:
@@ -44,7 +45,7 @@ tests:
     from: ci-image
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: unit-olm
   commands: |
@@ -70,7 +71,7 @@ tests:
     from: ci-image
 - as: e2e-gcp-olm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -84,7 +85,7 @@ tests:
   as: e2e-gcp-olm-flaky
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -96,7 +97,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-console-olm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

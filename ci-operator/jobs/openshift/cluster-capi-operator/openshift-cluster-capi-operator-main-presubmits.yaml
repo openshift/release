@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/build
     decorate: true
     labels:
@@ -562,7 +562,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-capi-techpreview
     decorate: true
     labels:
@@ -644,7 +644,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     labels:
@@ -727,7 +727,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-techpreview-upgrade
     decorate: true
     labels:
@@ -814,7 +814,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-gcp-capi-techpreview
@@ -896,7 +896,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-gcp-ovn-techpreview
@@ -1134,6 +1134,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-openstack-capi-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
     branches:
     - ^main$
     - ^main-
@@ -1146,6 +1148,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-capi-operator-main-e2e-openstack-ovn-techpreview
+    optional: true
     rerun_command: /test e2e-openstack-ovn-techpreview
     spec:
       containers:
@@ -1211,7 +1214,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-openstack-ovn-techpreview|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-ovn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -1299,7 +1302,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -1353,7 +1356,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     labels:
@@ -1499,7 +1502,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1640,7 +1643,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1701,7 +1704,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -1762,7 +1765,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build04
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -1775,6 +1778,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=verify-deps
@@ -1795,6 +1799,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1812,6 +1819,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

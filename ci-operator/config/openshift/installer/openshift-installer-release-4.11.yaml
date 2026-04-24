@@ -42,31 +42,33 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: installer
-- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
-  to: installer-artifacts
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
-  inputs:
-    ocp_4.10_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.10:cli
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
-  to: baremetal-installer
-- dockerfile_path: images/installer/Dockerfile.ci
-  from: base
-  to: ovirt-installer
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: installer
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    from: base
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: rhel-7
+    inputs:
+      ocp_4.10_cli:
+        as:
+        - registry.ci.openshift.org/ocp/4.10:cli
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: base
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    from: base
+    to: baremetal-installer
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: ovirt-installer
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 promotion:
   to:
   - name: "4.11"
@@ -200,7 +202,7 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-alibaba
@@ -220,7 +222,7 @@ tests:
   optional: true
   run_if_changed: gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-byo-vpc
 - always_run: false
   as: e2e-azure
@@ -260,14 +262,14 @@ tests:
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - always_run: false
   as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
   as: e2e-azure-upi
@@ -294,7 +296,7 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ipi
@@ -372,13 +374,13 @@ tests:
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-crc
 - always_run: false
   as: e2e-libvirt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-libvirt
 - always_run: false
   as: e2e-metal-assisted

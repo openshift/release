@@ -1,10 +1,10 @@
 base_images:
   aws-efs-driver-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: aws-efs-csi-driver
   csi-driver-smb-test:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-driver-smb-test
   hypershift-operator:
@@ -16,7 +16,7 @@ base_images:
     namespace: hypershift
     tag: latest
   livenessprobe-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-livenessprobe
   operator-index:
@@ -24,19 +24,19 @@ base_images:
     namespace: ci
     tag: v4.10
   provisioner-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-external-provisioner
   proxy-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: kube-rbac-proxy
   registrar-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-node-driver-registrar
   smb-driver-operand:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: csi-driver-smb
   tests-private:
@@ -47,40 +47,41 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.aws-ebs
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.aws-efs
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  to: aws-efs-csi-operator-create-efs
-- dockerfile_path: Dockerfile.azure-disk
-  to: azure-disk-csi-driver-operator
-- dockerfile_path: Dockerfile.azure-file
-  to: azure-file-csi-driver-operator
-- dockerfile_path: Dockerfile.openstack-cinder
-  to: openstack-cinder-csi-driver-operator
-- dockerfile_path: Dockerfile.openstack-manila
-  to: csi-driver-manila-operator
-- dockerfile_path: Dockerfile.samba
-  to: smb-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: aws-ebs-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-disk-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-file-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: openstack-cinder-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: smb-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: manila-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.aws-ebs
+    to: aws-ebs-csi-driver-operator
+  - dockerfile_path: Dockerfile.aws-efs
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    to: aws-efs-csi-operator-create-efs
+  - dockerfile_path: Dockerfile.azure-disk
+    to: azure-disk-csi-driver-operator
+  - dockerfile_path: Dockerfile.azure-file
+    to: azure-file-csi-driver-operator
+  - dockerfile_path: Dockerfile.openstack-cinder
+    to: openstack-cinder-csi-driver-operator
+  - dockerfile_path: Dockerfile.openstack-manila
+    to: csi-driver-manila-operator
+  - dockerfile_path: Dockerfile.samba
+    to: smb-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: aws-ebs-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-disk-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-file-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: openstack-cinder-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: smb-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: manila-csi-driver-operator-test
 operator:
   bundles:
   - as: smb-csi-driver-operator-bundle
@@ -112,17 +113,17 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -303,6 +304,15 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-azure-csi-volumeattributesclass
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-azure-csi-ultrassd
 - as: e2e-azure-file-csi
   steps:
     cluster_profile: openshift-org-azure

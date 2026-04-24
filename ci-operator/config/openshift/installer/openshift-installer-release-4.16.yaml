@@ -35,41 +35,58 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
+  ocp_4.16_base-rhel9:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/installer/Dockerfile.ci
-  to: installer
-- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  to: installer-artifacts
-- dockerfile_path: images/libvirt/Dockerfile.ci
-  to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  to: upi-installer
-- dockerfile_path: images/openstack/Dockerfile.ci
-  to: openstack-installer
-- dockerfile_path: images/baremetal/Dockerfile.ci
-  to: baremetal-installer
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
-    # Cache dir must be accessible when running the integration tests
-    RUN mkdir /.cache -m 0777
-  from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: openstack-base
+    inputs:
+      openstack-base:
+        as:
+        - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    to: baremetal-installer
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN dnf install -y nmstate
+      # Cache dir must be accessible when running the integration tests
+      RUN mkdir /.cache -m 0777
+    from: src
+    inputs:
+      ocp_4.10_cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 promotion:
   to:
   - excluded_images:
     - src-oc
     name: "4.16"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-16.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-16.repo
+    from: ocp_4.16_base-rhel9
+    to: openstack-base
 releases:
   initial:
     integration:
@@ -239,21 +256,21 @@ tests:
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-secureboot
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-byo-vpc
 - as: e2e-azure-ovn
   run_if_changed: azure
@@ -287,21 +304,21 @@ tests:
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - always_run: false
   as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
   as: e2e-gcp-ovn-xpn
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - as: e2e-azure-ovn-upi
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
@@ -320,7 +337,7 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ipi-ovn
@@ -494,7 +511,7 @@ tests:
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-crc
 - always_run: false
   as: e2e-metal-assisted

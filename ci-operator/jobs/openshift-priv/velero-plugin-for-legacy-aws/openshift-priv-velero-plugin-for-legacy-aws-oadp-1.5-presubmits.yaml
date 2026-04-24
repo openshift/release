@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^oadp-1\.5$
     - ^oadp-1\.5-
-    cluster: build09
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -71,7 +71,7 @@ presubmits:
     branches:
     - ^oadp-1\.5$
     - ^oadp-1\.5-
-    cluster: build06
+    cluster: build05
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
@@ -90,6 +90,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -111,6 +112,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -131,6 +135,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

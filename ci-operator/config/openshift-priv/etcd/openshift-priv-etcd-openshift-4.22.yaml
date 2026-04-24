@@ -12,10 +12,11 @@ build_root:
   from_repository: true
 canonical_go_repository: go.etcd.io/etcd
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: etcd
-- dockerfile_path: Dockerfile.installer
-  to: installer-etcd-artifacts
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: etcd
+  - dockerfile_path: Dockerfile.installer
+    to: installer-etcd-artifacts
 promotion:
   to:
   - name: 4.22-priv
@@ -33,13 +34,28 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "4"
+      memory: 3Gi
 tests:
-- as: unit
-  commands: CGO_ENABLED=1 make test --warn-undefined-variables
+- as: upstream-unit
+  commands: CGO_ENABLED=1 make test-unit --warn-undefined-variables
   container:
     from: bin
+- as: upstream-integration
+  commands: CGO_ENABLED=1 make test-integration --warn-undefined-variables
+  container:
+    from: bin
+  optional: true
+- as: upstream-e2e
+  commands: CGO_ENABLED=1 PASSES="e2e" ./scripts/test.sh
+  container:
+    from: bin
+  optional: true
+- as: upstream-release
+  commands: CGO_ENABLED=1 PASSES="release" ./scripts/test.sh
+  container:
+    from: bin
+  optional: true
 - as: e2e-aws-ovn
   steps:
     cluster_profile: openshift-org-aws

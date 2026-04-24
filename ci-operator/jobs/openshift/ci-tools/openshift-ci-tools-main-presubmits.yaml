@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/breaking-changes
     decorate: true
     labels:
@@ -24,6 +24,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=breaking-changes
         command:
@@ -43,6 +44,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -63,6 +67,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -87,7 +97,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/checkconfig
     decorate: true
     labels:
@@ -149,7 +159,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/codegen
     decorate: true
     labels:
@@ -213,7 +223,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e
     decorate: true
     labels:
@@ -230,6 +240,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e
         command:
@@ -249,6 +260,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -269,6 +283,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -295,7 +315,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-oo
     decorate: true
     labels:
@@ -313,6 +333,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-oo
         command:
@@ -332,6 +353,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -352,6 +376,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -376,7 +406,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/format
     decorate: true
     labels:
@@ -438,7 +468,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/frontend-checks
     decorate: true
     labels:
@@ -500,7 +530,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
@@ -562,7 +592,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/integration
     decorate: true
     labels:
@@ -624,7 +654,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/lint
     decorate: true
     labels:
@@ -685,7 +715,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: app.ci
     context: ci/prow/secret-bootstrapper-validation
     decorate: true
     extra_refs:
@@ -715,7 +745,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: app.ci
     context: ci/prow/secret-generator-validation
     decorate: true
     extra_refs:
@@ -730,10 +760,14 @@ presubmits:
       - args:
         - --config=../release/core-services/ci-secret-generator/_config.yaml
         - --bootstrap-config=../release/core-services/ci-secret-bootstrap/_config.yaml
+        - --enable-gsm-sync=true
+        - --gsm-config=../release/core-services/ci-secret-bootstrap/gsm-config.yaml
+        - --gsm-project-config=../release/core-services/ci-secret-bootstrap/gsm-project-config.yaml
         - --validate-only=true
         command:
         - go
         - run
+        - -mod=mod
         - -race
         - ./cmd/ci-secret-generator
         image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
@@ -748,7 +782,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/security
     decorate: true
     labels:
@@ -766,6 +800,7 @@ presubmits:
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=security
         command:
@@ -785,6 +820,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -805,6 +843,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -829,7 +873,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     labels:
@@ -891,7 +935,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build11
     context: ci/prow/validate-prow
     decorate: true
     extra_refs:
@@ -924,7 +968,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/validate-vendor
     decorate: true
     labels:
