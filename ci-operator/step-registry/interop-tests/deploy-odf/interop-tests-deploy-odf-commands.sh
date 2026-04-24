@@ -10,7 +10,8 @@ set -euxo pipefail; shopt -s inherit_errexit
 # timeout 8m keeps must-gather inside the 10m grace_period defined in the ref; || true prevents
 # a timeout or gather failure from masking the original exit code.
 trap '
-    (($?)) &&
+    saveExit=$?
+    (( saveExit )) &&
     timeout 8m oc adm must-gather \
         --image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}" \
         --dest-dir="${ARTIFACT_DIR}/ocs_must_gather" || true
@@ -32,7 +33,6 @@ MonitorProgress() {
         }
         sleep 30
     done
-    true
 }
 
 # WaitMcpForUpdated - waits for all MCPs to finish updating after an ICSP/MachineConfig change.
