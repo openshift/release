@@ -394,7 +394,8 @@ fi
 echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
 if ls "${ARTIFACT_DIR}"/junit_*.xml &>/dev/null; then
     # Compress to stay under 1MB SHARED_DIR limit
-    tar -czf "${SHARED_DIR}/junit_files.tar.gz" -C "${ARTIFACT_DIR}" junit_*.xml 2>/dev/null || true
+    # Use subshell to expand glob inside ARTIFACT_DIR
+    (cd "${ARTIFACT_DIR}" && tar -czf "${SHARED_DIR}/junit_files.tar.gz" junit_*.xml)
     if [[ -f "${SHARED_DIR}/junit_files.tar.gz" ]]; then
         _compressed_size=$(stat -f%z "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || stat -c%s "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || echo "unknown")
         echo "  - junit_files.tar.gz (compressed JUnit files, ${_compressed_size} bytes)"
