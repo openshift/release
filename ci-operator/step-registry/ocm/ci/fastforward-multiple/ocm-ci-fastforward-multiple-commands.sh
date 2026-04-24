@@ -963,14 +963,7 @@ for product in mce acm globalhub; do
           continue
         fi
 
-        # Check if branch exists
-        if ! branch_exists "${owner}" "${repo}" "${dest_branch}"; then
-          echo "WARNING: Branch ${dest_branch} does not exist for ${owner_repo}"
-          echo "         Excluded repos' branches are manually managed - skipping"
-          continue
-        fi
-
-        # Fast-forward from default branch
+        # Fast-forward from default branch (creates branch if doesn't exist)
         echo "INFO: Fast-forwarding ${default_branch} → ${dest_branch} for ${owner_repo}"
         branch_log="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${dest_branch}.log"
 
@@ -996,10 +989,12 @@ for product in mce acm globalhub; do
       done
 
       # Now create all Tekton file versions on each branch (including default)
+      # After fast-forward, all destination branches should exist (unless fast-forward failed)
       all_branches="${default_branch}"
       for version in ${DESTINATION_VERSIONS}; do
         dest_branch="${repo_branch_prefix}-${version}"
-        if [[ "${dest_branch}" != "${default_branch}" ]] && branch_exists "${owner}" "${repo}" "${dest_branch}"; then
+        if [[ "${dest_branch}" != "${default_branch}" ]]; then
+          # Add all destination branches - fast-forward created them
           all_branches="${all_branches} ${dest_branch}"
         fi
       done
