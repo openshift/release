@@ -1,0 +1,35 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-update-console-plugin
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-update-console-plugin
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: yarn install --immutable && yarn build
+tests:
+- as: frontend
+  commands: ./test-frontend.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: ^(README\.md|OWNERS|LICENSE|AGENTS\.md|CLAUDE\.md|\.gitignore)$
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: cluster-update-console-plugin
