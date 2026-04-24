@@ -376,6 +376,31 @@ create_tekton_files() {
     local highest_version
     highest_version=$(get_highest_tekton_version "." "${product_prefix}" "${branch_prefix}")
 
+    if [[ "$highest_version" == "0" ]] && [[ -n "${LAST_RELEASE_VERSION:-}" ]]; then
+      # No Tekton files on current branch, try fallback to LAST_RELEASE_VERSION
+      log "INFO No Tekton files on ${default_branch}, trying fallback to LAST_RELEASE_VERSION=${LAST_RELEASE_VERSION}"
+
+      local last_release_branch="${branch_prefix}-${LAST_RELEASE_VERSION}"
+      log "INFO Fetching template from ${last_release_branch}"
+
+      if git fetch origin "${last_release_branch}" 2>&1; then
+        log "INFO Checking out Tekton files from ${last_release_branch}"
+        # Try to checkout .tekton directory from last release branch
+        git checkout "origin/${last_release_branch}" -- .tekton/ 2>&1 || true
+
+        # Recheck for templates
+        highest_version=$(get_highest_tekton_version "." "${product_prefix}" "${branch_prefix}")
+
+        if [[ "$highest_version" != "0" ]]; then
+          log "INFO Found Tekton files from ${last_release_branch} (version ${highest_version})"
+        else
+          log "WARNING No Tekton files found on ${last_release_branch} either"
+        fi
+      else
+        log "WARNING Could not fetch ${last_release_branch}"
+      fi
+    fi
+
     if [[ "$highest_version" == "0" ]]; then
       log "INFO No existing ${product_prefix}-* or -main- Tekton files found, skipping"
       exit 0
@@ -729,6 +754,7 @@ install_gh_cli
 echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
+* LAST_RELEASE_VERSION: ${LAST_RELEASE_VERSION:-<not set>}
 * ARTIFACT_DIR: ${ARTIFACT_DIR:-<not set>}
 "
 
