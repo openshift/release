@@ -110,8 +110,13 @@ if [[ "${create_ret}" -ne 0 && "${CHANNEL_GROUP}" == "stable" ]]; then
   exit "${create_ret}"
 elif [[ "${create_ret}" -ne 0 ]]; then
   echo "Account role creation failed (exit ${create_ret}). Falling back to latest available version in channel-group ${CHANNEL_GROUP}..."
-  fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" ${CLUSTER_SWITCH} -o json 2>/dev/null \
-    | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" ${CLUSTER_SWITCH} -o json 2>/dev/null \
+      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  else
+    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json 2>/dev/null \
+      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  fi
   if [[ -n "${fallback_version}" && "${fallback_version}" != "${OPENSHIFT_VERSION}" ]]; then
     echo "Retrying with version ${fallback_version} (was ${OPENSHIFT_VERSION})"
     OPENSHIFT_VERSION="${fallback_version}"
