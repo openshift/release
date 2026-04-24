@@ -82,15 +82,13 @@ presubmits:
     cluster: build05
     context: ci/prow/baseimage-generator-images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/variant: baseimage-generator
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-baseimage-generator-images
     rerun_command: /test baseimage-generator-images
-    run_if_changed: ^dev-infrastructure/openshift-ci/Dockerfile$
+    run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.bingo/|\.ci-operator\.yaml$)
     spec:
       containers:
       - args:
@@ -490,7 +488,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=aro-hcp-e2e-tools
+        - --target=aro-hcp-e2e-tests
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -769,14 +767,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-integration-e2e-parallel-ocp-nightly
     optional: true
-    reporter_config:
-      slack:
-        channel: '#aro-hcp-failures-int'
-        job_states_to_report:
-        - failure
-        - error
-        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs>'
     rerun_command: /test integration-e2e-parallel-ocp-nightly
     spec:
       containers:

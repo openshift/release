@@ -1,0 +1,55 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci-operator/build-root/Dockerfile
+canonical_go_repository: github.com/openshift/mirror-gui
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: mirror-gui
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: npm ci && npm run build
+tests:
+- as: lint
+  commands: npm run lint
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: unit
+  commands: npm run test
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: audit-catalog
+  commands: npx vitest run tests/scripts/auditFetchCatalogs.test.ts
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: catalog-integrity
+  commands: npx vitest run tests/scripts/catalogDataIntegrity.test.ts
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: mirror-gui
