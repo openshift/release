@@ -274,6 +274,12 @@ echo "USE_LOCAL_CHART=${USE_LOCAL_CHART}"
 echo "USE_HELM_DEVEL=${USE_HELM_DEVEL}"
 echo "CHART_REF_RESOLVED=${CHART_REF_RESOLVED}"
 
+# Persist chart resolution state to SHARED_DIR for downstream steps (e.g., ReportPortal)
+# Environment variables don't persist across Prow steps, so we write to files
+echo "${CHART_REF_RESOLVED}" > "${SHARED_DIR}/chart_ref_resolved"
+echo "${USE_HELM_DEVEL}" > "${SHARED_DIR}/use_helm_devel"
+echo "${USE_LOCAL_CHART}" > "${SHARED_DIR}/use_local_chart"
+
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
@@ -384,9 +390,18 @@ fi
 
 # Copy JUnit files to SHARED_DIR for ReportPortal post step
 # (ARTIFACT_DIR is step-specific; SHARED_DIR persists across steps)
+# NOTE: SHARED_DIR has a 1MB limit, so we compress the files
 echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
-cp "${ARTIFACT_DIR}"/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || true
-ls "${SHARED_DIR}"/junit_*.xml 2>/dev/null | sed 's/^/  - /' || echo "  (no junit files to copy)"
+if ls "${ARTIFACT_DIR}"/junit_*.xml &>/dev/null; then
+    # Compress to stay under 1MB SHARED_DIR limit
+    tar -czf "${SHARED_DIR}/junit_files.tar.gz" -C "${ARTIFACT_DIR}" junit_*.xml 2>/dev/null || true
+    if [[ -f "${SHARED_DIR}/junit_files.tar.gz" ]]; then
+        _compressed_size=$(stat -f%z "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || stat -c%s "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || echo "unknown")
+        echo "  - junit_files.tar.gz (compressed JUnit files, ${_compressed_size} bytes)"
+    fi
+else
+    echo "  (no junit files to copy)"
+fi
 
 # Copy version_info.json for ReportPortal metadata
 if [ -f "./version_info.json" ]; then
