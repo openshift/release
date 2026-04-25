@@ -44,6 +44,8 @@ echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
 echo "Copying the env to the bastion host"
 scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
 
+echo "Manually reserving nodes? ${MANUALLY_RESERVED_NODES}"
+
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
@@ -62,7 +64,7 @@ JOB_URL="${6}"
 ADDITIONAL_WORKERS="${7}"
 ADDITIONAL_WORKER_ARCHITECTURE="${8}"
 VENDOR="${9:-}"
-MANUALLY_RESERVED_NODES="${10:-}"
+MANUALLY_RESERVED_NODES="${10}"
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
 # shellcheck disable=SC2174
