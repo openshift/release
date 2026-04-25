@@ -44,6 +44,27 @@ workflow:
         Ensure HTTPRoute object is created
     post:
     - chain: hypershift-dump
+    - as: dump-cilium-debug
+      cli: latest
+      commands: |-
+        set -xuo pipefail
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        mkdir -p ${ARTIFACT_DIR}/cilium-debug
+
+        oc get networkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/networkpolicies.yaml 2>&1 || true
+        oc get ciliumnetworkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/ciliumnetworkpolicies.yaml 2>&1 || true
+        oc get ciliumclusterwidenetworkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/ciliumclusterwidenetworkpolicies.yaml 2>&1 || true
+        oc get ciliumendpoint -A > ${ARTIFACT_DIR}/cilium-debug/ciliumendpoints.txt 2>&1 || true
+        oc version > ${ARTIFACT_DIR}/cilium-debug/oc-version.txt 2>&1 || true
+        oc get ns openshift-monitoring -o yaml > ${ARTIFACT_DIR}/cilium-debug/ns-openshift-monitoring.yaml 2>&1 || true
+        oc get pods -n cilium -o wide > ${ARTIFACT_DIR}/cilium-debug/cilium-pods.txt 2>&1 || true
+        oc logs -n cilium -l app.kubernetes.io/name=cilium --tail=200 > ${ARTIFACT_DIR}/cilium-debug/cilium-agent-logs.txt 2>&1 || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 5m0s
     - chain: hypershift-aws-destroy
     - chain: hypershift-destroy-nested-management-cluster
     test:
