@@ -50,6 +50,9 @@ else
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=${SCOPE}"
 fi
 
+if [[ $TEST_ENV == "prod" ]]; then
+    EXTRA_VARS="${EXTRA_VARS} ginkgo_label='tier0 && tier1'"
+fi
 
 cd /eco-ci-cd/
 ansible-playbook -vv ./playbooks/compute/nrop_testing.yml -i ./inventories/ocp-deployment/build-inventory.py \
