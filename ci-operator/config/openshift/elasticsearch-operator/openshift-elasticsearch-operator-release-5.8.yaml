@@ -57,14 +57,15 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- from: base
-  to: elasticsearch-operator
-- dockerfile_path: Dockerfile.src
-  from: src
-  to: elasticsearch-operator-src
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
-  to: elasticsearch-operator-registry
+  items:
+  - from: base
+    to: elasticsearch-operator
+  - dockerfile_path: Dockerfile.src
+    from: src
+    to: elasticsearch-operator-src
+  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+    from: base
+    to: elasticsearch-operator-registry
 operator:
   bundles:
   - as: elasticsearch-operator-bundle
@@ -109,7 +110,7 @@ tests:
     from: src
 - as: e2e-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
@@ -129,7 +130,7 @@ tests:
     workflow: optional-operators-ci-aws
 - as: cluster-logging-operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:

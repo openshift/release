@@ -15,6 +15,9 @@ set -o pipefail
 #      failure domain.
 # POOL_SELECTOR - Specifies pool selector labels as comma-separated key=value
 #      pairs (e.g., "vcf=true,region=us-east").
+# RESERVE_EXTRA_NETWORK - Requests an additional network that won't be attached
+#      to cluster nodes. Reserved networks are saved to reserved_networks.json
+#      for later use (e.g., remote worker installation).
 ################################################################################
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
@@ -48,17 +51,18 @@ declare PORTGROUP_RETVAL
 declare LEASES
 
 
-declare MULTI_TENANT_CAPABLE_WORKFLOWS
+declare SINGLE_TENANT_LEASE_JOB_SAFE_NAMES
 # shellcheck source=/dev/null
 source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
 
 LEASES=()
 
-DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"single-tenant"}
-for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
-  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
-    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
-    DEFAULT_NETWORK_TYPE="multi-tenant"
+DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"multi-tenant"}
+for job_safe_name in ${SINGLE_TENANT_LEASE_JOB_SAFE_NAMES}; do
+  job_safe_name=$(echo "${job_safe_name}" | tr -d '[:space:]\r')
+  if [[ "${JOB_NAME_SAFE}" == "${job_safe_name}"* ]]; then
+    log "job ${JOB_NAME_SAFE} requires a single-tenant lease. will request a single-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="single-tenant"
     break
   fi
 done
@@ -364,6 +368,12 @@ for POOL in "${pools[@]}"; do
     networks_number=2
   fi
 
+  # RESERVE_EXTRA_NETWORK requests an additional network that won't be attached to nodes.
+  # Useful for remote worker installations that need a separate network.
+  if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
+    networks_number=2
+  fi
+
   # For this flag, we need to make sure each FD has a unique name so it gets a unique subnet.
   unique_name=""
   if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]]; then
@@ -426,6 +436,7 @@ fi
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}")
 
 declare -A vcenter_portgroups
+declare -A vcenter_reserved_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
@@ -456,11 +467,22 @@ EOF
       getPortGroup $i
       portgroup_name=${PORTGROUP_RETVAL}
 
-      previousValue=""
-      if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
-        previousValue="${vcenter_portgroups[$VCENTER]},"
+      # If RESERVE_EXTRA_NETWORK is enabled, only use the first network for installation
+      # Additional networks are reserved for later use (e.g., remote workers)
+      if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]] && [[ $i -gt 0 ]]; then
+        log "Reserving network ${portgroup_name} for later use (not adding to platform spec)"
+        previousReservedValue=""
+        if [[ -n "${vcenter_reserved_portgroups[$VCENTER]:-}" ]]; then
+          previousReservedValue="${vcenter_reserved_portgroups[$VCENTER]},"
+        fi
+        vcenter_reserved_portgroups[$VCENTER]="${previousReservedValue}${portgroup_name}"
+      else
+        previousValue=""
+        if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
+          previousValue="${vcenter_portgroups[$VCENTER]},"
+        fi
+        vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
       fi
-      vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
     done
   fi
 
@@ -705,3 +727,15 @@ done
 log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+
+# Save reserved networks for later use
+if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
+  log "Saving reserved networks to reserved_networks.json"
+  reserved_spec='{}'
+  for VCENTER in "${!vcenter_reserved_portgroups[@]}"; do
+    networks="${vcenter_reserved_portgroups[$VCENTER]}"
+    reserved_spec=$(echo "$reserved_spec" | jq -r --arg vcenter "$VCENTER" --arg networks "$networks" '.[$vcenter] = $networks')
+  done
+  echo "$reserved_spec" > "${SHARED_DIR}"/reserved_networks.json
+  log "Reserved networks: $(cat "${SHARED_DIR}"/reserved_networks.json)"
+fi

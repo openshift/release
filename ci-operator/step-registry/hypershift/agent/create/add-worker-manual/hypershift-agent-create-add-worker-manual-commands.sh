@@ -34,17 +34,9 @@ curl -L --fail -o /var/lib/libvirt/images/extraworker.iso --insecure ${ISODownlo
 source dev-scripts-additional-config
 
 for ((i = 0; i < $NUM_EXTRA_WORKERS; i++)); do
-    virsh dumpxml "ostest_extraworker_$i" > "/tmp/ostest_extraworker_$i.xml"
-    sed -i "/<devices>/a \\
-     <disk type='file' device='cdrom'>\\
-       <driver name='qemu' type='raw'/>\\
-       <source file='/var/lib/libvirt/images/extraworker.iso'/>\\
-       <target dev='sdb' bus='scsi'/>\\
-       <readonly/>\\
-     </disk>" "/tmp/ostest_extraworker_$i.xml"
-    sed -i "s/<boot dev='network'\/>/<boot dev='hd'\/>/g" "/tmp/ostest_extraworker_$i.xml"
-    virsh define "/tmp/ostest_extraworker_$i.xml"
-    virsh start "ostest_extraworker_$i"
+    virt-xml "ostest_extraworker_$i" --add-device --disk "/var/lib/libvirt/images/extraworker.iso,device=cdrom,target.dev=sdc"
+    virt-xml "ostest_extraworker_$i" --edit target=vda --disk="boot_order=1"
+    virt-xml "ostest_extraworker_$i" --edit target=sdc --disk="boot_order=2" --start
 done
 
 _agentExist=0

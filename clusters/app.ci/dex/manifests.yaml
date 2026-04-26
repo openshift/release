@@ -56,16 +56,19 @@ spec:
           connectors:
           - config:
               claimMapping:
+                groups: groups
                 preferred_username: preferred_username
               clientID: $CLIENT_ID
               clientSecret: $CLIENT_SECRET
               getUserInfo: true
+              insecureEnableGroups: true
               issuer: https://auth.redhat.com/auth/realms/EmployeeIDP
               redirectURI: https://idp.ci.openshift.org/callback
               scopes:
               - openid
               - profile
               - email
+              - groups
             id: sso
             name: SSO
             type: oidc
@@ -183,6 +186,16 @@ spec:
             redirectURIs:
             - https://oauth-openshift.apps.build05.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
             secretEnv: BUILD05-SECRET
+          - idEnv: GRAFANA-CI-MONITORING-ID
+            name: grafana-ci-monitoring
+            redirectURIs:
+            - https://grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com/login/generic_oauth
+            secretEnv: GRAFANA-CI-MONITORING-SECRET
+          - idEnv: BUILD12-ID
+            name: build12
+            redirectURIs:
+            - https://oauth-openshift.apps.build12.ci.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+            secretEnv: BUILD12-SECRET
           storage:
             config:
               inCluster: true
@@ -440,6 +453,26 @@ spec:
             secretKeyRef:
               key: build05-secret
               name: build05-secret
+        - name: GRAFANA-CI-MONITORING-ID
+          valueFrom:
+            secretKeyRef:
+              key: grafana-ci-monitoring-id
+              name: grafana-ci-monitoring-secret
+        - name: GRAFANA-CI-MONITORING-SECRET
+          valueFrom:
+            secretKeyRef:
+              key: grafana-ci-monitoring-secret
+              name: grafana-ci-monitoring-secret
+        - name: BUILD12-ID
+          valueFrom:
+            secretKeyRef:
+              key: build12-id
+              name: build12-secret
+        - name: BUILD12-SECRET
+          valueFrom:
+            secretKeyRef:
+              key: build12-secret
+              name: build12-secret
         image: ghcr.io/dexidp/dex:v2.31.0
         name: dex
         ports:

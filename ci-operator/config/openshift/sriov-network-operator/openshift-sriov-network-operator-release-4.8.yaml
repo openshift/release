@@ -29,15 +29,16 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.15-openshift-4.8
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  from: base
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  from: base
-  to: sriov-network-webhook
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+    from: base
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.rhel7
+    from: base
+    to: sriov-network-webhook
 operator:
   bundles:
   - as: sriov-network-operator-bundle
@@ -97,7 +98,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-sriov-network-operator-bundle
     env:

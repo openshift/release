@@ -22,8 +22,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-version-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-version-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - name: "4.20"
@@ -92,6 +94,13 @@ tests:
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: e2e-agnostic-ovn-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-azure
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -118,7 +127,7 @@ tests:
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws

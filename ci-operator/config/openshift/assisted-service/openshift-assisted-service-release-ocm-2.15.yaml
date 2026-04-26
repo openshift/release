@@ -34,55 +34,56 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ci-images/Dockerfile.base
-  to: assisted-service-base
-- dockerfile_path: ci-images/Dockerfile.unit-tests
-  from: assisted-service-base
-  to: assisted-service-unit-test
-- dockerfile_path: ci-images/Dockerfile.lint
-  from: assisted-service-base
-  to: assisted-service-lint
-- dockerfile_path: ci-images/Dockerfile.subsystem
-  from: assisted-service-base
-  to: assisted-service-subsystem
-- dockerfile_path: ci-images/Dockerfile.code-generation
-  from: assisted-service-base
-  to: assisted-service-generate
-- dockerfile_path: Dockerfile.assisted-service-build
-  to: assisted-service-build-base
-- dockerfile_literal: |
-    FROM base-build
-    COPY . .
-  inputs:
-    assisted-service-build-base:
-      as:
-      - base-build
-    src:
-      paths:
-      - destination_dir: ./
-        source_path: /go/src/github.com/openshift/assisted-service/.
-  to: assisted-service-build
-- dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service
-- build_args:
-  - name: RHEL_VERSION
-    value: "8"
-  dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service-el8
-- dockerfile_literal: |
-    FROM quay.io/multi-arch/yq:4.30.5 as yq4
-    FROM coreos/stream9:9
-    COPY --from=yq4 /usr/bin/yq /usr/bin/yq
-    COPY . .
-  from: src
-  to: assisted-service-scripts
-- dockerfile_path: Dockerfile.assisted-service-debug
-  to: assisted-service-debug
-- dockerfile_literal: |
-    FROM coreos/stream9:9
-    RUN dnf install -y --skip-broken skopeo pip
-  from: src
-  to: assisted-service-publish-index
+  items:
+  - dockerfile_path: ci-images/Dockerfile.base
+    to: assisted-service-base
+  - dockerfile_path: ci-images/Dockerfile.unit-tests
+    from: assisted-service-base
+    to: assisted-service-unit-test
+  - dockerfile_path: ci-images/Dockerfile.lint
+    from: assisted-service-base
+    to: assisted-service-lint
+  - dockerfile_path: ci-images/Dockerfile.subsystem
+    from: assisted-service-base
+    to: assisted-service-subsystem
+  - dockerfile_path: ci-images/Dockerfile.code-generation
+    from: assisted-service-base
+    to: assisted-service-generate
+  - dockerfile_path: Dockerfile.assisted-service-build
+    to: assisted-service-build-base
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      assisted-service-build-base:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./
+          source_path: /go/src/github.com/openshift/assisted-service/.
+    to: assisted-service-build
+  - dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service
+  - build_args:
+    - name: RHEL_VERSION
+      value: "8"
+    dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service-el8
+  - dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM coreos/stream9:9
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY . .
+    from: src
+    to: assisted-service-scripts
+  - dockerfile_path: Dockerfile.assisted-service-debug
+    to: assisted-service-debug
+  - dockerfile_literal: |
+      FROM coreos/stream9:9
+      RUN dnf install -y --skip-broken skopeo pip
+    from: src
+    to: assisted-service-publish-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -124,7 +125,7 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-nightly-image
-  cron: 00 10 * * 5,2
+  cron: 00 10 * * 5
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
@@ -133,7 +134,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-nightly-image-el8
-  cron: 00 20 * * 5,2
+  cron: 00 17 * * 5
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service-el8
@@ -264,7 +265,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  cron: 00 21 * * 5,2
+  cron: 00 01 * * 5
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -335,7 +336,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  cron: 00 13 * * 5,2
+  cron: 00 16 * * 5
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -378,7 +379,7 @@ tests:
 - as: e2e-ai-operator-ztp-periodic
   capabilities:
   - intranet
-  cron: 00 02 * * 5,2
+  cron: 00 11 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -404,7 +405,7 @@ tests:
 - as: e2e-ai-operator-ztp-3masters-periodic
   capabilities:
   - intranet
-  cron: 00 10 * * 5,2
+  cron: 00 17 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -433,7 +434,7 @@ tests:
 - as: e2e-ai-operator-ztp-disconnected-periodic
   capabilities:
   - intranet
-  cron: 00 13 * * 5,2
+  cron: 00 18 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -496,7 +497,7 @@ tests:
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
   capabilities:
   - intranet
-  cron: 00 08 * * 5,2
+  cron: 00 08 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -512,7 +513,7 @@ tests:
 - as: e2e-ai-operator-ztp-node-labels-periodic
   capabilities:
   - intranet
-  cron: 00 15 * * 5,2
+  cron: 00 18 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -571,7 +572,7 @@ tests:
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
   capabilities:
   - intranet
-  cron: 00 16 * * 5,2
+  cron: 00 16 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -637,7 +638,7 @@ tests:
 - as: e2e-ai-operator-ztp-capi-periodic
   capabilities:
   - intranet
-  cron: 00 06 * * 5,2
+  cron: 00 16 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -671,7 +672,7 @@ tests:
 - as: e2e-ai-operator-disconnected-capi-periodic
   capabilities:
   - intranet
-  cron: 00 20 * * 5,2
+  cron: 00 04 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -720,7 +721,7 @@ tests:
 - as: e2e-ai-operator-ztp-remove-node-periodic
   capabilities:
   - intranet
-  cron: 00 17 * * 5,2
+  cron: 00 22 * * 5
   steps:
     cluster_profile: packet-assisted
     dependencies:

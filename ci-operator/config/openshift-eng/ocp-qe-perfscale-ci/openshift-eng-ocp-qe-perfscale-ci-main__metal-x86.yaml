@@ -47,6 +47,20 @@ tests:
     - ref: openshift-qe-installer-bm-load-kubeconfig
     - ref: redhat-chaos-pod-scenarios-etcd-disruption
 - always_run: false
+  as: orion-ingress
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      RUN_ORION: "true"
+      VERSION: "4.21"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-orion-ingress
+- always_run: false
   as: data-path-6nodes
   capabilities:
   - intranet
@@ -232,6 +246,17 @@ tests:
     - ref: openshift-qe-installer-bm-day2-cnv
     - chain: openshift-qe-data-path-tests
 - always_run: false
+  as: egressip
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-egressip
+- always_run: false
   as: foreman-1node
   capabilities:
   - intranet
@@ -256,10 +281,20 @@ tests:
   steps:
     cluster_profile: metal-perfscale-cpt
     env:
-      RUN_ORION: "true"
+      RUN_ORION: deferred
       VERSION: "4.19"
     test:
     - chain: openshift-qe-orion-consolidated-virt
+- always_run: false
+  as: orion-datapath
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      RUN_ORION: "true"
+      VERSION: "4.21"
+    test:
+    - ref: openshift-qe-orion-data-path
+    - ref: openshift-qe-orion-virt-data-path
 - always_run: false
   as: deploy-hmno
   capabilities:
@@ -331,6 +366,20 @@ tests:
       STARTING_NODE: "4"
     test:
     - ref: openshift-qe-installer-bm-foreman
+- always_run: false
+  as: orion-rds-core
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      RUN_ORION: "true"
+      VERSION: "4.20"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-orion-rds-core
 zz_generated_metadata:
   branch: main
   org: openshift-eng

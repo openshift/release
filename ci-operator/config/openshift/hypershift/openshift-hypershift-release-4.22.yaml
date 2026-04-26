@@ -27,25 +27,15 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- to: hypershift-operator
-- dockerfile_path: Dockerfile.control-plane
-  to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  to: hypershift-tests
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y python3-pip
-  from: src
-  to: custom-verify-src
-- dockerfile_literal: |
-    FROM base
-    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
-  from: src
-  to: docs-build-src
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - hypershift-operator
     - hypershift-tests
     name: "4.22"
@@ -62,7 +52,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.22"
+      version: "4.21"
   latest:
     integration:
       include_built_images: true
@@ -72,47 +62,47 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.17"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   latest-420:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.21"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.20"
   n3minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.19"
   n4minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -120,41 +110,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  unit:
-    limits:
-      cpu: 4000m
-      memory: 8Gi
-    requests:
-      cpu: 4000m
-      memory: 8Gi
-  verify:
-    limits:
-      cpu: 4000m
-      memory: 8Gi
-    requests:
-      cpu: 4000m
-      memory: 8Gi
 tests:
-- as: verify
-  commands: make verify
-  container:
-    from: custom-verify-src
-  timeout: 1h0m0s
-- as: docs-preview
+- always_run: false
+  as: agentic-qe-aws
   optional: true
-  run_if_changed: ^docs/
   steps:
-    test:
-    - ref: hypershift-docs-build-and-deploy
-    - ref: hypershift-docs-preview-comment
-- as: unit
-  commands: make test
-  container:
-    from: src
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+    cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-agentic-qe-aws
 - always_run: false
   as: e2e-aks
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
@@ -170,6 +137,9 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aks-4-21
@@ -202,7 +172,7 @@ tests:
   as: e2e-aws
   capabilities:
   - build-tmpfs
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -213,25 +183,41 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-v2-aws
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
 - always_run: false
+  as: e2e-v2-aws-backuprestore
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
   as: e2e-azure-self-managed
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-azure
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
     env:
-      CI_TESTS_RUN: ^TestCreateCluster$
+      CI_TESTS_RUN: ^(TestCreateCluster|TestAzurePrivateTopology|TestAzureOAuthLoadBalancer)$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
 - always_run: false
   as: e2e-aws-minimal
@@ -247,7 +233,7 @@ tests:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-techpreview
   optional: true
@@ -262,12 +248,12 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-upgrade-hypershift-operator
   capabilities:
   - build-tmpfs
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -276,7 +262,7 @@ tests:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
   - build-tmpfs
@@ -287,7 +273,7 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-4-21
   capabilities:
@@ -305,24 +291,27 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      E2E_TEST_REGEX: ^TestCreateCluster$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
-      SKIP_E2E_LOCAL: "true"
-    workflow: hypershift-kubevirt-e2e-nested
+      RUN_EXTERNAL_INFRA_TEST: "false"
+    workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
   as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -378,7 +367,7 @@ tests:
     cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
@@ -397,7 +386,7 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-openstack-aws-nfv
   optional: true
@@ -466,24 +455,7 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-external
-- always_run: true
-  as: e2e-aws-external-oidc
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CI_TESTS_RUN: TestExternalOIDC
-      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
-    workflow: hypershift-aws-e2e-external-oidc
-- always_run: true
-  as: e2e-azure-aks-external-oidc
-  steps:
-    cluster_profile: hypershift-aks
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      CI_TESTS_RUN: TestExternalOIDC
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-    workflow: hypershift-azure-aks-external-oidc
+    workflow: hypershift-aws-e2e-nested
 - as: verify-deps
   steps:
     env:
@@ -496,10 +468,14 @@ tests:
   - build-tmpfs
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- as: dependabot-triage
+  cron: 0 12 * * 5
+  steps:
+    workflow: hypershift-dependabot-triage
 - as: periodic-jira-agent
   cron: 30 8 * * 1
   steps:
@@ -531,6 +507,18 @@ tests:
       GKE_REGION: us-central1
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e
+- always_run: false
+  as: e2e-v2-gke
+  capabilities:
+  - build-tmpfs
+  optional: true
+  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+  steps:
+    cluster_profile: hypershift-gcp
+    env:
+      GKE_REGION: us-central1
+      GKE_RELEASE_CHANNEL: stable
+    workflow: hypershift-gcp-gke-e2e-v2
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

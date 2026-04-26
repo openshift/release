@@ -7,24 +7,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
-- dockerfile_path: images/router/base/Dockerfile.ocp
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.ocp
-  from: haproxy-router-base
-  to: haproxy-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.ocp
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.ocp
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -40,10 +41,28 @@ tests:
   commands: go test -race ./...
   container:
     from: src
+- as: fips-image-scan-haproxy-router
+  steps:
+    dependencies:
+      SCAN_IMAGE: haproxy-router
+    test:
+    - ref: fips-check-image-scan
+- as: e2e-aws-fips
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 - as: e2e-agnostic
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     post:
     - chain: gather-core-dump
     - chain: ipi-gcp-post
@@ -91,7 +110,7 @@ tests:
   shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router

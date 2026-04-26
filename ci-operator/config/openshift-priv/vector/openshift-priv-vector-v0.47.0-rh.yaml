@@ -4,15 +4,15 @@ base_images:
     namespace: ocp
     tag: "9"
   cluster-logging-operator:
-    name: 6.y
+    name: "6.5"
     namespace: logging
     tag: cluster-logging-operator
   cluster-logging-operator-e2e:
-    name: 6.y
+    name: "6.5"
     namespace: logging
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-registry:
-    name: 6.y
+    name: "6.5"
     namespace: logging
     tag: cluster-logging-operator-registry
   log-file-metric-exporter:
@@ -38,12 +38,13 @@ build_root:
     tag: rhel-9-release-golang-1.23-openshift-4.20
 canonical_go_repository: github.com/ViaQ/vector
 images:
-- dockerfile_path: Dockerfile
-  from: ubi9-minimal
-  to: vector
-- dockerfile_path: Dockerfile.unit
-  from: builder
-  to: logging-vector-test-unit
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi9-minimal
+    to: vector
+  - dockerfile_path: Dockerfile.unit
+    from: builder
+    to: logging-vector-test-unit
 promotion:
   to:
   - disabled: true
@@ -53,7 +54,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -63,7 +64,7 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: make test
+  commands: CARGO_BUILD_JOBS=4 make test
   container:
     from: logging-vector-test-unit
 - as: cargo-deny-check-bans
@@ -92,8 +93,8 @@ tests:
       region: us-east-1
     owner: obs-logging
     product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
+    timeout: 1h30m0s
+    version: "4.20"
   steps:
     test:
     - as: test
@@ -127,7 +128,7 @@ tests:
       region: us-east-1
     owner: obs-logging
     product: ocp
-    timeout: 1h0m0s
+    timeout: 1h30m0s
     version: "4.18"
   steps:
     test:

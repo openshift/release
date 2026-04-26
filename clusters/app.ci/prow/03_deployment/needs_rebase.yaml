@@ -34,20 +34,42 @@ spec:
         app: prow
         component: needs-rebase
     spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       containers:
       - name: needs-rebase
-        image: us-docker.pkg.dev/k8s-infra-prow/images/needs-rebase:v20260310-6097a43c8
+        image: us-docker.pkg.dev/k8s-infra-prow/images/needs-rebase:v20260421-d25a17867
         args:
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --hmac-secret-file=/etc/webhook/hmac.yaml
-        - --plugin-config=/etc/plugins/plugins.yaml
-        - --supplemental-plugin-config-dir=/etc/plugins
+        - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --dry-run=false
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-hourly-tokens=0
         - --cache-valid-time=3600
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
         ports:
           - name: http
             containerPort: 8888
@@ -55,12 +77,11 @@ spec:
         - name: hmac
           mountPath: /etc/webhook
           readOnly: true
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
-        - name: plugins
-          mountPath: /etc/plugins
-          readOnly: true
+        - name: release
+          mountPath: /var/repo
         resources:
           requests:
             memory: "75Mi"
@@ -75,13 +96,30 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: hmac
         secret:
           secretName: github-webhook-credentials
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-merge-robot
-      - name: plugins
-        configMap:
-          name: plugins
+          secretName: openshift-prow-github-app
+      - name: release
+        emptyDir: {}

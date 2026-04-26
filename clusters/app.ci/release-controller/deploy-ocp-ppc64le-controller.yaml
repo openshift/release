@@ -189,11 +189,12 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-throttle=250
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/api
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=brawilli@redhat.com
+        - --jira-password-file=/etc/jira/password
         - --verify-jira
-        - --plugin-config=/etc/plugins/plugins.yaml
-        - --supplemental-plugin-config-dir=/etc/plugins
+        - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-ppc64le
         - --manifest-list-mode
@@ -232,9 +233,6 @@ spec:
           readOnly: true
         - mountPath: /etc/jira
           name: jira
-          readOnly: true
-        - mountPath: /etc/plugins
-          name: plugins
           readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
@@ -300,10 +298,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
-      - configMap:
-          defaultMode: 420
-          name: plugins
-        name: plugins
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
@@ -361,8 +355,9 @@ spec:
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-ppc64le
         - --enable-jira
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/api
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=brawilli@redhat.com
+        - --jira-password-file=/etc/jira/password
         env:
         - name: HOME
           value: /tmp/home

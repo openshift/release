@@ -5,6 +5,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -91,8 +98,6 @@ create_mco_config_for_c2s_instance_metadata "${SHARED_DIR}/manifest_instance_met
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
 ca_file=`mktemp`
@@ -103,7 +108,7 @@ else
     cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
 fi
 
-if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+if version_le "${ocp_version}" "4.9"; then
   echo "C2S: workaround for C2S emulator (BZ#1926975)"
   cat << EOF > ${SHARED_DIR}/manifest_c2s_emulator_patch_cloud-provider-config.yaml
 apiVersion: v1

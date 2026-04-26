@@ -8,9 +8,10 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-provider-libvirt
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: libvirt-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: libvirt-machine-controllers
 promotion:
   to:
   - name: 4.13-priv
@@ -56,8 +57,15 @@ tests:
   as: e2e-libvirt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-libvirt
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+      COMPAT: -compat=1.17
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv

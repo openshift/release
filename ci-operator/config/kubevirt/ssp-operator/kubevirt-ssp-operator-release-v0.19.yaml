@@ -7,21 +7,22 @@ build_root:
   project_image:
     dockerfile_path: ci-builder/Dockerfile
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY prom-metrics-linter /usr/bin/prom-metrics-linter
-    RUN dnf install -y jq && dnf clean all
-  from: src
-  inputs:
-    metrics-linter:
-      paths:
-      - destination_dir: .
-        source_path: /prom-metrics-linter
-  to: ssp-metrics-linter
-- dockerfile_path: Dockerfile
-  to: ssp-operator-container
-- dockerfile_path: validator.Dockerfile
-  to: template-validator-container
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY prom-metrics-linter /usr/bin/prom-metrics-linter
+      RUN dnf install -y jq && dnf clean all
+    from: src
+    inputs:
+      metrics-linter:
+        paths:
+        - destination_dir: .
+          source_path: /prom-metrics-linter
+    to: ssp-metrics-linter
+  - dockerfile_path: Dockerfile
+    to: ssp-operator-container
+  - dockerfile_path: validator.Dockerfile
+    to: template-validator-container
 releases:
   initial:
     integration:

@@ -3,11 +3,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-olm-operator
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-olm-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-olm-operator
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
@@ -42,26 +44,26 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-devpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-customnoupgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_GATES: '[NewOLMWebhookProviderOpenshiftServiceCA=true]'
       FEATURE_SET: CustomNoUpgrade

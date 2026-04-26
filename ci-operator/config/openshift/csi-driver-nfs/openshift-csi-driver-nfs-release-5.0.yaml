@@ -3,11 +3,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
 images:
-- dockerfile_path: images/Dockerfile
-  to: csi-driver-nfs
+  items:
+  - dockerfile_path: images/Dockerfile
+    to: csi-driver-nfs
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -39,7 +41,11 @@ tests:
     from: src
 - as: e2e-openstack-csi
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
 - as: security
   optional: true

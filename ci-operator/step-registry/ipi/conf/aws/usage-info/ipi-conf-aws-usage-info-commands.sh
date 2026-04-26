@@ -4,6 +4,21 @@
 #set -o errexit
 #set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
 set +e
 
 env > "${ARTIFACT_DIR}/prow-ci-env.log"
@@ -51,11 +66,9 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+if version_ge "${ocp_version}" "4.11"; then
     while read -r TAG VALUE
     do
       printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"

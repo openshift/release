@@ -1,16 +1,17 @@
 base_images:
   kubernetes-sigs-lws:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: kubernetes-sigs-lws
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ci
-  to: lws-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: lws-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 resources:
   '*':
@@ -18,7 +19,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.22"
+  name: "5.0"
   namespace: ocp
 tests:
 - as: verify
@@ -53,7 +54,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -71,7 +72,7 @@ tests:
 - as: e2e-aws-operand
   skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

@@ -32,8 +32,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-kube-apiserver-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: cluster-kube-apiserver-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: cluster-kube-apiserver-operator
 promotion:
   to:
   - name: 4.23-priv
@@ -72,21 +73,21 @@ tests:
     from: test-bin
 - as: k8s-e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-kubernetes-e2e-gcp
 - always_run: false
   as: k8s-e2e-gcp-serial
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -103,7 +104,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -120,7 +121,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -139,7 +140,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -155,14 +156,14 @@ tests:
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-gcp-operator-encryption-rotation-aescbc
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -179,7 +180,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -198,7 +199,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -214,7 +215,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -230,7 +231,7 @@ tests:
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-single-node-live-iso
@@ -242,13 +243,13 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-aws-operator-disruptive-single-node
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -264,7 +265,7 @@ tests:
   as: e2e-gcp-operator-single-node
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -281,7 +282,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -298,7 +299,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -315,7 +316,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -336,7 +337,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-suspend-90d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -344,7 +345,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-suspend-180d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -352,7 +353,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-suspend-1y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -360,7 +361,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-suspend-2y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 2y
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -368,7 +369,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-suspend-3y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 3y
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -376,7 +377,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-suspend-90d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend
@@ -384,7 +385,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-suspend-180d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
@@ -392,7 +393,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-suspend-1y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 365d
     workflow: openshift-e2e-cert-rotation-suspend
@@ -400,7 +401,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -408,7 +409,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -416,7 +417,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-1y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend-sno
@@ -424,7 +425,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
@@ -432,7 +433,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-shutdown-180d
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown
@@ -440,7 +441,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-shutdown-1y
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 1y
     workflow: openshift-e2e-cert-rotation-shutdown
@@ -448,7 +449,7 @@ tests:
   as: e2e-short-cert-rotation
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-cert-rotation-short-aws
 - always_run: false
   as: e2e-short-cert-rotation-azure
@@ -457,9 +458,8 @@ tests:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-cert-rotation-short-azure
 - as: e2e-gcp-operator-serial-ote
-  optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/operator/serial
     test:

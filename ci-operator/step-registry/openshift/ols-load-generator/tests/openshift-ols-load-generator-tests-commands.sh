@@ -58,7 +58,7 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   job_status="success"
   job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   job_end=""
-  additional_attributes='{"olsTestWorkers": '"${OLS_TEST_WORKERS}"', "olsTestDuration": "'"$OLS_TEST_DURATION"'"}'
+  additional_attributes='{"olsTestWorkers": '"${OLS_TEST_WORKERS}"', "olsTestDuration": "'"$OLS_TEST_DURATION"'", "mcpEnabled": "'"$ENABLE_MCP"'"}'
 
   # Create namespace and set monitoring labels
   run_or_fail oc create namespace openshift-lightspeed
@@ -74,27 +74,37 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   run_or_fail make deploy
   run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-operator-controller-manager
   run_or_fail oc patch deployment lightspeed-operator-controller-manager \
-  -n openshift-lightspeed \
-  --type='json' \
-  -p='[
-    {
-      "op": "add",
-      "path": "/spec/template/spec/containers/0/securityContext",
-      "value": {
-        "allowPrivilegeEscalation": false,
-        "seccompProfile": {
-          "type": "RuntimeDefault"
-        },
-        "capabilities": {
-          "drop": ["ALL"]
+    -n openshift-lightspeed \
+    --type='json' \
+    -p='[
+      {
+        "op": "add",
+        "path": "/spec/template/spec/containers/0/securityContext",
+        "value": {
+          "allowPrivilegeEscalation": false,
+          "readOnlyRootFilesystem": true,
+          "runAsNonRoot": true,
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          },
+          "capabilities": {
+            "drop": ["ALL"]
+          }
         }
       }
-    }
-  ]'
-  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=600s
+    ]' || true
+  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=900s
   popd
 
   # Deploy olsconfig with fake values
+  PROVIDER_EXTRA=""
+  OLS_EXTRA=""
+
+  if [[ "${ENABLE_MCP:-false}" == "true" ]]; then
+    PROVIDER_EXTRA="      fakeProviderMCPToolCall: true"
+    OLS_EXTRA="    introspectionEnabled: true"
+  fi
+
   run_or_fail cat <<EOF | oc apply -f - -n openshift-lightspeed
 apiVersion: ols.openshift.io/v1alpha1
 kind: OLSConfig
@@ -110,11 +120,13 @@ spec:
       - name: fake_model
       name: fake_provider
       type: fake_provider
+${PROVIDER_EXTRA}
   ols:
     defaultModel: fake_model
     defaultProvider: fake_provider
     enableDeveloperUI: false
     logLevel: INFO
+${OLS_EXTRA}
     deployment:
       replicas: 1
     userDataCollection:
@@ -124,7 +136,7 @@ EOF
 
   # Wait for the app server deployment
   sleep 60
-  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
+  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=900s
   LOG_START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
@@ -295,17 +307,32 @@ EOF
 
   # Clean up
   run_or_fail oc delete namespace ols-load-test
-  run_or_fail oc wait --for=delete ns/ols-load-test --timeout=600s
+  oc wait --for=delete ns/ols-load-test --timeout=600s || true
   run_or_fail oc logs -n openshift-lightspeed deployment/lightspeed-app-server --since-time="$LOG_START_TIME" > ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
   run_or_fail cp ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt ${ARTIFACT_DIR}/ols_${OLS_TEST_WORKERS}_${OLS_TEST_DURATION}.txt
 
   pushd lightspeed-operator
-  run_or_fail make undeploy
+  timeout 120s make undeploy || true
+  timeout 60s kubectl api-resources --verbs=list --namespaced -o name \
+| xargs -n 1 kubectl get -n openshift-lightspeed -o json --ignore-not-found \
+| jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .apiVersion + " " + .kind + " " + .metadata.name' \
+| while read kind name; do
+    kubectl patch -n openshift-lightspeed "$kind/$name" \
+      -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+  done || true
+  timeout 60s kubectl api-resources --verbs=list --namespaced=false -o name \
+| xargs -n 1 kubectl get -o json --ignore-not-found \
+| jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .kind + " " + .metadata.name' \
+| while read kind name; do
+    kubectl patch "$kind/$name" \
+      -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+  done || true
+
   popd
   job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   log_fingerprint
 
-  sleep 300
+  sleep 180
 done
 
 popd

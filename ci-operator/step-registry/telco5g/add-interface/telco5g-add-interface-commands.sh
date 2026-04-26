@@ -11,20 +11,31 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # Install AWS CLI
 curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscli.zip
-unzip -o /tmp/awscli.zip -d /tmp/
-/tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
+echo "Extracting aws cli"
+unzip -o /tmp/awscli.zip -d /tmp/ 1>/dev/null
+echo "Insalling aws cli"
+/tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin 2>/dev/null
 export PATH="/tmp/bin:/tmp:${PATH}"
 aws --version
 
 # Install terraform
 TERRAFORM_VERSION="1.5.5"
 curl -sL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
-unzip -o /tmp/terraform.zip -d /tmp/
+echo "Extracting terraform"
+unzip -o /tmp/terraform.zip -d /tmp/ 1>/dev/null
 chmod +x /tmp/terraform
 terraform version
 
-# Discover the region and master instance
-INSTANCE_PREFIX="${NAMESPACE}"
+INSTANCE_PREFIX="$(grep "name: ci-op-" "$SHARED_DIR/install-config.yaml" | sed "s/.*name: //g")"
+if [[ -z "${INSTANCE_PREFIX}" ]]; then
+    INSTANCE_PREFIX="$(grep "name: ci-op-" "$SHARED_DIR/kubeconfig" | sed "s/.*name: //g")"
+fi
+if [[ -z "${INSTANCE_PREFIX}" ]]; then
+    echo "Can not find INSTANCE_PREFIX, exiting"
+    exit 1
+fi
+echo "Detected INSTANCE_PREFIX=${INSTANCE_PREFIX}"
+
 AWS_REGION=""
 MASTER_INSTANCE_ID=""
 for region in us-east-1 us-east-2 us-west-1 us-west-2; do
@@ -36,12 +47,13 @@ for region in us-east-1 us-east-2 us-west-1 us-west-2; do
     --output text 2>/dev/null || true)
   if [[ -n "$result" ]]; then
     AWS_REGION="$region"
-    echo "Found instance(s) in region: ${AWS_REGION}"
+    echo "Found instance(s) with prefix ID ${INSTANCE_PREFIX}* in region: ${AWS_REGION}"
     echo "$result" | while read -r id name state az; do
       echo "  Instance: ${id}  Name: ${name}  State: ${state}  AZ: ${az}"
     done
     # Select the instance with "master" in its name
     MASTER_INSTANCE_ID=$(echo "$result" | awk '$2 ~ /master/ {print $1; exit}')
+    echo "Found final master instance ID $MASTER_INSTANCE_ID"
     break
   fi
 done

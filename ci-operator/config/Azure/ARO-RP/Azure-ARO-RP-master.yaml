@@ -9,16 +9,17 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
-- dockerfile_path: ./Dockerfile.aro-e2e
-  from: ubi9-minimal
-  inputs:
-    src:
-      as:
-      - ${BUILDER_REGISTRY}/openshift-release-dev/golang-builder--partner-share:rhel-9-golang-1.25-openshift-4.21
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/Azure/ARO-RP/.
-  to: aro-classic-e2e
+  items:
+  - dockerfile_path: ./Dockerfile.aro-e2e
+    from: ubi9-minimal
+    inputs:
+      src:
+        as:
+        - ${BUILDER_REGISTRY}/openshift-release-dev/golang-builder--partner-share:rhel-9-golang-1.25-openshift-4.21
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/Azure/ARO-RP/.
+    to: aro-classic-e2e
 promotion:
   to:
   - name: aro-classic-ci-images
@@ -37,34 +38,73 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: integration-e2e-parallel
+  as: integration-e2e-parallel-miwi
   optional: true
   steps:
     cluster_profile: aro-classic-int
     env:
+      E2E_TYPE: miwi
       LOCATION: uksouth
     workflow: aro-classic-e2e
 - always_run: false
-  as: stage-e2e-parallel
+  as: stage-e2e-parallel-miwi
   optional: true
   steps:
     cluster_profile: aro-classic-stg
     env:
+      E2E_TYPE: miwi
       LOCATION: uksouth
     workflow: aro-classic-e2e
 - always_run: false
-  as: prod-e2e-parallel
+  as: prod-e2e-parallel-miwi
   optional: true
   steps:
     cluster_profile: aro-classic-prod
     env:
+      E2E_TYPE: miwi
       LOCATION: uksouth
     workflow: aro-classic-e2e
 - always_run: false
-  as: e2e-parallel
+  as: e2e-parallel-miwi
   steps:
     cluster_profile: aro-classic-dev
     env:
+      E2E_TYPE: miwi
+      LOCATION: westus3
+    workflow: aro-classic-e2e
+- always_run: false
+  as: integration-e2e-parallel-csp
+  optional: true
+  steps:
+    cluster_profile: aro-classic-int
+    env:
+      E2E_TYPE: csp
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: stage-e2e-parallel-csp
+  optional: true
+  steps:
+    cluster_profile: aro-classic-stg
+    env:
+      E2E_TYPE: csp
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: prod-e2e-parallel-csp
+  optional: true
+  steps:
+    cluster_profile: aro-classic-prod
+    env:
+      E2E_TYPE: csp
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- always_run: false
+  as: e2e-parallel-csp
+  steps:
+    cluster_profile: aro-classic-dev
+    env:
+      E2E_TYPE: csp
       LOCATION: westus3
     workflow: aro-classic-e2e
 zz_generated_metadata:

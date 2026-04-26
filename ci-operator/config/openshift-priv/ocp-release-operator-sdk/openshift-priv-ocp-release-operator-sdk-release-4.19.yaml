@@ -7,19 +7,20 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ocp-release-operator-sdk
 images:
-- dockerfile_path: ci/dockerfiles/builder.Dockerfile
-  from: root
-  to: osdk-builder
-- dockerfile_path: release/helm/Dockerfile
-  from: base-rhel9
-  to: helm-operator
-- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
-  from: helm-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-helm-e2e
+  items:
+  - dockerfile_path: ci/dockerfiles/builder.Dockerfile
+    from: root
+    to: osdk-builder
+  - dockerfile_path: release/helm/Dockerfile
+    from: base-rhel9
+    to: helm-operator
+  - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+    from: helm-operator
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-helm-e2e
 promotion:
   to:
   - excluded_images:
@@ -68,7 +69,7 @@ tests:
     from: src
 - as: e2e-helm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

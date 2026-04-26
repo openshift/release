@@ -2,6 +2,7 @@ apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
   name: qe-private-deck
+  namespace: openshift
 parameters:
   - description: The session secret for the component.
     name: SESSION_SECRET
@@ -102,6 +103,85 @@ objects:
             - name: release
               mountPath: /tmp/git-sync
           containers:
+            - name: deck
+              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260421-d25a17867
+              args:
+                - --github-oauth-config-file=/etc/oauth/config.json
+                - --github-app-id=$(GITHUB_APP_ID)
+                - --github-app-private-key-path=/etc/github/cert
+                - --github-endpoint=http://ghproxy
+                - --github-endpoint=https://api.github.com
+                - --github-graphql-endpoint=http://ghproxy/graphql
+                - --oauth-url=/github-login
+                - --config-path=/etc/config/config.yaml
+                - --supplemental-prow-config-dir=/etc/config
+                - --job-config-path=/var/repo/release/ci-operator/jobs
+                - --tide-url=http://tide/
+                - --hook-url=http://hook:8888/plugin-help
+                - --spyglass=true
+                - --cookie-secret=/etc/proxy/secrets/session_secret
+                - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-qe-private-deck/service-account.json
+                - --projected-token-file=/var/sa-token/token
+                - --rerun-creates-job=true
+                - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+                - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
+                - --kubeconfig-dir=/etc/build-farm-credentials
+                - --kubeconfig-suffix=config
+                - --tenant-id=qe-private
+                - --tenant-id=gangway-api
+              env:
+              - name: GITHUB_APP_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: openshift-prow-github-app
+                    key: appid
+              ports:
+                - name: main
+                  containerPort: 8080
+                - name: metrics
+                  containerPort: 9090
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+                initialDelaySeconds: 120
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /healthz/ready
+                  port: 8081
+                initialDelaySeconds: 120
+                periodSeconds: 10
+                timeoutSeconds: 600
+              volumeMounts:
+                - name: github-app-credentials
+                  mountPath: /etc/github
+                  readOnly: true
+                - name: service-account-token
+                  mountPath: /var/sa-token
+                - name: gce-sa-credentials-gcs-qe-private-deck
+                  mountPath: /etc/gce-sa-credentials-gcs-qe-private-deck
+                  readOnly: true
+                - mountPath: /etc/proxy/secrets
+                  name: session-secret
+                - name: config
+                  mountPath: /etc/config
+                  readOnly: true
+                - name: extensions
+                  mountPath: /var/run/ko/static/extensions
+                  readOnly: true
+                - name: oauth-config
+                  mountPath: /etc/oauth
+                  readOnly: true
+                - name: release
+                  mountPath: /var/repo
+                - mountPath: /etc/build-farm-credentials
+                  name: build-farm-credentials
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "9Gi"
+                  cpu: "500m"
             - name: git-sync
               command:
               - /git-sync
@@ -147,88 +227,6 @@ objects:
                   name: qe-private-deck-tls
                 - mountPath: /etc/proxy/secrets
                   name: session-secret
-            - name: deck
-              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260310-6097a43c8
-              args:
-                - --github-oauth-config-file=/etc/oauth/config.json
-                - --github-app-id=$(GITHUB_APP_ID)
-                - --github-app-private-key-path=/etc/github/cert
-                - --github-endpoint=http://ghproxy
-                - --github-endpoint=https://api.github.com
-                - --github-graphql-endpoint=http://ghproxy/graphql
-                - --oauth-url=/github-login
-                - --config-path=/etc/config/config.yaml
-                - --supplemental-prow-config-dir=/etc/config
-                - --job-config-path=/var/repo/release/ci-operator/jobs
-                - --tide-url=http://tide/
-                - --hook-url=http://hook:8888/plugin-help
-                - --spyglass=true
-                - --cookie-secret=/etc/proxy/secrets/session_secret
-                - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-qe-private-deck/service-account.json
-                - --projected-token-file=/var/sa-token/token
-                - --rerun-creates-job=true
-                - --plugin-config=/etc/plugins/plugins.yaml
-                - --supplemental-plugin-config-dir=/etc/plugins
-                - --kubeconfig-dir=/etc/build-farm-credentials
-                - --kubeconfig-suffix=config
-                - --tenant-id=qe-private
-                - --tenant-id=gangway-api
-              env:
-              - name: GITHUB_APP_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: openshift-prow-github-app
-                    key: appid
-              ports:
-                - name: main
-                  containerPort: 8080
-                - name: metrics
-                  containerPort: 9090
-              livenessProbe:
-                httpGet:
-                  path: /healthz
-                  port: 8081
-                initialDelaySeconds: 120
-                periodSeconds: 10
-              readinessProbe:
-                httpGet:
-                  path: /healthz/ready
-                  port: 8081
-                initialDelaySeconds: 120
-                periodSeconds: 10
-                timeoutSeconds: 600
-              volumeMounts:
-                - name: github-app-credentials
-                  mountPath: /etc/github
-                  readOnly: true
-                - name: service-account-token
-                  mountPath: /var/sa-token
-                - name: gce-sa-credentials-gcs-qe-private-deck
-                  mountPath: /etc/gce-sa-credentials-gcs-qe-private-deck
-                  readOnly: true
-                - mountPath: /etc/proxy/secrets
-                  name: session-secret
-                - name: config
-                  mountPath: /etc/config
-                  readOnly: true
-                - name: plugins
-                  mountPath: /etc/plugins
-                  readOnly: true
-                - name: extensions
-                  mountPath: /var/run/ko/static/extensions
-                  readOnly: true
-                - name: oauth-config
-                  mountPath: /etc/oauth
-                  readOnly: true
-                - name: release
-                  mountPath: /var/repo
-                - mountPath: /etc/build-farm-credentials
-                  name: build-farm-credentials
-                  readOnly: true
-              resources:
-                requests:
-                  memory: "9Gi"
-                  cpu: "500m"
           volumes:
             - name: github-app-credentials
               secret:
@@ -241,9 +239,6 @@ objects:
             - name: config
               configMap:
                 name: config
-            - name: plugins
-              configMap:
-                name: plugins
             - name: extensions
               configMap:
                 name: qe-private-deck-extensions

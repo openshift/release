@@ -9,27 +9,28 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: operators/multiclusterobservability/Dockerfile
-  from: base
-  to: multicluster-observability-operator
-- dockerfile_path: proxy/Dockerfile
-  from: base
-  to: rbac-query-proxy
-- dockerfile_path: operators/endpointmetrics/Dockerfile
-  from: base
-  to: endpoint-monitoring-operator
-- dockerfile_path: tests/Dockerfile
-  from: base
-  to: observability-e2e-test
-- dockerfile_path: collectors/metrics/Dockerfile
-  from: base
-  to: metrics-collector
-- dockerfile_path: loaders/dashboards/Dockerfile
-  from: base
-  to: grafana-dashboard-loader
+  items:
+  - dockerfile_path: operators/multiclusterobservability/Dockerfile
+    from: base
+    to: multicluster-observability-operator
+  - dockerfile_path: proxy/Dockerfile
+    from: base
+    to: rbac-query-proxy
+  - dockerfile_path: operators/endpointmetrics/Dockerfile
+    from: base
+    to: endpoint-monitoring-operator
+  - dockerfile_path: tests/Dockerfile
+    from: base
+    to: observability-e2e-test
+  - dockerfile_path: collectors/metrics/Dockerfile
+    from: base
+    to: metrics-collector
+  - dockerfile_path: loaders/dashboards/Dockerfile
+    from: base
+    to: grafana-dashboard-loader
 promotion:
   to:
-  - name: "2.17"
+  - name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -136,7 +137,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
-      ACM_RELEASE_VERSION: release-2.16
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
@@ -186,11 +187,35 @@ tests:
     test:
     - as: e2e
       commands: |
-        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        CTX_HUB_CLUSTER=$(oc config current-context)
+        oc create namespace managed --dry-run=client -o yaml | oc apply -f -
+
+        cat <<EOF | oc apply -f -
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: managed
+          labels:
+            cloud: auto-detect
+            vendor: auto-detect
+        spec:
+          hubAcceptsClient: true
+        EOF
+
+        oc create secret generic auto-import-secret \
+          -n managed \
+          --from-file=kubeconfig="${SHARED_DIR}/managed-1.kc" \
+          --dry-run=client -o yaml | oc apply -f -
+        oc wait managedcluster managed \
+          --for=condition=ManagedClusterConditionAvailable=True \
+          --timeout=300s
+        oc get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
@@ -214,7 +239,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.17
+      DESTINATION_BRANCH: release-5.0
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

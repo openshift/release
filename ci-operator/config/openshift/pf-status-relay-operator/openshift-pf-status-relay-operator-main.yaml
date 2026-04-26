@@ -4,14 +4,15 @@ base_images:
     namespace: ocp
     tag: v1.30.0
   pf-status-relay:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: pf-status-relay
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: pf-status-relay-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: pf-status-relay-operator
 operator:
   bundles:
   - as: operator-bundle
@@ -23,19 +24,19 @@ operator:
     with: pipeline:pf-status-relay
 promotion:
   to:
-  - name: sriov-4.22
+  - name: sriov-5.0
     namespace: origin
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -59,7 +60,7 @@ tests:
     workflow: openshift-ci-security
 - as: e2e-validation
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: operator-bundle
     env:

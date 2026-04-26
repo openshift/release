@@ -5,11 +5,13 @@ workflow:
       HOSTED_CP: "true"
       ENABLE_BYOVPC: "true"
       ZONES_COUNT: "1"
-      COMPUTE_MACHINE_TYPE: "inf2.xlarge"
+      COMPUTE_MACHINE_TYPE: "inf2.8xlarge"
       REPLICAS: "2"
       OCM_LOGIN_ENV: "production"
+      REGION: "us-west-2"
     pre:
-    # VPC and tagging setup
+    # Clean up stale VPC stack from previous failed runs, then provision
+    - ref: aws-neuron-operator-cleanup-vpc
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     # OIDC and account roles setup
@@ -19,18 +21,28 @@ workflow:
     - ref: rosa-cluster-wait-ready-cluster
     - ref: rosa-cluster-notify-error
     - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-nodes
     - ref: rosa-cluster-wait-ready-operators
     - ref: aws-provision-tags-for-byo-vpc
     # Additional configuration
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
-    - ref: rosa-cluster-wait-ready-nodes
+    # Install operators before tests so eco-gotests detects them as pre-existing
+    - ref: aws-neuron-operator-install-operators
     test:
     - ref: aws-neuron-operator-test
     post:
     - ref: aws-neuron-operator-gather
-    - chain: rosa-aws-sts-hcp-deprovision
+    # Inline the rosa-aws-sts-hcp-deprovision chain so we can mark
+    # aws-deprovision-stacks as best_effort independently — its
+    # CloudFormation DELETE_FAILED errors must not fail the overall job.
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
   documentation: |-
-    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.xlarge)
+    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
     compute nodes, then runs the AWS Neuron operator E2E tests conditionally
     based on kernel changes.
 

@@ -12,12 +12,14 @@ build_root:
       RUN ln -s /cli/oc /usr/bin/kubectl
       RUN ln -s /usr/bin/python3 /usr/bin/python
 images:
-- context_dir: maas-api/
-  dockerfile_path: Dockerfile
-  to: maas-api
-- context_dir: maas-controller/
-  dockerfile_path: Dockerfile
-  to: maas-controller
+  items:
+  - context_dir: maas-api/
+    dockerfile_path: Dockerfile
+    to: maas-api
+  - context_dir: .
+    dockerfile_path: maas-controller/Dockerfile
+    to: maas-controller
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|CONTRIBUTING\.md)$|^\.github/|^\.tekton/
 promotion:
   to:
   - namespace: opendatahub-io
@@ -38,7 +40,7 @@ resources:
 tests:
 - always_run: false
   as: e2e-test-maas
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|CONTRIBUTING\.md)$|^\.github/|^\.tekton/
+  optional: true
   steps:
     cluster_profile: aws-opendatahub
     env:
@@ -64,6 +66,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: pr-image-mirror-maas-api
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|CONTRIBUTING\.md)$|^\.github/|^\.tekton/
   steps:
     dependencies:
@@ -84,6 +87,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
   as: pr-image-mirror-maas-controller
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|CONTRIBUTING\.md)$|^\.github/|^\.tekton/
   steps:
     dependencies:

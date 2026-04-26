@@ -110,13 +110,15 @@ spec:
         - --slack-token-path=/etc/slack/oauth_token
         - --slack-signing-secret-path=/etc/slack/signing_secret
         - --log-level=debug
-        - --jira-bearer-token-file=/etc/jira/token
-        - --jira-endpoint=https://issues.redhat.com
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=aos-team-dp-testplatform@redhat.com
+        - --jira-password-file=/etc/jira/password
         - --prow-config-path=/etc/prow-config/config.yaml
         - --supplemental-prow-config-dir=/etc/prow-config
         - --prow-job-config-path=/var/repo/release/ci-operator/jobs
         - --keywords-config-path=/etc/slack-bot-config/config.yaml
         - --helpdesk-alias=subteam^STSR51Q76
+        - --pager-duty-token-file=/etc/pagerduty/token
         ports:
         - name: main
           containerPort: 8888
@@ -137,6 +139,9 @@ spec:
         - name: slack-bot-config
           mountPath: /etc/slack-bot-config
           readOnly: true
+        - name: pagerduty
+          mountPath: /etc/pagerduty
+          readOnly: true
         resources:
           requests:
             memory: "1Gi"
@@ -156,3 +161,6 @@ spec:
       - name: slack-bot-config
         configMap:
           name: slack-bot-keyword-list
+      - name: pagerduty
+        secret:
+          secretName: pagerduty

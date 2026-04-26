@@ -2,107 +2,108 @@
 set -e
 set -o pipefail
 
-echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt file — skipping the job"
+  echo "Detected skip.txt — skipping"
   exit 0
 fi
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-# Process inventory from vault mounts
 process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+  local directory="$1"
+  local dest_file="$2"
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
+  if [ -z "$directory" ]; then
+    echo "Usage: process_inventory <directory> <dest_file>"
+    return 1
+  fi
+
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  find "$directory" -type f | while IFS= read -r filename; do
+    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+      continue
     fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
+    local content
+    content=$(cat "$filename")
+    local varname
+    varname=$(basename "${filename}")
+    if [[ "$content" == *$'\n'* ]]; then
+      echo "${varname}: |"
+      echo "$content" | sed 's/^/  /'
+    else
+      echo "${varname}": \'"${content}"\'
     fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-        local content
-        content=$(cat "$filename")
-        local varname
-        varname=$(basename "${filename}")
-        # Check if content has newlines - if so, use literal block scalar (|)
-        if [[ "$content" == *$'\n'* ]]; then
-          echo "${varname}: |"
-          echo "$content" | sed 's/^/  /'
-        else
-          echo "${varname}": \'"${content}"\'
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
+  done > "${dest_file}"
 }
 
-echo "Create group_vars directory"
+echo "Processing common group_vars"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
-echo "Process group inventory files from vault mounts"
 find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
 done
 
-echo "Create host_vars directory"
+echo "Processing hub host_vars (kni-qe-99)"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
-echo "Process host inventory files from vault mounts"
 find /var/host_variables/kni-qe-99/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
+  echo "  host_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
 done
 
-echo "Remove old report directories"
 rm -rf /tmp/reports /tmp/junit
 
-echo "Create reports directory"
 mkdir -p /tmp/reports
-
-echo "Copy polarion reports from SHARED_DIR (files with polarion_ prefix)"
 for f in "${SHARED_DIR}"/polarion_*.xml; do
   if [[ -f "$f" ]]; then
     filename=$(basename "$f" | sed 's/^polarion_//')
-    echo "Copying polarion report: $(basename "$f") -> ${filename}"
     cp "$f" "/tmp/reports/${filename}"
   fi
 done
 
-echo "Create junit directory"
 mkdir -p /tmp/junit
-
-echo "Copy junit reports from SHARED_DIR (files with junit_ prefix)"
 for f in "${SHARED_DIR}"/junit_*.xml; do
   if [[ -f "$f" ]]; then
     filename=$(basename "$f" | sed 's/^junit_//')
-    echo "Copying junit report: $(basename "$f") -> ${filename}"
     cp "$f" "/tmp/junit/${filename}"
   fi
 done
 
 cd /eco-ci-cd
 
-echo "Construct Report Portal attributes"
+SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
+CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
+METRICS_FILE="/tmp/metrics/ran-metrics.txt"
+
+echo "Collecting metrics"
+ansible-playbook ./playbooks/ran/collect-metrics.yml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
+    ran_spoke_kubeconfig=${SPOKE_KUBECONFIG} \
+    ran_ci_lane='${CI_LANE}' \
+    ran_output_file=${METRICS_FILE} \
+    ran_metrics_list=${RAN_METRICS_LIST}" || true
+
 REPORTS_PORTAL_ATTRIBUTES=""
-if [[ -f "${SHARED_DIR}/cluster_version" ]]; then
-  CLUSTER_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
-  CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
-  REPORTS_PORTAL_ATTRIBUTES="ci-lane:${CI_LANE};spoke_ocp_build:${CLUSTER_VERSION}"
+if [[ -f "${METRICS_FILE}" ]]; then
+  REPORTS_PORTAL_ATTRIBUTES="$(cat "${METRICS_FILE}")"
   echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "Upload reports to Polarion and Report Portal"
-ansible-playbook ./playbooks/cnf/upload-report.yaml \
+echo "Uploading reports to Polarion and Report Portal"
+ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports junit_report_dir=/tmp/junit reports_directory=/tmp/upload upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} report_portal_url_filename='.reportportal_url_standard' reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
+    reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
+    processed_report_dir=/tmp/reports \
+    junit_report_dir=/tmp/junit \
+    reports_directory=/tmp/upload \
+    upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
+    report_portal_url_filename='.reportportal_url_standard' \
+    reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"

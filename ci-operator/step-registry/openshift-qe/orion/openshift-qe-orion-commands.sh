@@ -5,36 +5,6 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
-fi
-
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -89,6 +59,43 @@ export ES_SERVER
 
 pip install .
 
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
+if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
+    # Get current worker count (excluding infra and workload nodes)
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    # Determine scale prefix based on worker count
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    # Select orion config based on UDN layer mode
+    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
+    else
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
+    fi
+    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+fi
+
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
+
+# Unset proxy so we can pip install, reach sippy, etc.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+fi
+
 # Print Orion version
 orion_version=$(orion --version 2>&1)
 orion_version_exit=$?
@@ -123,8 +130,6 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-export VERSION
 # Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
 if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
     ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
@@ -162,23 +167,27 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
-# pull_number input variable is required and 
+# pull_number input variable is required and
 # it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
-pull_number=''
+pull_number='0'
 if [[ "${JOB_TYPE}" == "periodic" ]]; then
     if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
-        pull_number="${PULL_NUMBER} OR 0"
-        job_type="periodic OR pull"
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="(periodic OR pull)"
     else
         job_type="periodic"
     fi
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a ci test triggered in PR against a pull request
-    pull_number="${PULL_NUMBER} OR 0"
-    job_type="periodic OR pull"
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(periodic OR pull)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a rehearse job triggered from a PR
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(rehearse OR pull OR periodic)"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-    # Indicates a rehearsel in PR against openshift/release repo
-    job_type="periodic OR rehearse"
+    # Indicates a rehearsal in PR against openshift/release repo
+    job_type="(periodic OR rehearse)"
 fi
 
 set +e
@@ -202,7 +211,7 @@ process_change_point() {
     # Determine the path to prowjob.json based on prow ENV variables
     case "${JOB_TYPE:-}" in
         presubmit)
-            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && "${JOB_NAME}" != *rehearse* ]]; then
                 GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
             fi
             ;;
@@ -292,6 +301,11 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
+
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
   exit 0
 fi
 

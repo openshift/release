@@ -5,36 +5,39 @@ set -o errexit
 set -o pipefail
 set -x
 
-declare -A guest_to_job_aws=(
-    [4.14]="periodic-ci-openshift-hypershift-release-4.14-periodics-mce-e2e-aws-critical"
-    [4.15]="periodic-ci-openshift-hypershift-release-4.15-periodics-mce-e2e-aws-critical"
-    [4.16]="periodic-ci-openshift-hypershift-release-4.16-periodics-mce-e2e-aws-critical"
-    [4.17]="periodic-ci-openshift-hypershift-release-4.17-periodics-mce-e2e-aws-critical"
-    [4.18]="periodic-ci-openshift-hypershift-release-4.18-periodics-mce-e2e-aws-critical"
-    [4.19]="periodic-ci-openshift-hypershift-release-4.19-periodics-mce-e2e-aws-critical"
-)
+export SHARED_DIR=${SHARED_DIR:-/tmp/shared_dir}
+export ARTIFACT_DIR=${ARTIFACT_DIR:-/tmp/artifacts}
+export HOSTEDCLUSTER_PLATFORM=${HOSTEDCLUSTER_PLATFORM:-"aws"}
+export JOB_PARALLEL=${JOB_PARALLEL:-"5"}
+export CHECK_INTERVAL=${CHECK_INTERVAL:-300}
+export CHECK_TIMEOUT=${CHECK_TIMEOUT:-18000}
+
+TOKEN_PATH=${TOKEN_PATH:-/etc/mce-prow-gangway-credentials/token}
+GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"}
+
+# Each MCE supports the latest three HostedCluster versions
 declare -A mce_to_guest=(
-    [2.4]="4.14"
-    [2.5]="4.14 4.15"
-    [2.6]="4.14 4.15 4.16"
-    [2.7]="4.14 4.15 4.16 4.17"
-    [2.8]="4.14 4.15 4.16 4.17 4.18"
-    [2.9]="4.15 4.16 4.17 4.18 4.19"
+    [2.8]="4.16 4.17 4.18"
+    [2.9]="4.17 4.18 4.19"
+    [2.10]="4.18 4.19 4.20"
+    [2.11]="4.19 4.20 4.21"
+    [2.17]="4.20 4.21 4.22"
 )
+
+# Each MCE is available on the latest hub version and two versions back
 declare -A hub_to_mce=(
-    [4.14]="2.4 2.5 2.6"
-    [4.15]="2.5 2.6 2.7"
-    [4.16]="2.6 2.7 2.8"
-    [4.17]="2.7 2.8 2.9"
-    [4.18]="2.8 2.9"
-    [4.19]="2.9"
+    [4.18]="2.8 2.9 2.10"
+    [4.19]="2.9 2.10 2.11"
+    [4.20]="2.10 2.11 2.17"
+    [4.21]="2.11 2.17"
+    [4.22]="2.17"
 )
 
 function get_payload_list() {
     declare -A payload_list
-    local versions=("4.14" "4.15" "4.16" "4.17" "4.18" "4.19")
 
-    for version in "${versions[@]}"; do
+    # Get all guest versions and the release image for each guest version
+    for version in $(echo "${mce_to_guest[@]}" | tr ' ' '\n' | sort -uV); do
         image=$(curl -s "https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/api/v1/releasestream/${version}.0-0.nightly/latest" | jq -r '.pullSpec')
         payload_list["$version"]=$image
     done
@@ -54,13 +57,13 @@ function trigger_prow_job() {
     local _http_post_data="$2"
 
     # Set maximum retry attempts and retry interval (seconds)
-    local max_retries=2
+    local max_retries=30
     local retry_interval=10
 
     set +x
     for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
         response=$(curl -s -X POST -d "${_http_post_data}" \
-            -H "Authorization: Bearer $(cat /etc/mce-prow-gangway-credentials/token)" \
+            -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
             "${GANGWAY_API}/v1/executions/${_job_name}" \
             -w "%{http_code}")
 
@@ -80,26 +83,39 @@ function trigger_prow_job() {
     echo "Gangway API is still not available after $max_retries retries. Aborting." && return 0
 }
 
-function check_jobs() {
-    local GANGWAY_API='https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com'
-
-    local max_retries=2
+function wait_for_jobs() {
+    local job_list_file="$1"
+    local max_retries=30
     local retry_interval=10
+    local start_time
+    start_time=$(date +%s)
 
-    while IFS=, read -r HUB MCE HostedCluster PLATFORM JOB JOB_ID; do
-        JOB_ID=$(echo "$JOB_ID" | awk -F= '{print $2}' || true)
+    cp "$job_list_file" /tmp/job_list_pending
 
-        if [ -z "$JOB_ID" ]; then
-            job_status="TriggerFailed"
-            job_url=""
-        else
+    while true; do
+        true > /tmp/job_list_next_pending
+
+        while IFS= read -r line; do
+            local job_id
+            job_id=$(echo "$line" | awk -F'JOB_ID=' '{print $2}' | tr -d ' ')
+            local prefix
+            prefix=$(echo "$line" | sed 's/, *JOB_ID=.*//')
+
+            if [ -z "$job_id" ]; then
+                echo "${prefix}, JOB_URL=, JOB_STATUS=TriggerFailed" >> "${SHARED_DIR}/job_list"
+                continue
+            fi
+
+            local job_status=""
+            local job_url=""
+            local http_status=""
             set +x
             for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
-                response=$(curl -s -X GET -H "Authorization: Bearer $(cat /etc/mce-prow-gangway-credentials/token)" \
-                    "${GANGWAY_API}/v1/executions/${JOB_ID}" -w "%{http_code}")
+                response=$(curl -s -X GET -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
+                    "${GANGWAY_API}/v1/executions/${job_id}" -w "%{http_code}")
 
-                json_body=$(echo "$response" | sed '$d')    # Extract JSON response body
-                http_status=$(echo "$response" | tail -n 1) # Extract HTTP status code
+                json_body=$(echo "$response" | sed '$d')
+                http_status=$(echo "$response" | tail -n 1)
 
                 if [ "$http_status" -eq 200 ]; then
                     job_status=$(jq -r '.job_status' <<< "$json_body")
@@ -114,13 +130,38 @@ function check_jobs() {
                 fi
             done
             set -x
+
             if [ "$http_status" -ne 200 ]; then
-                job_status="QueryNotFound"
-                job_url=""
+                echo "${prefix}, JOB_URL=, JOB_STATUS=QueryNotFound" >> "${SHARED_DIR}/job_list"
+            elif [ "$job_status" == "PENDING" ] || [ "$job_status" == "TRIGGERED" ]; then
+                echo "$line" >> /tmp/job_list_next_pending
+            else
+                echo "${prefix}, JOB_URL=${job_url}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
             fi
+        done < /tmp/job_list_pending
+
+        if [ ! -s /tmp/job_list_next_pending ]; then
+            echo "All jobs have completed."
+            break
         fi
-        echo "$HUB, $MCE, $HostedCluster, $PLATFORM, $JOB, JOB_URL=${job_url}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
-    done < "/tmp/job_list"
+
+        local elapsed=$(( $(date +%s) - start_time ))
+        if [ "$elapsed" -ge "$CHECK_TIMEOUT" ]; then
+            echo "Timeout reached (${CHECK_TIMEOUT}s). Marking remaining jobs as PENDING."
+            while IFS= read -r line; do
+                local prefix
+                prefix=$(echo "$line" | sed 's/, *JOB_ID=.*//')
+                echo "${prefix}, JOB_URL=, JOB_STATUS=PENDING" >> "${SHARED_DIR}/job_list"
+            done < /tmp/job_list_next_pending
+            break
+        fi
+
+        local pending_count
+        pending_count=$(wc -l < /tmp/job_list_next_pending)
+        echo "${pending_count} job(s) still pending. Rechecking in ${CHECK_INTERVAL}s..."
+        sleep "${CHECK_INTERVAL}"
+        mv /tmp/job_list_next_pending /tmp/job_list_pending
+    done
 }
 
 function generate_junit_xml() {
@@ -160,20 +201,22 @@ EOF
 
 eval "$(get_payload_list)"
 
-job_count=1
+true > /tmp/wave_jobs
+job_count=0
 for hub_version in "${!hub_to_mce[@]}"; do
     mce_versions="${hub_to_mce[$hub_version]}"
 
     for mce_version in $mce_versions; do
         guest_versions="${mce_to_guest[$mce_version]}"
-
+        job_name=""
         for guest_version in $guest_versions; do
             case $HOSTEDCLUSTER_PLATFORM in
                 aws)
+                    job_name="periodic-ci-openshift-hypershift-release-${guest_version}-periodics-mce-e2e-aws-critical"
                     post_data=$(jq -n --arg mce_version "$mce_version" \
                         --arg release_image "${payload_list[$hub_version]}" \
                         '{job_execution_type: "1", pod_spec_options: {envs: {MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION: $mce_version, RELEASE_IMAGE_LATEST: $release_image, MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT: "true"}}}')
-                    result=$(trigger_prow_job "${guest_to_job_aws[$guest_version]}" "$post_data")
+                    result=$(trigger_prow_job "$job_name" "$post_data")
                     ;;
                 agent)
                     #todo
@@ -183,24 +226,24 @@ for hub_version in "${!hub_to_mce[@]}"; do
                     ;;
             esac
             job_id=$(echo "$result" | grep "JOB_ID###" | cut -d'#' -f4 || true)
-            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${guest_to_job_aws[$guest_version]}, JOB_ID=${job_id}" >> "/tmp/job_list"
+            echo "HUB=${hub_version}, MCE=${mce_version}, HostedCluster=${guest_version}, PLATFORM=${HOSTEDCLUSTER_PLATFORM}, JOB=${job_name}, JOB_ID=${job_id}" >> "/tmp/wave_jobs"
 
-            ((job_count++))
+            ((++job_count))
 
-            if ((job_count > JOB_PARALLEL)); then
-                echo "Reached $JOB_PARALLEL jobs, sleeping for ${JOB_DURATION} seconds..."
-                sleep "${JOB_DURATION}"
-                job_count=1
+            if ((job_count >= JOB_PARALLEL)); then
+                echo "Wave of ${job_count} job(s) triggered. Waiting for completion..."
+                wait_for_jobs /tmp/wave_jobs
+                true > /tmp/wave_jobs
+                job_count=0
             fi
         done
     done
 done
 
-if ((job_count > 1)); then
-    echo "Final batch, sleeping for ${JOB_DURATION} seconds..."
-    sleep "${JOB_DURATION}"
+if ((job_count > 0)); then
+    echo "Final wave of ${job_count} job(s) triggered. Waiting for completion..."
+    wait_for_jobs /tmp/wave_jobs
 fi
 
-check_jobs
 generate_junit_xml
 cat "${SHARED_DIR}/job_list" > "$ARTIFACT_DIR/job_list"

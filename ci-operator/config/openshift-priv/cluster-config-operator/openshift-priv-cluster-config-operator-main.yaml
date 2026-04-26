@@ -3,21 +3,22 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-config-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: cluster-config-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: cluster-config-operator
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -44,23 +45,23 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-serial-techpreview
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-serial
@@ -68,7 +69,7 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure
@@ -78,7 +79,7 @@ tests:
     workflow: openshift-e2e-azure
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-tests-extension

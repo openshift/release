@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -220,7 +220,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -353,6 +353,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws
+          - as: launch-devpreview
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
           - as: launch-sdn
             steps:
               cluster_profile: aws-3
@@ -424,7 +433,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -533,7 +542,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -767,7 +776,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -878,6 +887,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-sdn
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -949,7 +967,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1066,7 +1084,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1174,7 +1192,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -1304,6 +1322,15 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)
@@ -1732,6 +1759,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-static-techpreview
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -2092,7 +2128,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2197,7 +2233,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2337,6 +2373,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-sdn
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -2408,7 +2453,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2514,7 +2559,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2568,21 +2613,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2629,7 +2676,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -2683,21 +2730,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2744,7 +2793,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -2842,7 +2891,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -2886,22 +2935,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2941,7 +2991,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build04
   cron: '@yearly'
   decorate: true
   labels:
@@ -2985,22 +3035,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -3040,7 +3091,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -3159,7 +3210,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3252,7 +3303,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -3348,6 +3399,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-devpreview
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
           - as: launch-upi
             steps:
               cluster_profile: openstack-vexxhost
@@ -3408,7 +3468,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3528,7 +3588,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3635,7 +3695,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build09
+  cluster: build10
   cron: '@yearly'
   decorate: true
   labels:
@@ -3742,7 +3802,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -3953,7 +4013,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:

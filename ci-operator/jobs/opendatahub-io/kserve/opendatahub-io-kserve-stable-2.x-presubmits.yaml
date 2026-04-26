@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-graph
     decorate: true
     decoration_config:
@@ -17,7 +17,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-kserve-stable-2.x-e2e-graph
     rerun_command: /test e2e-graph
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
     spec:
       containers:
       - args:
@@ -88,7 +88,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-llm-inference-service
     decorate: true
     decoration_config:
@@ -171,7 +171,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-predictor
     decorate: true
     decoration_config:
@@ -183,7 +183,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-kserve-stable-2.x-e2e-predictor
     rerun_command: /test e2e-predictor
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
     spec:
       containers:
       - args:
@@ -254,7 +254,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build01
     context: ci/prow/e2e-raw
     decorate: true
     decoration_config:
@@ -266,7 +266,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-kserve-stable-2.x-e2e-raw
     rerun_command: /test e2e-raw
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
     spec:
       containers:
       - args:
@@ -337,7 +337,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -392,7 +392,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build11
     context: ci/prow/pr-image-mirror-kserve-agent
     decorate: true
     decoration_config:
@@ -408,6 +408,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-image-mirror-kserve-agent
@@ -428,6 +429,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -445,6 +449,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -463,7 +473,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build11
     context: ci/prow/pr-image-mirror-kserve-controller
     decorate: true
     decoration_config:
@@ -479,6 +489,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-image-mirror-kserve-controller
@@ -499,6 +510,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -516,6 +530,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -534,7 +554,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build11
     context: ci/prow/pr-image-mirror-kserve-router
     decorate: true
     decoration_config:
@@ -550,6 +570,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-image-mirror-kserve-router
@@ -570,6 +591,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -587,6 +611,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -605,7 +635,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build11
     context: ci/prow/pr-image-mirror-kserve-storage-initializer
     decorate: true
     decoration_config:
@@ -621,6 +651,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-image-mirror-kserve-storage-initializer
@@ -641,6 +672,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -658,6 +692,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

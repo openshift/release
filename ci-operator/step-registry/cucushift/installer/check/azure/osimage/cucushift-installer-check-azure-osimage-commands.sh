@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -99,9 +105,9 @@ critical_check_result=0
 
 echo "---------- Check worker nodes urn and hyperV generation ----------"
 echo "Expected worker_image_urn: ${worker_image_urn}, expected worker_generation: ${worker_generation}"
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 node_filter=""
-if (( ${ocp_minor_version} < 19 )); then
+if version_lt "${ocp_version}" "4.19"; then
     # No rhel worker is provisioned on 4.19+
     node_filter="node.openshift.io/os_id=rhcos,"
 fi

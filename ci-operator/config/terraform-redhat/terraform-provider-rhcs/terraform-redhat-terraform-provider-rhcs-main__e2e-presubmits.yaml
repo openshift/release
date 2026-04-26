@@ -1,12 +1,10 @@
 binary_build_commands: make install
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+  from_repository: true
 images:
-- dockerfile_path: build/ci-tf-e2e.Dockerfile
-  to: rhcs-tf-e2e
+  items:
+  - dockerfile_path: build/ci-tf-e2e.Dockerfile
+    to: rhcs-tf-e2e
 releases:
   latest:
     integration:
@@ -21,7 +19,7 @@ resources:
       memory: 200Mi
 tests:
 - as: rosa-sts-advanced-critical-high-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)
   steps:
     cluster_profile: oex-aws-qe
     env:
@@ -37,7 +35,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - as: rosa-sts-private-critical-high-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)
   steps:
     cluster_profile: oex-aws-qe
     env:
@@ -192,7 +190,7 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-hcp-advanced-critical-high-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)
   steps:
     cluster_profile: oex-aws-qe
     env:
@@ -208,7 +206,7 @@ tests:
     workflow: rhcs-aws-sts
 - always_run: false
   as: rosa-hcp-private-critical-high-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)
   steps:
     cluster_profile: oex-aws-qe
     env:

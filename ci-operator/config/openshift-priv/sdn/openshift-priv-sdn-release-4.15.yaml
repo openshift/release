@@ -3,10 +3,11 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sdn
 images:
-- dockerfile_path: images/sdn/Dockerfile.rhel
-  to: sdn
-- dockerfile_path: images/kube-proxy/Dockerfile.rhel
-  to: kube-proxy
+  items:
+  - dockerfile_path: images/sdn/Dockerfile.rhel
+    to: sdn
+  - dockerfile_path: images/kube-proxy/Dockerfile.rhel
+    to: kube-proxy
 promotion:
   to:
   - name: 4.15-priv
@@ -46,32 +47,32 @@ tests:
     from: test-bin
 - as: e2e-aws-sdn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-sdn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
 - always_run: false
   as: e2e-aws-sdn-multitenant
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-sdn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-serial
@@ -84,7 +85,7 @@ tests:
     workflow: openshift-ci-security
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
@@ -100,7 +101,7 @@ tests:
   as: e2e-aws-live-migration-sdn-ovn-rollback
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true

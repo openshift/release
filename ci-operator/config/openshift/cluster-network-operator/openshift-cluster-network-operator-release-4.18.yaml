@@ -15,8 +15,9 @@ binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-network-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-network-operator
 promotion:
   to:
   - name: "4.18"
@@ -47,14 +48,14 @@ tests:
     from: src
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-upgrade-gcp-ovn
 - always_run: true
   as: e2e-aws-ovn-upgrade-ipsec
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
@@ -62,13 +63,13 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -81,7 +82,7 @@ tests:
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
@@ -89,13 +90,13 @@ tests:
   as: e2e-ovn-ipsec-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -103,7 +104,7 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
@@ -133,7 +134,7 @@ tests:
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -207,14 +208,14 @@ tests:
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -223,7 +224,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -253,18 +254,18 @@ tests:
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
   cron: 30 15 26 6 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-subnet-configs
   cron: 14 7 25 5 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: ovn-subnet-configs
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
@@ -285,7 +286,7 @@ tests:
   as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       MTU_DECREASE: "400"
@@ -315,7 +316,7 @@ tests:
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -323,7 +324,7 @@ tests:
   as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -332,7 +333,7 @@ tests:
   as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density

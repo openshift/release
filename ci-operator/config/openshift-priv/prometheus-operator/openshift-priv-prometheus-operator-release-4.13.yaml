@@ -7,15 +7,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/coreos/prometheus-operator
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  to: prometheus-operator
-- dockerfile_path: Dockerfile.config-reloader.ocp
-  from: base
-  to: prometheus-config-reloader
-- dockerfile_path: Dockerfile.admission-webhook.ocp
-  from: base
-  to: prometheus-operator-admission-webhook
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: prometheus-operator
+  - dockerfile_path: Dockerfile.config-reloader.ocp
+    from: base
+    to: prometheus-config-reloader
+  - dockerfile_path: Dockerfile.admission-webhook.ocp
+    from: base
+    to: prometheus-operator-admission-webhook
 promotion:
   to:
   - name: 4.13-priv
@@ -46,11 +47,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-agnostic-cmo
   steps:

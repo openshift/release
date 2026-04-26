@@ -3,26 +3,28 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+  openshift_release_rhel-8-release-golang-1.25-openshift-4.21:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.22-openshift-4.17
+    tag: rhel-8-release-golang-1.25-openshift-4.21
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/kourier/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
-      as:
-      - $GO_BUILDER
-  to: net-kourier-kourier
-- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
-  from: src
-  to: net-kourier-source-image
+  items:
+  - dockerfile_path: openshift/ci-operator/knative-images/kourier/Dockerfile
+    inputs:
+      ocp_ubi-minimal_8:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-8-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: net-kourier-kourier
+  - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+    from: src
+    to: net-kourier-source-image
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
 promotion:
   to:
   - additional_images:

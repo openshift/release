@@ -7,15 +7,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/monitoring-plugin
 images:
-- dockerfile_path: Dockerfile
-  to: monitoring-plugin
-- dockerfile_path: Dockerfile.test
-  to: monitoring-plugin-test
-- dockerfile_path: Dockerfile.mcp
-  to: monitoring-console-plugin
-- context_dir: .
-  dockerfile_path: web/cypress/Dockerfile
-  to: monitoring-ui-tests-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: monitoring-plugin
+  - dockerfile_path: Dockerfile.test
+    to: monitoring-plugin-test
+  - dockerfile_path: Dockerfile.mcp
+    to: monitoring-console-plugin
+  - context_dir: .
+    dockerfile_path: web/cypress/Dockerfile
+    to: monitoring-ui-tests-runner
 promotion:
   to:
   - excluded_images:
@@ -52,13 +53,13 @@ tests:
     from: monitoring-plugin-test
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-hypershift-conformance
@@ -220,7 +221,7 @@ tests:
   as: e2e-monitoring-dev
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
     workflow: ipi-aws

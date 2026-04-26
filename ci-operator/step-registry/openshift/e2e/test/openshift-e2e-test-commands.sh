@@ -151,7 +151,7 @@ gcp|gcp-arm64)
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
-aws|aws-arm64)
+aws|aws-arm64|aws-eusc)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
@@ -285,10 +285,25 @@ function upgrade_paused() {
     OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f1 -d,)"
     OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f2 -d,)"
 
+    # Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
+    # which is available from 4.21+
+    installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+    # remove --disable-monitor=oc-adm-upgrade-status when https://redhat.atlassian.net/browse/OTA-1977 is fixed
+    # TODO: define it from the job like TEST_ARGS
+    TEST_ARGS_2="--disable-monitor=oc-adm-upgrade-status"
+    echo "The installed version is $installed_version"
+    if [[ $installed_version == "4.20."* ]]; then
+        echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
+        oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
+        echo "Showing the ClusterVersion spec"
+        oc get clusterversion version -o jsonpath='{.spec}{"\n"}'
+        TEST_ARGS_2="--disable-monitor=oc-adm-upgrade-status,legacy-cvo-invariants"
+    fi
+
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
-    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" "${TEST_ARGS:-}" \
         --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
@@ -299,7 +314,7 @@ function upgrade_paused() {
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
-        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" "${TEST_ARGS_2:-}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \

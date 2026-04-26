@@ -162,12 +162,124 @@ oc adm policy add-scc-to-user anyuid -z cost-onprem -n "${NAMESPACE}" || true
 
 echo "SecurityContextConstraints configured"
 
+echo "========== Determining Chart Source =========="
+
+# ============================================================================
+# Chart Source Resolution
+# ============================================================================
+# CHART_REF controls which chart version to test:
+# - "release": Latest released chart from Helm repo (non-RC)
+# - "rc": Latest RC - tries --devel flag first, falls back to git tag checkout
+# - Not set: Use local chart from current source (for PR testing)
+#
+# For nightly/periodic jobs: CHART_REF is set
+# For PR presubmit jobs: CHART_REF is not set, uses local source (USE_LOCAL_CHART=true)
+
+# Check if deploy script supports --devel flag
+check_devel_support() {
+    if [[ -f "./scripts/deploy-test-cost-onprem.sh" ]]; then
+        if grep -q -- '--devel' ./scripts/deploy-test-cost-onprem.sh 2>/dev/null; then
+            echo "true"
+        else
+            echo "false"
+        fi
+    else
+        echo "false"
+    fi
+}
+
+# Resolve latest RC tag from git
+get_latest_rc_tag() {
+    # Ensure we have the origin remote (ci-operator may not set it up)
+    if ! git remote get-url origin &>/dev/null; then
+        echo "Adding origin remote for tag fetch..." >&2
+        git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
+    fi
+    git fetch --tags origin 2>/dev/null
+    
+    # Find latest RC tag (e.g., cost-onprem-0.2.20-rc1)
+    local latest_rc
+    latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
+    echo "$latest_rc"
+}
+
+USE_HELM_DEVEL="false"
+USE_LOCAL_CHART="true"  # Default for PR runs
+CHART_REF_RESOLVED=""
+
+if [[ -n "${CHART_REF:-}" ]]; then
+    case "${CHART_REF}" in
+        release)
+            echo "Testing latest RELEASED chart from Helm repo"
+            # Helm will fetch the latest stable (non-prerelease) version by default
+            USE_LOCAL_CHART="false"
+            CHART_REF_RESOLVED="release"
+            ;;
+        rc)
+            echo "Testing latest RC chart..."
+            DEVEL_SUPPORTED=$(check_devel_support)
+            
+            if [[ "$DEVEL_SUPPORTED" == "true" ]]; then
+                # Deploy script supports --devel, use Helm repo
+                echo "Deploy script supports --devel flag - will use Helm repo with pre-release resolution"
+                USE_LOCAL_CHART="false"
+                USE_HELM_DEVEL="true"
+                CHART_REF_RESOLVED="rc"
+            else
+                # Fallback: checkout latest RC tag and use local chart
+                echo "Deploy script does not support --devel - falling back to git tag checkout"
+                LATEST_RC_TAG=$(get_latest_rc_tag)
+                
+                if [[ -n "$LATEST_RC_TAG" ]]; then
+                    echo "Found latest RC tag: $LATEST_RC_TAG"
+                    git checkout "$LATEST_RC_TAG"
+                    echo "Checked out: $(git describe --tags --always)"
+                    USE_LOCAL_CHART="true"  # Use local source from the checked-out tag
+                    CHART_REF_RESOLVED="$LATEST_RC_TAG"
+                else
+                    echo "WARNING: No RC tags found in repository"
+                    echo "Skipping RC test - no RC available"
+                    # Write skip status and exit gracefully
+                    _artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
+                    mkdir -p "$_artifact_dir"
+                    echo "skipped - no RC tags found" > "${_artifact_dir}/test_status.txt"
+                    exit 0
+                fi
+            fi
+            ;;
+        *)
+            echo "Testing explicit chart reference: ${CHART_REF}"
+            # Could be a specific version like "0.2.19" or "0.2.20-rc1"
+            # Assume it's a git tag, checkout and use local
+            if ! git remote get-url origin &>/dev/null; then
+                git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
+            fi
+            git fetch --tags origin 2>/dev/null
+            if git rev-parse "${CHART_REF}" &>/dev/null; then
+                git checkout "${CHART_REF}"
+                echo "Checked out: $(git describe --tags --always)"
+            fi
+            USE_LOCAL_CHART="true"
+            CHART_REF_RESOLVED="${CHART_REF}"
+            ;;
+    esac
+else
+    echo "No CHART_REF set - using LOCAL chart from current source (PR testing mode)"
+fi
+
+export USE_LOCAL_CHART
+export USE_HELM_DEVEL
+export CHART_REF_RESOLVED
+echo "USE_LOCAL_CHART=${USE_LOCAL_CHART}"
+echo "USE_HELM_DEVEL=${USE_HELM_DEVEL}"
+echo "CHART_REF_RESOLVED=${CHART_REF_RESOLVED}"
+
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
-export USE_LOCAL_CHART="true"
+# USE_LOCAL_CHART is already set above based on CHART_REF
 export COST_MGMT_NAMESPACE="${NAMESPACE}"
 export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 
@@ -175,6 +287,7 @@ export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 DEPLOY_ARGS=(
     --namespace "${NAMESPACE}"
     --verbose
+    --save-versions
 )
 
 # Add S4 storage flags if enabled
@@ -185,7 +298,123 @@ if [ "${DEPLOY_S4:-false}" == "true" ]; then
     DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
 fi
 
+# Add --devel flag if we're testing RC via Helm pre-release resolution
+if [ "${USE_HELM_DEVEL:-false}" == "true" ]; then
+    echo "Adding --devel flag for Helm pre-release (RC) chart resolution"
+    DEPLOY_ARGS+=(--devel)
+fi
+
+# Add IQE test flags if enabled
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "IQE tests enabled with profile: ${IQE_PROFILE:-smoke}"
+    DEPLOY_ARGS+=(--run-iqe)
+    DEPLOY_ARGS+=(--iqe-profile "${IQE_PROFILE:-smoke}")
+    DEPLOY_ARGS+=(--listener-cpu "${LISTENER_CPU:-max}")
+    
+    # Set up Quay pull secret for IQE image
+    SECRETS_DIR="/tmp/secrets/ci"
+    if [[ -f "${SECRETS_DIR}/username" ]] && [[ -f "${SECRETS_DIR}/password" ]]; then
+        echo "Creating Quay pull secret for IQE image..."
+        # Disable tracing due to password handling
+        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+        set +x
+        QUAY_USER=$(cat "${SECRETS_DIR}/username")
+        QUAY_PASS=$(cat "${SECRETS_DIR}/password")
+        oc create secret docker-registry iqe-pull-secret \
+            --docker-server=quay.io \
+            --docker-username="${QUAY_USER}" \
+            --docker-password="${QUAY_PASS}" \
+            -n "${NAMESPACE}" \
+            --dry-run=client -o yaml | oc apply -f -
+        $WAS_TRACING && set -x
+        echo "Quay pull secret created"
+    else
+        echo "WARNING: Quay credentials not found at ${SECRETS_DIR}, IQE image pull may fail"
+    fi
+fi
+
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
-bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
+# Capture exit code but continue to artifact collection regardless of test results
+DEPLOY_EXIT_CODE=0
+bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}" || DEPLOY_EXIT_CODE=$?
+echo "Deploy script exited with code: ${DEPLOY_EXIT_CODE}"
+
+# Copy test artifacts to CI artifact directory
+echo "========== Collecting Test Artifacts =========="
+if [ -d "./tests/reports" ]; then
+    echo "Found test reports directory, copying artifacts..."
+    
+    # Copy all files from reports directory
+    cp -r ./tests/reports/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    
+    # Rename junit files for Prow recognition (must be prefixed with junit)
+    # IQE test results
+    if [ -f "${ARTIFACT_DIR}/iqe_junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/iqe_junit.xml" "${ARTIFACT_DIR}/junit_iqe.xml"
+        echo "  - junit_iqe.xml (IQE test results)"
+    fi
+    
+    # Chart pytest results
+    if [ -f "${ARTIFACT_DIR}/junit.xml" ]; then
+        mv "${ARTIFACT_DIR}/junit.xml" "${ARTIFACT_DIR}/junit_chart.xml"
+        echo "  - junit_chart.xml (chart test results)"
+    fi
+    
+    # HTML report
+    if [ -f "${ARTIFACT_DIR}/report.html" ]; then
+        echo "  - report.html (HTML test report)"
+    fi
+    
+    # IQE output log
+    if [ -f "${ARTIFACT_DIR}/iqe_output.log" ]; then
+        echo "  - iqe_output.log (IQE test output)"
+    fi
+    
+    # Screenshots directory
+    if [ -d "${ARTIFACT_DIR}/screenshots" ]; then
+        echo "  - screenshots/ (UI test screenshots)"
+    fi
+    
+    echo "Artifacts collected to ${ARTIFACT_DIR}"
+else
+    echo "No test reports directory found"
+fi
+
+# Copy JUnit files to SHARED_DIR for ReportPortal post step
+# (ARTIFACT_DIR is step-specific; SHARED_DIR persists across steps)
+echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
+cp "${ARTIFACT_DIR}"/junit_*.xml "${SHARED_DIR}/" 2>/dev/null || true
+ls "${SHARED_DIR}"/junit_*.xml 2>/dev/null | sed 's/^/  - /' || echo "  (no junit files to copy)"
+
+# Copy version_info.json for ReportPortal metadata
+if [ -f "./version_info.json" ]; then
+    cp ./version_info.json "${ARTIFACT_DIR}/version_info.json"
+    # Also copy to SHARED_DIR for ReportPortal step
+    cp ./version_info.json "${SHARED_DIR}/version_info.json"
+    echo "  - version_info.json (component version metadata)"
+else
+    echo "No version_info.json found, skipping"
+fi
+
+# Capture IQE listener pod logs if IQE was run
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "Collecting IQE listener pod logs..."
+    IQE_LISTENER_POD=$(oc get pods -n "${NAMESPACE}" -l app=iqe-listener --no-headers -o name 2>/dev/null | head -1)
+    if [ -n "${IQE_LISTENER_POD}" ]; then
+        oc logs -n "${NAMESPACE}" "${IQE_LISTENER_POD}" \
+            > "${ARTIFACT_DIR}/iqe_listener.log" 2>/dev/null || true
+        echo "  - iqe_listener.log (IQE data listener output)"
+    else
+        echo "No IQE listener pod found, skipping log collection"
+    fi
+fi
+
+# Exit with the original deploy script exit code
+# This ensures Prow correctly reports test failures while still collecting artifacts
+echo "========== E2E Step Complete =========="
+if [ "${DEPLOY_EXIT_CODE}" -ne 0 ]; then
+    echo "Tests failed (exit code: ${DEPLOY_EXIT_CODE})"
+fi
+exit "${DEPLOY_EXIT_CODE}"

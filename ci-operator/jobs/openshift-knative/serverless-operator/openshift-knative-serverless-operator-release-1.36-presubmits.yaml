@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-images
     decorate: true
     decoration_config:
@@ -64,7 +64,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -149,7 +149,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-kitchensink-upgrade
     decorate: true
     decoration_config:
@@ -234,7 +234,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-mesh-e2e
     decorate: true
     decoration_config:
@@ -319,7 +319,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-mesh-upgrade
     decorate: true
     decoration_config:
@@ -404,7 +404,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-operator-e2e
     decorate: true
     decoration_config:
@@ -488,7 +488,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-test-soak
     decorate: true
     decoration_config:
@@ -574,7 +574,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-test-upgrade
     decorate: true
     decoration_config:
@@ -658,7 +658,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-ui-e2e
     decorate: true
     decoration_config:
@@ -744,7 +744,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-upstream-e2e
     decorate: true
     decoration_config:
@@ -829,7 +829,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/414-upstream-e2e-kafka
     decorate: true
     decoration_config:
@@ -914,7 +914,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-images
     decorate: true
     decoration_config:
@@ -973,7 +973,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -992,6 +992,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=kitchensink-e2e
@@ -1013,6 +1014,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1033,6 +1037,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1054,7 +1064,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-kitchensink-upgrade
     decorate: true
     decoration_config:
@@ -1073,6 +1083,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=kitchensink-upgrade
@@ -1094,6 +1105,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1114,6 +1128,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1135,7 +1155,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-mesh-e2e
     decorate: true
     decoration_config:
@@ -1154,6 +1174,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=mesh-e2e
@@ -1175,6 +1196,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1195,6 +1219,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1216,7 +1246,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-mesh-upgrade
     decorate: true
     decoration_config:
@@ -1235,6 +1265,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=mesh-upgrade
@@ -1256,6 +1287,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1276,6 +1310,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1297,7 +1337,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-operator-e2e
     decorate: true
     decoration_config:
@@ -1315,6 +1355,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=operator-e2e
@@ -1336,6 +1377,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1356,6 +1400,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1377,7 +1427,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-test-soak
     decorate: true
     decoration_config:
@@ -1396,6 +1446,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-soak
@@ -1417,6 +1468,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1437,6 +1491,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1458,7 +1518,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-test-upgrade
     decorate: true
     decoration_config:
@@ -1476,6 +1536,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-upgrade
@@ -1497,6 +1558,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1517,6 +1581,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1538,7 +1608,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-ui-e2e
     decorate: true
     decoration_config:
@@ -1557,6 +1627,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ui-e2e
@@ -1578,6 +1649,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1598,6 +1672,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1619,7 +1699,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-upstream-e2e
     decorate: true
     decoration_config:
@@ -1638,6 +1718,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=upstream-e2e
@@ -1659,6 +1740,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1679,6 +1763,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1700,7 +1790,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/420-upstream-e2e-kafka
     decorate: true
     decoration_config:
@@ -1719,6 +1809,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=upstream-e2e-kafka
@@ -1740,6 +1831,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1760,6 +1854,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1781,7 +1881,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-images
     decorate: true
     decoration_config:
@@ -1840,7 +1940,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -1926,7 +2026,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-kitchensink-upgrade
     decorate: true
     decoration_config:
@@ -2012,7 +2112,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-mesh-e2e
     decorate: true
     decoration_config:
@@ -2098,7 +2198,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-mesh-upgrade
     decorate: true
     decoration_config:
@@ -2184,7 +2284,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-operator-e2e
     decorate: true
     decoration_config:
@@ -2269,7 +2369,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-test-soak
     decorate: true
     decoration_config:
@@ -2356,7 +2456,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-test-upgrade
     decorate: true
     decoration_config:
@@ -2441,7 +2541,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-ui-e2e
     decorate: true
     decoration_config:
@@ -2528,7 +2628,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-upstream-e2e
     decorate: true
     decoration_config:
@@ -2614,7 +2714,7 @@ presubmits:
     branches:
     - ^release-1\.36$
     - ^release-1\.36-
-    cluster: build09
+    cluster: build05
     context: ci/prow/421-upstream-e2e-kafka
     decorate: true
     decoration_config:

@@ -30,15 +30,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
-  to: assisted-installer-agent
-- dockerfile_path: Dockerfile.assisted_installer_agent-build
-  to: assisted-installer-agent-build
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-installer-agent-src
+  items:
+  - dockerfile_path: Dockerfile.assisted_installer_agent
+    to: assisted-installer-agent
+  - dockerfile_path: Dockerfile.assisted_installer_agent-build
+    to: assisted-installer-agent-build
+  - dockerfile_literal: |
+      FROM base
+      COPY . .
+    from: src
+    to: assisted-installer-agent-src
 promotion:
   to:
   - name: ocm-2.16
@@ -59,7 +60,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: mirror-nightly-image
-  cron: 40 5 * * *
+  cron: 00 14 * * 4,6
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
@@ -123,7 +124,7 @@ tests:
 - as: subsystem-test-periodic
   capabilities:
   - intranet
-  cron: 30 20 * * 2,4,6
+  cron: 00 19 * * 4,6
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-agent

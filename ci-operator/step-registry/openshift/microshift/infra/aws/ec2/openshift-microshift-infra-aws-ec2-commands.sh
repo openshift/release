@@ -42,6 +42,11 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
   : Overriding step defaults by sourcing clusterbot settings
   # shellcheck disable=SC1090
   source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+  # Always assemble CLONEREFS for cloning when using clusterbot.
+  # The only sitation it would have JOB_SPEC with clonerefs is for rehearsal which is not the main usecase.
+  # When running via cluster bot, it's always empty and the decision "what to clone" is made based on the sourced
+  # `microshift-clusterbot-settings` file (envs like MICROSHIFT_PR, MICROSHIFT_GIT, MICROSHIFT_NIGHTLY, *AND* OCP_VERSION).
+  SRC_FROM_GIT=true
 fi
 
 # All graviton instances have a lower case g in the family part. Using
@@ -57,7 +62,17 @@ REGION=""
 stack_name="microshift-$(cat /proc/sys/kernel/random/uuid)"
 cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
-curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
+# To clone a private branch for testing cross-repository source changes, comment
+# out the 'ci_clone_src' function call and add the following commands instead.
+#
+# GUSR=myuser
+# GBRN=mybranch
+# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+#
+ci_clone_src "${SRC_FROM_GIT}"
+src_path="/go/src/github.com/openshift/microshift"
+
+cp "${src_path}"/scripts/aws/cf-gen.yaml "${cf_tpl_file}"
 
 ec2Type="VirtualMachine"
 if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then

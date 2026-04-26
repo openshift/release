@@ -1,44 +1,83 @@
 base_images:
-  fulfillment-cli:
-    name: latest
-    namespace: osac-project
-    tag: fulfillment-cli
+  assisted-image-service:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   origin-cli:
     name: "4.20"
     namespace: ocp
     tag: cli
+  osac-cli:
+    name: latest
+    namespace: osac-project
+    tag: osac-cli
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
-- dockerfile_literal: |
-    FROM src
+  items:
+  - dockerfile_literal: |
+      FROM src
 
-    ADD . /installer
-    WORKDIR /installer
+      ADD . /installer
+      WORKDIR /installer
 
-    RUN dnf install -y git jq
-    RUN git submodule update --init --recursive
+      RUN dnf install -y git jq
+      RUN git submodule update --init --recursive
 
-    RUN cp oc /usr/local/bin/oc
-    RUN cp fulfillment-cli /usr/local/bin/fulfillment-cli
-  from: src
-  inputs:
-    fulfillment-cli:
-      paths:
-      - destination_dir: .
-        source_path: /app/fulfillment-cli
-    origin-cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: osac-installer
+      RUN cp oc /usr/local/bin/oc
+      RUN cp osac /usr/local/bin/osac
+    from: src
+    inputs:
+      origin-cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+      osac-cli:
+        paths:
+        - destination_dir: .
+          source_path: /app/osac
+    to: osac-installer
 promotion:
   to:
   - name: latest
     namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -47,10 +86,150 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: temp
-  commands: echo "Test"
-  container:
-    from: src
+- as: e2e-metal-vmaas-compute-instance-creation
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_creation.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-compute-instance-api-fields
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_api_fields.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-compute-instance-cli-fields
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_cli_fields.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-compute-instance-delete-during-provision
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_delete_during_provision.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-compute-instance-restart
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_restart.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-compute-instance-restart-negative
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_compute_instance_restart_negative.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-subnet-lifecycle
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_subnet_lifecycle.py
+    workflow: osac-project-ofcir-baremetal
+- as: e2e-metal-vmaas-virtual-network-lifecycle
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST: test_virtual_network_lifecycle.py
+    workflow: osac-project-ofcir-baremetal
 zz_generated_metadata:
   branch: main
   org: osac-project

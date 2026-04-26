@@ -17,7 +17,32 @@ data:
       - key: node-role.kubernetes.io/infra
         operator: Exists
         effect: NoExecute
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 10Gi
     prometheusK8s:
+      externalLabels:
+        clusterName: build02
+      remoteWrite:
+        - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+          queueConfig:
+            maxShards: 200
+            sampleAgeLimit: 10m
+          tlsConfig:
+            ca:
+              secret:
+                name: thanos-remote-write-tls
+                key: ca.crt
+            cert:
+              secret:
+                name: thanos-remote-write-tls
+                key: client.crt
+            keySecret:
+              name: thanos-remote-write-tls
+              key: client.key
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -29,9 +54,10 @@ data:
         effect: NoExecute
       volumeClaimTemplate:
         spec:
+          storageClassName: standard
           resources:
             requests:
-              storage: 250Gi
+              storage: 400Gi
     prometheusOperator:
       nodeSelector:
         node-role.kubernetes.io/infra: ""

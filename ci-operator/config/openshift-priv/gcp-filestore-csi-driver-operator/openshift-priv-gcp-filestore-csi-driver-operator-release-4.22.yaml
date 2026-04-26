@@ -38,14 +38,15 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "4.22"
 binary_build_commands: make
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: gcp-filestore-csi-driver-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: gcp-filestore-csi-driver-operator
 operator:
   bundles:
   - as: gcp-filestore-csi-driver-operator-bundle
@@ -74,8 +75,7 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - disabled: true
-    name: 4.22-priv
+  - name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
@@ -106,7 +106,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     env:
@@ -145,7 +145,7 @@ tests:
   as: e2e-gcp-manual-oidc-filestore
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity-filestore

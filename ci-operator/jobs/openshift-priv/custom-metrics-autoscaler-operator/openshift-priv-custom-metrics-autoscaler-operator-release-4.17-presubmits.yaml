@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/ci-bundle-custom-metrics-autoscaler-operator-bundle
     decorate: true
     decoration_config:
@@ -68,7 +68,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/cma-check-all-csv
     decorate: true
     decoration_config:
@@ -140,7 +140,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build10
     context: ci/prow/cma-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -150,7 +150,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-custom-metrics-autoscaler-operator-release-4.17-cma-e2e-aws-ovn
@@ -231,7 +231,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/cma-verify-history
     decorate: true
     decoration_config:
@@ -303,7 +303,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -375,7 +375,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -447,7 +447,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -510,7 +510,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build09
+    cluster: build11
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -531,6 +531,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -552,6 +553,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -572,6 +576,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

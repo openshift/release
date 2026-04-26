@@ -20,9 +20,10 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-network-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-network-operator
 promotion:
   to:
   - name: 4.14-priv
@@ -53,45 +54,45 @@ tests:
     from: src
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-ovn
 - always_run: false
   as: e2e-aws-sdn-upgrade
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn-multi
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn-multi
 - always_run: false
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-hybrid
 - always_run: false
   as: e2e-ovn-ipsec-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-ipsec
 - always_run: false
   as: e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
@@ -117,7 +118,7 @@ tests:
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -163,7 +164,7 @@ tests:
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-vsphere-ovn-windows
@@ -197,7 +198,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-network-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
         state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
@@ -214,7 +215,7 @@ tests:
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-sdn-network-migration-rollback
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -228,7 +229,7 @@ tests:
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-sdn-network-reverse-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
         state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
@@ -247,13 +248,13 @@ tests:
   as: e2e-aws-ovn-clusternetwork-cidr-expansion-presubmit
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cidr-expansion
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-ovn
   steps:
@@ -272,7 +273,7 @@ tests:
   as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
@@ -300,7 +301,7 @@ tests:
   as: e2e-network-mtu-migration-sdn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
@@ -313,13 +314,13 @@ tests:
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - always_run: false
   as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -327,7 +328,7 @@ tests:
   as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density

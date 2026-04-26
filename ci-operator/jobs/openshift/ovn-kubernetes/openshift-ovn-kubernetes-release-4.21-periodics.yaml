@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
+  cluster: build07
   cron: 0 0 */2 * *
   decorate: true
   extra_refs:
@@ -9,7 +9,7 @@ periodics:
     repo: ovn-kubernetes
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-ovn-kubernetes-release-4.21-e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
@@ -78,7 +78,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build07
   cron: 0 0 */2 * *
   decorate: true
   extra_refs:
@@ -87,7 +87,7 @@ periodics:
     repo: ovn-kubernetes
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-ovn-kubernetes-release-4.21-e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
@@ -156,7 +156,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build03
   cron: 0 0 * * *
   decorate: true
   extra_refs:
@@ -234,11 +234,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build03
   cron: 0 * * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -254,6 +252,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=branch-sync
@@ -275,6 +274,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -292,6 +294,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -305,11 +313,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 3 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -389,11 +395,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 3 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -473,11 +477,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 7 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -557,11 +559,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 7 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -641,11 +641,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 4 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
@@ -725,11 +723,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 4 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift

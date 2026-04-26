@@ -31,6 +31,11 @@ trap cleanup EXIT
 
 export EVENTUALLY_VERBOSE="false"
 
+check_e2e_flag() {
+  grep -q "$1" <<<"$( bin/test-e2e -h 2>&1 )"
+  return $?
+}
+
 N1_NP_VERSION_TEST_ARGS=""
 if [[ ${OCP_IMAGE_N1} != "${OCP_IMAGE_LATEST}" ]]; then
   N1_NP_VERSION_TEST_ARGS="--e2e.n1-minor-release-image=${OCP_IMAGE_N1}"
@@ -44,6 +49,37 @@ fi
 EXTERNAL_DNS_ARGS=""
 if [[ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" != "" ]]; then
   EXTERNAL_DNS_ARGS="--e2e.external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+fi
+
+# Azure private platform args - pass credentials and resource group to the e2e test framework
+# so the HO upgrade test can reinstall with private platform support.
+# Values can come from env vars or from SHARED_DIR files written by the
+# hypershift-azure-setup-private-link step.
+# The AZURE_PRIVATE_NAT_SUBNET_ID env var is read directly by TestAzurePrivateTopology;
+# when empty, the test self-skips.
+PLS_RG="${AZURE_PLS_RESOURCE_GROUP:-}"
+if [[ -z "${PLS_RG}" && -f "${SHARED_DIR}/azure_pls_resource_group" ]]; then
+  PLS_RG="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
+fi
+NAT_SUBNET="${AZURE_PRIVATE_NAT_SUBNET_ID:-}"
+if [[ -z "${NAT_SUBNET}" && -f "${SHARED_DIR}/azure_private_nat_subnet_id" ]]; then
+  NAT_SUBNET="$(cat "${SHARED_DIR}/azure_private_nat_subnet_id")"
+fi
+PRIVATE_CREDS="${AZURE_PRIVATE_CREDS_FILE:-}"
+if [[ -z "${PRIVATE_CREDS}" && -f "${SHARED_DIR}/azure_private_link_creds_file" ]]; then
+  PRIVATE_CREDS="$(cat "${SHARED_DIR}/azure_private_link_creds_file")"
+fi
+AZURE_PRIVATE_ARGS=""
+if [[ -n "${PRIVATE_CREDS}" && -n "${PLS_RG}" ]]; then
+  AZURE_PRIVATE_ARGS="--e2e.private-platform=Azure \
+    --e2e.azure-private-credentials-file=${PRIVATE_CREDS} \
+    --e2e.azure-pls-resource-group=${PLS_RG}"
+fi
+export AZURE_PRIVATE_NAT_SUBNET_ID="${NAT_SUBNET}"
+
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
 fi
 
 hack/ci-test-e2e.sh -test.v \
@@ -60,6 +96,8 @@ hack/ci-test-e2e.sh -test.v \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${EXTERNAL_DNS_ARGS:-} \
+    ${AZURE_PRIVATE_ARGS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
-  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
 wait $!

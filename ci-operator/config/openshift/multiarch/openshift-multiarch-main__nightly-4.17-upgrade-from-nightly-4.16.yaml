@@ -73,7 +73,7 @@ tests:
 - as: ocp-e2e-aws-ovn-upgrade-multi-x-ax
   cron: 19 19 18 12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-heterogeneous
 - as: ocp-e2e-upgrade-azure-ovn-multi-x-ax
   cron: 20 0 11 11 *
@@ -89,7 +89,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   cron: 37 13 9 7 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
@@ -98,7 +98,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   cron: 3 23 26 5 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
@@ -117,10 +117,10 @@ tests:
     workflow: openshift-upgrade-azure
 - as: ocp-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
-  cron: 0 17 * * 1-4
+  - intranet
+  cron: 0 20 * * 5
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:initial
     env:
@@ -128,11 +128,12 @@ tests:
       BRANCH: "4.16"
       NODE_TUNING: "true"
       TEST_TYPE: upgrade
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
   - power-s2s-dns
-  cron: 0 17 * * 1-4
+  cron: 0 20 * * 5
   steps:
     cluster_profile: libvirt-ppc64le-s2s
     dependencies:

@@ -133,15 +133,57 @@ echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 # Shared prompt instruction for subagent behavior
 SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
 
-# Load Jira API token for adding labels after processing
+# Load Jira API credentials for Atlassian Cloud (Basic Auth: email:api-token)
 JIRA_TOKEN_FILE="/var/run/claude-code-service-account/jira-pat"
-if [ -f "$JIRA_TOKEN_FILE" ]; then
+JIRA_EMAIL_FILE="/var/run/claude-code-service-account/jira-email"
+if [ -f "$JIRA_TOKEN_FILE" ] && [ -f "$JIRA_EMAIL_FILE" ]; then
   JIRA_TOKEN=$(cat "$JIRA_TOKEN_FILE")
-  echo "Jira API token loaded from jira-pat"
+  JIRA_EMAIL=$(cat "$JIRA_EMAIL_FILE")
+  JIRA_AUTH=$(echo -n "${JIRA_EMAIL}:${JIRA_TOKEN}" | base64 | tr -d '\n')
+  echo "Jira API credentials loaded (email + token)"
 else
-  echo "Warning: Jira API token not found at $JIRA_TOKEN_FILE"
+  echo "Warning: Jira credentials not found (need both jira-pat and jira-email)"
   echo "Labels will not be added to processed issues"
   JIRA_TOKEN=""
+  JIRA_AUTH=""
+fi
+
+# Load Slack webhook URL for notifications (tracing disabled to protect credential)
+SLACK_WEBHOOK_FILE="/var/run/claude-code-service-account/slack-webhook-url"
+[[ $- == *x* ]] && _SLACK_WAS_TRACING=true || _SLACK_WAS_TRACING=false
+set +x
+if [ -f "$SLACK_WEBHOOK_FILE" ]; then
+  SLACK_WEBHOOK_URL=$(cat "$SLACK_WEBHOOK_FILE")
+  echo "Slack webhook URL loaded"
+else
+  echo "Warning: Slack webhook URL not found at $SLACK_WEBHOOK_FILE"
+  echo "Slack notifications will be skipped"
+  SLACK_WEBHOOK_URL=""
+fi
+$_SLACK_WAS_TRACING && set -x
+
+# Load GitHub-to-Slack user ID mapping
+GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/gh-to-slack-ids"
+if [ -f "$GITHUB_SLACK_MAP_FILE" ]; then
+  if GITHUB_SLACK_MAP=$(jq -c . < "$GITHUB_SLACK_MAP_FILE" 2>/dev/null); then
+    echo "GitHub-to-Slack mapping loaded"
+  else
+    echo "Warning: GitHub-to-Slack mapping is invalid JSON"
+    echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
+    GITHUB_SLACK_MAP="{}"
+  fi
+else
+  echo "Warning: GitHub-to-Slack mapping not found at $GITHUB_SLACK_MAP_FILE"
+  echo "Reviewer pings will use GitHub usernames instead of Slack mentions"
+  GITHUB_SLACK_MAP="{}"
+fi
+
+# Extract Slack fallback user ID from mapping (pinged when no reviewers are assigned)
+SLACK_FALLBACK_USER_ID=$(jq -r '.["backup-user"] // empty' <<<"$GITHUB_SLACK_MAP")
+if [ -n "$SLACK_FALLBACK_USER_ID" ]; then
+  echo "Slack fallback user ID loaded from mapping"
+else
+  echo "Warning: No 'backup-user' key in GitHub-to-Slack mapping"
 fi
 
 # Function to transition a Jira issue to a target status
@@ -151,8 +193,8 @@ transition_issue() {
 
   # Get available transitions
   TRANSITIONS=$(curl -s \
-    "https://issues.redhat.com/rest/api/2/issue/$ISSUE_KEY/transitions" \
-    -H "Authorization: Bearer $JIRA_TOKEN" \
+    "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY/transitions" \
+    -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json")
 
   # Find transition ID for target status (match by name)
@@ -161,8 +203,8 @@ transition_issue() {
 
   if [ -n "$TRANSITION_ID" ] && [ "$TRANSITION_ID" != "null" ]; then
     curl -s -X POST \
-      "https://issues.redhat.com/rest/api/2/issue/$ISSUE_KEY/transitions" \
-      -H "Authorization: Bearer $JIRA_TOKEN" \
+      "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY/transitions" \
+      -H "Authorization: Basic $JIRA_AUTH" \
       -H "Content-Type: application/json" \
       -d "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}"
     return 0
@@ -172,16 +214,109 @@ transition_issue() {
   fi
 }
 
-# Function to set assignee on a Jira issue
+# Function to set assignee on a Jira issue (Cloud uses accountId)
 set_assignee() {
   local ISSUE_KEY=$1
-  local ASSIGNEE_NAME=$2
+  local ACCOUNT_ID=$2
 
   curl -s -w "\n%{http_code}" -X PUT \
-    "https://issues.redhat.com/rest/api/2/issue/$ISSUE_KEY/assignee" \
-    -H "Authorization: Bearer $JIRA_TOKEN" \
+    "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY/assignee" \
+    -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"$ASSIGNEE_NAME\"}"
+    -d "{\"accountId\":\"$ACCOUNT_ID\"}"
+}
+
+# Function to send Slack notification after PR creation
+send_slack_notification() {
+  local PR_URL=$1
+  local PR_NUM=$2
+
+  if [ -z "$SLACK_WEBHOOK_URL" ]; then
+    echo "   Skipping Slack notification (no webhook URL configured)"
+    return 0
+  fi
+
+  echo "   Polling for PR reviewers (up to 2 minutes)..."
+  local REVIEWERS=""
+  local PR_TITLE=""
+  local ATTEMPT=0
+  local MAX_ATTEMPTS=5
+
+  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    local PR_DATA
+    PR_DATA=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json reviewRequests,title 2>/dev/null || echo "{}")
+    PR_TITLE=$(echo "$PR_DATA" | jq -r '.title // empty' 2>/dev/null)
+    REVIEWERS=$(echo "$PR_DATA" | jq -r '.reviewRequests[]?.login // empty' 2>/dev/null)
+    if [ -n "$REVIEWERS" ]; then
+      echo "   Reviewers found: $REVIEWERS"
+      break
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+      echo "   No reviewers yet, retrying in 30s (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+      sleep 30
+    fi
+  done
+
+  # Fallback PR title if not fetched
+  if [ -z "$PR_TITLE" ]; then
+    PR_TITLE="PR #${PR_NUM}"
+  fi
+
+  # Build reviewer mention string
+  local REVIEWER_MENTIONS=""
+  if [ -n "$REVIEWERS" ]; then
+    while IFS= read -r gh_user; do
+      local slack_id
+      slack_id=$(echo "$GITHUB_SLACK_MAP" | jq -r --arg user "$gh_user" '.[$user] // empty' 2>/dev/null)
+      if [ -n "$slack_id" ]; then
+        REVIEWER_MENTIONS="${REVIEWER_MENTIONS} <@${slack_id}>"
+      else
+        REVIEWER_MENTIONS="${REVIEWER_MENTIONS} ${gh_user}"
+      fi
+    done <<< "$REVIEWERS"
+  else
+    echo "   No reviewers assigned after 2 minutes, using fallback"
+    if [ -n "$SLACK_FALLBACK_USER_ID" ]; then
+      REVIEWER_MENTIONS="<@${SLACK_FALLBACK_USER_ID}>"
+    else
+      REVIEWER_MENTIONS="(none assigned)"
+    fi
+  fi
+  REVIEWER_MENTIONS=$(echo "$REVIEWER_MENTIONS" | sed 's/^ //')
+
+  # Send Slack message (tracing disabled to protect webhook URL)
+  local SLACK_PAYLOAD
+  SLACK_PAYLOAD=$(jq -n --arg title "$PR_TITLE" --arg url "$PR_URL" --arg reviewers "$REVIEWER_MENTIONS" \
+    '{text: ":hypershift-bot: *Jira Agent PR ready for review*\n:review: <\($url)|\($title)>\n:eyes: Reviewers: \($reviewers)"}')
+
+  [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
+  set +x
+  set +e
+  local SLACK_RESPONSE
+  SLACK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    --connect-timeout 10 \
+    --max-time 20 \
+    -H 'Content-type: application/json' \
+    --data "$SLACK_PAYLOAD" \
+    "$SLACK_WEBHOOK_URL")
+  local CURL_EXIT_CODE=$?
+  set -e
+  $_was_tracing && set -x
+
+  if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "   Warning: Failed to send Slack notification (curl exit $CURL_EXIT_CODE)"
+    return 0
+  fi
+
+  local SLACK_HTTP_CODE
+  SLACK_HTTP_CODE=$(echo "$SLACK_RESPONSE" | tail -1)
+
+  if [ "$SLACK_HTTP_CODE" = "200" ]; then
+    echo "   Slack notification sent successfully"
+  else
+    echo "   Warning: Failed to send Slack notification (HTTP $SLACK_HTTP_CODE)"
+  fi
 }
 
 # Query Jira for issues (excluding already processed ones via label)
@@ -190,14 +325,27 @@ if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
   echo "Using override: JIRA_AGENT_ISSUE_KEY=$JIRA_AGENT_ISSUE_KEY"
   JQL="key = ${JIRA_AGENT_ISSUE_KEY}"
 else
-  JQL="project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, \"To Do\") AND labels = issue-for-agent AND labels != agent-processed"
+  JQL='project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed'
 fi
-ISSUES=$(curl -s "https://issues.redhat.com/rest/api/2/search" \
-  -G \
-  --data-urlencode "jql=$JQL" \
-  --data-urlencode 'fields=key,summary' \
-  --data-urlencode "maxResults=$MAX_ISSUES" \
-  | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
+SEARCH_PAYLOAD=$(jq -n --arg jql "$JQL" --argjson max "$MAX_ISSUES" \
+  '{jql: $jql, fields: ["key", "summary"], maxResults: $max}')
+SEARCH_RESPONSE=$(curl -s -w "\n%{http_code}" "https://redhat.atlassian.net/rest/api/3/search/jql" \
+  -X POST \
+  -H "Authorization: Basic $JIRA_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "$SEARCH_PAYLOAD")
+SEARCH_HTTP_CODE=$(echo "$SEARCH_RESPONSE" | tail -1)
+SEARCH_BODY=$(echo "$SEARCH_RESPONSE" | sed '$d')
+
+if [ "$SEARCH_HTTP_CODE" != "200" ]; then
+  echo "ERROR: Jira search failed (HTTP $SEARCH_HTTP_CODE)"
+  echo "Response: $SEARCH_BODY"
+  exit 1
+fi
+
+TOTAL_RESULTS=$(echo "$SEARCH_BODY" | jq -r '.total // 0')
+echo "Jira search returned $TOTAL_RESULTS result(s)"
+ISSUES=$(echo "$SEARCH_BODY" | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
 
 if [ -z "$ISSUES" ]; then
   echo "No issues found matching criteria"
@@ -468,7 +616,7 @@ IMPORTANT:
       PR_PROMPT="Create a pull request for the changes on branch '${BRANCH_NAME}'. Details:
 - Jira issue: ${ISSUE_KEY}
 - Jira summary: ${ISSUE_SUMMARY}
-- Jira URL: https://issues.redhat.com/browse/${ISSUE_KEY}
+- Jira URL: https://redhat.atlassian.net/browse/${ISSUE_KEY}
 - Read the PR template at .github/PULL_REQUEST_TEMPLATE.md and use it to structure the PR body.
 - Use 'git log main..HEAD' to understand what changed and write a meaningful description.
 - PR title must start with '${ISSUE_KEY}: '.
@@ -476,7 +624,6 @@ IMPORTANT:
   Always review AI generated responses prior to use.
   Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
 - Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --title '<title>' --body '<body>'
-- After creating the PR, add a comment '/auto-cc' on the PR to assign reviewers.
 - SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
 - ${SUBAGENT_PROMPT}"
 
@@ -547,7 +694,7 @@ IMPORTANT:
             CURRENT_BODY=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json body -q .body 2>/dev/null || echo "")
             REPORT_SECTION="---
 
-> **Note:** This PR was auto-generated by the [jira-agent](https://github.com/openshift/release/tree/main/ci-operator/step-registry/hypershift/jira-agent) periodic CI job in response to [${ISSUE_KEY}](https://issues.redhat.com/browse/${ISSUE_KEY}). See the [full report](${REPORT_URL}) for token usage, cost breakdown, and detailed phase output."
+> **Note:** This PR was auto-generated by the [jira-agent](https://github.com/openshift/release/tree/main/ci-operator/step-registry/hypershift/jira-agent) periodic CI job in response to [${ISSUE_KEY}](https://redhat.atlassian.net/browse/${ISSUE_KEY}). See the [full report](${REPORT_URL}) for token usage, cost breakdown, and detailed phase output."
             UPDATED_BODY="${CURRENT_BODY}
 
 ${REPORT_SECTION}"
@@ -555,16 +702,21 @@ ${REPORT_SECTION}"
           fi
         fi
       fi
+
+      # Send Slack notification to team channel
+      if [ -n "$PR_URL" ] && [ -n "$PR_NUM" ]; then
+        send_slack_notification "$PR_URL" "$PR_NUM"
+      fi
     else
       echo "No code changes detected for $ISSUE_KEY, skipping review and PR creation"
     fi
 
     # Add 'agent-processed' label to mark issue as handled
-    if [ -n "$JIRA_TOKEN" ]; then
+    if [ -n "$JIRA_AUTH" ]; then
       echo "Adding 'agent-processed' label to $ISSUE_KEY..."
       LABEL_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
-        "https://issues.redhat.com/rest/api/2/issue/$ISSUE_KEY" \
-        -H "Authorization: Bearer $JIRA_TOKEN" \
+        "https://redhat.atlassian.net/rest/api/3/issue/$ISSUE_KEY" \
+        -H "Authorization: Basic $JIRA_AUTH" \
         -H "Content-Type: application/json" \
         -d '{"update":{"labels":[{"add":"agent-processed"}]}}')
       HTTP_CODE=$(echo "$LABEL_RESPONSE" | tail -1)
@@ -588,9 +740,21 @@ ${REPORT_SECTION}"
         echo "   Transition failed or not available"
       fi
 
-      # Set assignee to hypershift-automation
-      echo "Setting assignee to 'hypershift-automation'..."
-      ASSIGNEE_RESPONSE=$(set_assignee "$ISSUE_KEY" "hypershift-automation")
+      # Set assignee to hypershift-team automation (Cloud requires accountId, look it up by display name)
+      echo "Looking up accountId for 'hypershift-team automation'..."
+      ASSIGNEE_ACCOUNT_ID=$(curl -s -G \
+        "https://redhat.atlassian.net/rest/api/3/user/search" \
+        -H "Authorization: Basic $JIRA_AUTH" \
+        --data-urlencode "query=hypershift-automation" \
+        | jq -r '[.[] | select(.displayName == "hypershift-team automation")] | .[0].accountId // empty')
+      if [ -n "$ASSIGNEE_ACCOUNT_ID" ]; then
+        echo "Setting assignee to account ID '${ASSIGNEE_ACCOUNT_ID}'..."
+        ASSIGNEE_RESPONSE=$(set_assignee "$ISSUE_KEY" "$ASSIGNEE_ACCOUNT_ID")
+      else
+        echo "   Warning: Could not find accountId for 'hypershift-team automation', skipping assignee"
+        ASSIGNEE_RESPONSE="skipped
+200"
+      fi
       HTTP_CODE=$(echo "$ASSIGNEE_RESPONSE" | tail -1)
       if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
         echo "   Assignee set successfully"

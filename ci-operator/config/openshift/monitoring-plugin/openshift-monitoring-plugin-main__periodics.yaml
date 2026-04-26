@@ -1,15 +1,16 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: monitoring-plugin
-- dockerfile_path: Dockerfile.mcp
-  to: monitoring-console-plugin
-- dockerfile_path: Dockerfile.test
-  to: monitoring-plugin-test
-- context_dir: .
-  dockerfile_path: web/cypress/Dockerfile
-  to: monitoring-ui-tests-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: monitoring-plugin
+  - dockerfile_path: Dockerfile.mcp
+    to: monitoring-console-plugin
+  - dockerfile_path: Dockerfile.test
+    to: monitoring-plugin-test
+  - context_dir: .
+    dockerfile_path: web/cypress/Dockerfile
+    to: monitoring-ui-tests-runner
 releases:
   initial:
     integration:
@@ -31,37 +32,51 @@ tests:
 - as: e2e-monitoring
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
     workflow: ipi-aws
 - as: e2e-monitoring-dev
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
     workflow: ipi-aws
 - as: e2e-coo
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-coo-ui
     workflow: ipi-aws
 - as: e2e-incidents
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-incidents-ui
     workflow: ipi-aws
 - as: e2e-virtualization
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-virtualization-ui
+    workflow: ipi-aws
+- as: e2e-perses
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui
+    workflow: ipi-aws
+- as: e2e-perses-dev
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-dev-ui
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

@@ -7,18 +7,18 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.openshift-appliance-build
 images:
-- dockerfile_literal: |
-    FROM ubi9-minimal
-    RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
-  to: ubi9-minimal-entitled
-- dockerfile_path: Dockerfile.openshift-appliance
-  from: ubi9-minimal-entitled
-  to: agent-preinstall-image-builder
+  items:
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+    to: ubi9-minimal-entitled
+  - dockerfile_path: Dockerfile.openshift-appliance
+    from: ubi9-minimal-entitled
+    to: agent-preinstall-image-builder
 promotion:
   to:
-  - disabled: true
-    name: "4.22"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -56,7 +56,7 @@ tests:
       SOURCE_IMAGE_REF: agent-preinstall-image-builder
     env:
       IMAGE_REPO: openshift-appliance
-      IMAGE_TAG: latest
+      IMAGE_TAG: "4.22"
     test:
     - ref: assisted-baremetal-images-publish
 - always_run: false

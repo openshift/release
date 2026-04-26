@@ -7,28 +7,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-nfd-operator
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-nfd-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-nfd-operator
 operator:
   bundles:
   - context_dir: manifests/stable
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-cluster-nfd-operator:4.21
+  - pullspec: quay.io/openshift/origin-cluster-nfd-operator:4.22
     with: pipeline:cluster-nfd-operator
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -46,7 +47,7 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:

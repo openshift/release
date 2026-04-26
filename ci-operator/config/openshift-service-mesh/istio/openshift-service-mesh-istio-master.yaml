@@ -59,53 +59,6 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: gencheck
-  steps:
-    cluster_profile: ossm-aws
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: gencheck
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          export GOBIN='/gobin' && \
-          export GOCACHE='/tmp/cache' && \
-          export GOMODCACHE='/tmp/cache' && \
-          export XDG_CACHE_HOME='/tmp/cache' && \
-          export ARTIFACTS='${ARTIFACT_DIR}' && \
-          cd /work && \
-          entrypoint \
-          make gen-check"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
 - as: unit-and-gencheck
   steps:
     cluster_profile: ossm-aws
@@ -182,7 +135,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestPilotResourceFilter
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: pilot
       TEST_SUITE_DESC: Istio Integration pilot
@@ -235,7 +187,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: ambient
       TEST_SUITE_DESC: Istio Integration ambient
@@ -253,7 +204,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestAmbientStableRevisionLabelsGatewayStatus|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: helm
       TEST_SUITE_DESC: Istio Integration helm
@@ -273,7 +223,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality|TestPreserveHTTPHeaderCaseConfiguration|TestPilotResourceFilter
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: pilot
       TEST_SUITE_DESC: Istio Integration pilot
@@ -293,7 +242,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestDashboard/pilot-dashboard.json
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: telemetry
       TEST_SUITE_DESC: Istio Integration telemetry
@@ -313,8 +261,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_SUITES: external_ca|file_mounted_certs|policy_attachment_only
-      SKIPPED_TESTS: TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestNormalization|TestAuthz_MultipleCustomProviders_NonOverlapping|TestAuthz_MultipleCustomProviders_Overlapping
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: security
       TEST_SUITE_DESC: Istio Integration security
@@ -335,7 +281,6 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestZtunnelSecureMetrics|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestZtunnelCRL
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: ambient
       TEST_SUITE_DESC: Istio Integration ambient

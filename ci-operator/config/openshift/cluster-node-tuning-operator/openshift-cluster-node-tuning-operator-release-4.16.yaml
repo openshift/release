@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -10,10 +6,11 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-node-tuning-operator-us-tuned
-- dockerfile_path: Dockerfile.rhel9
-  to: cluster-node-tuning-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-node-tuning-operator-us-tuned
+  - dockerfile_path: Dockerfile.rhel9
+    to: cluster-node-tuning-operator
 promotion:
   to:
   - excluded_images:
@@ -77,11 +74,11 @@ tests:
     workflow: hypershift-aws-e2e-cluster
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -98,7 +95,7 @@ tests:
 - as: e2e-nightly
   cron: 26 0 25 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: nightly
       cli: latest
@@ -111,7 +108,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -125,7 +122,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -141,7 +138,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -157,7 +154,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -171,7 +168,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local

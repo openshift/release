@@ -11,15 +11,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  to: csi-external-snapshotter
-- dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
-  from: base
-  to: csi-snapshot-controller
-- dockerfile_path: Dockerfile.webhook.openshift.rhel7
-  from: base
-  to: csi-snapshot-validation-webhook
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: csi-external-snapshotter
+  - dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
+    from: base
+    to: csi-snapshot-controller
+  - dockerfile_path: Dockerfile.webhook.openshift.rhel7
+    from: base
+    to: csi-snapshot-validation-webhook
 promotion:
   to:
   - name: 4.14-priv
@@ -46,11 +47,11 @@ tests:
     from: src
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: e2e-gcp-csi
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi
 - as: verify-deps
   steps:

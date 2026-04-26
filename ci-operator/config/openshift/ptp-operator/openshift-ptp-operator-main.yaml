@@ -1,25 +1,26 @@
 base_images:
   linuxptp-daemon:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: ptp
   must_gather:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: must-gather
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: ptp-operator
-- dockerfile_path: Dockerfile.ocp
-  from: must_gather
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
-  to: ptp-operator-must-gather
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: ptp-operator
+  - dockerfile_path: Dockerfile.ocp
+    from: must_gather
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
+    to: ptp-operator-must-gather
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
@@ -30,19 +31,19 @@ operator:
     with: pipeline:linuxptp-daemon
 promotion:
   to:
-  - name: ptp-4.22
+  - name: ptp-5.0
     namespace: origin
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -66,11 +67,11 @@ tests:
     from: src
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:

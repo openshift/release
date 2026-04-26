@@ -16,10 +16,11 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-resource-override-admission-operator
 images:
-- dockerfile_path: images/ci/Dockerfile
-  to: cluster-resource-override-admission-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  to: cluster-resource-override-admission-operator-registry
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    to: cluster-resource-override-admission-operator
+  - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+    to: cluster-resource-override-admission-operator-registry
 operator:
   bundles:
   - as: cluster-resource-override-admission-operator-bundle
@@ -34,6 +35,7 @@ promotion:
   to:
   - additional_images:
       cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
+    disabled: true
     name: 5.0-priv
     namespace: ocp-private
 releases:
@@ -74,7 +76,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -94,7 +96,7 @@ tests:
 - as: e2e-aws-olm
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -114,7 +116,7 @@ tests:
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest

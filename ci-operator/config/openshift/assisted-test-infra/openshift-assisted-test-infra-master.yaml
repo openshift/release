@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -34,16 +34,17 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-test-infra
-- dockerfile_path: Dockerfile.assisted-test-infra
-  to: assisted-test-infra-internal
+  items:
+  - dockerfile_literal: |
+      FROM base
+      COPY . .
+    from: src
+    to: assisted-test-infra
+  - dockerfile_path: Dockerfile.assisted-test-infra
+    to: assisted-test-infra-internal
 promotion:
   to:
-  - name: ocm-2.17
+  - name: backplane-5.0
     namespace: edge-infrastructure
 releases:
   latest:
@@ -126,7 +127,7 @@ tests:
         DEPLOY_TARGET=onprem
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-4-22-periodic
   capabilities:
@@ -138,7 +139,19 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-5-0-periodic
+  capabilities:
+  - intranet
+  cron: 30 03 * * 0,2,4
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=5.0
+      CLUSTERTYPE: assisted_medium_el9
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-tpmv2-4-22
@@ -176,7 +189,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
@@ -210,7 +223,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-18
@@ -233,7 +246,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-19
@@ -256,7 +269,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.19
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-lvm-4-22
@@ -291,7 +304,7 @@ tests:
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-mce-4-22
@@ -405,7 +418,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: minimal
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-day2-4-22-periodic
   capabilities:
@@ -418,7 +431,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: minimal
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-binding-sno-4-22
@@ -534,7 +547,7 @@ tests:
         IPv4=yes
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-none-4-22
@@ -559,7 +572,7 @@ tests:
         PLATFORM=none
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-external-4-22
@@ -584,7 +597,7 @@ tests:
         PLATFORM=external
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-sno-4-22
@@ -609,7 +622,7 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-4-22
@@ -695,7 +708,7 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-bond-4-22-periodic
   capabilities:
@@ -708,7 +721,7 @@ tests:
         IS_BONDED=true
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-sno-with-worker-live-iso
   run_if_changed: .*bootstrap_in_place.*
@@ -814,7 +827,7 @@ tests:
         IPXE_BOOT=true
         OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: extensive
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-vsphere-assisted-umn-4-22

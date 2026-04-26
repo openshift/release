@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v1.2.0"
+	TAG="v2.0.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	MACHINE=$(uname -m)
 	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi

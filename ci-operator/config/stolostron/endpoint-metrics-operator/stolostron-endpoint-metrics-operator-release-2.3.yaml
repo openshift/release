@@ -10,14 +10,15 @@ build_root:
     namespace: stolostron
     tag: go1.17-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./build/_output/bin
-        source_path: /go/src/github.com/stolostron/endpoint-metrics-operator/build/_output/bin/endpoint-monitoring-operator
-  to: endpoint-monitoring-operator
+  items:
+  - dockerfile_path: Dockerfile.prow
+    from: base
+    inputs:
+      bin:
+        paths:
+        - destination_dir: ./build/_output/bin
+          source_path: /go/src/github.com/stolostron/endpoint-metrics-operator/build/_output/bin/endpoint-monitoring-operator
+    to: endpoint-monitoring-operator
 promotion:
   to:
   - name: "2.3"
@@ -56,7 +57,7 @@ tests:
 - as: e2e
   run_if_changed: ^(config/.*|controllers/.*|manifests/.*|pkg/.*|Makefile\.prow|Dockerfile\.prow|go\.mod|go\.sum|main\.go)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: run-e2e
       cli: latest

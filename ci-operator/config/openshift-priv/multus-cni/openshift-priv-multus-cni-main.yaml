@@ -2,23 +2,24 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/multus-cni
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: multus-cni
-- dockerfile_path: Dockerfile.microshift
-  to: multus-cni-microshift
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: multus-cni
+  - dockerfile_path: Dockerfile.microshift
+    to: multus-cni-microshift
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -28,11 +29,11 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density

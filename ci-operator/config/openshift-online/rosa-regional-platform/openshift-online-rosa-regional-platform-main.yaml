@@ -1,6 +1,14 @@
 build_root:
   project_image:
     dockerfile_path: ci/Containerfile
+images:
+  items:
+  - dockerfile_path: ci/Containerfile
+    to: rosa-regional-platform-ci
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -22,12 +30,16 @@ tests:
   commands: ./ci/helm-lint.sh
   container:
     from: src
+- as: check-docs
+  commands: ./ci/check-docs.sh
+  container:
+    from: src
 - as: check-rendered-files
   commands: ./ci/check-rendered-files.sh
   container:
     from: src
 - as: nightly-ephemeral
-  cron: 0 7 * * *
+  cron: 0 4 * * *
   steps:
     post:
     - as: teardown-ephemeral
@@ -66,7 +78,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: nightly-integration
-  cron: 0 7 * * *
+  cron: 0 4 * * *
   steps:
     test:
     - as: e2e
@@ -116,21 +128,6 @@ tests:
     test:
     - as: e2e
       commands: ./ci/e2e-tests.sh
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: ephemeral-resources-janitor
-  cron: 0 12 * * 0
-  steps:
-    test:
-    - as: ephemeral-resources-janitor
-      commands: ./ci/ephemeral-resources-janitor.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds

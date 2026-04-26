@@ -1,25 +1,20 @@
-base_images:
-  base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ocp-release-operator-sdk
 images:
-- dockerfile_path: ci/dockerfiles/builder.Dockerfile
-  from: root
-  to: osdk-builder
-- dockerfile_path: release/helm/Dockerfile
-  from: base-rhel9
-  to: helm-operator
-- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
-  from: helm-operator
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-helm-e2e
+  items:
+  - dockerfile_path: ci/dockerfiles/builder.Dockerfile
+    from: root
+    to: osdk-builder
+  - dockerfile_path: release/helm/Dockerfile
+    to: helm-operator
+  - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+    from: helm-operator
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-helm-e2e
 promotion:
   to:
   - excluded_images:
@@ -27,17 +22,17 @@ promotion:
     - osdk-helm-e2e
     - memcached-operator
     - nginx-operator
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -68,7 +63,77 @@ tests:
     from: src
 - as: e2e-helm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-helm-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FIPS_ENABLED: "true"
+    post:
+    - chain: ipi-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-helm-rhcos10-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    post:
+    - chain: ipi-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-helm-rhcos10
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
     test:
     - as: test
       cli: latest

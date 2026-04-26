@@ -6,21 +6,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- context_dir: base
-  dockerfile_path: Dockerfile.rhel
-  to: base
-- context_dir: egress/router
-  from: base
-  to: egress-router
-- context_dir: egress/http-proxy
-  from: base
-  to: egress-http-proxy
-- context_dir: egress/dns-proxy
-  from: base
-  to: egress-dns-proxy
-- context_dir: ipfailover/keepalived
-  from: base
-  to: keepalived-ipfailover
+  items:
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel
+    to: base
+  - context_dir: egress/router
+    from: base
+    to: egress-router
+  - context_dir: egress/http-proxy
+    from: base
+    to: egress-http-proxy
+  - context_dir: egress/dns-proxy
+    from: base
+    to: egress-dns-proxy
+  - context_dir: ipfailover/keepalived
+    from: base
+    to: keepalived-ipfailover
 promotion:
   to:
   - name: "4.13"
@@ -43,11 +44,11 @@ resources:
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
