@@ -50,8 +50,14 @@ tests:
   - nested-podman
   commands: |
     env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
-    export JOB_ID="${PROW_JOB_ID}"
-    export JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main/${JOB_ID}"
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}/pr-logs/pull/openshift-online_rosa-e2e/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}/logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    echo "JOB_LINK=${JOB_LINK}"
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
     export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
     export ENABLE_JIRA_REPORTING=true
