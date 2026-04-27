@@ -181,6 +181,9 @@ chain:
             mirror_test_images
             patch_image_streams
             export TEST_PROVIDER='{"type":"kubevirt","disconnected":true}'
+            # Patching image stream causes Node rollout to start, so we need to wait for it to finish otherwise
+            # mass test failures will occur.
+            oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" wait nodepools -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}" --for=condition=AllMachinesReady=True --timeout=30m
           else
             export TEST_PROVIDER='{"type":"kubevirt"}'
           fi
