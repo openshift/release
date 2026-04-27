@@ -863,7 +863,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260421-d25a17867
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -898,7 +898,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260421-d25a17867
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -929,13 +929,14 @@ periodics:
   spec:
     containers:
     - args:
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --confirm=true
-      - --git-name=openshift-bot
-      - --git-email=openshift-bot@redhat.com
+      - --git-name=openshift-merge-bot[bot]
+      - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
       - --current-release=5.0
@@ -946,6 +947,12 @@ periodics:
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/auto-config-brancher
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
       image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
       imagePullPolicy: Always
       name: auto-config-brancher
@@ -954,15 +961,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/prometheus
         name: prometheus
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-merge-bot
     - name: prometheus
       secret:
         items:
@@ -997,6 +1004,7 @@ periodics:
       - --self-approve=true
       - --prometheus-bearer-token-path=/etc/prometheus/token
       - --create-pr=true
+      - --pr-body=@coderabbitai ignore
       command:
       - /usr/bin/prow-job-dispatcher
       image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
@@ -1240,7 +1248,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1297,7 +1305,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1388,7 +1396,7 @@ periodics:
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
           --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1420,7 +1428,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2006,7 +2014,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2038,7 +2046,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2070,7 +2078,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260414-6691f5aff
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260421-d25a17867
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2160,8 +2168,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-image-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2204,8 +2212,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2248,8 +2256,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2292,8 +2300,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2336,8 +2344,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2380,8 +2388,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-test-infra
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
+      - --current-release=backplane-5.0
+      - --future-release=backplane-5.0
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -2629,6 +2637,174 @@ periodics:
         secretName: openshift-merge-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 4 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-trigger-trusted-apps-autofix
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "python3 is required but missing from image" >&2
+          echo "failed" > /shared/fixer.status
+          exit 1
+        fi
+
+        trap 'echo "failed" > /shared/fixer.status' ERR
+        python3 ./hack/validate-trigger-trusted-apps.py --fix
+        python3 ./hack/validate-trigger-trusted-apps.py
+        echo "done" > /shared/fixer.status
+      command:
+      - /bin/bash
+      image: quay.io/openshift/ci-public:ci_python-validation_latest
+      imagePullPolicy: Always
+      name: trigger-trusted-apps-fixer
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /shared
+        name: shared
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        for _ in $(seq 1 600); do
+          if [[ -f /shared/fixer.status ]]; then
+            break
+          fi
+          sleep 2
+        done
+
+        if [[ ! -f /shared/fixer.status ]]; then
+          echo "timed out waiting for fixer container status" >&2
+          exit 1
+        fi
+
+        status="$(cat /shared/fixer.status)"
+        if [[ "${status}" != "done" ]]; then
+          echo "fixer container reported status: ${status}" >&2
+          echo "failed" > /shared/prow-config.status
+          exit 1
+        fi
+
+        DETERMINIZE_BIN="/usr/bin/determinize-prow-config"
+        if ! command -v "${DETERMINIZE_BIN}" >/dev/null 2>&1; then
+          DETERMINIZE_BIN="$(command -v determinize-prow-config || true)"
+        fi
+        if [[ -z "${DETERMINIZE_BIN}" ]]; then
+          echo "determinize-prow-config is required but missing from image" >&2
+          echo "failed" > /shared/prow-config.status
+          exit 1
+        fi
+
+        trap 'echo "failed" > /shared/prow-config.status' ERR
+        "${DETERMINIZE_BIN}" \
+        --prow-config-dir ./core-services/prow/02_config \
+        --sharded-prow-config-base-dir ./core-services/prow/02_config \
+        --sharded-plugin-config-base-dir ./core-services/prow/02_config
+        echo "done" > /shared/prow-config.status
+      command:
+      - /bin/bash
+      image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
+      imagePullPolicy: Always
+      name: trigger-trusted-apps-prow-config
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /shared
+        name: shared
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        for _ in $(seq 1 600); do
+          if [[ -f /shared/prow-config.status ]]; then
+            break
+          fi
+          sleep 2
+        done
+
+        if [[ ! -f /shared/prow-config.status ]]; then
+          echo "timed out waiting for prow-config container status" >&2
+          exit 1
+        fi
+
+        status="$(cat /shared/prow-config.status)"
+        if [[ "${status}" != "done" ]]; then
+          echo "prow-config container reported status: ${status}" >&2
+          exit 1
+        fi
+
+        PRCREATOR_BIN="/usr/bin/prcreator"
+        if ! command -v "${PRCREATOR_BIN}" >/dev/null 2>&1; then
+          PRCREATOR_BIN="$(command -v prcreator || true)"
+        fi
+        if [[ -z "${PRCREATOR_BIN}" ]]; then
+          echo "prcreator is required but missing from image" >&2
+          exit 1
+        fi
+
+        if git diff --quiet -- core-services/prow/02_config; then
+          echo "No trigger trusted_apps/prow-config updates needed."
+          exit 0
+        fi
+
+        "${PRCREATOR_BIN}" \
+        -pr-source-mode=branch \
+        -self-approve=true \
+        -github-app-id=$(GITHUB_APP_ID) \
+        -github-app-private-key-path=/etc/github/cert \
+        -organization=openshift -repo=release -branch=main \
+        -git-message="Automated update for trigger trusted apps" \
+        -pr-title="Automated: ensure trigger trusted_apps include openshift-merge-bot"
+      command:
+      - /bin/bash
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_prcreator_latest
+      imagePullPolicy: Always
+      name: trigger-trusted-apps-prcreator
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+      - mountPath: /shared
+        name: shared
+    volumes:
+    - emptyDir: {}
+      name: shared
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-merge-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 10,22 * * *
   decorate: true
   extra_refs:
@@ -2672,6 +2848,9 @@ periodics:
         -pr-title="Automated - Update config ./config/openshift.yaml"
       command:
       - /bin/bash
+      env:
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/bigquery/token
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-sippy-config-generator_latest
       imagePullPolicy: Always
       name: auto-sippy-config-generator
@@ -2682,10 +2861,16 @@ periodics:
       - mountPath: /etc/github
         name: token
         readOnly: true
+      - mountPath: /etc/bigquery
+        name: bigquery-token
+        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+    - name: bigquery-token
+      secret:
+        secretName: ci-data-bigquery-readonly
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1 * * 5

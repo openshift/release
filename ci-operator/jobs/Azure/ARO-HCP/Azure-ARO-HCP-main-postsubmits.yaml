@@ -6,8 +6,6 @@ postsubmits:
     - ^main$
     cluster: build03
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/variant: baseimage-generator
@@ -73,7 +71,15 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-Azure-ARO-HCP-main-cspr
+    name: branch-ci-Azure-ARO-HCP-main-cspr-pipeline-postsubmit
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-dev'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     spec:
       containers:
       - args:
@@ -81,7 +87,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=cspr
+        - --target=cspr-pipeline-postsubmit
         command:
         - ci-operator
         env:
@@ -383,6 +389,14 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-Azure-ARO-HCP-main-global-pipeline-postsubmit
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-dev'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
     spec:
       containers:
@@ -463,7 +477,7 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=aro-hcp-e2e-tools
+        - --target=aro-hcp-e2e-tests
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -512,8 +526,16 @@ postsubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 100
-    name: branch-ci-Azure-ARO-HCP-main-images-push
+    max_concurrency: 1
+    name: branch-ci-Azure-ARO-HCP-main-images-push-postsubmit
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-dev'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     spec:
       containers:
       - args:
@@ -521,7 +543,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=images-push
+        - --target=images-push-postsubmit
         command:
         - ci-operator
         env:
