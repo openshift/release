@@ -13,7 +13,7 @@ trap '
     saveExit=$?
     (( saveExit )) &&
     timeout 8m oc adm must-gather \
-        --image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}" \
+        --image="quay.io/rhceph-dev/ocs-must-gather:latest-stable-${ODF_VERSION_MAJOR_MINOR}" \
         --dest-dir="${ARTIFACT_DIR}/ocs_must_gather" || true
 ' EXIT
 
@@ -56,9 +56,6 @@ fi
 # ODF_OPERATOR_CHANNEL, ODF_SUBSCRIPTION_NAME, ODF_VOLUME_SIZE, ODF_BACKEND_STORAGE_CLASS are defined
 # in the Step Conf (ref.yaml) and are guaranteed by CI Operator — no local shadow vars needed.
 typeset odfInstallNamespace="openshift-storage"
-typeset odfDefaultStorageClass="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd"
-# Alternative: odfDefaultStorageClass=ocs-storagecluster-ceph-rbd-virtualization
-typeset defaultStorageClass="${DEFAULT_STORAGE_CLASS:-${odfDefaultStorageClass}}"
 
 typeset -r odfCatalogImage="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 typeset -r odfCatalogName="odf-catalogsource"
@@ -106,7 +103,7 @@ EOF
 
 # Extract ICSP from the catalog image; apply if present, then wait for MCP update.
 oc image extract "${odfCatalogImage}" --file /icsp.yaml
-if [ -e "icsp.yaml" ] ; then
+if [[ -e "icsp.yaml" ]]; then
     oc apply --filename="icsp.yaml"
     WaitMcpForUpdated
 fi
@@ -150,25 +147,69 @@ spec:
 EOF
 )"
 
-# Wait for OLM to resolve the CSV name from the catalog (catalog is READY so this is fast).
-# currentCSV is populated before installedCSV; poll tightly since resolution takes only seconds.
+# Wait for OLM to fully install the CSV.
+# installedCSV is set by OLM only when the CSV has reached Succeeded phase — it is the single field
+# that proves the operator is installed. currentCSV is set earlier (OLM's intent) but is not sufficient
+# proof of a successful install. Using installedCSV collapses the old two-step
+# (poll currentCSV → oc wait csv --for=Succeeded) into one authoritative check.
+# IMPORTANT: use the fully-qualified resource type 'subscriptions.operators.coreos.com' to avoid
+# ambiguity with 'subscriptions.apps.open-cluster-management.io' (ACM CRD) which registers the same
+# short name 'subscription'. When ACM is installed, unqualified 'oc get subscription' resolves to the
+# ACM CRD instead of the OLM CRD, returning empty output and causing the loop to spin until timeout.
+# oc get -o jsonpath returns exit 0 + empty string when the field is absent, so 2>/dev/null covers the
+# brief "not found" window right after apply; || true covers transient API server errors.
+# ODF install typically takes 10-15 minutes; 20m timeout covers slow CI nodes with headroom to spare.
 typeset csvName=''
+typeset -i csvDeadline
+csvDeadline=$(( $(date +%s) + 1200 ))
 until [[ -n "${csvName}" ]]; do
-    csvName="$(oc -n "${odfInstallNamespace}" get subscription "${subscriptionName}" \
-        -o jsonpath='{.status.currentCSV}' 2>/dev/null || true)"
-    [[ -z "${csvName}" ]] && sleep 5
+    csvName="$(oc -n "${odfInstallNamespace}" \
+        get subscriptions.operators.coreos.com "${subscriptionName}" \
+        -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+    if [[ -z "${csvName}" ]]; then
+        if (( $(date +%s) >= csvDeadline )); then
+            echo "[ERROR] Timed out (20m) waiting for subscription '${subscriptionName}' to install CSV" >&2
+            oc -n "${odfInstallNamespace}" get subscriptions.operators.coreos.com "${subscriptionName}" -o yaml >&2 || true
+            oc -n openshift-marketplace get catalogsource "${odfCatalogName}" -o yaml >&2 || true
+            oc -n "${odfInstallNamespace}" get csv -o wide >&2 || true
+            exit 1
+        fi
+        sleep 10
+    fi
 done
+echo "[INFO] OLM installed CSV: ${csvName}"
 
-# Wait for CSV to reach Succeeded phase (OLM installs all operator components).
-oc wait csv "${csvName}" -n "${odfInstallNamespace}" \
-    --for=jsonpath='{.status.phase}=Succeeded' --timeout=10m
-echo "[INFO] ClusterServiceVersion ${csvName} ready"
-
-# CSV Succeeded guarantees the ocs-operator Deployment exists; wait for it to become Available.
-oc wait deployment ocs-operator \
+# Wait for the odf-operator deployment to be Available.
+#
+# WHY THIS IS REQUIRED (root cause of the 2049108224325455872 failure):
+# installedCSV is set by OLM when the CSV transitions to Succeeded. That is a
+# control-plane event — it does NOT guarantee the operator pod has started and
+# registered its own CRDs. The 'storageclusters.ocs.openshift.io' CRD is
+# dynamically registered by the running odf-operator pod, NOT pre-shipped by
+# OLM. Applying a StorageCluster manifest before that CRD exists produces:
+#
+#   error: resource mapping not found for name: "ocs-storagecluster"
+#          namespace: "openshift-storage" from "STDIN":
+#          no matches for kind "StorageCluster" in version "ocs.openshift.io/v1"
+#          ensure CRDs are installed first
+#
+# Waiting for odf-operator Available and then for the CRD Established condition
+# guarantees the API is ready before the StorageCluster manifest is applied.
+#
+# In ODF 4.x (4.12+) the CSV creates 'odf-operator', NOT 'ocs-operator'.
+# 'ocs-operator' is a sub-component started AFTER StorageSystem/StorageCluster
+# exists. Do NOT wait for 'ocs-operator' here — it doesn't exist yet.
+oc wait deployment odf-operator \
     --namespace="${odfInstallNamespace}" \
     --for=condition='Available' \
     --timeout='5m'
+
+# Wait for the StorageCluster CRD to be fully established (Established=True).
+# The CRD is registered by the odf-operator pod at startup; this is the precise
+# gate that proves the API server will accept StorageCluster manifests.
+oc wait crd storageclusters.ocs.openshift.io \
+    --for=condition='Established' \
+    --timeout='2m'
 
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
     --selector='node-role.kubernetes.io/worker'
@@ -204,7 +245,7 @@ oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" \
     -n "${odfInstallNamespace}" --for=condition='Available' --timeout='180m'
 
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
-oc annotate storageclass "${defaultStorageClass}" storageclass.kubernetes.io/is-default-class=true
-
-echo "[SUCCESS] ODF/OCS Operator deployed successfully"
+# ODF_STORAGE_CLUSTER_NAME is the step env var (ref.yaml) that controls the cluster name;
+# the default StorageClass is always the ceph-rbd class derived from that same name.
+oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true
 true

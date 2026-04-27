@@ -16,29 +16,24 @@ DebugOnExit() {
     typeset -i exitCode=$?
     typeset -i endTime=$SECONDS
     typeset -i executionTime=$((endTime - startTime))
-    typeset -i debugThreshold=720 # 12 minutes in seconds
     typeset hcoNamespace="openshift-cnv"
 
-    if (( executionTime < debugThreshold || exitCode != 0 )); then
+    if (( exitCode != 0 )); then
         echo
         echo "--------------------------------------------------------"
         echo " SCRIPT EXITED PREMATURELY (runtime: ${executionTime}s) "
         echo "--------------------------------------------------------"
-        echo "Entering 2-hour debug sleep. Press Ctrl+C to terminate."
         echo "You can now inspect the system state."
         echo "PID: $$"
         echo "Exit Code: ${exitCode}"
         echo "--------------------------------------------------------"
-        # The 'sleep' command will be interrupted by Ctrl+C.
-        # To make the sleep uninterruptible by Ctrl+C, you could add:
-        # trap '' SIGINT SIGTERM
         oc get -n "${hcoNamespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
         oc logs --since=1h -n "${hcoNamespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
-
         RunMustGather
-        echo "[INFO] Entering debug sleep loop (remove /tmp/debug_marker to continue)."
-
-        # Use file flag so loop can be interrupted by removing the file
+        # Loop until the marker file is removed (or Ctrl+C). Each iteration sleeps 120s.
+        # To unblock from outside the pod: rm /tmp/debug_marker
+        # To unblock interactively: Ctrl+C (interrupts the current sleep and exits the trap).
+        echo "[INFO] Entering debug hold. Remove /tmp/debug_marker to continue, or press Ctrl+C."
         touch /tmp/debug_marker
         while [[ -f /tmp/debug_marker ]]; do
             sleep 120
@@ -133,7 +128,7 @@ Cnv__ReimportDatavolumes() {
     Cnv__ToggleCommonBootImageImport "false"
     sleep 1
 
-    oc wait dataimportcrons -n "${dvnamespace}" --all --for='delete'
+    oc wait dataimportcrons -n "${dvnamespace}" --all --for='delete' --timeout=10m
 
     # `oc delete` command does not account for dependencies or the sequence in which OpenShift resources are managed.
     # So we need to run the following commands in order to avoid issues like:
@@ -336,7 +331,11 @@ fi
 
 MapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
-# Send junit file to shared dir for Data Router Reporter step
-cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
+# Send junit file to shared dir for Data Router Reporter step.
+# Guard the copy: pytest may not produce the file when it fails before the collection phase.
+# A missing file must not mask the real test exit code captured in exitCode.
+if [[ -f "${JUNIT_RESULTS_FILE}" ]]; then
+    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
+fi
 
 exit "${exitCode}"
