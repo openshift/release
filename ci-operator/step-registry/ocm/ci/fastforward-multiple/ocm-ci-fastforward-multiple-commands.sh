@@ -128,6 +128,7 @@ transform_tekton_files() {
   local source_version=$6  # e.g., "5.0"
   local dest_version=$7    # e.g., "5.1"
   local log_file=$8
+  local last_release_version=$9  # e.g., "2.17" - fallback if files missing
 
   local product_prefix="acm"
   if [[ "${product}" == "mce" ]]; then
@@ -187,8 +188,31 @@ transform_tekton_files() {
     cd "$repo" || exit 1
 
     if [[ ! -d .tekton ]]; then
-      echo "INFO: No .tekton directory, skipping"
-      exit 0
+      echo "INFO: No .tekton directory on ${dest_branch}"
+
+      # Fallback to last_release_version if available
+      if [[ -n "${last_release_version:-}" ]]; then
+        local fallback_branch="${branch_prefix}-${last_release_version}"
+        echo "INFO: Trying fallback to ${fallback_branch}"
+
+        if git fetch origin "${fallback_branch}" 2>&1; then
+          echo "INFO: Checking out .tekton from ${fallback_branch}"
+          git checkout "origin/${fallback_branch}" -- .tekton/ 2>&1 || true
+
+          if [[ -d .tekton ]]; then
+            echo "INFO: Found .tekton from ${fallback_branch}"
+          else
+            echo "INFO: No .tekton on ${fallback_branch} either, skipping"
+            exit 0
+          fi
+        else
+          echo "INFO: Could not fetch ${fallback_branch}, skipping"
+          exit 0
+        fi
+      else
+        echo "INFO: LAST_RELEASE_VERSION not set, skipping"
+        exit 0
+      fi
     fi
 
     # Find files to transform
@@ -1236,7 +1260,7 @@ for product in mce acm globalhub; do
 
         TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-        if transform_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log}"; then
+        if transform_tekton_files "${owner}" "${repo}" "${product}" "${repo_branch_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log}" "${LAST_RELEASE_VERSION:-}"; then
           status=0
         else
           status=$?
@@ -1272,7 +1296,7 @@ for product in mce acm globalhub; do
 
           TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-          if transform_tekton_files "${owner}" "${repo}" "${alternate_product}" "${alternate_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log_alt}"; then
+          if transform_tekton_files "${owner}" "${repo}" "${alternate_product}" "${alternate_prefix}" "${dest_branch}" "${default_version}" "${version}" "${transform_log_alt}" "${LAST_RELEASE_VERSION:-}"; then
             status=0
           else
             status=$?
@@ -1359,7 +1383,13 @@ for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
   fi
 
   # List all branches matching ff-release-* or ff-backplane-*
-  stale_branches=$(gh api "repos/${owner}/${repo}/branches" --paginate --jq '.[].name | select(test("^ff-(release|backplane)-"))' 2>/dev/null || true)
+  stale_branches=$(gh api "repos/${owner}/${repo}/branches" --paginate --jq '.[].name | select(test("^ff-(release|backplane)-"))' 2>&1)
+  api_status=$?
+
+  if [[ $api_status -ne 0 ]]; then
+    echo "WARNING: Failed to list branches for ${owner_repo}: ${stale_branches}"
+    continue
+  fi
 
   if [[ -z "${stale_branches}" ]]; then
     continue
