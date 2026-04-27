@@ -202,6 +202,16 @@ EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
+# CDI auto-detects only volumeMode=Block for gp3-csi in its StorageProfile.
+# KubeVirt DataVolumes created by HyperShift request volumeMode=Filesystem,
+# which CDI rejects because no matching claimPropertySet exists.
+# Patch the StorageProfile to also advertise Filesystem so DataVolumes can bind.
+if oc get storageprofile gp3-csi &>/dev/null; then
+  echo "Patching gp3-csi StorageProfile to include Filesystem volumeMode"
+  oc patch storageprofile gp3-csi --type=merge -p \
+    '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteOnce"],"volumeMode":"Filesystem"},{"accessModes":["ReadWriteOnce"],"volumeMode":"Block"}]}}'
+fi
+
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
 
