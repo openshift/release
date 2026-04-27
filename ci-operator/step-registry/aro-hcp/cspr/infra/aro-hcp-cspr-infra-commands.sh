@@ -26,11 +26,11 @@ export PERSIST=true
 export PRINCIPAL_ID; PRINCIPAL_ID=$(az ad sp show --id "${AZURE_CLIENT_ID}" --query id -o tsv)
 
 cd dev-infrastructure
-make region
-make svc
+make region EXTRA_ARGS="--step-cache-dir="
+make svc EXTRA_ARGS="--step-cache-dir="
 
 make svc.aks.admin-access
 make svc.cs-pr-check-msi
-make mgmt
+make mgmt EXTRA_ARGS="--step-cache-dir="
 make mgmt.aks.admin-access
-make monitoring
+make monitoring EXTRA_ARGS="--step-cache-dir="
