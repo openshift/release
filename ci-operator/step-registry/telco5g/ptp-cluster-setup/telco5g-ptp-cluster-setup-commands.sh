@@ -320,6 +320,14 @@ if [[ ! -f "$SHARED_DIR/kubeconfig" ]]; then
   status=1
 fi
 
+if [[ -f "$SHARED_DIR/kubeconfig" ]]; then
+  echo "************ Cluster version (oc get clusterversion) ************"
+  if ! KUBECONFIG="$SHARED_DIR/kubeconfig" oc get clusterversion; then
+    echo "WARNING: oc get clusterversion failed (API unreachable, auth, or oc missing in this ref)"
+  fi
+  echo "****************************************************************"
+fi
+
 if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then
   #installer has issues applying machine-configs with OCP 4.10, using manual way
   KUBECONFIG="$SHARED_DIR/kubeconfig" oc apply -f "$SHARED_DIR/disable_ntp.yml" || true
