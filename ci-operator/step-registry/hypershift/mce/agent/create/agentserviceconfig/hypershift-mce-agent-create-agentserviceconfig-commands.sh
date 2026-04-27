@@ -28,6 +28,18 @@ function registry_config() {
   ' ${src_image} ${mirrored_image}
 }
 
+function deploy_assisted_service_config_map() {
+  oc apply -f - <<END
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assisted-service-config
+  namespace: ${ASSISTED_NAMESPACE}
+data:
+  SERVICE_IMAGE: 'quay.io/mgencur/assisted-service:MGMT-23509'
+END
+}
+
 function config_agentserviceconfig() {
   oc apply -f - <<END
 apiVersion: agent-install.openshift.io/v1beta1
@@ -37,6 +49,7 @@ metadata:
   # TODO: Remove after OCPBUGS-55106 is fixed
   # OCPBUGS-55106 workaround
   unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
+  unsupported.agent-install.openshift.io/assisted-service-configmap: 'assisted-service-config'
  name: agent
 spec:
  databaseStorage:
@@ -257,6 +270,7 @@ if [ "${DISCONNECTED}" = "true" ]; then
 fi
 
 deploy_mirror_config_map
+deploy_assisted_service_config_map
 config_agentserviceconfig
 
 oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
