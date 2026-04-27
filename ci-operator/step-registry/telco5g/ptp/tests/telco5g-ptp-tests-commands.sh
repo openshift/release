@@ -352,6 +352,13 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
   if [[ "$T5CI_VERSION" =~ 4.1[2-5] ]]; then
     TEST_MODES=("${TEST_MODES[@]/dualnicbcha}")
   fi
+
+  # DualNICBoundaryClock test mode is only supported from 4.13 onwards,
+  # so if the version is less than 4.13, remove it from the list
+  if [[ "$T5CI_VERSION" == 4.12 ]]; then
+    TEST_MODES=("${TEST_MODES[@]/dualnicbc}")
+  fi
+
 else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
