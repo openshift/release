@@ -623,6 +623,45 @@ When creating new step-registry components:
 4. **Make it reusable** - Use environment variables for configuration
 5. **Test thoroughly** - Validate before submitting
 
+### `/test-repo-files` - Validate Repo File URLs
+
+**Purpose**: Validate that `core-services/release-controller/_repos/ocp-*.repo` files have correct mirror2 and CDN URLs after editing.
+
+**Usage**:
+```bash
+/test-repo-files [file-pattern]
+```
+
+**Parameters**:
+- `file-pattern` (optional): Version or filename pattern to match repo files. If omitted, tests all `.repo` files modified vs `main` branch.
+
+**Examples**:
+```bash
+# Test all modified repo files
+/test-repo-files
+
+# Test all 4.22 repo files
+/test-repo-files 4.22
+
+# Test a specific repo file
+/test-repo-files ocp-4.22-rhel9
+```
+
+**What it does**:
+1. **mirror2 path validation**: Checks that all `mirror2.openshift.com` baseurls return 401 (auth required = path exists), not 404 (missing)
+2. **CDN path validation**: Checks that all `cdn.redhat.com` baseurls resolve via `rhsm-pulp.corp.redhat.com` (requires Red Hat VPN)
+3. **dnf wrapper container test** (optional): Serves the repo file locally and runs a `dnf-wrapper-test` container to verify no 404 errors occur. Requires podman and a pre-built `dnf-wrapper-test` image (from `ocp-build-data` repo, branch `openshift-<version>`, at `ci_images/dnf_wrapper_test.Dockerfile`)
+
+**Output**:
+```
+=== ocp-4.22-rhel9.repo ===
+mirror2 paths: 15/15 OK (all 401)
+CDN paths:      8/8 OK (all 200)
+dnf wrapper:   PASS (0 paths returned 404)
+```
+
+---
+
 ## Additional Resources
 
 - [CI Operator Documentation](https://docs.ci.openshift.org/docs/architecture/ci-operator/)

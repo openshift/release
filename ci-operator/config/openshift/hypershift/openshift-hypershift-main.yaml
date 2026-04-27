@@ -220,6 +220,7 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 - always_run: false
@@ -315,19 +316,26 @@ tests:
   as: e2e-kubevirt-aws-ovn-reduced
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
-      SKIP_E2E_LOCAL: "true"
-    workflow: hypershift-kubevirt-e2e-nested
+      RUN_EXTERNAL_INFRA_TEST: "false"
+    workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
   as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
     cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -341,6 +349,8 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-azure
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -369,6 +379,8 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-azure
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"
@@ -487,12 +499,21 @@ tests:
       exit 1
     fi
     MAIN_REF="FETCH_HEAD"
-    BASE=$(git merge-base HEAD "$MAIN_REF")
+    # ci-operator runs on a merge commit (PR merged into base). HEAD is the
+    # merge result, so workflow files from main are already present. We need
+    # the actual PR head commit (second parent of the merge) to detect
+    # outdated files on the PR branch itself.
+    PR_HEAD=$(git rev-parse HEAD^2 2>/dev/null) || PR_HEAD="HEAD"
+    BASE=$(git merge-base "$PR_HEAD" "$MAIN_REF")
+    echo "PR_HEAD: $(git rev-parse "$PR_HEAD")"
+    echo "MAIN:    $(git rev-parse "$MAIN_REF")"
+    echo "BASE:    $BASE"
+    echo ""
     FAILED=0
     while IFS= read -r file; do
       [ -z "$file" ] && continue
       main_hash=$(git rev-parse "${MAIN_REF}:${file}" 2>/dev/null) || continue
-      head_hash=$(git rev-parse "HEAD:${file}" 2>/dev/null) || head_hash=""
+      head_hash=$(git rev-parse "${PR_HEAD}:${file}" 2>/dev/null) || head_hash=""
       if [ -z "$head_hash" ]; then
         echo "MISSING: $file exists on main but not on this branch."
         FAILED=1
