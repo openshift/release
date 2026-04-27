@@ -1,60 +1,23 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            export cmp="${REPORTPORTAL_CMP}--"
-            
-            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name |= sub("^(.*)$", env(cmp) + "${1}")' $results_file 2>/dev/null || yq eval -px -ox -iI0 '.testsuites.testsuite[].+@name |= sub("^(.*)$", env(cmp) + "${1}")' $results_file
-        fi
-    fi
-}
+set -euxo pipefail; shopt -s inherit_errexit
 
 # Archive results function
-function cleanup-collect() {
+function CleanupCollect() {
     if [[ $MAP_TESTS == "true" ]]; then
-      install_yq_if_not_exists
-      original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}" || true
-      echo "Collecting original results in ${original_results}"
-
-      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
-        # Keep a copy of all the original Junit files before modifying them
-        cp "${result_file}" "${original_results}/" || echo "Warning: couldn't copy original file ${result_file}" >&2
-
-        # Map tests if needed for related use cases
-        mapTestsForComponentReadiness "${result_file}"
-
-        # Send junit file to shared dir for Data Router Reporter step
-        # Skip DR reporting for corrupted file #TODO remove
-        if [[ "${results_file}" != *"3.xml" ]]; then
-          cp "${result_file}" "${SHARED_DIR}/" || echo "Warning: couldn't copy ${result_file} to SHARED_DIR" >&2
-        fi
-      done
+      # Map results by setting identifier prefix in tests suites names for reporting tools
+      # Merge original results into a single file and compress
+      # Send modified file to shared dir for Data Router Reporter step
+      export LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s"
+      eval "$(
+          curl -fsSL \
+      https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+      )"; trap '
+          ExitTrap--PostProcessPrep junit--openshift-pipelines__tests__openshift-pipelines-tests.xml
+      ' EXIT
     fi
 }
+
+trap 'CleanupCollect' EXIT
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -95,5 +58,3 @@ readarray -t path <<< "$(find ${ARTIFACT_DIR}/xml-report/ -name '*.xml')"
 for index in "${!path[@]}"; do
   mv "${path[index]}" ${ARTIFACT_DIR}/junit_test_result$[index+1].xml
 done
-
-cleanup-collect
