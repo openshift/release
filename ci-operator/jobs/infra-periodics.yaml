@@ -929,13 +929,14 @@ periodics:
   spec:
     containers:
     - args:
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --confirm=true
-      - --git-name=openshift-bot
-      - --git-email=openshift-bot@redhat.com
+      - --git-name=openshift-merge-bot[bot]
+      - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
       - --current-release=5.0
@@ -946,6 +947,12 @@ periodics:
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/auto-config-brancher
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
       image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
       imagePullPolicy: Always
       name: auto-config-brancher
@@ -954,15 +961,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/prometheus
         name: prometheus
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-merge-bot
     - name: prometheus
       secret:
         items:
