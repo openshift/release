@@ -81,8 +81,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
-  cron: 5 * * * *
+  cluster: build09
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -91,10 +91,18 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-rg-ordered
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-dev-pers-resource-groups
+  reporter_config:
+    slack:
+      channel: '#aro-hcp-failures-dev'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -102,8 +110,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=cleanup-sweeper-rg-ordered
-      - --variant=periodic
+      - --target=delete-expired-dev-pers-resource-groups
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -164,156 +172,18 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-shared-leftovers
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --target=cleanup-sweeper-shared-leftovers
-      - --variant=periodic
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build04
-  cron: 7,37 * * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: Azure
-    repo: ARO-HCP
-  labels:
-    ci-operator.openshift.io/variant: periodic
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-dev-pers-resource-groups
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --target=delete-expired-dev-pers-resource-groups
-      - --variant=periodic
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build04
-  cron: 7,37 * * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: Azure
-    repo: ARO-HCP
-  labels:
-    ci-operator.openshift.io/variant: periodic
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-dev-prow-resource-groups
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-dev-prow-resource-groups
+  reporter_config:
+    slack:
+      channel: '#aro-hcp-failures-dev'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -322,7 +192,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-dev-prow-resource-groups
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -374,7 +244,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -383,10 +253,10 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-integration-resource-groups
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-integration-resource-groups
   reporter_config:
     slack:
       channel: '#aro-hcp-failures-int'
@@ -403,7 +273,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-integration-resource-groups
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -455,7 +325,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 0 4 * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -464,10 +334,18 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-kusto-role-assignments
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-kusto-role-assignments
+  reporter_config:
+    slack:
+      channel: '#aro-hcp-failures-dev'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -476,7 +354,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-kusto-role-assignments
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -528,7 +406,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 0 5 * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -537,10 +415,10 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-msft-test-tenant-app-registrations
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-msft-test-tenant-app-registrations
   reporter_config:
     slack:
       channel: '#aro-hcp-failures-dev'
@@ -557,7 +435,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-msft-test-tenant-app-registrations
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -609,7 +487,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -618,10 +496,10 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-prod-resource-groups
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-prod-resource-groups
   reporter_config:
     slack:
       channel: '#aro-hcp-failures-prod'
@@ -638,7 +516,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-prod-resource-groups
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -690,7 +568,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 0 5 * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -699,10 +577,10 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-red-hat-tenant-app-registrations
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-red-hat-tenant-app-registrations
   reporter_config:
     slack:
       channel: '#aro-hcp-failures-dev'
@@ -719,7 +597,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-red-hat-tenant-app-registrations
-      - --variant=periodic
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
@@ -771,7 +649,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -780,10 +658,10 @@ periodics:
     org: Azure
     repo: ARO-HCP
   labels:
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: periodic-cleanup
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-Azure-ARO-HCP-main-periodic-delete-expired-stage-resource-groups
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-delete-expired-stage-resource-groups
   reporter_config:
     slack:
       channel: '#aro-hcp-failures-stg'
@@ -800,7 +678,169 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=delete-expired-stage-resource-groups
-      - --variant=periodic
+      - --variant=periodic-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 5 */4 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: Azure
+    repo: ARO-HCP
+  labels:
+    ci-operator.openshift.io/variant: periodic-cleanup
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-rg-ordered
+  reporter_config:
+    slack:
+      channel: '#aro-hcp-failures-dev'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --target=sweeper-rg-ordered
+      - --variant=periodic-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 35 * * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: Azure
+    repo: ARO-HCP
+  labels:
+    ci-operator.openshift.io/variant: periodic-cleanup
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-shared-leftovers-dev
+  reporter_config:
+    slack:
+      channel: '#aro-hcp-failures-dev'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --target=sweeper-shared-leftovers-dev
+      - --variant=periodic-cleanup
       command:
       - ci-operator
       env:
