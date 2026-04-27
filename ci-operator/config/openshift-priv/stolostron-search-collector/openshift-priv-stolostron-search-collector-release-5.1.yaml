@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
 canonical_go_repository: github.com/stolostron/search-collector
@@ -14,12 +18,13 @@ images:
   items:
   - dockerfile_path: Dockerfile
     from: base
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: search-collector
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
-    namespace: stolostron
   - disabled: true
     name: "5.1"
     namespace: stolostron
@@ -29,6 +34,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -64,11 +74,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -87,6 +92,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-5.1
   org: openshift-priv
   repo: stolostron-search-collector

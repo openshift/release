@@ -1,3 +1,8 @@
+base_images:
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -7,6 +12,10 @@ canonical_go_repository: github.com/stolostron/cluster-curator-controller
 images:
   items:
   - dockerfile_path: Dockerfile.prow
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: cluster-curator-controller
 promotion:
   to:
@@ -23,19 +32,6 @@ tests:
   commands: make unit-tests
   container:
     from: src
-- as: sonar
-  commands: |
-    export SONAR_GO_TEST_ARGS="-short ./..."
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    export PATH=$PATH:$(go env GOPATH)/bin
-    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-    export KUBEBUILDER_ASSETS=$(setup-envtest use -p path 1.30)
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -45,6 +41,6 @@ tests:
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: openshift-priv
   repo: stolostron-cluster-curator-controller

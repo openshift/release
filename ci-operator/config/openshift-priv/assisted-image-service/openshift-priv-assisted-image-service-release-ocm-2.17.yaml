@@ -1,36 +1,28 @@
 base_images:
   assisted-installer:
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: latest
+    tag: ocm-2.17
   assisted-service-scripts:
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  assisted-test-infra:
-    name: backplane-5.0
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
-  assisted-test-infra-internal:
-    name: backplane-5.0
-    namespace: edge-infrastructure
-    tag: assisted-test-infra-internal
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -47,7 +39,7 @@ images:
 promotion:
   to:
   - disabled: true
-    name: backplane-5.0
+    name: ocm-2.17
     namespace: edge-infrastructure
 releases:
   latest:
@@ -90,42 +82,6 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-- as: e2e-metal-assisted-4-22
-  capabilities:
-  - intranet
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-deploy-nodes-4-22
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        MAKEFILE_TARGET="deploy_nodes"
-        OPENSHIFT_VERSION=4.22
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-day2-arm-workers-4-22
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-agent-ds-main:latest
-        CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
-        INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
-        DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.22-multi
-    workflow: assisted-ofcir-baremetal-heterogeneous
 - as: e2e-ai-operator-ztp
   capabilities:
   - intranet
@@ -139,29 +95,7 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-- always_run: false
-  as: e2e-oci-assisted-4-22
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
-    workflow: assisted-oci
-- always_run: false
-  as: e2e-metal-assisted-external-4-22
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        PLATFORM=external
-        OPENSHIFT_VERSION=4.22
-    workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
-  branch: main
+  branch: release-ocm-2.17
   org: openshift-priv
   repo: assisted-image-service
-  variant: edge

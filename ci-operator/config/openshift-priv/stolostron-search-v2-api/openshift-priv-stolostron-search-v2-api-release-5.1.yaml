@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
 canonical_go_repository: github.com/stolostron/search-v2-api
@@ -14,12 +18,13 @@ images:
   items:
   - dockerfile_path: Dockerfile
     from: base
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: search-v2-api
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
-    namespace: stolostron
   - disabled: true
     name: "5.1"
     namespace: stolostron
@@ -58,6 +63,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-5.1
   org: openshift-priv
   repo: stolostron-search-v2-api

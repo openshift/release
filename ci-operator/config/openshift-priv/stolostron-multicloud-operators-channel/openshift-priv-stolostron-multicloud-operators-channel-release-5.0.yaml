@@ -3,17 +3,25 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
     tag: go1.25-linux
-canonical_go_repository: github.com/stolostron/multicloud-integrations
+canonical_go_repository: github.com/stolostron/multicloud-operators-channel
 images:
   items:
   - dockerfile_path: build/Dockerfile.prow
     from: base
-    to: multicloud-integrations
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: multicluster-operators-channel
 promotion:
   to:
   - disabled: true
@@ -25,9 +33,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocm-ci-rbac
-  steps:
-    workflow: ocm-ci-rbac
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -50,9 +55,9 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicloud-integrations
+      SOURCE_IMAGE_REF: multicluster-operators-channel
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-5.0
   org: openshift-priv
-  repo: stolostron-multicloud-integrations
+  repo: stolostron-multicloud-operators-channel

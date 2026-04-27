@@ -7,19 +7,24 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
-canonical_go_repository: github.com/stolostron/search-collector
+canonical_go_repository: github.com/stolostron/insights-client
 images:
   items:
   - dockerfile_path: Dockerfile
     from: base
-    to: search-collector
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: insights-client
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
-    namespace: stolostron
   - disabled: true
     name: "5.1"
     namespace: stolostron
@@ -32,12 +37,12 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-collector
+      SOURCE_IMAGE_REF: insights-client
     env:
-      IMAGE_REPO: search-collector
+      IMAGE_REPO: insights-client
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-on-kind-cluster
+- as: e2e
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
@@ -57,18 +62,13 @@ tests:
         set +o pipefail
       dependencies:
       - env: COMPONENT_IMAGE_REF
-        name: search-collector
+        name: insights-client
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -78,8 +78,6 @@ tests:
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    export DEPLOYED_IN_HUB=true
-    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -87,6 +85,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-5.1
   org: openshift-priv
-  repo: stolostron-search-collector
+  repo: stolostron-insights-client
