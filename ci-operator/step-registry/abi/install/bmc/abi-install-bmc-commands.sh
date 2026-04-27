@@ -335,7 +335,7 @@ chisel client \
     1> "${ARTIFACT_DIR}/ocp--installer--chisel.log" 2>&1 & taskPIDs+=($!)
 set -x
 
-# Probe BMC-facing ISO URL over the tunnel (`HEAD` Do `sleep` before `curl` so Chisel can finish the reverse tunnel.
+# Probe BMC-facing ISO URL over the tunnel (HTTP `HEAD`). `sleep` before `curl` so the Chisel reverse tunnel can finish coming up.
 (
     typeset -i tryLeft=5
     while ((tryLeft)); do
