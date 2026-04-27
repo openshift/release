@@ -7,7 +7,7 @@ CI workflows for **Agent-based Installer (ABI)** on bare metal in RDU2 (**`metal
 ## Workflow `gs-baremetal-agent-install`
 
 - **Test:** not defined on the workflow; the job must set **`steps.test`** (e.g. `chain: cucushift-installer-check-cluster-health`).
-- **Env:** set **`steps.env`** per [`CI-ABI-JOB-CONFIG.md`](./CI-ABI-JOB-CONFIG.md).
+- **Env:** set **`steps.env`** per the **`abi-conf-bm`** / **`abi-install-bmc`** **`*-ref.yaml`** files (see [`../abi/README.md`](../abi/README.md)); a consolidated job env table is planned in a follow-up change.
 - **Cluster profile:** **`metal-redhat-gs`** (fixed by this workflow).
 - **Capability:** **`intranet`** (standard for GS bare-metal jobs that reach internal services).
 
