@@ -64,6 +64,11 @@ if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
 fi
 
 
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
+fi
+
 OAUTH_EXTERNAL_OIDC_PARAM=""
 if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
@@ -112,5 +117,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
-  ${OAUTH_EXTERNAL_OIDC_PARAM:-} &
+  ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
 wait $!

@@ -1,0 +1,174 @@
+base_images:
+  must_gather:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: must-gather
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/redhat-cne/downstream-ptp-operator-monorepo
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    inputs:
+      ocp_4.17_base-rhel9:
+        as:
+        - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    to: ptp-operator-mono
+  - context_dir: pkg/linuxptp-daemon
+    dockerfile_path: Dockerfile
+    inputs:
+      ocp_4.17_base-rhel9:
+        as:
+        - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    to: ptp-mono
+  - context_dir: pkg/cloud-event-proxy
+    dockerfile_path: Dockerfile
+    inputs:
+      ocp_4.17_base-rhel9:
+        as:
+        - registry.ci.openshift.org/ocp/4.17:base-rhel9
+      ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    to: cloud-event-proxy-mono
+  - context_dir: pkg/cloud-event-proxy
+    dockerfile_path: examples/consumer.Dockerfile
+    to: cloud-event-consumer-mono
+  - context_dir: must-gather
+    dockerfile_path: Dockerfile.ocp
+    from: must_gather
+    inputs:
+      ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+    to: ptp-operator-must-gather-mono
+operator:
+  bundles:
+  - dockerfile_path: bundleci.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ptp-operator:.*
+    with: pipeline:ptp-operator-mono
+  - pullspec: quay.io/openshift/origin-ptp:.*
+    with: pipeline:ptp-mono
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - cloud-event-consumer-mono
+    name: ptp-4.17
+    namespace: origin
+  - disabled: true
+    excluded_images:
+    - cloud-event-consumer-mono
+    name: 4.17-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.17-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.17-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: bundle-check
+  commands: |
+    unset VERSION
+    make bundle-check
+  container:
+    from: src
+- as: operator-e2e
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: e2e-aws-cep
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  steps:
+    test:
+    - as: functests
+      cli: latest
+      commands: |
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        export CNE_IMG=${IMAGE_CLOUD_EVENT_PROXY}
+        export CONSUMER_IMG=${IMAGE_CLOUD_EVENT_CONSUMER}
+        cd pkg/cloud-event-proxy
+        hack/deploy_test.sh deploy
+        make functests
+      dependencies:
+      - env: IMAGE_CLOUD_EVENT_PROXY
+        name: pipeline:cloud-event-proxy-mono
+      - env: IMAGE_CLOUD_EVENT_CONSUMER
+        name: pipeline:cloud-event-consumer-mono
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: downstream-ptp-operator-monorepo
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-priv
+  repo: downstream-ptp-operator-monorepo
