@@ -1,4 +1,8 @@
 base_images:
+  art-fbc-ose-support-log-gather-rhel9-operator-4-22:
+    name: art-fbc
+    namespace: ocp-art-tenant
+    tag: ocp__4.22__ose-support-log-gather-rhel9-operator
   base-rhel9:
     name: "4.22"
     namespace: ocp
@@ -122,6 +126,109 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- as: e2e-gcp-operator-weekly
+  cron: '@weekly'
+  presubmit: false
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      OO_INDEX: art-fbc-ose-support-log-gather-rhel9-operator-4-22
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_PACKAGE: must-gather-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-gcp
+- as: e2e-hypershift-operator-weekly
+  cron: '@weekly'
+  presubmit: false
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: must-gather-operator
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-rosa-operator-weekly
+  cron: '@weekly'
+  presubmit: false
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: art-fbc-ose-support-log-gather-rhel9-operator-4-22
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_PACKAGE: must-gather-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
