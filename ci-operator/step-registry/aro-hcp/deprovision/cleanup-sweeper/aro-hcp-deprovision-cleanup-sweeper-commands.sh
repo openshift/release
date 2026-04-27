@@ -8,45 +8,35 @@ export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
 export AZURE_TOKEN_CREDENTIALS=prod
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
-az account set --subscription "${SUBSCRIPTION_ID}"
 
 go build -o /tmp/cleanup-sweeper ./tooling/cleanup-sweeper
 
-trim_whitespace() {
-  local value="${1}"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf '%s' "${value}"
-}
+discover_subscription_ids() {
+  local -a ids=()
+  local file sub_id
 
-available_subscriptions=()
-
-load_enabled_subscriptions() {
-  mapfile -t available_subscriptions < <(az account list --all --query "[?state=='Enabled'].[name,id]" -o tsv)
-  if [[ "${#available_subscriptions[@]}" -eq 0 ]]; then
-    echo "No enabled subscriptions discovered in tenant ${AZURE_TENANT_ID}" >&2
-    return 1
-  fi
-}
-
-resolve_subscription_id() {
-  local wanted_name="${1}"
-  local entry subscription_name subscription_id
-
-  for entry in "${available_subscriptions[@]}"; do
-    IFS=$'\t' read -r subscription_name subscription_id <<< "${entry}"
-    if [[ "${subscription_name}" == "${wanted_name}" ]]; then
-      printf '%s\n' "${subscription_id}"
-      return 0
+  # infra-*-subscription-id matches all infra subscriptions including
+  # infra-global-subscription-id (global shared infra: ACR, Kusto, KV, DNS)
+  # and infra-shardN-subscription-id (per-shard infra).
+  # customer-*-subscription-id matches all customer/hosted-cluster subscriptions.
+  for file in "${CLUSTER_PROFILE_DIR}"/customer-*-subscription-id \
+              "${CLUSTER_PROFILE_DIR}"/infra-*-subscription-id; do
+    [[ -f "${file}" ]] || continue
+    sub_id="$(cat "${file}")"
+    if [[ -n "${sub_id}" ]]; then
+      ids+=("${sub_id}")
     fi
   done
 
-  echo "Configured subscription name '${wanted_name}' was not found among enabled subscriptions visible to this credential" >&2
-  return 1
+  if [[ "${#ids[@]}" -eq 0 ]]; then
+    echo "No subscription IDs discovered in ${CLUSTER_PROFILE_DIR}" >&2
+    return 1
+  fi
+
+  printf '%s\n' "${ids[@]}"
 }
 
 run_cleanup() {
@@ -74,7 +64,6 @@ run_cleanup() {
   fi
 
   if [[ -n "${CLEANUP_SWEEPER_EXTRA_ARGS}" ]]; then
-    # Intentional word splitting to support multiple CLI flags.
     read -r -a extra_args <<< "${CLEANUP_SWEEPER_EXTRA_ARGS}"
     cmd+=("${extra_args[@]}")
   fi
@@ -85,46 +74,19 @@ run_cleanup() {
   "${cmd[@]}"
 }
 
-run_named_subscription_cleanups() {
-  local raw_name subscription_name subscription_id
-  local failures=0
-  local selected=0
-  local -a requested_names=()
+mapfile -t subscription_ids < <(discover_subscription_ids | sort -u)
+echo "Discovered ${#subscription_ids[@]} unique subscription(s)"
 
-  IFS=',' read -r -a requested_names <<< "${CLEANUP_SWEEPER_SUBSCRIPTION_NAMES}"
-  load_enabled_subscriptions
-
-  for raw_name in "${requested_names[@]}"; do
-    subscription_name="$(trim_whitespace "${raw_name}")"
-    if [[ -z "${subscription_name}" ]]; then
-      continue
-    fi
-    selected=$((selected + 1))
-    subscription_id="$(resolve_subscription_id "${subscription_name}")"
-    echo "Starting cleanup for subscription name='${subscription_name}' id='${subscription_id}'"
-    if ! run_cleanup "${subscription_id}"; then
-      failures=$((failures + 1))
-      echo "Cleanup failed for subscription name='${subscription_name}' id='${subscription_id}'; continuing"
-    fi
-  done
-
-  if [[ "${selected}" -eq 0 ]]; then
-    echo "CLEANUP_SWEEPER_SUBSCRIPTION_NAMES was set but did not contain any subscription names" >&2
-    return 1
+failures=0
+for sub_id in "${subscription_ids[@]}"; do
+  echo "Starting cleanup for subscription id='${sub_id}'"
+  if ! run_cleanup "${sub_id}"; then
+    failures=$((failures + 1))
+    echo "Cleanup failed for subscription id='${sub_id}'; continuing"
   fi
+done
 
-  if [[ "${failures}" -gt 0 ]]; then
-    echo "Cleanup failed for ${failures} subscription(s)"
-    return 1
-  fi
-
-  return 0
-}
-
-if [[ -n "${CLEANUP_SWEEPER_SUBSCRIPTION_NAMES}" ]]; then
-  run_named_subscription_cleanups
-  exit 0
+if [[ "${failures}" -gt 0 ]]; then
+  echo "Cleanup failed for ${failures} of ${#subscription_ids[@]} subscription(s)"
+  exit 1
 fi
-
-current_subscription_id="$(az account show --query id -o tsv)"
-run_cleanup "${current_subscription_id}"
