@@ -49,19 +49,12 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    PROW_GS_BUCKET="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.bucket')"
-    JOB_URL_PREFIX="$(echo ${JOB_SPEC} | jq -r '.decoration_config.gcs_configuration.job_url_prefix // empty')"
-
-    if [[ "${JOB_URL_PREFIX}" == "" ]]; then
-      JOB_URL_PREFIX="https://prow.ci.openshift.org/view/"
-    fi
-
-    JOB_URL="${JOB_URL_PREFIX}gs/${PROW_GS_BUCKET}"
+    JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/"
 
     if [ -n "${PULL_NUMBER:-}" ]; then
-      JOB_URL="${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+      JOB_URL="${JOB_URL}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
-      JOB_URL="${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}"
+      JOB_URL="${JOB_URL}logs/${JOB_NAME}/${BUILD_ID}"
     fi
 
     echo "JOB_URL=${JOB_URL}"
