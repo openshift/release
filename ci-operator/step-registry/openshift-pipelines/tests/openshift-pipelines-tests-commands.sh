@@ -11,9 +11,8 @@ function CleanupCollect() {
       eval "$(
           curl -fsSL \
       https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-      )"; trap '
-          ExitTrap--PostProcessPrep junit--openshift-pipelines__tests__openshift-pipelines-tests.xml
-      ' EXIT
+      )"
+      ExitTrap--PostProcessPrep junit--openshift-pipelines__tests__openshift-pipelines-tests.xml
     fi
 }
 
