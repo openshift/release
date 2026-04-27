@@ -51,6 +51,11 @@ if [[ "${HYPERSHIFT_AZURE_ZONES:-}" != "" ]]; then
   ZONES_ARGS="--e2e.availability-zones=${HYPERSHIFT_AZURE_ZONES}"
 fi
 
+ETCD_STORAGE_CLASS_ARGS=""
+if [[ "${HYPERSHIFT_ETCD_STORAGE_CLASS:-}" != "" ]]; then
+  ETCD_STORAGE_CLASS_ARGS="--e2e.etcd-storage-class=${HYPERSHIFT_ETCD_STORAGE_CLASS}"
+fi
+
 # Azure private platform args - pass credentials and resource group to the e2e test framework
 # so the HO upgrade test can reinstall with private platform support.
 # Values can come from env vars or from SHARED_DIR files written by the
@@ -92,6 +97,7 @@ hack/ci-test-e2e.sh -test.v \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${EXTERNAL_DNS_ARGS:-} \
     ${ZONES_ARGS:-} \
+    ${ETCD_STORAGE_CLASS_ARGS:-} \
     ${AZURE_PRIVATE_ARGS:-} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
