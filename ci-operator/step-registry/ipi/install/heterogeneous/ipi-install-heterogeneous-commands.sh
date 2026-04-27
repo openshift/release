@@ -195,6 +195,10 @@ EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 # Count worker machinesets and randomly select one to distribute load across zones
 WORKER_MACHINESET_COUNT=$(oc -n openshift-machine-api get machinesets.machine.openshift.io -o yaml | \
   yq-v4 '[.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")] | length')
+if (( WORKER_MACHINESET_COUNT == 0 )); then
+  echo >&2 "Error: No worker machinesets found in cluster"
+  exit 1
+fi
 RANDOM_INDEX=$(( RANDOM % WORKER_MACHINESET_COUNT ))
 echo "Found ${WORKER_MACHINESET_COUNT} worker machinesets, randomly selected index ${RANDOM_INDEX} to avoid zone capacity issues"
 
