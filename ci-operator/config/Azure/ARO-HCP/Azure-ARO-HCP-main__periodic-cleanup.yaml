@@ -14,26 +14,26 @@ resources:
       memory: 4Gi
 tests:
 - as: delete-expired-kusto-role-assignments
-  cron: 0 4 * * *
+  cron: 35 * * * *
   steps:
     test:
     - ref: aro-hcp-deprovision-kusto-role-assignments
 - as: delete-expired-red-hat-tenant-app-registrations
-  cron: 0 5 * * *
+  cron: 35 * * * *
   steps:
     env:
       VAULT_SECRET_PROFILE: red-hat-tenant
     test:
     - ref: aro-hcp-deprovision-expired-app-registrations
 - as: delete-expired-msft-test-tenant-app-registrations
-  cron: 0 5 * * *
+  cron: 35 * * * *
   steps:
     env:
       VAULT_SECRET_PROFILE: msft-test-tenant
     test:
     - ref: aro-hcp-deprovision-expired-app-registrations
 - as: delete-expired-dev-prow-resource-groups
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   steps:
     env:
       CLEANUP_MODE: no-rp
@@ -41,7 +41,7 @@ tests:
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-dev-pers-resource-groups
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   steps:
     env:
       CLEANUP_MODE: no-rp
@@ -49,30 +49,31 @@ tests:
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-integration-resource-groups
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   steps:
     env:
       VAULT_SECRET_PROFILE: int
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-stage-resource-groups
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   steps:
     env:
       VAULT_SECRET_PROFILE: stg
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-prod-resource-groups
-  cron: 7,37 * * * *
+  cron: 35 * * * *
   steps:
     env:
       VAULT_SECRET_PROFILE: prod
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: sweeper-rg-ordered
-  cron: 5 * * * *
+  cron: 5 */4 * * *
   steps:
     env:
+      CLEANUP_SWEEPER_PARALLELISM: "1"
       CLEANUP_SWEEPER_POLICY: tooling/cleanup-sweeper/resourcegroups.policy.yaml
       CLEANUP_SWEEPER_WAIT: "false"
       CLEANUP_SWEEPER_WORKFLOW: rg-ordered
@@ -82,6 +83,7 @@ tests:
   cron: 35 * * * *
   steps:
     env:
+      CLEANUP_SWEEPER_PARALLELISM: "1"
       CLEANUP_SWEEPER_VERBOSITY: "1"
       CLEANUP_SWEEPER_WORKFLOW: shared-leftovers
     test:
