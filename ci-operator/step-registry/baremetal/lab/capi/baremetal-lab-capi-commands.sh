@@ -55,15 +55,14 @@ ocp_minor=$(echo "${ocp_version}" | cut -d. -f2)
 #  use_legacy_status_path=true
 #fi
 
-if [[ "${ocp_major}" -ge 5 ]]; then
+if [[ "${ocp_major}" -ge 5 ]] || [[ "${ocp_major}" -eq 4 && "${ocp_minor}" -ge 22 ]] ; then
   capi_api_version="v1beta2"
-  use_legacy_status_path=false
-elif [[ "${ocp_major}" -eq 4 ]] && [[ "${ocp_minor}" -ge 19 ]]; then
-  capi_api_version="v1beta2"
-  use_legacy_status_path=false
+#  use_legacy_status_path=false
+  infra_api='apiGroup: infrastructure.cluster.x-k8s.io'
 else
   capi_api_version="v1beta1"
-  use_legacy_status_path=true
+#  use_legacy_status_path=true
+  infra_api='apiVersion: infrastructure.cluster.x-k8s.io/v1beta1'
 fi
 
 echo "[INFO] Detected OpenShift version: ${ocp_version}, using CAPI API version: ${capi_api_version}"
@@ -181,7 +180,7 @@ spec:
          dataSecretName: worker-user-data-managed
       clusterName: "${infra_name}"
       infrastructureRef:
-        apiGroup: infrastructure.cluster.x-k8s.io
+        ${infra_api}
         kind: Metal3MachineTemplate
         name: "${machinetemplate}"
 EOF
@@ -222,37 +221,38 @@ done
 wait
 
 echo "[INFO] Waiting for available replicas"
-if [[ "${use_legacy_status_path}" == "true" ]]; then
-  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.availableReplicas}{"\n"}' | grep "${replicas}"; do
-    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-      sleep 30
-  done
-else
-  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.availableReplicas}{"\n"}' | grep "${replicas}"; do
-    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-      sleep 30
-  done
-fi
-
-echo "--- Waiting for ready replicas ---"
-if [[ "${use_legacy_status_path}" == "true" ]]; then
-  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.readyReplicas}{"\n"}' | grep "${replicas}"; do
-    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-      sleep 30
-  done
-else
-  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.readyReplicas}{"\n"}' | grep "${replicas}"; do
-    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-      sleep 30
-  done
-fi
+#if [[ "${use_legacy_status_path}" == "true" ]]; then
+#  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.availableReplicas}{"\n"}' | grep "${replicas}"; do
+#    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+#      sleep 30
+#  done
+#else
+#  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.availableReplicas}{"\n"}' | grep "${replicas}"; do
+#    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+#      sleep 30
+#  done
+#fi
+#
+#echo "--- Waiting for ready replicas ---"
+#if [[ "${use_legacy_status_path}" == "true" ]]; then
+#  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.readyReplicas}{"\n"}' | grep "${replicas}"; do
+#    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+#      sleep 30
+#  done
+#else
+#  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.readyReplicas}{"\n"}' | grep "${replicas}"; do
+#    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+#      sleep 30
+#  done
+#fi
 
 echo "--- CAPI worker nodes added successfully ---"
 for bmhname in "${bmhlist[@]}"; do
   bmhnode=$(oc get nodes -o name | grep "${bmhname}" | awk -F/ '{print $2}')
   while ! oc get nodes "${bmhnode}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep "True"; do
-    echo "Node ${bmhname} is not Ready. Waiting for 5 seconds..."
-    sleep 5
+    #echo "Node ${bmhname} is not Ready. Waiting for 5 seconds..."
+    echo "Node ${bmhname} is not Ready. Waiting for 60 seconds..."
+    sleep 60
   done
 done
 
