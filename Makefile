@@ -394,19 +394,6 @@ build_farm_day2:
 	hack/build_farm_day2_image_registry.sh $(cluster)
 .PHONY: build_farm_day2
 
-# Need to run inside Red Had network
-update_github_ldap_mapping_config_map: 
-	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ldap-users-from-github-owners-files_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
-		--rm \
-		-v "/tmp:/tmp$(VOLUME_MOUNT_FLAGS)" \
-		quay.io/openshift/ci-public:ci_ldap-users-from-github-owners-files_latest \
-		-ldap-file /tmp/out \
-		-mapping-file /tmp/mapping.yaml
-	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping.yaml=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
-.PHONY: update_github_ldap_mapping_config_map
-
 download_dp_crd:
 	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
 	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
