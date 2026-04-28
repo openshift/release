@@ -359,8 +359,7 @@ echo "before hitting subnet exhaustion with $notready_nodes nodes remaining NotR
 } | tee "$RESULTS_DIR/final-comprehensive-summary.txt"
 
 echo ""
-echo "📊 All test results and artifacts saved to: $RESULTS_DIR"
-echo "📈 Key files for analysis:"
+echo " All test results and artifacts saved to: $RESULTS_DIR"
 echo "  - test-results-summary.txt"
 echo "  - node-provisioning-progress.csv"
 echo "  - network-expansion-timeline.txt"
