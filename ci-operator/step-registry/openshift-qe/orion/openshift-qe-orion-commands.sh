@@ -56,9 +56,10 @@ case "$ES_TYPE" in
 esac
 
 if [[ -f "${CLUSTER_PROFILE_DIR}/jira-api-key" ]]; then
-    export JIRA_TOKEN=$(<"${CLUSTER_PROFILE_DIR}/jira-api-key")
-    export JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
-    export JIRA_URL=https://redhat.atlassian.net/
+    JIRA_TOKEN=$(<"${CLUSTER_PROFILE_DIR}/jira-api-key")
+    JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+    JIRA_URL=https://redhat.atlassian.net/
+    export JIRA_TOKEN JIRA_EMAIL JIRA_URL
     # We use orion's default JIRA project and components
     ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
 fi
