@@ -57,7 +57,8 @@ esac
 
 if [[ -f "${CLUSTER_PROFILE_DIR}/jira-api-key" ]]; then
     export JIRA_TOKEN=$(<"${CLUSTER_PROFILE_DIR}/jira-api-key")
-    export JIRA_EMAIL
+    export JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+    export JIRA_URL=https://redhat.atlassian.net/
     # We use orion's default JIRA project and components
     ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
 fi
