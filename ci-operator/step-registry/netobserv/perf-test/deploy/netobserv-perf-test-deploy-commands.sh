@@ -63,7 +63,7 @@ fi
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
+    patch_netobserv "ebpf" "quay.io/rhn_support_memodi/netobserv-ebpf-agent:perf-baseline-mar30"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
