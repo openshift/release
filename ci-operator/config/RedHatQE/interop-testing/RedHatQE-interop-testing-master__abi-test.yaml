@@ -1,0 +1,52 @@
+base_images:
+  baremetal-qe-base:
+    name: baremetal-qe-base
+    namespace: ci
+    tag: latest
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: abi-test-conf-bm
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  cluster_profile: metal-redhat-gs
+  steps:
+    env:
+      OCP__ABI__BM__BASE_DOM: example.com
+      OCP__ABI__BM__CLS_NAME: test-cluster
+      OCP__ABI__CLUSTER_DIR: ocpClusterDir
+    test:
+    - ref: abi-conf-bm
+- as: abi-test-install-bmc
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  cluster_profile: metal-redhat-gs
+  steps:
+    env:
+      OCP__ABI__CLUSTER_DIR: ocpClusterDir
+      OCP__ABI__TEAM_NAME: mpex
+      OCP__ABI__TUN_SVC__CP_URL: https://example.com/cp
+      OCP__ABI__TUN_SVC__DP_BASE_URL: https://example.com/dp
+      OCP__ABI__TUN_SVC__DP_PORT: "8443"
+    test:
+    - ref: abi-install-bmc
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: abi-test
