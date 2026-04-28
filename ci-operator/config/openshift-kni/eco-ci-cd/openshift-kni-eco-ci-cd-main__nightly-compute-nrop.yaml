@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-telcov10n-nrop-tests-4.22-nightly
+  capabilities:
+  - intranet
+  cron: 59 23 * * 0
+  steps:
+    env:
+      CLUSTER_NAME: helix47
+      OCP_VERSION_RELEASE_TYPE: nightly
+      OPERATORS: |
+        [
+          { "name": "numaresources-operator","catalog": "numaresources-operator-fbc","og_name": "numaresources-operator","nsname": "openshift-numaresources","deploy_default_config": false,"fbc_iib_repo": "latest","channel": "4.22","ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-4-22"}
+        ]
+      TEST_ENV: stage
+      VERSION: "4.22"
+    workflow: telcov10n-functional-compute-nrop-nrop-testing
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: nightly-compute-nrop
