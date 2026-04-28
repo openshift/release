@@ -20,7 +20,7 @@ echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} 
 OS_VER=$(awk -F= '/^VERSION_ID=/ { print $2 }' /etc/os-release | tr -d '"' | cut -f1 -d'.')
 if [[ ${OS_VER} == "9" ]]; then
     echo "Detected RHEL9, installing pip"
-    curl -L -o /tmp/get-pip.py -w "\nStatus Code: %{http_code}\n" https://bootstrap.pypa.io/get-pip.py
+    curl -L -o /tmp/get-pip.py -w "\nStatus Code: %{http_code}\n" "https://bootstrap.pypa.io/pip/$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)/get-pip.py"
     python /tmp/get-pip.py
     export PATH=$PATH:$HOME/.local/bin
 fi
