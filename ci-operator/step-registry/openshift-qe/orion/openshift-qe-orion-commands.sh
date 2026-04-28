@@ -1,11 +1,14 @@
 #!/bin/bash
-set -x
 
 if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+python --version
 pushd /tmp
+python -m virtualenv ./venv_qe
+source ./venv_qe/bin/activate
+cd /tmp
 
 if [[ $TAG == "latest" ]]; then
     LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
@@ -13,7 +16,7 @@ else
     LATEST_TAG=$TAG
 fi
 git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
-pushd orion
+cd orion
 
 # Invoked from orion repo by the openshift-ci bot
 if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
