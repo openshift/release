@@ -55,6 +55,13 @@ case "$ES_TYPE" in
     ;;
 esac
 
+if [[ -f "${CLUSTER_PROFILE_DIR}/jira-api-key" ]]; then
+    export JIRA_TOKEN=$(<"${CLUSTER_PROFILE_DIR}/jira-api-key")
+    export JIRA_EMAIL
+    # We use orion's default JIRA project and components
+    ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+fi
+
 export ES_SERVER
 
 pip install .
