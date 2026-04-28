@@ -56,7 +56,7 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density-cni
-EXTRA_FLAGS="${KB_FLAGS} ${ND_CNI_EXTRA_FLAGS} --gc=$GC --gc-metrics=$GC_METRICS --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="--gc=$GC --gc-metrics=$GC_METRICS --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE --profile-type=${PROFILE_TYPE} --pprof=${PPROF} ${KB_FLAGS} ${ND_CNI_EXTRA_FLAGS}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
@@ -84,6 +84,17 @@ fi
 
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
+fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
 fi
 
 exit ${RUN_EXIT_CODE}
