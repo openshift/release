@@ -49,4 +49,6 @@ tests/e2e-openshift-serverless \
 tests/e2e-openshift-ossm \
 tests/e2e-openshift-object-stores \
 tests/e2e-long-running \
-tests/operator-metrics
+tests/e2e-openshift-tshirt-sizes \
+tests/operator-metrics \
+tests/e2e-openshift-tls-profile
