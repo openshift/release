@@ -1369,6 +1369,12 @@ for product in mce acm globalhub; do
   done
 done
 
+# Export GitHub token for gh CLI
+if [[ -f "${GITHUB_TOKEN_FILE}" ]]; then
+  token=$(cat "${GITHUB_TOKEN_FILE}")
+  export GH_TOKEN="${token}"
+fi
+
 # For each processed repo, clean up stale ff-* branches
 for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
   owner=${owner_repo%/*}
