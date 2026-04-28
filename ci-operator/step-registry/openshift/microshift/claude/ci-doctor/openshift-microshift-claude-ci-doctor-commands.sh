@@ -36,9 +36,12 @@ atexit_handler() {
         return 1
     fi
 
-    # Check if Claude log contains tool errors
-    if grep -q '"is_error":\s*true' "${WORKDIR}/claude-output.log"; then
-        echo "ERROR: Claude log contains tool errors"
+    # Check if the Claude session completed successfully
+    local result_line
+    result_line=$(grep '"type":"result"' "${WORKDIR}/claude-output.log" | tail -1)
+    if ! echo "$result_line" | grep -q '"subtype":"success"' ||
+       ! echo "$result_line" | grep -q '"is_error":false'; then
+        echo "ERROR: Claude session did not complete successfully"
         return 1
     fi
 }
