@@ -14,6 +14,10 @@ images:
   - dockerfile_path: build/Dockerfile
     from: base
     to: klusterlet-addon-controller
+promotion:
+  to:
+  - name: "5.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -42,14 +46,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
-    env:
-      IMAGE_REPO: klusterlet-addon-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
@@ -57,16 +53,35 @@ tests:
       SOURCE_IMAGE_REF: klusterlet-addon-controller
     env:
       IMAGE_REPO: klusterlet-addon-controller
-      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: klusterlet-addon-controller
     env:
-      DESTINATION_BRANCH: release-5.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: klusterlet-addon-controller
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=klusterlet-addon-controller
+        export OSCI_COMPONENT_VERSION=release-5.0
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-5.0
   org: stolostron
   repo: klusterlet-addon-controller
