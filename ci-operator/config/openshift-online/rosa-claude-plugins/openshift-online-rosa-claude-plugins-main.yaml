@@ -12,16 +12,25 @@ images:
   items:
   - dockerfile_literal: |
       FROM ubi-python
+      USER 0
       COPY . /workspace/
       WORKDIR /workspace
+      RUN dnf install -y git && dnf clean all
       RUN pip install -r /workspace/rosa-claude-plugins/requirements.txt
+      RUN PREK_VERSION="$(tr -d '[:space:]' < /workspace/rosa-claude-plugins/.prek-version 2>/dev/null || true)" \
+        && PREK_VERSION="${PREK_VERSION:-v0.3.9}" \
+        && curl -fsSL "https://github.com/j178/prek/releases/download/${PREK_VERSION}/prek-x86_64-unknown-linux-gnu.tar.gz" \
+        | tar xzf - --strip-components=1 -C /usr/local/bin/ prek-x86_64-unknown-linux-gnu/prek
     from: ubi-python
     inputs:
       src:
         paths:
         - destination_dir: .
           source_path: /go/src/github.com/openshift-online/rosa-claude-plugins
-    to: python-runner
+    to: prek-runner
+prowgen:
+  expose: true
+  private: true
 resources:
   '*':
     limits:
@@ -30,11 +39,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: validate-marketplace
-  commands: python3 /workspace/rosa-claude-plugins/validate_marketplace.py
+- as: prek
+  commands: |
+    export PREK_HOME=/tmp/prek
+    cd /workspace/rosa-claude-plugins
+    git init
+    git add -A
+    if [ -x hack/ci.sh ]; then
+      ./hack/ci.sh
+    else
+      prek run --all-files
+    fi
   container:
-    from: python-runner
-  optional: true
+    from: prek-runner
 zz_generated_metadata:
   branch: main
   org: openshift-online

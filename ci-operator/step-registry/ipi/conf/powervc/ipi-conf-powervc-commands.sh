@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v1.2.0"
+	TAG="v2.0.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	MACHINE=$(uname -m)
 	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi
@@ -268,6 +268,52 @@ pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+EOF
+
+# Add the chrony config
+# setting it to clock.corp.redhat.com
+echo "Saving chrony worker yaml config..."
+cat > "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-chrony-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
+echo "Saving chrony master yaml config..."
+cat > "${SHARED_DIR}/99-chrony-master.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-chrony-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
+        filesystem: root
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
 EOF
 
 echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""

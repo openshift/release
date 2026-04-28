@@ -8,6 +8,6 @@ Run this command:
 owners_file=ci-operator/step-registry/ocm/OWNERS
 owners=$(yq '.approvers' -I=0 -o=json "${owners_file}")
 
-find "$(dirname "${owners_file}")" -type f -name "*.metadata.json" \
+find "$(basename "${owners_file}")" -type f -name "*.metadata.json" \
   -exec yq -i -o json '.owners.approvers = '"${owners}" {} \;
 ```

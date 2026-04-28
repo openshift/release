@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v1.2.0"
+	TAG="v2.0.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	MACHINE=$(uname -m)
 	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi
@@ -365,6 +365,20 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${DIR}" create manifests
 
 sed -i '/^  channel:/d' "${DIR}/manifests/cvo-overrides.yaml"
+
+# Sets up the chrony machineconfig for the worker nodes
+CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+if [ -f "${CHRONY_WORKER_YAML}" ]; then
+  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
+  cp "${CHRONY_WORKER_YAML}" "${DIR}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the master nodes
+CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+if [ -f "${CHRONY_MASTER_YAML}" ]; then
+  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
+  cp "${CHRONY_MASTER_YAML}" "${DIR}/manifests"
+fi
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)

@@ -19,12 +19,19 @@ def main():
         if len(desc) > MAX_LENGTH:
             errors.append(f"default/{label['name']}: {len(desc)} chars - {desc}")
 
+    # Check org-level labels
+    for org, config in data.get("orgs", {}).items():
+        for label in config.get("labels", []):
+            desc = label.get("description", "")
+            if len(desc) > MAX_LENGTH:
+                errors.append(f"orgs/{org}/{label['name']}: {len(desc)} chars - {desc}")
+
     # Check repo-specific labels
     for repo, config in data.get("repos", {}).items():
         for label in config.get("labels", []):
             desc = label.get("description", "")
             if len(desc) > MAX_LENGTH:
-                errors.append(f"{repo}/{label['name']}: {len(desc)} chars - {desc}")
+                errors.append(f"repos/{repo}/{label['name']}: {len(desc)} chars - {desc}")
 
     if errors:
         print(f"Labels with descriptions exceeding {MAX_LENGTH} characters:")
