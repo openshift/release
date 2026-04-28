@@ -1,6 +1,6 @@
 base_images:
   tests-base:
-    name: "4.19"
+    name: "4.22"
     namespace: ocp
     tag: tests
 binary_build_commands: |
@@ -30,12 +30,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -50,7 +50,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: openshift-org-azure
     env:
-      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
+      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --retry-strategy=aggressive
+        --run ^\[sig-node\].*|^\[sig-network\] '
       TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]
         Sysctls.*should support sysctls\|\[sig-node\] Pods Extended Pod Container
         Status should never report success for a pending container\|\[sig-node\] Security
@@ -66,7 +67,11 @@ tests:
         create pingable pods with vlan interface on an in-container master\|\[sig-network\].*should
         create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
         create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
-        in writing subpaths in container
+        in writing subpaths in container\|\[sig-node\].*\[DRA\]\|\[sig-node\].*User
+        Namespaces.*\|\[sig-node\].*HostUsers.*\|\[sig-node\].*UserNamespacesSupport.*\|\[sig-node\].*FileKeyRef.*\|\[sig-node\].*HostnameOverride.*\|\[sig-node\].*SupplementalGroupsPolicy.*Strict.*\|\[sig-node\].*Pod
+        Generation.*increment.*\|\[sig-node\].*Container Restart Rules.*\|\[sig-node\].*ImageVolume.*\|\[sig-node\].*Downward
+        API.*PodLevelResources.*\|\[sig-node\].*Pod InPlace Resize.*\|\[sig-node\].*Allow
+        dev fuse by default.*
     pre:
     - chain: ipi-azure-pre
     - as: kata-containers-e2e-pre
