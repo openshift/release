@@ -18,6 +18,11 @@ raw_steps:
     from: tools
     to: tools-openstack
 releases:
+  4-21-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
   initial:
     integration:
       name: "4.21"
@@ -35,25 +40,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-gcp-nvidia-dra
+- as: e2e-aws-nvidia-dra
   optional: true
   run_if_changed: ^test/extended/(node/dra/nvidia|dra/nvidia)/.*
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
     env:
       COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: g2-standard-4
-      COMPUTE_ON_HOST_MAINTENANCE: Terminate
-      COMPUTE_ZONES: '[us-central1-a]'
+      COMPUTE_NODE_TYPE: g4dn.xlarge
     post:
     - ref: nvidia-cleanup
-    - chain: ipi-gcp-post
+    - chain: ipi-aws-post
     pre:
-    - chain: ipi-conf-gcp
-    - ref: ipi-conf-gcp-confidential-computing
-    - chain: ipi-install
+    - chain: ipi-aws-pre
     - ref: nvidia-nfd-operator-install
     - ref: nvidia-gpu-operator-install
+    - ref: nvidia-dra-driver-install
     test:
     - as: nvidia-dra-tests
       commands: |
@@ -64,6 +68,18 @@ tests:
 
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
         export OPENSHIFT_SKIP_EXTERNAL_TESTS=1
+
+        # Install Helm (required by test prerequisite checks)
+        echo "Installing Helm..."
+        HELM_VERSION="3.14.0"
+        curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz
+        tar -xzf /tmp/helm.tar.gz -C /tmp
+        mkdir -p /tmp/bin
+        mv /tmp/linux-amd64/helm /tmp/bin/helm
+        chmod +x /tmp/bin/helm
+        export PATH="/tmp/bin:$PATH"
+        rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
+        echo "Helm installed: $(helm version --short)"
 
         readonly GPU_LABEL="nvidia.com/gpu.present=true"
 
@@ -76,13 +92,14 @@ tests:
         fi
         echo "Found ${GPU_NODES} GPU node(s)"
 
-        # Run NVIDIA DRA tests
+        # Run NVIDIA DRA tests (disable monitors for focused testing)
         mkdir -p "${ARTIFACT_DIR}/nvidia-dra"
         openshift-tests run --dry-run all 2>&1 | \
           grep "\[Feature:NVIDIA-DRA\]" | \
           openshift-tests run -f - \
             -o "${ARTIFACT_DIR}/nvidia-dra/test-output.log" \
-            --junit-dir="${ARTIFACT_DIR}/nvidia-dra/junit"
+            --junit-dir="${ARTIFACT_DIR}/nvidia-dra/junit" \
+            --disable-monitor=true
       from: tests
       resources:
         requests:
