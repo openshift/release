@@ -216,12 +216,12 @@ oc get egressip | tee "$RESULTS_DIR/egressip-status.txt"
 
 # Save CloudPrivateIPConfig status
 echo ""
-echo "📋 CloudPrivateIPConfig status:"
+echo " CloudPrivateIPConfig status:"
 oc get cloudprivateipconfig | tee "$RESULTS_DIR/cloudprivateipconfig-status.txt"
 
 # Analyze load distribution per node
 echo ""
-echo "📊 EgressIP load distribution:"
+echo " EgressIP load distribution:"
 for node in "${worker_nodes[@]}"; do
     node_assignment_count=$(oc get egressip -o jsonpath='{range .items[*]}{.status.items[0].node}{"\n"}{end}' | grep "^$node$" | wc -l)
     echo "Node $node: $node_assignment_count EgressIPs"
@@ -233,7 +233,7 @@ echo "🔍 Checking for unassigned EgressIPs:"
 unassigned_egressips=$(oc get egressip -o jsonpath='{range .items[*]}{.metadata.name}{"="}{.status.items[0].node}{"\n"}{end}' | grep "=$" | cut -d'=' -f1 || true)
 
 if [ -n "$unassigned_egressips" ]; then
-    echo "⚠️  Unassigned EgressIPs found:"
+    echo "  Unassigned EgressIPs found:"
     echo "$unassigned_egressips" | tee "$RESULTS_DIR/unassigned-egressips.txt"
     unassigned_count=$(echo "$unassigned_egressips" | wc -l)
     echo "Total unassigned: $unassigned_count"
@@ -340,6 +340,6 @@ echo "=== FINAL RESULTS SUMMARY ==="
 } | tee "$RESULTS_DIR/test-results-summary.txt"
 
 echo ""
-echo "🎯 OCPBUGS-45891 test completed successfully!"
-echo "📊 Key validation: $assigned_count/$TOTAL_EGRESSIP_OBJECTS EgressIPs assigned with optimal load distribution"
-echo "💾 All results saved to: $RESULTS_DIR"
+echo " OCPBUGS-45891 test completed successfully!"
+echo " Key validation: $assigned_count/$TOTAL_EGRESSIP_OBJECTS EgressIPs assigned with optimal load distribution"
+echo " All results saved to: $RESULTS_DIR"
