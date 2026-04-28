@@ -27,6 +27,8 @@ export GOCACHE
 export HOME
 export DIST_DIR
 export CONTAINER_TAG
+export CLUSTER_TOPOLOGY
+export NUMBER_OF_NODES
 
 make generate && make manifests && make build-installer
 

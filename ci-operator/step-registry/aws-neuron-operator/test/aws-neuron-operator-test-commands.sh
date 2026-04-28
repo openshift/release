@@ -145,12 +145,12 @@ echo "=== Cleanup: removing test namespaces ==="
 oc delete namespace neuron-vllm-test --wait=true --timeout=5m 2>/dev/null || true
 
 # Write operator version after tests (operator is deployed during test execution)
-NEURON_CSV=$(oc get csv -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -i neuron | head -1 || echo "")
-if [[ -n "${NEURON_CSV}" ]]; then
-    NEURON_OPERATOR_VERSION=$(oc get csv -A "${NEURON_CSV}" -o jsonpath='{.spec.version}' 2>/dev/null || echo "unknown")
-else
+NEURON_OPERATOR_VERSION=$(oc get csv -A -o json 2>/dev/null \
+    | jq -r '[.items[] | select(.metadata.name | test("neuron";"i"))] | .[0].spec.version // empty' || true)
+if [[ -z "${NEURON_OPERATOR_VERSION}" ]]; then
     NEURON_OPERATOR_VERSION="${ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE##*:}"
 fi
+NEURON_OPERATOR_VERSION="${NEURON_OPERATOR_VERSION:-unknown}"
 echo "${NEURON_OPERATOR_VERSION}" > "${ARTIFACT_DIR}/operator.version"
 echo "Neuron Operator Version: ${NEURON_OPERATOR_VERSION}"
 

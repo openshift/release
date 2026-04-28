@@ -8,6 +8,52 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.22
+images:
+  items:
+  - build_args:
+    - name: FLAVOR
+      value: cpu
+    - name: NUM_WORKERS
+      value: "4"
+    - name: OS_VERSION
+      value: "2025.2"
+    - name: BUILD_UPSTREAM_DOCS
+      value: "true"
+    - name: BUILD_OPERATORS_DOCS
+      value: "false"
+    - name: INDEX_NAME
+      value: os-docs-2025.2
+    - name: VECTOR_DB_TYPE
+      value: faiss
+    - name: BUILD_OCP_DOCS
+      value: "false"
+    - name: BUILD_OKP_CONTENT
+      value: "false"
+    - name: HERMETIC
+      value: "false"
+    - name: OS_PROJECTS
+      value: nova horizon keystone neutron neutron-lib manila glance swift ceilometer
+        octavia designate heat ironic barbican aodh watcher adjutant blazar cyborg
+        magnum mistral skyline-apiserver skyline-console storlets venus vitrage zun
+        python-openstackclient tempest trove masakari zaqar
+    - name: RHOSO_DOCS_GIT_URL
+    - name: RHOSO_DOCS_GIT_BRANCH
+    - name: RHOSO_CA_CERT_URL
+    - name: DOCS_LINK_UNREACHABLE_ACTION
+      value: fail
+    - name: RHOSO_IGNORE_LIST
+    - name: OPERATORS_REPO_URL
+      value: https://github.com/openstack-k8s-operators/openstack-operator.git
+    - name: OPERATORS_BRANCH
+      value: main
+    dockerfile_path: Containerfile
+    to: rag-content-openstack
+promotion:
+  to:
+  - additional_images:
+      rag-content: rag-content-openstack
+    namespace: openstack-lightspeed
+    tag: latest
 releases:
   initial:
     integration:
@@ -24,11 +70,6 @@ resources:
     requests:
       cpu: "4"
       memory: 8Gi
-tests:
-- as: hello-world
-  commands: 'echo "Hello from OpenShift CI! Repository: openstack-lightspeed/rag-content"'
-  container:
-    from: src
 zz_generated_metadata:
   branch: main
   org: openstack-lightspeed

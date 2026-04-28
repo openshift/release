@@ -291,6 +291,12 @@ CONFIG = {
     'aro-hcp-dev-global-pipeline-quota-slice': {
         'default': 1,
     },
+    'aro-hcp-dev-cspr-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-image-push-quota-slice': {
+        'default': 1,
+    },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},

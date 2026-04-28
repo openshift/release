@@ -37,13 +37,13 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: statusreconciler
-        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260408-3bbc91829
+        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260421-d25a17867
         imagePullPolicy: IfNotPresent
         args:
         - --dry-run=false
         - --continue-on-error=true
-        - --plugin-config=/etc/plugins/plugins.yaml
-        - --supplemental-plugin-config-dir=/etc/plugins
+        - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --github-app-id=$(GITHUB_APP_ID)
@@ -73,9 +73,6 @@ spec:
           readOnly: true
         - name: release
           mountPath: /var/repo
-        - name: plugins
-          mountPath: /etc/plugins
-          readOnly: true
         resources:
           requests:
             memory: "12Gi"
@@ -112,6 +109,3 @@ spec:
           name: config
       - name: release
         emptyDir: {}
-      - name: plugins
-        configMap:
-          name: plugins

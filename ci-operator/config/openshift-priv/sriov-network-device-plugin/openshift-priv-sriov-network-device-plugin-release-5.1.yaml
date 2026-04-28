@@ -1,0 +1,66 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/sriov-network-device-plugin
+images:
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: sriov-network-device-plugin
+  - dockerfile_literal: |-
+      FROM src
+      RUN dnf install -y --nodocs hwdata && dnf clean all
+    from: src
+    to: unit-test-bin
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - unit-test-bin
+    name: sriov-5.1
+    namespace: origin
+  - excluded_images:
+    - unit-test-bin
+    name: 5.1-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 5.1-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.1-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- as: unit-test
+  commands: make test-race
+  container:
+    from: unit-test-bin
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: sriov-network-device-plugin
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: sriov-network-device-plugin

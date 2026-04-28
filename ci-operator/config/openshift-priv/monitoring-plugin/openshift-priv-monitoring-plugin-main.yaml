@@ -21,17 +21,19 @@ promotion:
   to:
   - excluded_images:
     - monitoring-plugin-test
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -230,6 +232,14 @@ tests:
     - ref: monitoring-plugin-tests-virtualization-ui
     workflow: generic-claim
 - always_run: false
+  as: e2e-perses
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui
+    workflow: ipi-aws
+- always_run: false
   as: e2e-monitoring-dev
   optional: true
   steps:
@@ -238,12 +248,12 @@ tests:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
     workflow: ipi-aws
 - always_run: false
-  as: e2e-perses
+  as: e2e-perses-dev
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     test:
-    - ref: monitoring-plugin-tests-perses-ui
+    - ref: monitoring-plugin-tests-perses-dev-ui
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

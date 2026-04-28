@@ -172,6 +172,46 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
+- always_run: false
+  as: test-e2e-ci-build-upstream-4-21
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - ref: kueue-operator-test-e2e-dra-enable-feature-gate
+    - ref: dra-example-driver-install
+    - as: e2e-kueue-upstream
+      cli: latest
+      commands: make e2e-upstream-test
+      env:
+      - default: singlecluster certmanager dra
+        name: E2E_TARGET_FOLDERS
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
 - as: test-e2e-4-18
   capabilities:
   - arm64
@@ -268,7 +308,6 @@ tests:
     timeout: 1h0m0s
     version: "4.20"
   cron: '@daily'
-  presubmit: true
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -289,7 +328,6 @@ tests:
     timeout: 1h0m0s
     version: "4.20"
   cron: '@daily'
-  presubmit: true
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -310,7 +348,6 @@ tests:
     timeout: 1h0m0s
     version: "4.21"
   cron: '@daily'
-  presubmit: true
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -331,7 +368,6 @@ tests:
     timeout: 1h0m0s
     version: "4.21"
   cron: '@daily'
-  presubmit: true
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -473,8 +509,11 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
-- as: test-e2e-dra-gpu-4-21
+- always_run: false
+  as: test-e2e-dra-gpu-4-21
   cron: '@daily'
+  optional: true
+  presubmit: true
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

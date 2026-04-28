@@ -32,7 +32,15 @@ workflow:
     - ref: aws-neuron-operator-test
     post:
     - ref: aws-neuron-operator-gather
-    - chain: rosa-aws-sts-hcp-deprovision
+    # Custom deprovision step with retry logic for STS resource deletion.
+    # The standard rosa-cluster-deprovision has a race condition where
+    # operator-roles deletion fails because OCM still reports the cluster
+    # as "uninstalling" after it disappears from the API.
+    - ref: aws-neuron-operator-rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: aws-deprovision-stacks
       best_effort: true
   documentation: |-
     This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
