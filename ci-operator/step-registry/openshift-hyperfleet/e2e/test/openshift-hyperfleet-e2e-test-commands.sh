@@ -33,5 +33,10 @@ export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
 export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
 
+# Export API chart parameters for tier2 tests
+export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
+export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_PATH="${API_CHART_PATH:-charts}"
+
 # Run e2e tests via --label-filter
 hyperfleet-e2e test --label-filter=${LABEL_FILTER} --junit-report ${ARTIFACT_DIR}/junit.xml
