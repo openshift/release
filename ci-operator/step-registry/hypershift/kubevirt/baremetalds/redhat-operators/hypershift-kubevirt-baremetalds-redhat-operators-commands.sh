@@ -5,6 +5,11 @@ set -o errexit
 set -o pipefail
 set -x
 
+export REDHAT_OPERATORS_INDEX_TAG="${REDHAT_OPERATORS_INDEX_TAG:-v4.15}"
+export DISCONNECTED="${DISCONNECTED:-false}"
+export CCS_OPERATOR_PACKAGES="${CCS_OPERATOR_PACKAGES:-}"
+export CCS_OPERATOR_CHANNELS="${CCS_OPERATOR_CHANNELS:-}"
+
 function mirror_ccs() {
     echo "### Mirroring the selected operators to the internal registry"
     source "${SHARED_DIR}/packet-conf.sh"
