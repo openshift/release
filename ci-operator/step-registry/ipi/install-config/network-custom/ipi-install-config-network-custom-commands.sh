@@ -34,8 +34,39 @@ networking:
 EOF
 
 echo "Applying network patch to install-config.yaml"
-yq eval-all '. as $item ireduce ({}; . * $item)' "${CONFIG}" /tmp/network-patch.yaml > /tmp/install-config-patched.yaml
+
+# Use Python to merge the YAML files since yq may not be available
+python3 << EOF
+import yaml
+import sys
+
+# Read existing install-config.yaml
+with open("${CONFIG}", "r") as f:
+    install_config = yaml.safe_load(f)
+
+# Read network patch
+with open("/tmp/network-patch.yaml", "r") as f:
+    network_patch = yaml.safe_load(f)
+
+# Merge network configuration
+if 'networking' not in install_config:
+    install_config['networking'] = {}
+
+install_config['networking'].update(network_patch['networking'])
+
+# Write updated config
+with open("/tmp/install-config-patched.yaml", "w") as f:
+    yaml.dump(install_config, f, default_flow_style=False, sort_keys=False)
+
+print("Network configuration merged successfully")
+EOF
+
 cp /tmp/install-config-patched.yaml "${CONFIG}"
 
 echo "Updated install-config.yaml with custom network configuration:"
-yq eval '.networking' "${CONFIG}"
+python3 << EOF
+import yaml
+with open("${CONFIG}", "r") as f:
+    config = yaml.safe_load(f)
+print(yaml.dump(config.get('networking', {}), default_flow_style=False))
+EOF
