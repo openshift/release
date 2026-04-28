@@ -90,6 +90,7 @@ chain:
           --service-cidr=172.29.0.0/16 \
           --cluster-cidr=10.124.0.0/14 \
           --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+          --availability-zones=1,2,3 \
           --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
           --release-stream=${DEFAULT_RELEASE_STREAM} \
           --namespace=${HYPERSHIFT_NAMESPACE} \
@@ -150,6 +151,24 @@ chain:
       done
       # Data for cluster bot.
       echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+
+      # Create a Premium SSD v2 storage class on Azure management clusters for etcd
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        echo "Creating managed-csi-premium-v2 StorageClass on management cluster"
+        oc apply -f - <<'EOF'
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: managed-csi-premium-v2
+      provisioner: disk.csi.azure.com
+      parameters:
+        skuName: PremiumV2_LRS
+        cachingMode: None
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+      allowVolumeExpansion: true
+      EOF
+      fi
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
