@@ -107,10 +107,18 @@ for node in "${worker_nodes[@]}"; do
     fi
     
     echo "Egress IP config for $node:"
-    echo "$egress_config" | jq '.' | tee "$RESULTS_DIR/egress-config-$node.json"
+    echo "$egress_config" | tee "$RESULTS_DIR/egress-config-$node.json"
     
-    # Extract IPv4 capacity
-    ipv4_capacity=$(echo "$egress_config" | jq -r '.[0].capacity.ipv4' 2>/dev/null || echo "0")
+    # Extract IPv4 capacity using Python since jq may not be available
+    ipv4_capacity=$(python3 -c "
+import json
+import sys
+try:
+    data = json.loads('$egress_config')
+    print(data[0]['capacity']['ipv4'] if data and len(data) > 0 and 'capacity' in data[0] and 'ipv4' in data[0]['capacity'] else '0')
+except:
+    print('0')
+" 2>/dev/null || echo "0")
     echo "IPv4 capacity: $ipv4_capacity"
     
     if [ "$ipv4_capacity" -lt 49 ]; then
@@ -189,8 +197,16 @@ echo "=== STEP 6: Validate EgressIP assignment results ==="
 assigned_count=$(oc get egressip -o jsonpath='{range .items[*]}{.status.items[0].node}{"\n"}{end}' | grep -v '^$' | wc -l)
 echo "📊 Assigned EgressIPs: $assigned_count"
 
-# Count CloudPrivateIPConfig objects
-cloudconfig_count=$(oc get cloudprivateipconfig -o json | jq '.items | length')
+# Count CloudPrivateIPConfig objects using Python since jq may not be available
+cloudconfig_count=$(oc get cloudprivateipconfig -o json | python3 -c "
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+    print(len(data.get('items', [])))
+except:
+    print('0')
+" 2>/dev/null || echo "0")
 echo "📊 CloudPrivateIPConfig objects: $cloudconfig_count"
 
 # Save detailed EgressIP status
