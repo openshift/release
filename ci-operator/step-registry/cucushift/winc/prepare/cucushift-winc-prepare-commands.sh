@@ -26,6 +26,10 @@ function setup_image_mirroring()
     # Disconnected environment with ephemeral mirror registry
     MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
     echo "Disconnected mode: Using ephemeral mirror registry at ${MIRROR_REGISTRY_HOST}"
+    echo "Skipping ImageTagMirrorSet creation - already created by windows-e2e-operator-test-mirror-images step"
+    echo "DEBUG: Existing ImageTagMirrorSets:"
+    oc get imagetagmirrorset -o yaml
+    return 0
   else
     # Connected Prow CI - use pre-mirrored images from CI registry
     MIRROR_REGISTRY_HOST="registry.ci.openshift.org"
@@ -130,7 +134,26 @@ spec:
 EOF
 
   # Wait up to 5 minutes for Windows workload to be ready
-  oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m
+  echo "Waiting for Windows workload deployment to become available..."
+  if ! oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m; then
+    echo "ERROR: Windows deployment failed to become available"
+    echo "DEBUG: Final Windows deployment status:"
+    oc get deployment win-webserver -n winc-test -o yaml
+    echo "DEBUG: Final Windows pod status:"
+    oc get pods -n winc-test -o wide
+    echo "DEBUG: Final Windows pod descriptions:"
+    for pod in $(oc get pods -n winc-test -o name); do
+      echo "=== ${pod} ==="
+      oc describe -n winc-test ${pod}
+    done
+    echo "DEBUG: Events in winc-test namespace:"
+    oc get events -n winc-test --sort-by='.lastTimestamp' | tail -50
+    exit 1
+  fi
+
+  echo "Windows deployment is available"
+  echo "DEBUG: Final Windows pod status:"
+  oc get pods -n winc-test -o wide
 
   # Create Linux workload
   oc create -f - <<EOF
@@ -172,8 +195,28 @@ spec:
         ports:
         - containerPort: 8080
 EOF
+
   # Wait up to 5 minutes for Linux workload to be ready
-  oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m
+  echo "Waiting for Linux workload deployment to become available..."
+  if ! oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m; then
+    echo "ERROR: Linux deployment failed to become available"
+    echo "DEBUG: Final Linux deployment status:"
+    oc get deployment linux-webserver -n winc-test -o yaml
+    echo "DEBUG: Final Linux pod status:"
+    oc get pods -n winc-test -o wide
+    echo "DEBUG: Final Linux pod descriptions:"
+    for pod in $(oc get pods -n winc-test -o name | grep linux); do
+      echo "=== ${pod} ==="
+      oc describe -n winc-test ${pod}
+    done
+    echo "DEBUG: Events in winc-test namespace:"
+    oc get events -n winc-test --sort-by='.lastTimestamp' | tail -50
+    exit 1
+  fi
+
+  echo "Linux deployment is available"
+  echo "DEBUG: Final Linux pod status:"
+  oc get pods -n winc-test -o wide
 }
 
 # Function to get Windows machineset name based on platform
@@ -254,12 +297,31 @@ echo "Windows OS image ID: $windows_os_image_id"
 # Get replica count
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
-echo "Waiting for Windows nodes to come up in Running state"
+echo "DEBUG: Windows machineset configuration:"
+oc get machineset -n openshift-machine-api ${winworker_machineset_name} -o yaml
+
+echo "Waiting for ${winworker_machineset_replicas} Windows machines to become ready..."
 while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do echo -n "." && sleep 10; done
+echo ""
+echo "${winworker_machineset_replicas} Windows machines are ready in machineset"
+
+echo "DEBUG: Windows machines status:"
+oc get machines -n openshift-machine-api | grep winworker || echo "No Windows machines found"
+
+echo "DEBUG: Describing Windows machines:"
+for machine in $(oc get machines -n openshift-machine-api -o name | grep winworker); do
+  echo "=== ${machine} ==="
+  oc describe -n openshift-machine-api ${machine}
+done
 
 # Make sure the Windows nodes get in Ready state
 # Timeout increased to 30m to accommodate BYOH node configuration time
+echo "Waiting for ${winworker_machineset_replicas} Windows nodes to reach Ready state (timeout: 30m)..."
 oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=30m
+
+echo ""
+echo "All Windows nodes are Ready:"
+oc get nodes -l kubernetes.io/os=windows -o wide
 
 # Choose the Windows container version depending on the Windows version
 # installed on the Windows workers
