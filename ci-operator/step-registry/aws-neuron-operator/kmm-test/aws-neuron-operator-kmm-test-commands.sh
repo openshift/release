@@ -38,10 +38,10 @@ fi
 
 cd /home/testuser || exit 1
 
-export ECO_TEST_FEATURES="${ECO_TEST_FEATURES:-modules}"
-export ECO_TEST_LABELS="${ECO_TEST_LABELS:-kmm-sanity}"
-export ECO_TEST_VERBOSE="${ECO_TEST_VERBOSE:-true}"
-export ECO_VERBOSE_LEVEL="${ECO_VERBOSE_LEVEL:-100}"
+export ECO_TEST_FEATURES="${KMM_TEST_FEATURES:-modules}"
+export ECO_TEST_LABELS="${KMM_TEST_LABELS:-kmm-sanity}"
+export ECO_TEST_VERBOSE="true"
+export ECO_VERBOSE_LEVEL="100"
 export ECO_DUMP_FAILED_TESTS="${ECO_DUMP_FAILED_TESTS:-true}"
 export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
 
