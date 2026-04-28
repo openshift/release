@@ -332,7 +332,7 @@ if [ -z "$yaml_files" ]; then
 
   for folder in $all_version_folder
   do
-    yaml_files=$(curl -sSL ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep yaml )
+    yaml_files=$(curl -sSL ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
     if [[ ! -z $yaml_files ]]
     then
       echo "Found files in build: $folder"

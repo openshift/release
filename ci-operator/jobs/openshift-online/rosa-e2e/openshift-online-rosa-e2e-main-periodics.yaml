@@ -11,11 +11,10 @@ periodics:
     repo: rosa-e2e
   labels:
     capability/nested-podman: nested-podman
-    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   spec:
     containers:
     - args:
@@ -24,7 +23,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/cs-qe-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
-      - --variant=periodics
       command:
       - ci-operator
       env:
@@ -321,7 +319,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build06
   cron: 0 14 * * *
   decorate: true
   decoration_config:
@@ -342,11 +340,10 @@ periodics:
       - success
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: ROSA
-        CI Daily Status: all jobs healthy. <{{.Status.URL}}|View logs> | <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy>
-        {{else}} :x: ROSA CI Daily Status: some jobs failing. <{{.Status.URL}}|View
-        logs> | <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy>
-        {{end}}'
+      report_template: |-
+        {{if eq .Status.State "success"}} :white_check_mark: ROSA CI Daily Status: all tracked jobs healthy. <{{.Status.URL}}|Full report> | <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy>
+        <https://prow.ci.openshift.org/?type=periodic&job=*rosa-hcp-e2e-nightly*|ROSA E2E> | <https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*rosa*|OCM FVT> | <https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-*-ovn|Conformance> {{else}} :x: ROSA CI Daily Status: some jobs failing. <{{.Status.URL}}|Full report> | <https://sippy.dptools.openshift.org/sippy-ng/release/rosa-stage|Sippy>
+        <https://prow.ci.openshift.org/?type=periodic&job=*rosa-hcp-e2e-nightly*|ROSA E2E> | <https://prow.ci.openshift.org/?type=periodic&job=*ocm-fvt*rosa*|OCM FVT> | <https://prow.ci.openshift.org/?type=periodic&job=*main-nightly-*e2e-rosa-*-ovn|Conformance> {{end}}
   spec:
     containers:
     - args:

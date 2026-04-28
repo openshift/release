@@ -21,6 +21,8 @@ promotion:
   to:
   - name: 5.1-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -34,13 +36,28 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "4"
+      memory: 3Gi
 tests:
-- as: unit
-  commands: CGO_ENABLED=1 make test --warn-undefined-variables
+- as: upstream-unit
+  commands: CGO_ENABLED=1 make test-unit --warn-undefined-variables
   container:
     from: bin
+- as: upstream-integration
+  commands: CGO_ENABLED=1 make test-integration --warn-undefined-variables
+  container:
+    from: bin
+  optional: true
+- as: upstream-e2e
+  commands: CGO_ENABLED=1 PASSES="e2e" ./scripts/test.sh
+  container:
+    from: bin
+  optional: true
+- as: upstream-release
+  commands: CGO_ENABLED=1 PASSES="release" ./scripts/test.sh
+  container:
+    from: bin
+  optional: true
 - as: e2e-aws-ovn
   steps:
     cluster_profile: openshift-org-aws

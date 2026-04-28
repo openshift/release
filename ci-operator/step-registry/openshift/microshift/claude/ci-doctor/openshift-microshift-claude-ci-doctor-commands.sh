@@ -12,11 +12,10 @@ mkdir -p "${CLAUDE_HOME}"
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
-        echo "Copying reports to artifact and shared directories..."
+        echo "Copying report files to the artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${SHARED_DIR}/"   \; || true
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
@@ -189,7 +188,9 @@ configure_claude() {
       "Read(//tmp/**)",
       "Write(//tmp/**)",
       "Bash(bash plugins/microshift-ci/scripts/*)",
+      "Bash(bash /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
+      "Bash(python3 /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(curl:*)",
       "Bash(date:*)",
       "Bash(cat:*)",
@@ -262,18 +263,10 @@ cd "${SRC_DIR}"
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
+    --max-turns 100 \
     --output-format stream-json \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
-
-# After the analysis, run automatic approval of rebase PRs with all tests passing
-echo "Running automatic approval of rebase PRs with all tests passing..."
-"${EXE_DIR}/prow-jobs-for-pull-requests.sh" \
-    --mode approve \
-    --execute \
-    --author 'microshift-rebase-script[bot]'
-echo "Automatic approval of rebase PRs with all tests passing completed"
 
 # After the analysis, attempt to restart failed rebase PRs tests. If the
 # restarted tests complete successfully, the PR will be automatically

@@ -63,59 +63,6 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
-- as: rosa-stage-e2e-byo-vpc-proxy-install
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CLUSTER_EXPIRY_IN_MINUTES="480"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export USE_EXISTING_CLUSTER="false"
-    export USE_PROXY_FOR_INSTALL="true"
-    export USE_LATEST_VERSION_FOR_INSTALL="true"
-    export CHANNEL="candidate"
-    export CONFIGS="rosa,rosa-e2e-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-dev"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 19 14,28 * *
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-dev
-    name: osde2e-dev
-  - mount_path: /usr/local/osde2e-static-byo-vpc
-    name: osde2e-static-byo-vpc
-- as: rosa-stage-e2e-byo-vpc-proxy-postinstall
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CLUSTER_EXPIRY_IN_MINUTES="480"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export USE_EXISTING_CLUSTER="false"
-    export USE_LATEST_VERSION_FOR_INSTALL="true"
-    export CHANNEL="candidate"
-    export CONFIGS="rosa,proxy-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-dev"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 19 15,29 * *
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-dev
-    name: osde2e-dev
-  - mount_path: /usr/local/osde2e-static-byo-vpc
-    name: osde2e-static-byo-vpc
 - as: aws-stage-informing-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -129,6 +76,7 @@ tests:
     clone: true
     from: osde2e
   cron: 0 12 * * 1
+  disable_rehearsal: true
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -144,7 +92,7 @@ tests:
   container:
     clone: true
     from: osde2e
-  cron: 0 0 * * 2
+  cron: 0 1 * * 0
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -160,7 +108,23 @@ tests:
   container:
     clone: true
     from: osde2e
-  cron: 45 0 * * 2
+  cron: 0 2 * * 0
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: int-clusters-cleanup
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="int"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 3 * * 0
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -245,7 +209,7 @@ tests:
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-tekton-copy,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -261,7 +225,7 @@ tests:
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -273,27 +237,11 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: cleanup-dev-aws
-  commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev,/usr/local/osde2e-credentials"
-
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 8 * * *
-  secrets:
-  - mount_path: /usr/local/osde2e-dev
-    name: osde2e-dev
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
 - as: cleanup-hypershift-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -309,7 +257,7 @@ tests:
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false  --send-cleanup-summary
   container:
     clone: true
     from: osde2e
@@ -319,27 +267,11 @@ tests:
     name: osde2e-trt-credentials
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
-- as: cleanup-informing-aws
-  commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing,/usr/local/osde2e-credentials"
-
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false  --send-cleanup-summary
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 8 * * *
-  secrets:
-  - mount_path: /usr/local/osde2e-informing
-    name: osde2e-informing
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
 - as: cleanup-rosa-nightly
   commands: |
     export SECRET_LOCATIONS="/usr/local/rosa-e2e-prow-ci-01-osde2e"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --vpc --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e

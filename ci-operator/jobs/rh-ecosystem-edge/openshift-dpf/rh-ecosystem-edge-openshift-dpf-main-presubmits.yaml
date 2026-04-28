@@ -21,6 +21,7 @@ presubmits:
       slack:
         channel: '#wg-nvidia-dpf-ci'
         job_states_to_report:
+        - success
         - failure
         - error
         - aborted
@@ -153,11 +154,104 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
+    context: ci/prow/network-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 2h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-network-tests
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |
+          {{if eq .Status.State "success"}}
+            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{else}}
+            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+            {{if eq .Status.State "aborted"}}
+              The job was aborted, check for orphaned cloud resources.
+            {{end}}
+          {{end}}
+    rerun_command: /test network-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=network-tests
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(network-tests|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/sanity
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 1h0m0s
+      timeout: 2h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cluster: build05
@@ -168,6 +262,7 @@ presubmits:
       slack:
         channel: '#wg-nvidia-dpf-ci'
         job_states_to_report:
+        - success
         - failure
         - error
         - aborted
