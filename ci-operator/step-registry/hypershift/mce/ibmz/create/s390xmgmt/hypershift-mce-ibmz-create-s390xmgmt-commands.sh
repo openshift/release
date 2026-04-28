@@ -22,8 +22,11 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+#IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+#export IC_API_KEY
+IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+
 
 # Run the clone
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
