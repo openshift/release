@@ -29,7 +29,14 @@ function mirror_ccs() {
     set -xeo pipefail
 
     echo "1. Get mirror registry"
-    mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+    mirror_registry=""
+    set +e
+    for attempt in 1 2 3; do
+        mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]') && break
+        echo "Attempt ${attempt}/3 failed to get imagecontentsourcepolicy, retrying in 30s..."
+        sleep 30
+    done
+    set -e
     mirror_registry=${mirror_registry%%/*}
     if [[ $mirror_registry == "" ]] ; then
         echo "Warning: Can not find the mirror registry, abort !!!"
