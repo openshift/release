@@ -8,14 +8,11 @@ echo "Updating install-config.yaml to a single ${SINGLE_NODE_AZURE_INSTANCE_TYPE
 
 # RHEL9 based images do not contain pip3, we need to install it. Multiple jobs rely on the installer image
 # so simply using something like upi-installer will break things since some jobs use stable payload which
-# does not include upi-installer.
+# does not include upi-installer. Use stdlib ensurepip (no curl / bootstrap.pypa.io).
 OS_VER="$(awk -F= '/^VERSION_ID=/ { print $2 }' /etc/os-release | tr -d '"' | cut -f1 -d'.')"
 if [[ "${OS_VER}" == "9" ]]; then
-    echo "Detected RHEL9, installing pip"
-    py_mm="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-    curl -fSL --connect-timeout 30 --max-time 120 -o /tmp/get-pip.py "https://bootstrap.pypa.io/pip/${py_mm}/get-pip.py"
-    python3 /tmp/get-pip.py --user
-    rm -f /tmp/get-pip.py
+    echo "Detected RHEL9, installing pip via ensurepip"
+    python3 -m ensurepip --upgrade --user
     export PATH="${PATH}:${HOME}/.local/bin"
 fi
 
