@@ -30,17 +30,20 @@ workflow:
     - ref: aws-neuron-operator-install-operators
     test:
     - ref: aws-neuron-operator-test
+    - ref: aws-neuron-operator-kmm-test
     post:
     - ref: aws-neuron-operator-gather
-    # Inline the rosa-aws-sts-hcp-deprovision chain so we can mark
-    # aws-deprovision-stacks as best_effort independently — its
-    # CloudFormation DELETE_FAILED errors must not fail the overall job.
-    - chain: rosa-cluster-deprovision
+    # Custom deprovision step with retry logic for STS resource deletion.
+    # The standard rosa-cluster-deprovision has a race condition where
+    # operator-roles deletion fails because OCM still reports the cluster
+    # as "uninstalling" after it disappears from the API.
+    - ref: aws-neuron-operator-rosa-cluster-deprovision
       best_effort: true
     - chain: rosa-sts-oidc-config-delete
       best_effort: true
     - ref: aws-deprovision-stacks
       best_effort: true
+      timeout: 30m
   documentation: |-
     This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.8xlarge)
     compute nodes, then runs the AWS Neuron operator E2E tests conditionally

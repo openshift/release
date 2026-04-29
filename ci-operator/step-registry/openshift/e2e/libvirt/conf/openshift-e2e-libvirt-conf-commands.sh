@@ -324,9 +324,10 @@ fi
 # elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 17 && $2 <= 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
 #
 
-# Until the yellow-zone network bandwidth is upgraded, we will run the following tests in their own periodic and exclude
-# them from the conformance-parallel workflow in versions older than 4.21.
-if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 <= 20)) { exit 0 } else { exit 1 } }' &&  [[ "${TEST_TYPE}" == "conformance-parallel" || "${TEST_TYPE}" == "heavy-build" ]] && [ "${ARCH}" != "ppc64le" ]; then
+# s390x "yellow zone" (through 4.16): run bandwidth-heavy build/image tests in a separate periodic and exclude them
+# from conformance-parallel. From 4.17 onward, Z homogeneous (VPN) jobs are off yellow zone, so the full
+# parallel suite runs in the main conformance job only.
+if echo "${BRANCH}" | awk -F. '{ if (($1 == 4) && ($2 <= 16)) { exit 0 } else { exit 1 } }' && [[ "${TEST_TYPE}" == "conformance-parallel" || "${TEST_TYPE}" == "heavy-build" ]] && [ "${ARCH}" != "ppc64le" ]; then
     cat > "${SHARED_DIR}/temp_tests" << EOF
 "[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
@@ -350,7 +351,7 @@ if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 <= 20)) { exit 0 } else { ex
 "[sig-builds][Feature:Builds] verify /run filesystem contents are writeable using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 EOF
     if [ "${TEST_TYPE}" == "conformance-parallel" ]; then
-        echo "Adding heavy_build tests to the excluded test list..."
+        echo "Adding heavy_build tests to the excluded test list (s390x yellow zone through 4.16)..."
         cat ${SHARED_DIR}/temp_tests >> ${SHARED_DIR}/excluded_tests
     else
         echo "Creating test list from the heavy_build test list..."
