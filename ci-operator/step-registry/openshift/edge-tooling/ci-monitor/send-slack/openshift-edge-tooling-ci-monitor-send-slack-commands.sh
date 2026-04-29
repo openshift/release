@@ -52,24 +52,22 @@ fi
 # Build per-version aggregated counts from pipe-delimited job data.
 # Produces output like: 4.19 (1), 4.20 (0), 4.21 (2), 5.0 (1)
 #
-# $1 = lines to count (one type)
-# $2 = all lines (both types) — used to build the full version list so
-#      versions with zero failures for this type still appear
+# $1 = lines to count (one type) — versions are derived from these lines
+#      so only versions with actual failures for this type appear
 # ---------------------------------------------------------------------------
 version_summary() {
     local job_lines="$1"
-    local all_lines="$2"
+
+    [[ -z "${job_lines}" ]] && return
 
     local versions
-    versions=$(echo "${all_lines}" | awk -F'|' '{print $5}' | sort -uV)
+    versions=$(echo "${job_lines}" | awk -F'|' '{print $5}' | sort -uV)
 
     local result=""
     while IFS= read -r ver; do
         [[ -z "${ver}" ]] && continue
-        local count=0
-        if [[ -n "${job_lines}" ]]; then
-            count=$(echo "${job_lines}" | awk -F'|' -v v="${ver}" '$5 == v' | wc -l)
-        fi
+        local count
+        count=$(echo "${job_lines}" | awk -F'|' -v v="${ver}" '$5 == v' | wc -l)
         result+="${result:+, }${ver} (${count})"
     done <<< "${versions}"
     echo "${result}"
@@ -79,7 +77,6 @@ version_summary() {
 # Compose the Slack message
 # ---------------------------------------------------------------------------
 NL=$'\n'
-ALL_LINES="${BLOCKING_LINES}${BLOCKING_LINES:+$'\n'}${INFORMING_LINES}"
 
 if [[ "${DATA_AVAILABLE}" != "true" ]]; then
     ICON=":warning:"
@@ -90,14 +87,14 @@ elif [[ "${BLOCKING_COUNT}" -eq 0 ]] && [[ "${INFORMING_COUNT}" -eq 0 ]]; then
 elif [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
     ICON=":large_yellow_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing blocking jobs."
-    INFORMING_SUMMARY=$(version_summary "${INFORMING_LINES}" "${ALL_LINES}")
+    INFORMING_SUMMARY=$(version_summary "${INFORMING_LINES}")
     INFORMING_TOPOS=$(echo "${INFORMING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
     MESSAGE+="${NL}:warning: *${INFORMING_COUNT}* failing informing job(s)"
     MESSAGE+="${NL}• *Versions:* ${INFORMING_SUMMARY}"
     MESSAGE+="${NL}• *Topologies:* ${INFORMING_TOPOS}"
 else
     ICON=":red_circle:"
-    BLOCKING_SUMMARY=$(version_summary "${BLOCKING_LINES}" "${ALL_LINES}")
+    BLOCKING_SUMMARY=$(version_summary "${BLOCKING_LINES}")
     BLOCKING_TOPOS=$(echo "${BLOCKING_LINES}" | awk -F'|' '{print $4}' | sort -u | tr '\n' ',' | sed 's/,/, /g; s/, $//')
     MESSAGE="${ICON} *Edge OCP CI Monitor* — *${BLOCKING_COUNT}* failing blocking job(s)."
     MESSAGE+="${NL}• *Versions:* ${BLOCKING_SUMMARY}"
