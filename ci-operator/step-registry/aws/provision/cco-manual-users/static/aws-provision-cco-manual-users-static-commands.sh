@@ -57,24 +57,26 @@ function aws_create_user()
     return 0
 }
 
-function b64() { echo -n "${1}" | base64 ; }
-
 function create_secret_file_for_aws()
 {
     local ns=$1
     local name=$2
-    local b64_key_id=$3
-    local b64_key_sec=$4
+    local key_id=$3
+    local key_sec=$4
     local output_file=$5
-    cat <<EOF >${output_file}
+    cat <<EOF >"${output_file}"
 apiVersion: v1
 kind: Secret
 metadata:
   name: ${name}
   namespace: ${ns}
-data:
-  aws_access_key_id: ${b64_key_id}
-  aws_secret_access_key: ${b64_key_sec}
+stringData:
+  aws_access_key_id: ${key_id}
+  aws_secret_access_key: ${key_sec}
+  credentials: |
+    [default]
+    aws_access_key_id = ${key_id}
+    aws_secret_access_key = ${key_sec}
 EOF
 }
 
@@ -212,7 +214,7 @@ do
     # Generate users manifests
     user_manifest="${SHARED_DIR}/manifest_user-${ns}-${name}-secret.yaml"
     echo "Generate users manifest file ${user_manifest}"
-    create_secret_file_for_aws "$ns" "$name" "$(b64 ${key_id})" "$(b64 ${key_sec})" "${user_manifest}"
+    create_secret_file_for_aws "$ns" "$name" "${key_id}" "${key_sec}" "${user_manifest}"
 done < "${credentials_requests_files}"
 
 exit 0
