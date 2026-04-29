@@ -118,6 +118,31 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-capi-disconnected-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_IDMS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      commands: |-
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:

@@ -21,6 +21,11 @@ images:
     dockerfile_path: Dockerfile
     from: base
     to: multicloud-manager
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -34,10 +39,10 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 1Gi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -110,7 +115,17 @@ tests:
         requests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
+- as: pr-image-mirror
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: openshift-priv
   repo: stolostron-multicloud-operators-foundation
