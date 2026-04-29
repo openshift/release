@@ -4,16 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Setting up golden image environment"
+echo "$(date +%T) Setting up golden image environment"
 
-echo "Merging pull secrets..."
+echo "$(date +%T) Merging pull secrets..."
 jq -s '.[0] * .[1]' \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
   "/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret" \
   > /tmp/merged-pull-secret
 scp -F "${SHARED_DIR}/ssh_config" /tmp/merged-pull-secret ci_machine:/root/pull-secret
 
-timeout -s 9 35m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s \
+timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s \
   "${GOLDEN_HUB_IMAGE}" "${GOLDEN_VIRT_IMAGE}" <<'REMOTE_EOF'
 set -euo pipefail
 
@@ -22,6 +22,7 @@ GOLDEN_VIRT_IMAGE="$2"
 GOLDEN_DIR="/data/golden"
 PULL_SECRET="/root/pull-secret"
 
+echo "$(date +%T) Installing packages..."
 dnf install -y libvirt qemu-kvm podman dnsmasq
 systemctl enable --now libvirtd
 
@@ -33,22 +34,24 @@ CONFEOF
 
 mkdir -p "${GOLDEN_DIR}/hub" "${GOLDEN_DIR}/virt"
 
-echo "Pulling golden images..."
+echo "$(date +%T) Pulling golden images..."
 podman pull --authfile "${PULL_SECRET}" "${GOLDEN_HUB_IMAGE}" &
 podman pull --authfile "${PULL_SECRET}" "${GOLDEN_VIRT_IMAGE}" &
 wait
+echo "$(date +%T) Pull complete"
 
-echo "Extracting hub..."
+echo "$(date +%T) Extracting hub..."
 podman create --name golden-hub "${GOLDEN_HUB_IMAGE}"
 podman cp golden-hub:/ "${GOLDEN_DIR}/hub/"
 podman rm golden-hub
 
-echo "Extracting virt..."
+echo "$(date +%T) Extracting virt..."
 podman create --name golden-virt "${GOLDEN_VIRT_IMAGE}"
 podman cp golden-virt:/ "${GOLDEN_DIR}/virt/"
 podman rm golden-virt
+echo "$(date +%T) Extraction complete"
 
-echo "Reassembling QCOW2s from chunks..."
+echo "$(date +%T) Reassembling QCOW2s from chunks..."
 cat "${GOLDEN_DIR}/hub/hub-os.chunk."* > "${GOLDEN_DIR}/hub/hub-os.qcow2"
 rm -f "${GOLDEN_DIR}/hub/hub-os.chunk."*
 cat "${GOLDEN_DIR}/hub/hub-data.chunk."* > "${GOLDEN_DIR}/hub/hub-data.qcow2"
@@ -57,14 +60,15 @@ cat "${GOLDEN_DIR}/virt/virt-os.chunk."* > "${GOLDEN_DIR}/virt/virt-os.qcow2"
 rm -f "${GOLDEN_DIR}/virt/virt-os.chunk."*
 cat "${GOLDEN_DIR}/virt/virt-data.chunk."* > "${GOLDEN_DIR}/virt/virt-data.qcow2"
 rm -f "${GOLDEN_DIR}/virt/virt-data.chunk."*
+echo "$(date +%T) Reassembly complete"
 
-echo "Creating networks..."
+echo "$(date +%T) Creating networks..."
 virsh net-define "${GOLDEN_DIR}/hub/hub-network.xml"
 virsh net-start test-infra-net-d55276d8
 virsh net-define "${GOLDEN_DIR}/virt/virt-network.xml"
 virsh net-start test-infra-net-ad07fc71
 
-echo "Fixing domain XMLs..."
+echo "$(date +%T) Fixing domain XMLs..."
 python3 "${GOLDEN_DIR}/hub/fix-domain-xml.py" \
   "${GOLDEN_DIR}/hub/hub-domain.xml" \
   "${GOLDEN_DIR}/hub/hub-domain-fixed.xml" \
@@ -81,7 +85,7 @@ python3 "${GOLDEN_DIR}/virt/fix-domain-xml.py" \
   "disk2" \
   "test-infra-net-ad07fc71"
 
-echo "Configuring DNS for cluster hostnames..."
+echo "$(date +%T) Configuring DNS for cluster hostnames..."
 cat > /etc/dnsmasq.d/golden-clusters.conf <<DNSEOF
 address=/test-infra-cluster-d55276d8.redhat.com/192.168.131.10
 address=/test-infra-cluster-ad07fc71.redhat.com/192.168.130.10
@@ -91,56 +95,69 @@ echo "nameserver 127.0.0.1" > /etc/resolv.conf.golden
 cat /etc/resolv.conf >> /etc/resolv.conf.golden
 cp /etc/resolv.conf.golden /etc/resolv.conf
 
-echo "Starting VMs..."
+echo "$(date +%T) Starting VMs..."
 virsh define "${GOLDEN_DIR}/hub/hub-domain-fixed.xml"
 virsh start test-infra-cluster-d55276d8-master-0
 virsh define "${GOLDEN_DIR}/virt/virt-domain-fixed.xml"
 virsh start test-infra-cluster-ad07fc71-master-0
 
-echo "Waiting for cluster APIs and ingress routers..."
-for endpoint in "https://192.168.131.10:6443/readyz" "https://192.168.130.10:6443/readyz" "https://192.168.131.10:443/" "https://192.168.130.10:443/"; do
-  ready=false
+echo "$(date +%T) Waiting for all endpoints (parallel)..."
+
+wait_for_endpoint() {
+  local endpoint="$1"
+  local label="$2"
   for i in $(seq 1 60); do
     if curl -sk --connect-timeout 5 "${endpoint}" 2>/dev/null; then
-      echo "${endpoint} reachable (${i}0s)"
-      ready=true
-      break
+      echo "$(date +%T) ${label} reachable (${i}0s)"
+      return 0
     fi
     sleep 10
   done
-  if [[ "${ready}" != "true" ]]; then
-    echo "ERROR: ${endpoint} did not become reachable within 600 seconds"
-    exit 1
-  fi
-done
+  echo "$(date +%T) ERROR: ${label} did not become reachable within 600s"
+  return 1
+}
 
-echo "Waiting for OSAC fulfillment service..."
-ready=false
-for i in $(seq 1 60); do
-  if code=$(curl -sk --connect-timeout 5 -o /dev/null -w '%{http_code}' \
-    https://fulfillment-api-osac-e2e-ci.apps.test-infra-cluster-d55276d8.redhat.com/); then
-    if [[ "${code}" != "503" ]]; then
-      echo "Fulfillment API ready (${i}0s, HTTP ${code})"
-      ready=true
-      break
+wait_for_fulfillment() {
+  for i in $(seq 1 60); do
+    if code=$(curl -sk --connect-timeout 5 -o /dev/null -w '%{http_code}' \
+      https://fulfillment-api-osac-e2e-ci.apps.test-infra-cluster-d55276d8.redhat.com/); then
+      if [[ "${code}" != "503" ]]; then
+        echo "$(date +%T) Fulfillment API ready (${i}0s, HTTP ${code})"
+        return 0
+      fi
     fi
-  fi
-  sleep 10
+    sleep 10
+  done
+  echo "$(date +%T) ERROR: Fulfillment API did not become ready within 600s"
+  return 1
+}
+
+wait_for_endpoint "https://192.168.131.10:6443/readyz" "Hub API (6443)" &
+wait_for_endpoint "https://192.168.130.10:6443/readyz" "Virt API (6443)" &
+wait_for_endpoint "https://192.168.131.10:443/" "Hub ingress (443)" &
+wait_for_endpoint "https://192.168.130.10:443/" "Virt ingress (443)" &
+wait_for_fulfillment &
+
+failed=0
+for pid in $(jobs -p); do
+  wait "${pid}" || failed=1
 done
-if [[ "${ready}" != "true" ]]; then
-  echo "ERROR: Fulfillment API did not become ready within 600 seconds"
+if [[ "${failed}" -ne 0 ]]; then
+  echo "$(date +%T) ERROR: One or more endpoints failed readiness checks"
   exit 1
 fi
+
+echo "$(date +%T) All endpoints ready"
 
 mkdir -p /root/.kube
 cp "${GOLDEN_DIR}/hub/hub-kubeconfig" /root/.kube/config
 cp "${GOLDEN_DIR}/virt/virt-kubeconfig" /root/virt-kubeconfig
 echo 'export KUBECONFIG=/root/.kube/config' >> /root/.bashrc
 
-echo "Golden image setup complete"
+echo "$(date +%T) Golden image setup complete"
 REMOTE_EOF
 
-echo "Copying virt kubeconfig to shared dir..."
+echo "$(date +%T) Copying virt kubeconfig to shared dir..."
 scp -F "${SHARED_DIR}/ssh_config" ci_machine:/root/virt-kubeconfig "${SHARED_DIR}/virt-kubeconfig"
 
-echo "Golden setup complete"
+echo "$(date +%T) Golden setup complete"
