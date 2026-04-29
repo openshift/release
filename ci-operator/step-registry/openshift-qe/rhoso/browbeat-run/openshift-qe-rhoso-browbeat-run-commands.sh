@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-ssh root@${bastion} "
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=240 root@${bastion} "
   set -o errexit
   set -o pipefail
   # Export CI metadata and ES host to the remote environment
