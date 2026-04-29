@@ -35,38 +35,55 @@ EOF
 
 echo "Applying network patch to install-config.yaml"
 
-# Use Python to merge the YAML files since yq may not be available
-python3 << EOF
-import yaml
-import sys
+# Create a simple script to update the networking section using sed and awk
+# This avoids dependency on yaml module
+echo "Creating backup of original install-config.yaml..."
+cp "${CONFIG}" "${CONFIG}.backup"
 
-# Read existing install-config.yaml
-with open("${CONFIG}", "r") as f:
-    install_config = yaml.safe_load(f)
+echo "Updating networking section in install-config.yaml..."
 
-# Read network patch
-with open("/tmp/network-patch.yaml", "r") as f:
-    network_patch = yaml.safe_load(f)
+# Remove existing networking section and add our custom one
+# This is a more reliable approach than trying to merge YAML without dependencies
+awk '
+BEGIN { in_networking = 0; print_networking = 0 }
+/^networking:/ { 
+    in_networking = 1
+    print "networking:"
+    print "  clusterNetwork:"
+    print "  - cidr: '"${CLUSTER_NETWORK_CIDR}"'"
+    print "    hostPrefix: '"${CLUSTER_NETWORK_HOST_PREFIX}"'"
+    print "  serviceNetwork:"
+    print "  - '"${SERVICE_NETWORK_CIDR}"'"
+    print "  machineNetwork:"
+    print "  - cidr: '"${MACHINE_NETWORK_CIDR}"'"
+    print "  networkType: '"${NETWORK_TYPE}"'"
+    print_networking = 1
+    next
+}
+/^[a-zA-Z]/ && in_networking && !/^  / {
+    in_networking = 0
+}
+!in_networking || /^  / && in_networking && print_networking {
+    if (!in_networking) print $0
+}
+!in_networking && !print_networking {
+    print $0
+}
+' "${CONFIG}.backup" > "${CONFIG}"
 
-# Merge network configuration
-if 'networking' not in install_config:
-    install_config['networking'] = {}
-
-install_config['networking'].update(network_patch['networking'])
-
-# Write updated config
-with open("/tmp/install-config-patched.yaml", "w") as f:
-    yaml.dump(install_config, f, default_flow_style=False, sort_keys=False)
-
-print("Network configuration merged successfully")
-EOF
-
-cp /tmp/install-config-patched.yaml "${CONFIG}"
+# If no networking section existed, add it at the end
+if ! grep -q "^networking:" "${CONFIG}"; then
+    echo "" >> "${CONFIG}"
+    echo "networking:" >> "${CONFIG}"
+    echo "  clusterNetwork:" >> "${CONFIG}"
+    echo "  - cidr: ${CLUSTER_NETWORK_CIDR}" >> "${CONFIG}"
+    echo "    hostPrefix: ${CLUSTER_NETWORK_HOST_PREFIX}" >> "${CONFIG}"
+    echo "  serviceNetwork:" >> "${CONFIG}"
+    echo "  - ${SERVICE_NETWORK_CIDR}" >> "${CONFIG}"
+    echo "  machineNetwork:" >> "${CONFIG}"
+    echo "  - cidr: ${MACHINE_NETWORK_CIDR}" >> "${CONFIG}"
+    echo "  networkType: ${NETWORK_TYPE}" >> "${CONFIG}"
+fi
 
 echo "Updated install-config.yaml with custom network configuration:"
-python3 << EOF
-import yaml
-with open("${CONFIG}", "r") as f:
-    config = yaml.safe_load(f)
-print(yaml.dump(config.get('networking', {}), default_flow_style=False))
-EOF
+grep -A 10 "^networking:" "${CONFIG}" || echo "Failed to find networking section"

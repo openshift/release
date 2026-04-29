@@ -368,18 +368,20 @@ for item in data['items']:
         local max_sync_time=0
         
         for result in "${sync_results[@]}"; do
-            local node=$(echo "$result" | cut -d':' -f1)
-            local sync_time=$(echo "$result" | cut -d':' -f2)
+            local node
+            local sync_time
+            node=$(echo "$result" | cut -d':' -f1)
+            sync_time=$(echo "$result" | cut -d':' -f2)
             echo "  $node: $sync_time"
             
             # Calculate statistics for valid numeric results
             if [[ "$sync_time" =~ ^[0-9]+\.?[0-9]*$ ]]; then
                 ((total_valid_syncs++))
                 total_sync_time=$(echo "$total_sync_time + $sync_time" | python3 -c "import sys; print(eval(sys.stdin.read().strip()))")
-                if (( $(echo "$sync_time < $min_sync_time" | python3 -c "import sys; print(1 if float(sys.stdin.read().strip().split()[0]) < float(sys.stdin.read().strip().split()[-1]) else 0)" <<< "$sync_time $min_sync_time") )); then
+                if (( $(python3 -c "import sys; print(1 if float('$sync_time') < float('$min_sync_time') else 0)") )); then
                     min_sync_time=$sync_time
                 fi
-                if (( $(echo "$sync_time > $max_sync_time" | python3 -c "import sys; print(1 if float(sys.stdin.read().strip().split()[0]) > float(sys.stdin.read().strip().split()[-1]) else 0)" <<< "$sync_time $max_sync_time") )); then
+                if (( $(python3 -c "import sys; print(1 if float('$sync_time') > float('$max_sync_time') else 0)") )); then
                     max_sync_time=$sync_time
                 fi
             fi
@@ -393,7 +395,7 @@ for item in data['items']:
         
         if [[ $total_valid_syncs -gt 0 ]]; then
             local avg_sync_time
-            avg_sync_time=$(echo "scale=2; $total_sync_time / $total_valid_syncs" | python3 -c "import sys; print(f'{float(sys.stdin.read().strip().split()[-1]) / float(sys.stdin.read().strip().split()[2]):.2f}')" <<< "$total_sync_time $total_valid_syncs")
+            avg_sync_time=$(python3 -c "print(f'{float('$total_sync_time') / float('$total_valid_syncs'):.2f}')")
             echo "  Average sync time: ${avg_sync_time}s"
             echo "  Min sync time: ${min_sync_time}s"
             echo "  Max sync time: ${max_sync_time}s"
