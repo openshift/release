@@ -16,9 +16,12 @@ else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
 fi
 
-if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+if [[ "${ENABLE_SLACK_NOTIFICATIONS}" == "true" ]] && [ -f "${SLACK_WEBHOOK_URL}" ]; then
     SLACK_WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
     echo "Slack webhook loaded."
+elif [[ "${ENABLE_SLACK_NOTIFICATIONS}" != "true" ]]; then
+    SLACK_WEBHOOK=""
+    echo "Slack notifications disabled via ENABLE_SLACK_NOTIFICATIONS."
 else
     SLACK_WEBHOOK=""
     echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
