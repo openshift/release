@@ -42,6 +42,14 @@ function openshift-install () {
     ((! PIPESTATUS[0]))
 }
 
+function HandleSIGCHLD () {
+    typeset -i i=0
+    for i in "${!taskPIDs[@]}"; do
+        kill -0 "${taskPIDs[i]}" 2>/dev/null ||
+        unset "taskPIDs[i]"
+    done
+}
+
 function RedfishAPIcall () {
     typeset bmcInfo="${1:?}"; (($#)) && shift
     typeset bmcURL="${1:?}"; (($#)) && shift
@@ -102,9 +110,11 @@ function WipeDisks () {
             --arg url "${bmcURL}" \
             '.[] | select(.url == $url).hostIPv4' \
         0< "${bmcInfo}")"
+        typeset -i es=0
         while true; do
             kill -0 "${tPID}" 2>/dev/null || break
             sleep 30
+            es=0
             ssh -n \
                 -o UserKnownHostsFile=/dev/null \
                 -o StrictHostKeyChecking=no \
@@ -114,6 +124,7 @@ function WipeDisks () {
                 "$(cat - 0<<'sshEOF'
 sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
     typeset dev=
+    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
     udevadm settle
     while IFS= read -r dev; do
         sgdisk --zap-all "${dev}"
@@ -126,7 +137,11 @@ sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
 shEOF
 )"
 sshEOF
-                    )" && break || true
+                    )" || es=$?
+            case ${es} in
+              (0)   break ;;
+              (193) exit ${es} ;;
+            esac
         done
       ) ;;
       (BMC) (
@@ -204,6 +219,7 @@ chiselCrdUsr="$(cat "/secret/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
 chiselCrdPwd="$(cat "/secret/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
 set -x
 
+trap 'HandleSIGCHLD' CHLD
 trap '
     ((${#taskPIDs[@]})) && {
         kill "${taskPIDs[@]}" 2>/dev/null || true
@@ -220,13 +236,6 @@ rm -f "${SHARED_DIR}/ocpClusterInf.tgz"
 [ -n "${OCP__ABI__TUN_SVC__DP_BASE_URL}" ] && [ -n "${OCP__ABI__TUN_SVC__DP_PORT}" ] && [ -n "${OCP__ABI__TUN_SVC__CP_URL}" ]
 
 # ISO Creation Phase.
-((OCP__ABI__MIN_ISO)) && (
-    export __IMG__ROOT_FS="${OCP__ABI__TUN_SVC__DP_BASE_URL%%/}/${OCP__ABI__TUN_SVC__DP_PORT}/boot-artifacts"
-    yq -i eval '
-        .minimalISO=true |
-        .bootArtifactsBaseURL=strenv(__IMG__ROOT_FS)
-    ' "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
-)
 openshift-install agent create image
 isoFile="$(
     shopt -s nullglob
@@ -353,13 +362,11 @@ set -x
 ({
     typeset bmcURL='' bmcVend='' bmcSysId='' bmcMgrId=''
     typeset diskWipeMethod=''
-    typeset -i myPID
-    myPID="${BASHPID}"
+    typeset -i tryLeft=0
+    typeset -i myPID="${BASHPID}"
     typeset -i tPID
     tPID="$(ps -o ppid= -p "${myPID}")"
     while IFS= read -r bmcURL; do
-        kill -0 "${tPID}" 2>/dev/null || break
-
         # Auto-discover BMC Vendor and Identifiers.
         bmcVend=$(
             RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET '' |
@@ -385,52 +392,60 @@ set -x
           (*)   false;;
         esac
 
-        # Eject previously mounted media.
-        VCD-Eject "${bmcInfo}" "${bmcURL}" "${bmcMgrId}"
-        # Set Boot Order.
-        {
-            # Try to set to VCD for wiping Disks via Host OS.
-            diskWipeMethod=OS
-            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
-                "Systems/${bmcSysId}" \
-                -d '{"Boot": {
-                    "BootSourceOverrideEnabled": "Continuous",
-                    "BootSourceOverrideTarget": "Cd"
-                }}'
-        } || {
-            # Fallback to wiping Disks via BMC.
-            diskWipeMethod=''
+        # Ensure booting to ISO.
+        tryLeft=3
+        while ((tryLeft)); do
+            kill -0 "${tPID}" 2>/dev/null || break
+
+            # Eject previously mounted media.
+            VCD-Eject "${bmcInfo}" "${bmcURL}" "${bmcMgrId}"
+            # Set Boot Order.
+            {
+                # Try to set to VCD for wiping Disks via Host OS.
+                diskWipeMethod=OS
+                RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                    "Systems/${bmcSysId}" \
+                    -d '{"Boot": {
+                        "BootSourceOverrideEnabled": "Continuous",
+                        "BootSourceOverrideTarget": "Cd"
+                    }}'
+            } || {
+                # Fallback to wiping Disks via BMC.
+                diskWipeMethod=''
+                WipeDisks "${tPID}" "${bmcInfo}" \
+                    "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
+                    BMC
+            }
+            # Mount ISO.
+            RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia" \
+                -d "$(
+                    jq -cnr \
+                        --arg img "${isoURL}" \
+                        '{
+                            "Image": $img,
+                            "TransferProtocolType": "HTTPS",
+                            "TransferMethod": "Stream"
+                        }'
+                )"
+            # Set boot `Once` if BMC Wipe (`Continuous` not supported).
+            [ -n "${diskWipeMethod}" ] || {
+                RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                    "Systems/${bmcSysId}" \
+                    -d '{"Boot": {
+                        "BootSourceOverrideEnabled": "Once",
+                        "BootSourceOverrideTarget": "Cd"
+                    }}'
+            }
+            # Restart Host.
+            Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
+            # Wipe Disks via Host OS (no-op for BMC Wipe).
             WipeDisks "${tPID}" "${bmcInfo}" \
                 "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
-                BMC
-        }
-        # Mount ISO.
-        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
-            "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia" \
-            -d "$(
-                jq -cnr \
-                    --arg img "${isoURL}" \
-                    '{
-                        "Image": $img,
-                        "TransferProtocolType": "HTTPS",
-                        "TransferMethod": "Stream"
-                    }'
-            )"
-        # Set boot `Once` if BMC Wipe (`Continuous` not supported).
-        [ -n "${diskWipeMethod}" ] || {
-            RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
-                "Systems/${bmcSysId}" \
-                -d '{"Boot": {
-                    "BootSourceOverrideEnabled": "Once",
-                    "BootSourceOverrideTarget": "Cd"
-                }}'
-        }
-        # Restart Host.
-        Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
-        # Wipe Disks via Host OS (no-op for BMC Wipe).
-        WipeDisks "${tPID}" "${bmcInfo}" \
-            "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
-            "${diskWipeMethod}"
+                "${diskWipeMethod}" && break || true
+            ((tryLeft--))
+        done
+        ((tryLeft))
         # Restore Boot Order.
         [ -z "${diskWipeMethod}" ] || {
             RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \

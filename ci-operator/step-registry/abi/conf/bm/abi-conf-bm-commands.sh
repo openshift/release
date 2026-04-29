@@ -45,7 +45,9 @@ function UpdateCfg () {
     typeset topKey="${1:?}"; (($#)) && shift
     typeset cfgType='' cfgFile='' cfgCont='' updateOp=''
     while IFS=$'\t' read -r cfgType cfgFile cfgCont; do
-        true >> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
+        [[ "${cfgFile}" == */* ]] &&
+            mkdir -p "${OCP__ABI__CLUSTER_DIR}/${cfgFile%/*}"
+        true 1>> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
         exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
         case ${cfgType} in
           (*+)  updateOp='select(fileIndex==0) *+ ' ;;
@@ -161,20 +163,20 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
                 (.hosts[] | select(.role == "auto-assign")),
                 (.hosts[] | select(.role == "arbiter")),
                 (.hosts[] | select(.role == "master"))
-            ) | select([
+            ) | select(any((
                 .networkConfig.interfaces[] |
                 select(.ipv4.enabled == true) |
                 .ipv4.address[]?.ip
-            ] | any(. == $rIP) | not)),
-            (.hosts[] | select([
+            ); . == $rIP) | not)),
+            (.hosts[] | select(any((
                 .networkConfig.interfaces[] |
                 select(.ipv4.enabled == true) |
                 .ipv4.address[]?.ip
-            ] | any(. == $rIP)))
+            ); . == $rIP)))
         ) | {
             url: ("https://" + (.bmc.address | split("://")[-1])),
-            usr: (.bmc.username // $usr),
-            pwd: (.bmc.password // $pwd),
+            usr: (.bmc.username // ($usr | rtrimstr("\n"))),
+            pwd: (.bmc.password // ($pwd | rtrimstr("\n"))),
             hostIPv4: ([
                 .networkConfig.interfaces[] |
                 select(.ipv4.enabled == true) |
@@ -191,6 +193,15 @@ exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"); wait $!
     yq -p json -o yaml eval .
 } 0<&3 1> "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
 exec 3<&-
+
+# Set ISO Mode.
+((OCP__ABI__MIN_ISO)) && (
+    export __IMG__ROOT_FS="${OCP__ABI__TUN_SVC__DP_BASE_URL%%/}/${OCP__ABI__TUN_SVC__DP_PORT}/boot-artifacts"
+    yq -i eval '
+        .minimalISO=true |
+        .bootArtifactsBaseURL=strenv(__IMG__ROOT_FS)
+    ' "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
+)
 
 # Generate full manifest tree.
 openshift-install agent create cluster-manifests
