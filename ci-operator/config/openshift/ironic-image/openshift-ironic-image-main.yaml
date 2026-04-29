@@ -39,6 +39,12 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -68,6 +74,37 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-bm-multi-arch-pxe
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_RELEASE_IMAGE: release:multi-latest
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_ARM_WORKERS=1
+        APPLY_ARM_WORKERS=true
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-virtualmedia-multi-arch
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_RELEASE_IMAGE: release:multi-latest
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        NUM_ARM_WORKERS=1
+        APPLY_ARM_WORKERS=true
+    workflow: baremetalds-e2e-virtualmedia
 - as: check-requirements
   commands: |-
     #!/bin/bash
