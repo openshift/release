@@ -52,7 +52,7 @@ else
 fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
-OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/rp-override-config-$(date +%s).yaml}
+OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
 MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
 MSI_MOCK_PRINCIPAL_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".principalId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
