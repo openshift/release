@@ -1,0 +1,52 @@
+ref:
+  as: hypershift-kubevirt-check-kernel-isolation
+  from: hypershift-tests
+  grace_period: 5m0s
+  commands: hypershift-kubevirt-check-kernel-isolation-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Validates kernel-level isolation between management cluster and hosted cluster
+    running in KubeVirt VMs. This step verifies ANSSI BP-028 compliance requirements
+    for multi-tenant hosted control planes.
+
+    The validation checks:
+
+    1. **Different kernel boot IDs** (Critical): Proves that management and guest
+       clusters are running separate kernel instances, not sharing the same kernel.
+       This is the definitive test for VM-level isolation.
+
+    2. **VirtLauncher pods exist and are running**: Confirms that the hosted cluster
+       control plane is running inside KubeVirt VMs, not just containers.
+
+    3. **VirtualMachineInstance resources are present**: Validates that KubeVirt
+       virtualization layer is active and managing the guest VMs.
+
+    4. **NetworkPolicy is applied to VirtLauncher pods**: Verifies network isolation
+       between management and guest clusters.
+
+    5. **/proc/version differences** (Informational): When kernel versions differ,
+       this provides additional evidence of version skew working correctly. When
+       kernel versions are the same, compilation timestamps are checked.
+
+    **Why Boot ID Matters:**
+    The boot ID (`/proc/sys/kernel/random/boot_id`) is a randomly generated UUID
+    created when the kernel boots. It is unique per kernel instance and cannot be
+    shared between different kernel boots. If management and guest have different
+    boot IDs, they MUST be running separate kernel instances, which proves true
+    VM-level isolation.
+
+    **ANSSI BP-028 Compliance:**
+    This validation demonstrates that OpenShift Hosted Control Planes provide
+    kernel-level isolation when running on KubeVirt, meeting the highest security
+    requirements for multi-tenant environments as specified in ANSSI BP-028.
+
+    **Related Jira:**
+    - OCPSTRAT-2217: VM-level and Hosted Cluster Isolation levels for HCP
+    - OCPSTRAT-1707: Align HCP NodePool minor-version skew limits
+
+    **Exit Codes:**
+    - 0: Kernel isolation confirmed (different boot IDs)
+    - 1: Kernel isolation failed (same boot ID or missing VMs)
