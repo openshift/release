@@ -30,7 +30,7 @@ function openshift-install () {
     typeset -i es=0
     {
         echo \
-"$(date -Iseconds)|${FUNCNAME[0]@Q} ${@@Q}"$'\n'"$(printf '%.0s-' {1..80})"
+"$(date -Iseconds)|${FUNCNAME[0]@Q} ${*@Q}"$'\n'"$(printf '%.0s-' {1..80})"
         command openshift-install \
             --dir "${OCP__ABI__CLUSTER_DIR}/" \
             --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
@@ -43,9 +43,9 @@ function openshift-install () {
 
 function UpdateCfg () {
     typeset topKey="${1:?}"; (($#)) && shift
-    typeset cfgType= cfgFile= cfgCont= updateOp=
+    typeset cfgType='' cfgFile='' cfgCont='' updateOp=''
     while IFS=$'\t' read -r cfgType cfgFile cfgCont; do
-        1>> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
+        true >> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
         exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
         case ${cfgType} in
           (*+)  updateOp='select(fileIndex==0) *+ ' ;;

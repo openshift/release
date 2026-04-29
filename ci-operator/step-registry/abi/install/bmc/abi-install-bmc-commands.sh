@@ -31,7 +31,7 @@ function openshift-install () {
     typeset -i es=0
     {
         echo \
-"$(date -Iseconds)|${FUNCNAME[0]@Q} ${@@Q}"$'\n'"$(printf '%.0s-' {1..80})"
+"$(date -Iseconds)|${FUNCNAME[0]@Q} ${*@Q}"$'\n'"$(printf '%.0s-' {1..80})"
         command openshift-install \
             --dir "${OCP__ABI__CLUSTER_DIR}/" \
             --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
@@ -97,7 +97,8 @@ function WipeDisks () {
     typeset wipeMethod="${1?}"; (($#)) && shift
     case ${wipeMethod} in
       (OS) (
-        typeset hostIPv4="$(jq -r \
+        typeset hostIPv4
+        hostIPv4="$(jq -r \
             --arg url "${bmcURL}" \
             '.[] | select(.url == $url).hostIPv4' \
         0< "${bmcInfo}")"
@@ -129,7 +130,7 @@ sshEOF
         done
       ) ;;
       (BMC) (
-        typeset ctrlId= volEP= driveEP= jobId=
+        typeset ctrlId='' volEP='' driveEP='' jobId=''
         typeset -a jobIds=()
         while IFS= read -r ctrlId; do
             while IFS= read -r volEP; do
@@ -350,10 +351,12 @@ set -x
 
 # Reboot Nodes into OCP Agent Installation ISO.
 ({
-    typeset bmcURL= bmcVend= bmcSysId= bmcMgrId=
-    typeset diskWipeMethod=
-    typeset -i myPID="${BASHPID}"
-    typeset -i tPID="$(ps -o ppid= -p "${myPID}")"
+    typeset bmcURL='' bmcVend='' bmcSysId='' bmcMgrId=''
+    typeset diskWipeMethod=''
+    typeset -i myPID
+    myPID="${BASHPID}"
+    typeset -i tPID
+    tPID="$(ps -o ppid= -p "${myPID}")"
     while IFS= read -r bmcURL; do
         kill -0 "${tPID}" 2>/dev/null || break
 
@@ -454,7 +457,7 @@ cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minim
 
 # Day-1.5 Phase.
 (
-    typeset cfgKey= cfgVal=
+    typeset cfgKey='' cfgVal=''
     export KUBECONFIG="${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
     while IFS=$'\t' read -r cfgKey cfgVal; do
         case ${cfgKey} in
