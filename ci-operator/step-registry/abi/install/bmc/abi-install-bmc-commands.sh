@@ -42,6 +42,14 @@ function openshift-install () {
     ((! PIPESTATUS[0]))
 }
 
+function HandleSIGCHLD () {
+    typeset -i i=0
+    for i in "${!taskPIDs[@]}"; do
+        kill -0 "${taskPIDs[i]}" 2>/dev/null ||
+        unset "taskPIDs[i]"
+    done
+}
+
 function RedfishAPIcall () {
     typeset bmcInfo="${1:?}"; (($#)) && shift
     typeset bmcURL="${1:?}"; (($#)) && shift
@@ -211,6 +219,7 @@ chiselCrdUsr="$(cat "/secret/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
 chiselCrdPwd="$(cat "/secret/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
 set -x
 
+trap 'HandleSIGCHLD' CHLD
 trap '
     ((${#taskPIDs[@]})) && {
         kill "${taskPIDs[@]}" 2>/dev/null || true
