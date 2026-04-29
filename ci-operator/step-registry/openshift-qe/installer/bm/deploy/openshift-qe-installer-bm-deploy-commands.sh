@@ -87,10 +87,10 @@ reset_idrac: $RESET_IDRAC
 EOF
 
 # Append ocp_inventory_override if enabled
-if [[ $OCP_INVENTORY_OVERRIDE == "true" ]]; then
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
    OCP_INVENTORY_PATH=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
    cat <<EOF >>/tmp/all.yml
-ocp_inventory_override: $OCP_INVENTORY_PATH
+ocp_inventory_override: "${OCP_INVENTORY_PATH}"
 EOF
 fi
 
