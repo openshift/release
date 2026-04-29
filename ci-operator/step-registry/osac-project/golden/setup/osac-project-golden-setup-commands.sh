@@ -26,6 +26,10 @@ echo "$(date +%T) Installing packages..."
 dnf install -y libvirt qemu-kvm podman dnsmasq
 systemctl enable --now libvirtd
 
+echo "$(date +%T) Installing oc client..."
+curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+  | tar xzf - -C /usr/local/bin oc kubectl
+
 mkdir -p ~/.config/containers
 cat > ~/.config/containers/containers.conf <<CONFEOF
 [engine]
@@ -153,6 +157,28 @@ mkdir -p /root/.kube
 cp "${GOLDEN_DIR}/hub/hub-kubeconfig" /root/.kube/config
 cp "${GOLDEN_DIR}/virt/virt-kubeconfig" /root/virt-kubeconfig
 echo 'export KUBECONFIG=/root/.kube/config' >> /root/.bashrc
+
+echo "$(date +%T) Checking cluster health..."
+echo "--- Hub cluster pods in osac-e2e-ci namespace ---"
+oc --kubeconfig=/root/.kube/config get pods -n osac-e2e-ci -o wide 2>&1 || true
+echo "--- Hub cluster deployments in osac-e2e-ci namespace ---"
+oc --kubeconfig=/root/.kube/config get deployments -n osac-e2e-ci 2>&1 || true
+echo "--- Hub cluster nodes ---"
+oc --kubeconfig=/root/.kube/config get nodes 2>&1 || true
+echo "--- Hub cluster clusteroperators (degraded) ---"
+oc --kubeconfig=/root/.kube/config get co 2>&1 | grep -E 'NAME|False|True.*True' || true
+echo "--- Virt cluster nodes ---"
+oc --kubeconfig=/root/virt-kubeconfig get nodes 2>&1 || true
+echo "--- Virt cluster KubeVirt status ---"
+oc --kubeconfig=/root/virt-kubeconfig get kubevirt -A 2>&1 || true
+echo "--- Virt cluster pods not ready in openshift-cnv ---"
+oc --kubeconfig=/root/virt-kubeconfig get pods -n openshift-cnv --field-selector=status.phase!=Running 2>&1 || true
+
+echo "$(date +%T) Waiting for OSAC deployments to be available..."
+for dep in $(oc --kubeconfig=/root/.kube/config get deployments -n osac-e2e-ci -o name 2>/dev/null); do
+  echo "$(date +%T) Waiting for ${dep}..."
+  oc --kubeconfig=/root/.kube/config rollout status "${dep}" -n osac-e2e-ci --timeout=300s 2>&1 || true
+done
 
 echo "$(date +%T) Golden image setup complete"
 REMOTE_EOF
