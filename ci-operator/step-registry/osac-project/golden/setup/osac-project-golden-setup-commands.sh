@@ -158,27 +158,68 @@ cp "${GOLDEN_DIR}/hub/hub-kubeconfig" /root/.kube/config
 cp "${GOLDEN_DIR}/virt/virt-kubeconfig" /root/virt-kubeconfig
 echo 'export KUBECONFIG=/root/.kube/config' >> /root/.bashrc
 
-echo "$(date +%T) Checking cluster health..."
-echo "--- Hub cluster pods in osac-e2e-ci namespace ---"
-oc --kubeconfig=/root/.kube/config get pods -n osac-e2e-ci -o wide 2>&1 || true
-echo "--- Hub cluster deployments in osac-e2e-ci namespace ---"
-oc --kubeconfig=/root/.kube/config get deployments -n osac-e2e-ci 2>&1 || true
-echo "--- Hub cluster nodes ---"
-oc --kubeconfig=/root/.kube/config get nodes 2>&1 || true
-echo "--- Hub cluster clusteroperators (degraded) ---"
-oc --kubeconfig=/root/.kube/config get co 2>&1 | grep -E 'NAME|False|True.*True' || true
-echo "--- Virt cluster nodes ---"
-oc --kubeconfig=/root/virt-kubeconfig get nodes 2>&1 || true
-echo "--- Virt cluster KubeVirt status ---"
-oc --kubeconfig=/root/virt-kubeconfig get kubevirt -A 2>&1 || true
-echo "--- Virt cluster pods not ready in openshift-cnv ---"
-oc --kubeconfig=/root/virt-kubeconfig get pods -n openshift-cnv --field-selector=status.phase!=Running 2>&1 || true
+HUB_KC="/root/.kube/config"
+VIRT_KC="/root/virt-kubeconfig"
+
+echo "$(date +%T) Waiting for ingress router..."
+oc --kubeconfig="${HUB_KC}" rollout status deployment/router-default -n openshift-ingress --timeout=300s 2>&1 || true
 
 echo "$(date +%T) Waiting for OSAC deployments to be available..."
-for dep in $(oc --kubeconfig=/root/.kube/config get deployments -n osac-e2e-ci -o name 2>/dev/null); do
+for dep in $(oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci -o name 2>/dev/null); do
   echo "$(date +%T) Waiting for ${dep}..."
-  oc --kubeconfig=/root/.kube/config rollout status "${dep}" -n osac-e2e-ci --timeout=300s 2>&1 || true
+  oc --kubeconfig="${HUB_KC}" rollout status "${dep}" -n osac-e2e-ci --timeout=300s 2>&1 || true
 done
+
+echo "$(date +%T) Waiting for cluster operators to stabilize..."
+for i in $(seq 1 30); do
+  progressing=$(oc --kubeconfig="${HUB_KC}" get co -o jsonpath='{range .items[*]}{.metadata.name}={.status.conditions[?(@.type=="Progressing")].status}{" "}{end}' 2>/dev/null \
+    | tr ' ' '\n' | grep '=True' || true)
+  if [[ -z "${progressing}" ]]; then
+    echo "$(date +%T) All cluster operators stable (${i}0s)"
+    break
+  fi
+  echo "$(date +%T) Still progressing: ${progressing}"
+  sleep 10
+done
+
+echo "$(date +%T) Waiting for OSAC operator pod to stabilize..."
+for i in $(seq 1 30); do
+  restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+    -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
+  ready=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+    -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+  if [[ "${ready}" == "true" ]]; then
+    sleep 10
+    new_restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+      -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
+    if [[ "${restarts}" == "${new_restarts}" ]]; then
+      echo "$(date +%T) OSAC operator stable (ready, no restarts in 10s, total restarts: ${restarts})"
+      break
+    fi
+    echo "$(date +%T) OSAC operator restarted (${restarts} -> ${new_restarts}), waiting..."
+  else
+    echo "$(date +%T) OSAC operator not ready yet (restarts: ${restarts})"
+    sleep 10
+  fi
+done
+
+echo "$(date +%T) Cluster health snapshot..."
+echo "--- Hub deployments in osac-e2e-ci ---"
+oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci 2>&1 || true
+echo "--- Hub pods in osac-e2e-ci ---"
+oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -o wide 2>&1 || true
+echo "--- Hub cluster operators ---"
+oc --kubeconfig="${HUB_KC}" get co 2>&1 || true
+echo "--- Hub nodes ---"
+oc --kubeconfig="${HUB_KC}" get nodes 2>&1 || true
+echo "--- Virt nodes ---"
+oc --kubeconfig="${VIRT_KC}" get nodes 2>&1 || true
+echo "--- Virt KubeVirt status ---"
+oc --kubeconfig="${VIRT_KC}" get kubevirt -A 2>&1 || true
+echo "--- OSAC operator logs (last 50 lines) ---"
+oc --kubeconfig="${HUB_KC}" logs deployment/osac-operator-controller-manager -n osac-e2e-ci --tail=50 2>&1 || true
+echo "--- Fulfillment controller logs (last 30 lines) ---"
+oc --kubeconfig="${HUB_KC}" logs deployment/fulfillment-controller -n osac-e2e-ci --tail=30 2>&1 || true
 
 echo "$(date +%T) Golden image setup complete"
 REMOTE_EOF
