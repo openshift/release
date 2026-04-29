@@ -17,6 +17,8 @@ ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kub
 export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
 
 if [[ -n "${TEST_SKIPS:-}" ]]; then
+    # Strip whitespace around \| separators injected by YAML >- folding
+    TEST_SKIPS=$(echo "$TEST_SKIPS" | sed 's/ *\\|/\\|/g; s/\\| */\\|/g')
     TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
     echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests || { echo 'Error: all tests were filtered out by TEST_SKIPS regex:'; echo "$TEST_SKIPS"; exit 1; }
     echo "Skipping tests:"
