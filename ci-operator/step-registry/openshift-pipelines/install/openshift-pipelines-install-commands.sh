@@ -20,7 +20,6 @@ export CONSOLE_URL
 export API_URL
 export gauge_reports_dir="${ARTIFACT_DIR}"
 export overwrite_reports=false
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export GOPROXY="https://proxy.golang.org/"
 
 # Add timeout to ignore runner connection error
