@@ -521,6 +521,267 @@ WaitAllSubmarinerComponentsReady() {
 }
 
 #=====================
+# WaitGlobalnetHeadlessServiceReady
+#   Creates a canary headless service on the source cluster, exports it, and
+#   verifies that Lighthouse CoreDNS on the target cluster can resolve the
+#   service's Globalnet VIP via the generic DNS format:
+#     <service>.<namespace>.svc.clusterset.local
+#
+#   WHY THIS IS REQUIRED (root cause of run 2049494878454288384 and earlier):
+#
+#   WaitAllSubmarinerComponentsReady confirms that submariner-globalnet,
+#   submariner-lighthouse-agent, and submariner-lighthouse-coredns pods are
+#   all Running. But "Running" does NOT mean the end-to-end headless service
+#   DNS path is functional.
+#
+#   Observed pattern across 4+ consecutive runs:
+#     - StatefulSet pod DNS (web-0.<cluster-id>.<svc>.<ns>.svc.clusterset.local)
+#       PASSES in ~18 seconds — this code path works correctly.
+#     - Generic headless service DNS (<svc>.<ns>.svc.clusterset.local) FAILS
+#       with 'dig' returning "" for the full 247-300 second timeout for EVERY
+#       headless service test case in 'subctl verify'.
+#
+#   This distinguishes two different code paths in the Lighthouse CoreDNS plugin:
+#     1. StatefulSet pod DNS — includes cluster-id in the query, resolved by
+#        per-endpoint GlobalIngressIP lookups keyed on pod hostname. WORKS.
+#     2. Generic headless service DNS — aggregates ALL remote endpoint
+#        GlobalIngressIPs without a cluster-id filter. BROKEN in this config
+#        (Submariner v0.23.1 + OVNKubernetes + Globalnet on c5n.metal).
+#
+#   By running this canary before 'subctl verify', we:
+#     (a) Confirm the specific code path is functional before running 31 specs;
+#     (b) Capture GlobalIngressIP, ServiceImport, and Lighthouse agent logs
+#         immediately if the path is broken — rather than discovering failures
+#         only after 4+ minutes per test case;
+#     (c) Give the system additional time to fully initialise the
+#         GlobalIngressIP → ServiceImport update → Lighthouse DNS pipeline,
+#         which is slower on c5n.metal bare-metal nodes.
+#
+# Arguments:
+#   $1 - kubeconfig for the source cluster (headless service deployed here)
+#   $2 - kubeconfig for the target cluster (dig runs from here)
+#   $3 - source cluster name (for logging)
+#   $4 - target cluster name (for logging)
+#=====================
+WaitGlobalnetHeadlessServiceReady() {
+    typeset kcSource="$1"
+    typeset kcTarget="$2"
+    typeset sourceCluster="$3"
+    typeset targetCluster="$4"
+
+    typeset canaryNS="submariner-canary"
+    typeset canarySvcName="canary-headless"
+    typeset -i maxWait=600   # 10 minutes — generous for bare-metal node image pulls
+    typeset -i interval=10
+    typeset -i elapsed=0
+
+    echo "[INFO] ============================================================"
+    echo "[INFO] Globalnet headless service DNS canary test"
+    echo "[INFO]   Deploy headless svc on : ${sourceCluster}"
+    echo "[INFO]   Verify DNS resolution on: ${targetCluster}"
+    echo "[INFO]   Timeout                : ${maxWait}s"
+    echo "[INFO] ============================================================"
+
+    # Create the canary namespace idempotently on both clusters
+    for kc in "${kcSource}" "${kcTarget}"; do
+        KUBECONFIG="${kc}" oc create namespace "${canaryNS}" \
+            --dry-run=client -o yaml | KUBECONFIG="${kc}" oc apply -f -
+    done
+
+    # Deploy a headless service (clusterIP: None) backed by a single nginx pod
+    echo "[INFO] Creating headless canary service on '${sourceCluster}'"
+    KUBECONFIG="${kcSource}" oc -n "${canaryNS}" apply -f - <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canary
+  template:
+    metadata:
+      labels:
+        app: canary
+    spec:
+      containers:
+      - name: nginx
+        image: nginxinc/nginx-unprivileged:stable-alpine
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary-headless
+spec:
+  clusterIP: None
+  selector:
+    app: canary
+  ports:
+  - port: 80
+    targetPort: 8080
+YAML
+
+    # Wait for the canary pod to be running so that endpoints exist
+    echo "[INFO] Waiting for canary deployment to be ready on '${sourceCluster}'"
+    KUBECONFIG="${kcSource}" oc -n "${canaryNS}" rollout status \
+        deployment/canary --timeout=5m
+
+    # Export the headless service via Submariner so Lighthouse publishes it
+    echo "[INFO] Exporting canary headless service on '${sourceCluster}'"
+    KUBECONFIG="${kcSource}" "${subctlBin}" export service \
+        --namespace "${canaryNS}" "${canarySvcName}"
+
+    # ----------------------------------------------------------------
+    # Phase 1: Wait for GlobalIngressIP to be assigned on the SOURCE cluster.
+    #
+    # For a headless service Globalnet assigns one GlobalIngressIP per backing
+    # pod endpoint (as opposed to one per Service for ClusterIP services).
+    # The allocated IP is the Globalnet VIP that remote clusters will resolve.
+    # Without this, Lighthouse DNS on the target cluster returns "".
+    # ----------------------------------------------------------------
+    typeset giAllocatedIP=""
+    typeset -i giWait=0
+    typeset -i giMax=300
+    echo "[INFO] Waiting for GlobalIngressIP for '${canarySvcName}' on '${sourceCluster}' (timeout=${giMax}s)"
+    while (( giWait < giMax )); do
+        giAllocatedIP="$(
+            KUBECONFIG="${kcSource}" oc get globalingressips \
+                -n "${canaryNS}" \
+                -o jsonpath='{.items[0].status.allocatedIP}' 2>/dev/null || true
+        )"
+        if [[ -n "${giAllocatedIP}" ]]; then
+            echo "[INFO] GlobalIngressIP assigned: ${giAllocatedIP} (after ${giWait}s)"
+            break
+        fi
+        echo "[INFO]   No GlobalIngressIP yet on '${sourceCluster}' (${giWait}/${giMax}s)"
+        sleep "${interval}"
+        (( giWait += interval ))
+    done
+
+    if [[ -z "${giAllocatedIP}" ]]; then
+        echo "[ERROR] GlobalIngressIP not assigned for '${canarySvcName}' on '${sourceCluster}' after ${giMax}s" >&2
+        echo "[DEBUG] All GlobalIngressIPs on '${sourceCluster}':" >&2
+        KUBECONFIG="${kcSource}" oc get globalingressips -A -o wide 2>&1 || true
+        echo "[DEBUG] ServiceExports on '${sourceCluster}':" >&2
+        KUBECONFIG="${kcSource}" oc get serviceexports -A -o wide 2>&1 || true
+        echo "[DEBUG] GlobalIngressIP CRD on '${sourceCluster}':" >&2
+        KUBECONFIG="${kcSource}" oc get crd globalingressips.submariner.io -o yaml 2>&1 | head -30 || true
+        # Capture submariner-globalnet pod logs — most likely to reveal the failure reason
+        typeset gnPod
+        gnPod="$(
+            KUBECONFIG="${kcSource}" oc get pods -n submariner-operator \
+                -l app=submariner-globalnet \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+        )"
+        if [[ -n "${gnPod}" ]]; then
+            echo "[DEBUG] submariner-globalnet pod logs on '${sourceCluster}' (last 80 lines):" >&2
+            KUBECONFIG="${kcSource}" oc logs "${gnPod}" \
+                -n submariner-operator --tail=80 2>&1 || true
+        fi
+        exit 1
+    fi
+
+    # ----------------------------------------------------------------
+    # Phase 2: Verify DNS from the TARGET cluster resolves the Globalnet VIP
+    # using the generic headless service format:
+    #   <service>.<namespace>.svc.clusterset.local
+    #
+    # This is the EXACT DNS pattern used by 'subctl verify' headless tests and
+    # the one that was consistently returning "" in all previous runs despite
+    # GlobalIngressIP assignment succeeding on the source cluster.
+    # A successful resolution here proves the full propagation pipeline:
+    #   GlobalIngressIP (source) → lighthouse-agent (source) →
+    #   broker → lighthouse-agent (target) → lighthouse-coredns (target) → DNS
+    # ----------------------------------------------------------------
+    echo "[INFO] Creating dig pod on '${targetCluster}'"
+    KUBECONFIG="${kcTarget}" oc -n "${canaryNS}" delete pod submariner-canary-dig \
+        --ignore-not-found --grace-period=0 2>/dev/null || true
+    KUBECONFIG="${kcTarget}" oc -n "${canaryNS}" run submariner-canary-dig \
+        --image=quay.io/submariner/nettest \
+        --restart=Never \
+        --command -- sleep 700
+    KUBECONFIG="${kcTarget}" oc -n "${canaryNS}" wait pod/submariner-canary-dig \
+        --for=condition=Ready --timeout=3m
+
+    typeset digResult=""
+    echo "[INFO] Polling dig on '${targetCluster}': '${canarySvcName}.${canaryNS}.svc.clusterset.local' (timeout=${maxWait}s)"
+    while (( elapsed < maxWait )); do
+        digResult="$(
+            KUBECONFIG="${kcTarget}" oc -n "${canaryNS}" exec \
+                submariner-canary-dig -- \
+                dig +short "${canarySvcName}.${canaryNS}.svc.clusterset.local" \
+                2>/dev/null || true
+        )"
+        if [[ -n "${digResult}" ]]; then
+            echo "[INFO] Headless DNS resolved after ${elapsed}s: '${canarySvcName}' -> '${digResult}'"
+            break
+        fi
+        echo "[INFO]   dig returned '' (${elapsed}/${maxWait}s elapsed)"
+        sleep "${interval}"
+        (( elapsed += interval ))
+    done
+
+    if [[ -z "${digResult}" ]]; then
+        echo "[ERROR] Headless service DNS did not resolve on '${targetCluster}' after ${maxWait}s" >&2
+        echo "[ERROR]   Expected GlobalIngressIP VIP: ${giAllocatedIP}" >&2
+        echo "[DEBUG] ServiceImports on '${targetCluster}':" >&2
+        KUBECONFIG="${kcTarget}" oc get serviceimports -A -o wide 2>&1 || true
+        echo "[DEBUG] GlobalIngressIPs on '${sourceCluster}':" >&2
+        KUBECONFIG="${kcSource}" oc get globalingressips -A -o wide 2>&1 || true
+        # Lighthouse agent on SOURCE — responsible for propagating VIP to broker
+        typeset laSourcePod
+        laSourcePod="$(
+            KUBECONFIG="${kcSource}" oc get pods -n submariner-operator \
+                -l app=submariner-lighthouse-agent \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+        )"
+        if [[ -n "${laSourcePod}" ]]; then
+            echo "[DEBUG] submariner-lighthouse-agent logs on '${sourceCluster}' (last 80 lines):" >&2
+            KUBECONFIG="${kcSource}" oc logs "${laSourcePod}" \
+                -n submariner-operator --tail=80 2>&1 || true
+        fi
+        # Lighthouse agent on TARGET — responsible for creating local ServiceImport
+        typeset laTargetPod
+        laTargetPod="$(
+            KUBECONFIG="${kcTarget}" oc get pods -n submariner-operator \
+                -l app=submariner-lighthouse-agent \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+        )"
+        if [[ -n "${laTargetPod}" ]]; then
+            echo "[DEBUG] submariner-lighthouse-agent logs on '${targetCluster}' (last 80 lines):" >&2
+            KUBECONFIG="${kcTarget}" oc logs "${laTargetPod}" \
+                -n submariner-operator --tail=80 2>&1 || true
+        fi
+        # Lighthouse CoreDNS on TARGET — serves the actual DNS answers
+        typeset coreTargetPod
+        coreTargetPod="$(
+            KUBECONFIG="${kcTarget}" oc get pods -n submariner-operator \
+                -l app=submariner-lighthouse-coredns \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+        )"
+        if [[ -n "${coreTargetPod}" ]]; then
+            echo "[DEBUG] submariner-lighthouse-coredns logs on '${targetCluster}' (last 80 lines):" >&2
+            KUBECONFIG="${kcTarget}" oc logs "${coreTargetPod}" \
+                -n submariner-operator --tail=80 2>&1 || true
+        fi
+        exit 1
+    fi
+
+    # Cleanup canary resources on both clusters
+    echo "[INFO] Cleaning up canary resources"
+    KUBECONFIG="${kcSource}" oc delete namespace "${canaryNS}" \
+        --ignore-not-found 2>/dev/null || true
+    KUBECONFIG="${kcTarget}" oc delete namespace "${canaryNS}" \
+        --ignore-not-found 2>/dev/null || true
+
+    echo "[INFO] Globalnet headless service DNS canary test PASSED"
+    true
+}
+
+#=====================
 # VerifyConnectivity
 #   Runs 'subctl verify' between two spoke clusters to validate that
 #   Submariner tunnels are established and cross-cluster connectivity works.
@@ -761,6 +1022,33 @@ done
 # service-discovery tests in subctl verify to fail with empty dig results.
 for ((i = 0; i < spokeCount; i++)); do
     WaitAllSubmarinerComponentsReady "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
+done
+
+# Canary: verify that the generic headless service Globalnet DNS path
+# (service.namespace.svc.clusterset.local) works end-to-end before running
+# the full subctl verify suite (31 test specs, 4+ min each on failure).
+#
+# WHY this is needed after WaitAllSubmarinerComponentsReady:
+#   All Submariner pods pass rollout status, but the headless service DNS code
+#   path (Globalnet endpoint → lighthouse-agent propagation → CoreDNS response)
+#   was systematically returning "" for 247-300 s per test across 4 consecutive
+#   runs. StatefulSet pod DNS (different code path) always passed.
+#   The canary either confirms the path works or fails fast with diagnostics from
+#   GlobalIngressIP CRs, ServiceImport state, and lighthouse-agent/coredns logs.
+for ((i = 0; i < spokeCount - 1; i++)); do
+    WaitGlobalnetHeadlessServiceReady \
+        "${spokeKubeconfigs[$((i + 1))]}" \
+        "${spokeKubeconfigs[i]}" \
+        "${spokeNames[$((i + 1))]}" \
+        "${spokeNames[i]}"
+done
+
+# Capture full Submariner diagnostic state on both clusters before running
+# subctl verify. This preserves the cluster health snapshot in CI artifacts
+# and is invaluable when individual test cases fail.
+for ((i = 0; i < spokeCount; i++)); do
+    echo "[INFO] --- subctl diagnose all on '${spokeNames[i]}' ---"
+    KUBECONFIG="${spokeKubeconfigs[i]}" "${subctlBin}" diagnose all 2>&1 || true
 done
 
 # Step 6: subctl verify — automated tunnel and service-discovery validation
