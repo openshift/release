@@ -8,10 +8,9 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-# Only trigger the next job in the chain if SKIP_CHAIN_TRIGGER is not set
-# When manually triggering via curl, pass: "MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER": "true"
-if [ "${SKIP_CHAIN_TRIGGER}" == "true" ]; then
-  echo "SKIP_CHAIN_TRIGGER is set to true — skipping chain trigger to prevent cascade"
+echo "Validate MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER variable: ${MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER}"
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER,,}" = "true" ]]; then
+  echo "🛑 MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER=true — skipping script"
   exit 0
 fi
 
