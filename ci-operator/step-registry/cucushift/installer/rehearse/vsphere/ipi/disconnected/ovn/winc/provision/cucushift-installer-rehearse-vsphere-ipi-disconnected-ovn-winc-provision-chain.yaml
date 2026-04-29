@@ -1,0 +1,35 @@
+chain:
+  as: cucushift-installer-rehearse-vsphere-ipi-disconnected-ovn-winc-provision
+  steps:
+  - chain: ipi-conf-vsphere
+  - chain: vsphere-provision-bastionhost
+  - chain: mirror-images-payload
+  - ref: ovn-conf
+  - ref: ovn-conf-hybrid-manifest-with-custom-vxlan-port
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install
+  - ref: ipi-install-vsphere-registry
+  - ref: openshift-windows-setup-wmco-konflux-disconnected
+  - ref: mirror-images-tag-images
+  - ref: windows-e2e-operator-test-mirror-images
+  - ref: set-sample-operator-disconnected
+  - ref: ssh-bastion
+  - ref: openshift-windows-install-wmco
+  - ref: windows-conf-operator
+  - ref: ipi-conf-vsphere-windows-machineset
+  - ref: cucushift-winc-prepare
+  env:
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+    documentation: |-
+      Register DNS for mirror registry.
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: |-
+      Mirror images by running oc adm release mirror on the bastion host.
+  - name: ENABLE_IDMS
+    default: "yes"
+    documentation: |-
+      Use ImageDigestMirrorSet instead of deprecated ImageContentSourcePolicy.
+  documentation: |-
+    Create an IPI cluster in disconnected (air-gapped) network on vSphere with OVN hybrid overlay and Windows workers for QE e2e tests.
