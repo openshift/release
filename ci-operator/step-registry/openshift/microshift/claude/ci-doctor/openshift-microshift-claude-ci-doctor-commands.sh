@@ -36,9 +36,12 @@ atexit_handler() {
         return 1
     fi
 
-    # Check if Claude log contains tool errors
-    if grep -q '"is_error":\s*true' "${WORKDIR}/claude-output.log"; then
-        echo "ERROR: Claude log contains tool errors"
+    # Check if the Claude session completed successfully
+    local result_line
+    result_line=$(grep '"type":"result"' "${WORKDIR}/claude-output.log" | tail -1)
+    if ! echo "$result_line" | grep -q '"subtype":"success"' ||
+       ! echo "$result_line" | grep -q '"is_error":false'; then
+        echo "ERROR: Claude session did not complete successfully"
         return 1
     fi
 }
@@ -191,13 +194,6 @@ configure_claude() {
       "Bash(bash /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
       "Bash(python3 /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
-      "Bash(curl:*)",
-      "Bash(date:*)",
-      "Bash(cat:*)",
-      "Bash(echo:*)",
-      "Bash(wc:*)",
-      "Bash(ls:*)",
-      "Bash(jq:*)",
       "Skill(microshift-ci:create-bugs)",
       "Skill(microshift-ci:doctor)",
       "Skill(microshift-ci:prow-job)",
@@ -250,7 +246,7 @@ configure_claude
 # Clone the edge-tooling repository from the main branch to get the latest
 # microshift-ci skills and run analysis on all releases and open pull requests
 SRC_DIR="/tmp/edge-tooling"
-EXE_DIR="${SRC_DIR}/plugins/microshift-ci/scripts"
+PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 { set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_EDGE}"; set -x; }
 gh repo clone openshift-eng/edge-tooling "${SRC_DIR}" -- --branch main
 cd "${SRC_DIR}"
@@ -265,6 +261,7 @@ timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
 
@@ -272,7 +269,7 @@ timeout 3600 claude \
 # restarted tests complete successfully, the PR will be automatically
 # approved next time the analysis runs.
 echo "Running automatic restart of failed rebase PRs tests..."
-"${EXE_DIR}/prow-jobs-for-pull-requests.sh" \
+"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
     --mode restart \
     --execute \
     --author 'microshift-rebase-script[bot]'

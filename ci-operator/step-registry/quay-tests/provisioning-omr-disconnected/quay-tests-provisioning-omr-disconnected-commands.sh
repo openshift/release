@@ -17,7 +17,7 @@ OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
 OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
 if [ -z "${OMR_IMAGE_ENV+x}" ]; then
-    OMR_IMAGE_TAG="${OMR_IMAGE}"
+    OMR_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_OMR_IMAGE}"
 else
    OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE_ENV}"
 fi
@@ -128,7 +128,7 @@ resource "aws_security_group" "quaybuilder" {
 resource "aws_instance" "quaybuilder" {
   key_name      = aws_key_pair.quaybuilder0710.key_name
   ami           = "${ami_id}"
-  instance_type = "m6i.xlarge"
+  instance_type = "m6i.2xlarge"
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.quaybuilder.id]
   subnet_id = "${PublicSubnet}"
