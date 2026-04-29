@@ -179,24 +179,40 @@ until [[ -n "${csvName}" ]]; do
 done
 echo "[INFO] OLM installed CSV: ${csvName}"
 
-# Wait for the storageclusters.ocs.openshift.io CRD to be Established.
+# Wait for the storageclusters.ocs.openshift.io CRD to be registered and Established.
 #
 #
-# 1. oc wait deployment ocs-operator → NotFound.
-#    'ocs-operator' is a sub-component created only AFTER StorageSystem/StorageCluster
-#    exists. Waiting for it before applying the StorageCluster manifest was wrong.
 #
-# 2. oc wait deployment odf-operator → NotFound.
-#    ODF 4.16+ restructured the operator packaging. The CSV
-#    odf-operator.v4.20.10-rhodf succeeds (installedCSV is populated) but does
-#    NOT create a deployment named 'odf-operator' in openshift-storage. The
-#    controller runs under a different name that varies between ODF releases.
-#    'oc wait' fails immediately on NotFound; it does not poll for creation.
+#   Phase 1 — poll for existence with 'oc get' until the CRD object appears.
+#             'oc get' returns exit 1 when the resource is absent; a loop on that
+#             correctly handles the creation race without races of its own.
 #
-
+#   Phase 2 — once the object exists, 'oc wait --for=condition=Established' is safe
+#             because 'oc wait' now has an object to watch and will block until the
+#             condition flips, using --timeout as a hard cap.
+#
+typeset -i crdWait=0
+typeset -i crdMax=300   # 5 minutes — mirrors the old single-command timeout
+echo "[INFO] Waiting for CRD storageclusters.ocs.openshift.io to be registered (timeout=${crdMax}s)"
+until oc get crd storageclusters.ocs.openshift.io &>/dev/null 2>&1; do
+    if (( crdWait >= crdMax )); then
+        echo "[ERROR] CRD storageclusters.ocs.openshift.io not registered after ${crdMax}s" >&2
+        echo "[DEBUG] OCS/ODF CRDs currently registered:" >&2
+        oc get crd 2>&1 | grep -Ei 'ocs|odf|storage' || true
+        echo "[DEBUG] CSVs in ${odfInstallNamespace}:" >&2
+        oc -n "${odfInstallNamespace}" get csv -o wide 2>&1 || true
+        echo "[DEBUG] Pods in ${odfInstallNamespace}:" >&2
+        oc -n "${odfInstallNamespace}" get pods -o wide 2>&1 || true
+        exit 1
+    fi
+    echo "[INFO]   CRD not yet registered (${crdWait}/${crdMax}s elapsed)"
+    sleep 10
+    (( crdWait += 10 ))
+done
+echo "[INFO] CRD storageclusters.ocs.openshift.io registered after ${crdWait}s — waiting for Established"
 oc wait crd storageclusters.ocs.openshift.io \
     --for=condition='Established' \
-    --timeout='5m'
+    --timeout='2m'
 
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
     --selector='node-role.kubernetes.io/worker'
