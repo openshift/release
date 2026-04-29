@@ -185,23 +185,23 @@ test_ovn_service_sync() {
     
     # Get all ovnkube-node pods on worker nodes
     local worker_ovnkube_pods
-    mapfile -t worker_ovnkube_pods < <(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o json | python3 -c "
-import json
-import sys
-data = json.load(sys.stdin)
-for item in data['items']:
-    node_name = item['spec']['nodeName']
-    pod_name = item['metadata']['name']
-    # Check if node is a worker
-    try:
-        import subprocess
-        result = subprocess.run(['oc', 'get', 'node', node_name, '-o', 'jsonpath={.metadata.labels.node-role\.kubernetes\.io/worker}'], 
-                              capture_output=True, text=True, check=False)
-        if result.stdout.strip():  # Has worker label
-            print(pod_name)
-    except:
-        pass
-")
+    echo "Finding ovnkube-node pods on worker nodes..."
+    
+    # First, list all worker nodes
+    local worker_nodes
+    mapfile -t worker_nodes < <(oc get nodes -l node-role.kubernetes.io/worker --no-headers -o custom-columns=NAME:.metadata.name)
+    echo "Worker nodes found: ${worker_nodes[*]}"
+    
+    # List all ovnkube-node pods
+    echo "All ovnkube-node pods:"
+    oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o wide
+    
+    # Get ovnkube-node pods on worker nodes
+    mapfile -t worker_ovnkube_pods < <(
+        for worker_node in "${worker_nodes[@]}"; do
+            oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --field-selector spec.nodeName="$worker_node" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | grep -v "^$"
+        done
+    )
     
     if [[ ${#worker_ovnkube_pods[@]} -eq 0 ]]; then
         echo "❌ ERROR: No ovnkube-node pods found on worker nodes"
