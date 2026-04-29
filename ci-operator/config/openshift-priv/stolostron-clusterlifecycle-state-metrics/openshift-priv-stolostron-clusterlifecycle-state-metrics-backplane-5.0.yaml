@@ -20,6 +20,11 @@ images:
   - dockerfile_path: build/Dockerfile.coverage.prow
     from: clusterlifecycle-state-metrics
     to: clusterlifecycle-state-metrics-coverage
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -38,12 +43,11 @@ resources:
       cpu: 81m
       memory: 200Mi
 tests:
-- as: sonar-pre-submit
+- as: sonarcloud
   commands: |
     export HOME="/tmp"
     export XDG_CONFIG_HOME="/tmp/xdg_config"
     export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -51,6 +55,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: check
   commands: make check
   container:
@@ -63,7 +68,15 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
+    env:
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: openshift-priv
   repo: stolostron-clusterlifecycle-state-metrics
