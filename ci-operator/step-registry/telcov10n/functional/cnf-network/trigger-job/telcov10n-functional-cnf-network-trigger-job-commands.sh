@@ -8,7 +8,13 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-echo "Set tigger TOKEN env var"
+echo "Validate MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER variable: ${MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER}"
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER,,}" = "true" ]]; then
+  echo "🛑 MULTISTAGE_PARAM_OVERRIDE_SKIP_CHAIN_TRIGGER=true — skipping script"
+  exit 0
+fi
+
+echo "Set trigger TOKEN env var"
 TOKEN=$(cat /var/prow-trigger-token/token)
 
 curl -v -X POST \
