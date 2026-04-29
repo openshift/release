@@ -76,7 +76,9 @@ do
   master_name=\$(printf \$MASTER_HOSTNAME_FORMAT \$n)
   master_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$master_name']/@ip)" -)
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${master_ip} \
-    sudo cat /var/log/pacemaker/pacemaker.log > /tmp/artifacts/pacemaker_\${master_name//:/_}.log || true
+    sudo cat /var/log/pacemaker/pacemaker.log | \
+    sed -E 's/(name="(password|passwd|username)" value=")[^"]*/\1REDACTED/g' \
+    > /tmp/artifacts/pacemaker_\${master_name//:/_}.log || true
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${master_ip} \
     sudo podman logs etcd > /tmp/artifacts/podman-etcd_\${master_name//:/_}.log 2>&1 || true
 done
