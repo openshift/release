@@ -442,9 +442,28 @@ main() {
 	echo "failed to check mcp status. resolve the above errors"
   }
 
-  # Exit early if MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE is not provided
+  # Without an index image we normally skip the rest. For TEST_TYPE=dev, still apply
+  # Konflux ICSP so bundle/catalog installs can resolve registry.redhat.io references to quay.
   if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE}" ]]; then
-    echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty. Skipping catalog source creation..."
+    echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty."
+    if [[ "${TEST_TYPE}" == "dev" ]]; then
+      echo "TEST_TYPE is dev: creating ImageContentSourcePolicy for Konflux dev repos, then exiting (no catalog source)."
+      # Skip ICSP on management cluster for hypershift (same as connected path below).
+      if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+        create_icsp_connected || {
+          echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+          return 1
+        }
+        check_mcp_status || {
+          echo "failed to check mcp status. resolve the above errors"
+        }
+      else
+        echo "nested_kubeconfig present: skipping ICSP on this cluster (hypershift management cluster)."
+      fi
+      echo "Skipping catalog source creation (no index image)."
+      exit 0
+    fi
+    echo "Skipping catalog source creation..."
     exit 0
   fi
 

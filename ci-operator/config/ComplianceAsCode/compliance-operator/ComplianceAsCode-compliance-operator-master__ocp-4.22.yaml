@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  initial:
+    integration:
+      name: "4.22"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: e2e-aws-prerelease-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-dev:master
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: dev
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-prerelease
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: ComplianceAsCode
+  repo: compliance-operator
+  variant: ocp-4.22
