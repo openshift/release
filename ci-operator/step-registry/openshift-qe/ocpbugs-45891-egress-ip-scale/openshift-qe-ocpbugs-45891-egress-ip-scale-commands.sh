@@ -190,6 +190,10 @@ echo "✅ Successfully created $TOTAL_EGRESSIP_OBJECTS EgressIP objects"
 echo ""
 echo "=== STEP 5: Wait for EgressIP assignment ==="
 
+# Record start time for assignment timing
+assignment_start_time=$(date +%s)
+echo "📊 Recording EgressIP assignment start time: $(date)"
+
 # Wait for EgressIPs to be assigned
 echo "⏳ Waiting for EgressIP assignments to stabilize..."
 
@@ -197,6 +201,15 @@ wait_for_condition \
     "EgressIP assignments to stabilize" \
     "[ \$(oc get egressip -o jsonpath='{range .items[*]}{.status.items[0].node}{\"\n\"}{end}' | grep -v '^\$' | wc -l) -ge $((EXPECTED_ASSIGNED_EGRESSIPS - 5)) ]" \
     "$TEST_TIMEOUT"
+
+# Calculate assignment duration
+assignment_end_time=$(date +%s)
+assignment_duration=$((assignment_end_time - assignment_start_time))
+assignment_minutes=$((assignment_duration / 60))
+assignment_seconds=$((assignment_duration % 60))
+
+echo "⏱️  EgressIP assignment completed in: ${assignment_minutes}m ${assignment_seconds}s (${assignment_duration}s total)"
+echo "📈 Assignment rate: ~$(echo "scale=2; $TOTAL_EGRESSIP_OBJECTS / $assignment_duration" | bc) EgressIPs per second"
 
 echo ""
 echo "=== STEP 6: Validate EgressIP assignment results ==="

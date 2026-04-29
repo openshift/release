@@ -9,8 +9,13 @@ presubmits:
     context: ci/prow/check
     decorate: true
     decoration_config:
+<<<<<<< HEAD:ci-operator/jobs/openshift-priv/stolostron-console/openshift-priv-stolostron-console-release-5.0-presubmits.yaml
       skip_cloning: true
     hidden: true
+=======
+      sparse_checkout_files:
+      - Dockerfile
+>>>>>>> fa1e2127285 (workflow fix):ci-operator/jobs/stolostron/search-collector/stolostron-search-collector-release-2.6-presubmits.yaml
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -24,7 +29,67 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+<<<<<<< HEAD:ci-operator/jobs/openshift-priv/stolostron-console/openshift-priv-stolostron-console-release-5.0-presubmits.yaml
         - --target=check
+=======
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.6$
+    - ^release-2\.6-
+    cluster: build06
+    context: ci/prow/lint
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-search-collector-release-2.6-lint
+    rerun_command: /test lint
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=lint
+>>>>>>> fa1e2127285 (workflow fix):ci-operator/jobs/stolostron/search-collector/stolostron-search-collector-release-2.6-presubmits.yaml
         command:
         - ci-operator
         env:
@@ -145,8 +210,13 @@ presubmits:
     context: ci/prow/pr-image-mirror
     decorate: true
     decoration_config:
+<<<<<<< HEAD:ci-operator/jobs/openshift-priv/stolostron-console/openshift-priv-stolostron-console-release-5.0-presubmits.yaml
       skip_cloning: true
     hidden: true
+=======
+      sparse_checkout_files:
+      - Dockerfile
+>>>>>>> fa1e2127285 (workflow fix):ci-operator/jobs/stolostron/search-collector/stolostron-search-collector-release-2.6-presubmits.yaml
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -227,6 +297,7 @@ presubmits:
     context: ci/prow/pr-image-mirror-mce
     decorate: true
     decoration_config:
+<<<<<<< HEAD:ci-operator/jobs/openshift-priv/stolostron-console/openshift-priv-stolostron-console-release-5.0-presubmits.yaml
       skip_cloning: true
     hidden: true
     labels:
@@ -235,6 +306,86 @@ presubmits:
     name: pull-ci-openshift-priv-stolostron-console-release-5.0-pr-image-mirror-mce
     path_alias: github.com/stolostron/console
     rerun_command: /test pr-image-mirror-mce
+=======
+      sparse_checkout_files:
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-search-collector-release-2.6-sonar-pre-submit
+    rerun_command: /test sonar-pre-submit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-pre-submit
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.6$
+    - ^release-2\.6-
+    cluster: build06
+    context: ci/prow/test-on-kind-cluster
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-search-collector-release-2.6-test-on-kind-cluster
+    rerun_command: /test test-on-kind-cluster
+>>>>>>> fa1e2127285 (workflow fix):ci-operator/jobs/stolostron/search-collector/stolostron-search-collector-release-2.6-presubmits.yaml
     spec:
       containers:
       - args:
@@ -309,8 +460,13 @@ presubmits:
     context: ci/prow/unit-tests-sonarcloud
     decorate: true
     decoration_config:
+<<<<<<< HEAD:ci-operator/jobs/openshift-priv/stolostron-console/openshift-priv-stolostron-console-release-5.0-presubmits.yaml
       skip_cloning: true
     hidden: true
+=======
+      sparse_checkout_files:
+      - Dockerfile
+>>>>>>> fa1e2127285 (workflow fix):ci-operator/jobs/stolostron/search-collector/stolostron-search-collector-release-2.6-presubmits.yaml
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
