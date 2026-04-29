@@ -98,13 +98,15 @@ if [[ "${POD_CAPTURE_ENABLED:-true}" == "true" ]]; then
   echo "Started pod state capture (PID: ${POD_CAPTURE_PID}, interval: ${POD_CAPTURE_INTERVAL}s)"
 fi
 
-./run.sh
+cleanup_pod_capture() {
+  if [[ -n "${POD_CAPTURE_PID:-}" ]]; then
+    kill ${POD_CAPTURE_PID} 2>/dev/null || true
+    echo "Stopped pod state capture"
+  fi
+}
+trap cleanup_pod_capture EXIT
 
-# Stop pod state capture
-if [[ -n "${POD_CAPTURE_PID:-}" ]]; then
-  kill ${POD_CAPTURE_PID} 2>/dev/null || true
-  echo "Stopped pod state capture"
-fi
+./run.sh
 
 METRICS_FOLDER="collected-metrics-${UUID}"
 if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
