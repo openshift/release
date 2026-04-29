@@ -26,7 +26,6 @@ export GOPROXY="https://proxy.golang.org/"
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
 # login for interop
-set +x
 if test -f "${SHARED_DIR}/kubeadmin-password"
 then
   OCP_CRED_USR="kubeadmin"
@@ -35,9 +34,8 @@ then
   export OCP_CRED_PSW
   oc login -u kubeadmin -p "$(cat "${SHARED_DIR}/kubeadmin-password")" "${API_URL}" --insecure-skip-tls-verify=true
 else #login for ROSA & Hypershift platforms
-  eval "$(cat "${SHARED_DIR}/api.login")"
+  set +x; eval "$(cat "${SHARED_DIR}/api.login")"; set -x
 fi
-set -x
 
 # Install openshift-pipelines operator (olm.spec)
 CATALOG_SOURCE=redhat-operators CHANNEL="${OLM_CHANNEL:-latest}" gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
