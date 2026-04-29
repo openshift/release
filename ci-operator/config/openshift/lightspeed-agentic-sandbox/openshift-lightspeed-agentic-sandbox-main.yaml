@@ -1,0 +1,28 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-312:9
+      USER 0
+      RUN pip install uv==0.9.24
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: lint
+  commands: make install && make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: unit-test
+  commands: make install && make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-agentic-sandbox
