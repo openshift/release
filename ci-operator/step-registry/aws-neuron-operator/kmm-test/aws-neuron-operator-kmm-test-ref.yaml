@@ -1,0 +1,28 @@
+ref:
+  as: aws-neuron-operator-kmm-test
+  from: eco-gotests
+  grace_period: 10m
+  commands: aws-neuron-operator-kmm-test-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 90m
+  env:
+  - name: KMM_TEST_FEATURES
+    default: "modules"
+    documentation: The eco-gotests feature directories to run for KMM tests (space-separated).
+  - name: KMM_TEST_LABELS
+    default: "kmm-sanity && !bmc"
+    documentation: Ginkgo label filter expression for KMM test selection.
+  - name: ECO_HWACCEL_KMM_REGISTRY
+    default: "quay.io/ocp-edge-qe"
+    documentation: External registry used by KMM tests for pushing built module images.
+  - name: ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE
+    default: "quay.io/cvultur/device-plugin:latest-%s"
+    documentation: Device plugin image template. The %s is replaced with the node architecture (amd64/arm64).
+  documentation: |-
+    Runs KMM (Kernel Module Management) sanity tests using eco-gotests on a
+    ROSA cluster where KMM is already installed. Validates basic KMM
+    functionality including module build/sign/load, device plugin, webhooks,
+    in-tree replacement, firmware loading, and DTK auto-selection.
