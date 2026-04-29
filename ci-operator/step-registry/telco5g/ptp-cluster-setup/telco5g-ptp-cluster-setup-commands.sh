@@ -323,7 +323,8 @@ fi
 if [[ -f "$SHARED_DIR/kubeconfig" ]]; then
   echo "************ Cluster version (oc get clusterversion) ************"
   if ! KUBECONFIG="$SHARED_DIR/kubeconfig" oc get clusterversion; then
-    echo "WARNING: oc get clusterversion failed (API unreachable, auth, or oc missing in this ref)"
+    echo "ERROR: oc get clusterversion failed (API unreachable, auth, or oc missing in this ref)"
+    status=1
   fi
   echo "****************************************************************"
 fi
