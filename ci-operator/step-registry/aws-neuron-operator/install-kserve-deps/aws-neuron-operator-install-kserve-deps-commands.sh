@@ -167,16 +167,18 @@ KNATIVE_TIMEOUT=300
 KNATIVE_ELAPSED=0
 while [[ ${KNATIVE_ELAPSED} -lt ${KNATIVE_TIMEOUT} ]]; do
     if oc get configmap config-deployment -n knative-serving &>/dev/null; then
-        oc patch configmap config-deployment -n knative-serving --type=merge \
-            -p '{"data":{"registries-skipping-tag-resolving":"kind.local,ko.local,dev.local,registry.redhat.io"}}' || true
-        echo "Knative Serving config-deployment patched"
-        break
+        if oc patch configmap config-deployment -n knative-serving --type=merge \
+            -p '{"data":{"registries-skipping-tag-resolving":"kind.local,ko.local,dev.local,registry.redhat.io"}}'; then
+            echo "Knative Serving config-deployment patched"
+            break
+        fi
     fi
     sleep 10
     KNATIVE_ELAPSED=$((KNATIVE_ELAPSED + 10))
 done
 if [[ ${KNATIVE_ELAPSED} -ge ${KNATIVE_TIMEOUT} ]]; then
-    echo "WARNING: knative-serving/config-deployment configmap not found within ${KNATIVE_TIMEOUT}s"
+    echo "ERROR: knative-serving/config-deployment configmap could not be patched within ${KNATIVE_TIMEOUT}s"
+    exit 1
 fi
 
 # --- 8. Create ServingRuntime ---
