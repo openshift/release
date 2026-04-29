@@ -130,6 +130,19 @@ copy_artifacts() {
         cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
     fi
 
+    # Extract blocking/informing job summaries into a single file for
+    # downstream steps.  Each line is prefixed BLOCKING| or INFORMING|.
+    # SHARED_DIR is backed by a K8s Secret (1 MB limit) so only the
+    # extracted data is shared — not the full multi-MB stream-JSON log.
+    if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
+        {
+            sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
+                | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+'
+            sed -n '/INFORMING_JOBS_START/,/INFORMING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
+                | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+'
+        } | sort -u > "${SHARED_DIR}/failing-jobs.txt" || true
+    fi
+
     # Archive Claude session for local continuation
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session..."
@@ -267,4 +280,5 @@ EOF
 
 echo ""
 echo "JUnit XML written to ${JUNIT_FILE}"
+touch "${SHARED_DIR}/monitor-completed"
 echo "=== Edge CI Monitor complete ==="
