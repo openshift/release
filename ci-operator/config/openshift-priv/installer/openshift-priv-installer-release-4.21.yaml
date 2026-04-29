@@ -121,8 +121,6 @@ promotion:
     - src-oc
     name: 4.21-priv
     namespace: ocp-private
-prowgen:
-  private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -752,7 +750,7 @@ tests:
   as: e2e-openstack-singlestackv6
   optional: true
   steps:
-    cluster_profile: openstack-hwoffload
+    cluster_profile: openstack-vexxhost
     workflow: openshift-e2e-openstack-singlestackv6
 - always_run: false
   as: e2e-openstack-proxy
@@ -1055,6 +1053,14 @@ tests:
         AGENT_PLATFORM_TYPE=none
         NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-two-node-fencing-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-two-node-fencing-ipv4
 - always_run: false
   as: e2e-agent-compact-ipv4-appliance-diskimage
   capabilities:

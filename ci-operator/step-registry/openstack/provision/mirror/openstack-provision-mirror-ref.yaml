@@ -25,8 +25,20 @@ ref:
     - name: CONTROL_PLANE_NETWORK
       default: ''
       documentation: |-
-        Name of the OpenStack dualstack network. Defaults to the value in
+        Name of the OpenStack network for IPv6 connectivity (or dualstack if
+        MIRROR_IPV4_NETWORK is not set). Defaults to the value in
         "${SHARED_DIR}/CONTROL_PLANE_NETWORK"
+    - name: MIRROR_IPV4_NETWORK
+      default: ''
+      documentation: |-
+        Optional: Name of the OpenStack network for IPv4 connectivity.
+        If set, the mirror VM will be attached to both this network (for IPv4)
+        and CONTROL_PLANE_NETWORK (for IPv6). This is needed for environments
+        without dualstack networks (e.g., vexxhost with separate 'public' and
+        'public-ipv6' networks). If not set, only CONTROL_PLANE_NETWORK is used
+        (assumes it's a dualstack network).
+        When using dual networks, a floating IP will be automatically allocated
+        from OPENSTACK_EXTERNAL_NETWORK for SSH access to the mirror VM.
     - name: CONFIG_TYPE
       documentation: |
         The type of config for the environment to deploy.

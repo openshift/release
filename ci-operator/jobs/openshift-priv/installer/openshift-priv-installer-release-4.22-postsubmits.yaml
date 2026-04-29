@@ -10,6 +10,9 @@ postsubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/installer-artifacts/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
@@ -77,10 +80,13 @@ postsubmits:
     cluster: build04
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/baremetal/Dockerfile.ci
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
@@ -93,7 +99,6 @@ postsubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
@@ -108,9 +113,6 @@ postsubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
