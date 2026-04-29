@@ -191,7 +191,7 @@ if [[ "${WITH_TIMING}" == "true" ]]; then
     SKILL_ARGS+="--with-timing "
 fi
 if [[ -n "${PAYLOAD_COUNT}" ]]; then
-    SKILL_ARGS+="--payload ${PAYLOAD_COUNT} "
+    SKILL_ARGS+="--payloads ${PAYLOAD_COUNT} "
 fi
 
 # ===========================================================================
