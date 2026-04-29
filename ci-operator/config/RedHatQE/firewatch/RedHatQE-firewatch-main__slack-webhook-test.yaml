@@ -1,0 +1,63 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  firewatch-base:
+    name: firewatch
+    namespace: firewatch
+    tag: main
+images:
+  items:
+  - dockerfile_literal: |
+      FROM firewatch-base
+      RUN pip install --no-cache-dir \
+          "firewatch @ git+https://github.com/RedHatQE/firewatch.git@slack-webhook-notifications" \
+          && echo "SUCCESS: firewatch PR branch (slack-webhook-notifications) injected at image build time"
+    from: firewatch-base
+    to: main
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: slack-webhook-test
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules": [
+            {"step": "*", "failure_type": "all", "classification": "Test", "jira_project": "INTEROP", "slack_user": "mpruitt@redhat.com"}
+          ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+    post:
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws
+    - chain: ipi-install
+    test:
+    - as: fail-to-trigger-webhook
+      commands: exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+zz_generated_metadata:
+  branch: main
+  org: RedHatQE
+  repo: firewatch
+  variant: slack-webhook-test

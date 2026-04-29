@@ -42,6 +42,16 @@ if [ -f "${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
     report_command+=" --additional-labels-file=${SHARED_DIR}/${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
 fi
 
+if [ -f /tmp/secrets/slack/slack_rule_notification_webhook_url ]; then
+    SLACK_WEBHOOK_URL=$(cat /tmp/secrets/slack/slack_rule_notification_webhook_url)
+    SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL%"${SLACK_WEBHOOK_URL##*[![:space:]]}"}"
+    if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+        echo "ERROR: slack_rule_notification_webhook_url secret is present but empty" >&2
+        exit 1
+    fi
+    export SLACK_WEBHOOK_URL
+fi
+
 echo $report_command
 
 eval "$report_command"
