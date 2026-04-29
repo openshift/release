@@ -113,9 +113,26 @@ oc get network.config.openshift.io cluster -o yaml | tee "$RESULTS_DIR/initial-n
 actual_cidr=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
 echo "Actual initial CIDR: $actual_cidr"
 if [[ "$actual_cidr" != "$CLUSTER_NETWORK_ORIGINAL_CIDR" ]]; then
-    echo "⚠️  WARNING: Cluster started with CIDR $actual_cidr instead of expected $CLUSTER_NETWORK_ORIGINAL_CIDR"
-    echo "This means the cluster install-config was not configured correctly for network expansion testing"
-    echo "The test should start with $CLUSTER_NETWORK_ORIGINAL_CIDR and expand to $CLUSTER_NETWORK_EXPANDED_CIDR"
+    echo "❌ CRITICAL ERROR: Cluster started with CIDR $actual_cidr instead of expected $CLUSTER_NETWORK_ORIGINAL_CIDR"
+    echo ""
+    echo "DIAGNOSIS:"
+    echo "  Expected: $CLUSTER_NETWORK_ORIGINAL_CIDR (for expansion to $CLUSTER_NETWORK_EXPANDED_CIDR)"
+    echo "  Actual:   $actual_cidr"
+    echo ""
+    echo "ROOT CAUSE:"
+    echo "  The cluster install-config was not configured correctly for network expansion testing."
+    echo "  The test methodology requires:"
+    echo "    1. Start with $CLUSTER_NETWORK_ORIGINAL_CIDR (small CIDR)"
+    echo "    2. Expand to $CLUSTER_NETWORK_EXPANDED_CIDR (larger CIDR)"  
+    echo "    3. Scale to ~520 nodes to validate capacity"
+    echo ""
+    echo "RESOLUTION:"
+    echo "  1. Verify the ipi-install-config-network-custom step is working correctly"
+    echo "  2. Check that CLUSTER_NETWORK_CIDR environment variable is properly set to $CLUSTER_NETWORK_ORIGINAL_CIDR"
+    echo "  3. Ensure the install-config.yaml networking section is not overridden later in the workflow"
+    echo ""
+    echo "TEST CANNOT PROCEED: Expansion from $actual_cidr to $CLUSTER_NETWORK_EXPANDED_CIDR would not validate the intended functionality"
+    exit 1
 else
     echo "✅ SUCCESS: Cluster started with correct initial CIDR $actual_cidr"
 fi
