@@ -1,9 +1,10 @@
 workflow:
   as: quay-tests-hypershift-mce-ibmz-s390xmgmt
   documentation: |-
-    Provisions an ephemeral management cluster and HyperShift hosted control plane on IBM Cloud
-    using IBM Z VSIs (same pre/post as hypershift-mce-ibmz-conformance-s390xmgmt), then runs only
-    the test steps supplied by the ci-operator test configuration (e.g. Quay operator install and QE).
+    Provisions an ephemeral IBM Z management cluster on IBM Cloud (hypershift-mce-ibmz-create-s390xmgmt
+    and hypershift-mce-ibmz-destroy-s390x-mgmt only), then runs the test steps from the ci-operator
+    configuration. It does not install MCE, create a hosted control plane, or provision ZVSI compute
+    nodes; workflow env is limited to parameters declared by those two steps so ci-operator-checkconfig passes.
 
     IBM Cloud access uses the credential bundle mounted by the hypershift IBM Z steps: create a
     Secret named "hypershift-agent-ibmz-credentials" in the "test-credentials" namespace on the CI
@@ -18,15 +19,9 @@ workflow:
       - ref: hypershift-mce-ibmz-destroy-s390x-mgmt
     env:
       CLUSTER_VERSION: "4.21"
-      MCE_VERSION: "2.11"
-      HYPERSHIFT_BASEDOMAIN: 'hcpci.com'
-      HYPERSHIFT_NODE_COUNT: 2
       IC_CLI_VERSION: '2.36.0'
       OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
       VSI_IMAGE_NAME: 'ubuntu-s390x-image'
-      ZVSI_IMAGE: 'ubuntu-s390x-image'
-      IC_REGION: 'eu-de'
-      HC_NS: 'agent-ibmz'
       CONTROL_NODE_COUNT: 3
       COMPUTE_NODE_COUNT: 3
       REGION: 'Frankfurt'
