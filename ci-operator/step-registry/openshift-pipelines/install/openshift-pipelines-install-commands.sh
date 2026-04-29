@@ -40,6 +40,12 @@ fi
 set -x
 
 # Install openshift-pipelines operator (olm.spec)
-CATALOG_SOURCE=redhat-operators CHANNEL="${OLM_CHANNEL:-latest}" gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
+CONSOLE_URL="$(oc whoami --show-console)" \
+    API_URL="$(oc whoami --show-server)" \
+    CATALOG_SOURCE=redhat-operators \
+    CHANNEL="${OLM_CHANNEL:-latest}" \
+    gauge_reports_dir="${ARTIFACT_DIR}" \
+    overwrite_reports=false \
+    gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
 
 true
