@@ -24,7 +24,13 @@ workflow:
         when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
         API LBs follow \/readyz of kube-apiserver and stop sending requests before server shutdowns for external clients\|
         Node Lifecycle should run through the lifecycle of a node\|
-        check registry.redhat.io is available and samples operator can import sample imagestreams
+        check registry.redhat.io is available and samples operator can import sample imagestreams\|
+        NetworkPolicy between server and client should allow ingress access from updated pod\|
+        In-tree Volumes.*local.*blockfs.*subPath should support file as subpath\|
+        DRA.*kubelet.*DynamicResourceAllocation\|
+        InPlacePodVerticalScaling.*decrease memory limit below usage\|
+        CSI Mock volume expansion Expansion with recovery recovery should not be possible\|
+        CSI Mock volume expansion Expansion with recovery should allow recovery if controller expansion fails with final error\|cloud-provider-aws-e2e.*loadbalancer NLB internal should be reachable with hairpinning traffic\|cloud-provider-aws-e2e.*loadbalancer NLB should be reachable with target-node-labels
     pre:
       - chain: rosa-aws-sts-hcp-provision
       - ref: osd-ccs-conf-idp-htpasswd-multi-users
@@ -33,7 +39,13 @@ workflow:
       - chain: hypershift-conformance
     post:
       - ref: osd-gather-extra
-      - chain: rosa-aws-sts-hcp-deprovision
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
         best_effort: true
       - ref: send-results-to-reportportal
   documentation: |-

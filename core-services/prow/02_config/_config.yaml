@@ -23,6 +23,7 @@ deck:
       - bparees
       - AlexNPavel
       - jupierce
+      - petr-muller
   - repo: openshift/multiarch-tuning-operator
     rerun_auth_configs:
       github_team_slugs:
@@ -180,6 +181,7 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/agent-qe-infra: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-eng/olm-team-ai-helpers: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/ship-help-bot: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-hyperfleet/hyperfleet-adapter: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-hyperfleet/hyperfleet-api: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -352,14 +354,14 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260328-dc2bbc9fc
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260328-dc2bbc9fc
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260328-dc2bbc9fc
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260328-dc2bbc9fc
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260421-d25a17867
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260421-d25a17867
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260421-d25a17867
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260421-d25a17867
   - config:
       censoring_options:
         exclude_directories:
-        - aro-hcp-gather-custom-link-tools/**
+        - '**/custom-link-tools*.html'
     repo: Azure/ARO-HCP
   - config:
       gcs_configuration:
@@ -477,6 +479,13 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-eng/olm-team-ai-helpers
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-eng/ship-help-bot
   - config:
       timeout: 12h0m0s
@@ -499,9 +508,13 @@ plank:
   - config:
       timeout: 24h0m0s
     repo: openshift/machine-config-operator
+  - config:
+      timeout: 24h0m0s
+    repo: redhat-performance/backstage-performance
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-eng/olm-team-ai-helpers: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-hyperfleet/hyperfleet-adapter: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-hyperfleet/hyperfleet-api: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -536,6 +549,9 @@ plank:
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
     openshift-eng/agent-qe-infra: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-eng/olm-team-ai-helpers: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-eng/ship-help-bot: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -581,6 +597,18 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
+presets:
+- env: null
+  labels:
+    presets.ci.openshift.io/registry-pull: "true"
+  volumeMounts:
+  - mountPath: /etc/pull-secret
+    name: pull-secret
+    readOnly: true
+  volumes:
+  - name: pull-secret
+    secret:
+      secretName: registry-pull-credentials
 prowjob_default_entries:
 - cluster: '*'
   config:
@@ -614,6 +642,10 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift-eng/agent-qe-infra
+- cluster: '*'
+  config:
+    tenant_id: qe-private
+  repo: openshift-eng/olm-team-ai-helpers
 - cluster: '*'
   config:
     tenant_id: qe-private
@@ -684,8 +716,6 @@ tide:
       opendatahub-io:
         repos:
           odh-dashboard:
-            required-if-present-contexts:
-            - Tests
             skip-unknown-contexts: true
           opendatahub-operator:
             optional-regex-contexts:
@@ -726,6 +756,8 @@ tide:
             branches:
               master:
                 skip-unknown-contexts: true
+          vector:
+            skip-unknown-contexts: true
       operator-framework:
         repos:
           api:
@@ -769,6 +801,7 @@ tide:
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-eng/olm-team-ai-helpers: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-hyperfleet/hyperfleet-adapter: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-hyperfleet/hyperfleet-api: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

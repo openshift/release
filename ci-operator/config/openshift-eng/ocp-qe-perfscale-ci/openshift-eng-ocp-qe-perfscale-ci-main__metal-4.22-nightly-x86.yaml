@@ -37,8 +37,9 @@ tests:
       CNV_VERSION: "4.22"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
+      OUTPUT_FORMAT: JUNIT
       PUBLIC_VLAN: "false"
-      RUN_ORION: "true"
+      RUN_ORION: deferred
       VERSION: "4.22"
       VM: "true"
     post:
@@ -53,6 +54,7 @@ tests:
     - ref: openshift-qe-orion-virt-udn-density
     - ref: openshift-qe-virt-density-nomount
     - ref: openshift-qe-orion-virt-density-nomount
+    - ref: openshift-qe-orion-report
     workflow: openshift-qe-installer-bm-deploy
 - as: udn-bgp
   capabilities:
@@ -64,11 +66,12 @@ tests:
     env:
       INFRA: "false"
       NETWORK_WORKLOAD: udn-bgp
-      NUM_NODES: "9"
-      NUM_WORKER_NODES: "24"
+      NUM_HYBRID_WORKER_NODES: "24"
+      NUM_NODES: "6"
+      NUM_WORKER_NODES: "0"
       PUBLIC_VLAN: "false"
-      STARTING_NODE: "1"
-      TYPE: vmno
+      STARTING_NODE: "4"
+      TYPE: hmno
     post:
     - ref: openshift-qe-installer-bm-day2-network-workloads-post
     test:
@@ -90,11 +93,12 @@ tests:
     cluster_profile: metal-perfscale-cpt
     env:
       ITERATIONS: "2400"
-      NUM_NODES: "9"
-      NUM_WORKER_NODES: "24"
+      NUM_HYBRID_WORKER_NODES: "24"
+      NUM_NODES: "6"
+      NUM_WORKER_NODES: "0"
       PUBLIC_VLAN: "false"
-      STARTING_NODE: "1"
-      TYPE: vmno
+      STARTING_NODE: "4"
+      TYPE: hmno
     test:
     - ref: openshift-qe-installer-bm-ping
     - ref: openshift-qe-installer-bm-poweroff
@@ -118,6 +122,7 @@ tests:
       LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
       OCP_BUILD: dev
       OPERATOR_SOURCE_INDEX: prega-operator-index
+      RUN_ORION: "true"
       TELCO: "true"
     test:
     - ref: openshift-qe-installer-bm-day2-label
@@ -126,6 +131,7 @@ tests:
     - ref: openshift-qe-installer-bm-day2-metallb
     - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
     - ref: openshift-qe-rds-core
+    - ref: openshift-qe-orion-rds-core
     workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main

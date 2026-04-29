@@ -38,8 +38,11 @@ images:
     to: get-collections
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -70,7 +73,71 @@ tests:
     from: src
 - as: e2e-ansible
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make -f openshift/Makefile test-e2e-ansible
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-ansible-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FIPS_ENABLED: "true"
+    post:
+    - chain: ipi-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: make -f openshift/Makefile test-e2e-ansible
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-ansible-rhcos10-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    post:
+    - chain: ipi-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: make -f openshift/Makefile test-e2e-ansible
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-ansible-rhcos10
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
     test:
     - as: test
       cli: latest

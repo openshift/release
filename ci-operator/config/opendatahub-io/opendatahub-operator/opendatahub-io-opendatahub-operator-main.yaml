@@ -42,12 +42,14 @@ operator:
     with: pipeline:opendatahub-operator-rhoai
   - pullspec: REPLACE_IMAGE:v0.0.0-placeholder
     with: pipeline:opendatahub-operator
+prowgen:
+  skip_operator_presubmits: true
 releases:
   latest:
     release:
       architecture: multi
       channel: stable
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -61,7 +63,7 @@ tests:
     owner: opendatahub
     product: ocp
     timeout: 2h0m0s
-    version: "4.19"
+    version: "4.20"
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
@@ -72,34 +74,7 @@ tests:
       IMAGE_REPO: opendatahub-operator
     pre:
     - ref: ipi-install-rbac
-    - as: cluster-preflight-health-check
-      cli: latest
-      commands: |
-        # Clusters from Hive pools may have been hibernated. After resume,
-        # kube-controller-manager needs time to sync its informer caches before
-        # controllers (like the ServiceAccount controller) start processing events.
-        # Hive declares the cluster "ready" as soon as the API server responds,
-        # which can be minutes before kcm is fully operational.
-        echo "Running cluster preflight health check..."
-        oc wait --for=condition=Ready node --all --timeout=240s
-        echo "All nodes ready."
-        oc create namespace ci-preflight
-        if ! timeout 270 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
-          echo "FATAL: Cluster preflight health check failed."
-          echo "ServiceAccount controller not operational after 4.5 minutes."
-          echo "Cluster has not fully initialized after hibernation resume."
-          oc get nodes -o wide || true
-          oc get co || true
-          exit 1
-        fi
-        echo "Cluster preflight health check passed."
-        oc delete namespace ci-preflight --wait=false
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 10m0s
+    - ref: opendatahub-operator-e2e-cluster-preflight-health-check
     test:
     - as: install
       cli: latest
@@ -128,7 +103,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-      timeout: 1h30m0s
+      timeout: 2h0m0s
     workflow: generic-claim
 - as: opendatahub-operator-rhoai-e2e
   cluster_claim:
@@ -137,7 +112,7 @@ tests:
     owner: opendatahub
     product: ocp
     timeout: 2h0m0s
-    version: "4.19"
+    version: "4.20"
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
@@ -148,34 +123,7 @@ tests:
       IMAGE_REPO: opendatahub-operator
     pre:
     - ref: ipi-install-rbac
-    - as: cluster-preflight-health-check
-      cli: latest
-      commands: |
-        # Clusters from Hive pools may have been hibernated. After resume,
-        # kube-controller-manager needs time to sync its informer caches before
-        # controllers (like the ServiceAccount controller) start processing events.
-        # Hive declares the cluster "ready" as soon as the API server responds,
-        # which can be minutes before kcm is fully operational.
-        echo "Running cluster preflight health check..."
-        oc wait --for=condition=Ready node --all --timeout=240s
-        echo "All nodes ready."
-        oc create namespace ci-preflight
-        if ! timeout 270 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
-          echo "FATAL: Cluster preflight health check failed."
-          echo "ServiceAccount controller not operational after 4.5 minutes."
-          echo "Cluster has not fully initialized after hibernation resume."
-          oc get nodes -o wide || true
-          oc get co || true
-          exit 1
-        fi
-        echo "Cluster preflight health check passed."
-        oc delete namespace ci-preflight --wait=false
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 10m0s
+    - ref: opendatahub-operator-e2e-cluster-preflight-health-check
     test:
     - as: install
       cli: latest
@@ -203,7 +151,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-      timeout: 1h30m0s
+      timeout: 2h0m0s
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
   postsubmit: true

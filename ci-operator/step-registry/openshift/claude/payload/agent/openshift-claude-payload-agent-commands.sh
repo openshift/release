@@ -16,9 +16,12 @@ else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
 fi
 
-if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+if [[ "${ENABLE_SLACK_NOTIFICATIONS}" == "true" ]] && [ -f "${SLACK_WEBHOOK_URL}" ]; then
     SLACK_WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
     echo "Slack webhook loaded."
+elif [[ "${ENABLE_SLACK_NOTIFICATIONS}" != "true" ]]; then
+    SLACK_WEBHOOK=""
+    echo "Slack notifications disabled via ENABLE_SLACK_NOTIFICATIONS."
 else
     SLACK_WEBHOOK=""
     echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
@@ -137,8 +140,8 @@ PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
 # Sessions created by -p get sessionKind tagged and are filtered from --continue lookup.
-# Setting CLAUDE_CODE_ENTRYPOINT=cli prevents the sessionKind tag from being set.
-export CLAUDE_CODE_ENTRYPOINT=cli
+# Setting CLAUDE_CODE_ENTRYPOINT=-sdk-cli prevents the sessionKind tag from being set.
+export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."

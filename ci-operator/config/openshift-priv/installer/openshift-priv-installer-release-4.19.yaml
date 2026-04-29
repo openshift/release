@@ -82,12 +82,15 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 promotion:
   to:
   - excluded_images:
     - src-oc
     name: 4.19-priv
     namespace: ocp-private
+prowgen:
+  private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -403,14 +406,14 @@ tests:
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-default-config
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     post:
     - chain: ipi-gcp-post
     pre:
@@ -421,7 +424,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -446,14 +449,14 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-byo-vpc
 - always_run: false
   as: e2e-azure-default-config
@@ -524,21 +527,21 @@ tests:
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - always_run: false
   as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
   as: e2e-gcp-ovn-xpn
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - always_run: false
   as: e2e-azure-ovn-upi
@@ -551,7 +554,7 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ovn-two-node-arbiter
@@ -806,7 +809,7 @@ tests:
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-crc
 - always_run: false
   as: e2e-metal-assisted
@@ -1076,7 +1079,7 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       PUBLISH: Internal
     post:
@@ -1163,7 +1166,7 @@ tests:
   as: e2e-gcp-ovn-heterogeneous
   optional: true
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:

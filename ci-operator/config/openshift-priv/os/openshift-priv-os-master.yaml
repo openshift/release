@@ -14,11 +14,16 @@ images:
   - build_args:
     - name: OPENSHIFT_CI
       value: "1"
+    - name: IMAGE_NAME
+      value: openshift/ose-rhel-coreos-9
+    - name: IMAGE_CPE
+      value: cpe:/a:redhat:openshift:4.22::el9
     dockerfile_path: Containerfile
     inputs:
       rhel-coreos-base:
         as:
         - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+        - ${IMAGE_FROM}
     to: rhel-coreos
   - build_args:
     - name: OPENSHIFT_CI
@@ -29,22 +34,25 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
     to: rhel-coreos-extensions
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - excluded_images:
     - rhel-coreos
     - rhel-coreos-extensions
-    name: 4.22-priv
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':

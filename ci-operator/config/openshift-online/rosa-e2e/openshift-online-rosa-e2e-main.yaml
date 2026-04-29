@@ -34,6 +34,17 @@ tests:
   commands: make unit-test
   container:
     from: src
+- as: lint
+  commands: |
+    unset GOFLAGS
+    make lint
+  container:
+    from: src
+- as: rosa-ci-daily-status
+  commands: scripts/ci-status-report.sh
+  container:
+    from: src
+  cron: 0 14 * * *
 - as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   capabilities:
   - nested-podman
@@ -41,7 +52,9 @@ tests:
     env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
     export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export ENABLE_JIRA_REPORTING=true
     source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
     env | grep -v '^_='
     EOF
 
@@ -51,7 +64,7 @@ tests:
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main
+    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main --reportJiraTicket
   container:
     from: nested-podman
     memory_backed_volume:
@@ -61,23 +74,6 @@ tests:
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
-- as: lint
-  commands: |
-    unset GOFLAGS
-    make lint
-  container:
-    from: src
-- as: rosa-hcp-e2e-nightly
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: rosa-e2e-01
-    env:
-      CHANNEL_GROUP: stable
-      ENABLE_BILLING_ACCOUNT: "yes"
-      HOSTED_CP: "true"
-      OCM_LOGIN_ENV: staging
-      REPLICAS: "3"
-    workflow: rosa-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-online

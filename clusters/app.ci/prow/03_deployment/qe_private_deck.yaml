@@ -104,7 +104,7 @@ objects:
               mountPath: /tmp/git-sync
           containers:
             - name: deck
-              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260328-dc2bbc9fc
+              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260421-d25a17867
               args:
                 - --github-oauth-config-file=/etc/oauth/config.json
                 - --github-app-id=$(GITHUB_APP_ID)
@@ -123,8 +123,8 @@ objects:
                 - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-qe-private-deck/service-account.json
                 - --projected-token-file=/var/sa-token/token
                 - --rerun-creates-job=true
-                - --plugin-config=/etc/plugins/plugins.yaml
-                - --supplemental-plugin-config-dir=/etc/plugins
+                - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+                - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
                 - --kubeconfig-dir=/etc/build-farm-credentials
                 - --kubeconfig-suffix=config
                 - --tenant-id=qe-private
@@ -166,9 +166,6 @@ objects:
                   name: session-secret
                 - name: config
                   mountPath: /etc/config
-                  readOnly: true
-                - name: plugins
-                  mountPath: /etc/plugins
                   readOnly: true
                 - name: extensions
                   mountPath: /var/run/ko/static/extensions
@@ -242,9 +239,6 @@ objects:
             - name: config
               configMap:
                 name: config
-            - name: plugins
-              configMap:
-                name: plugins
             - name: extensions
               configMap:
                 name: qe-private-deck-extensions

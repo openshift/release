@@ -134,8 +134,8 @@ trap 'cleanup_ssh' EXIT
 PROXY_EOF
 fi
 
-if [[ "$TYPE" == "vmno" ]]; then
-  # Load VMNO configuration from cluster profile
+if [[ "$TYPE" == "vmno" || "$TYPE" == "hmno" ]]; then
+  # Load VM configuration from cluster profile
   HV_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_count")
   HV_VM_CPU_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_cpu_count")
   HV_VM_MEMORY_SIZE=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_memory_size")
@@ -146,7 +146,9 @@ if [[ "$TYPE" == "vmno" ]]; then
 
   # Convert hv_vm_disk JSON to YAML format with proper indentation
   HV_VM_DISK_YAML=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r '.hv_vm_disk | to_entries | map("      " + .key + ": " + (.value | tostring)) | join("\n")')
+fi
 
+if [[ "$TYPE" == "vmno" ]]; then
   cat <<EOF >>/tmp/all.yml
 hv_ssh_pass: $LOGIN
 hv_ip_offset: 0
@@ -174,6 +176,14 @@ compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
 cluster_type: mno
+hv_count: $HV_COUNT
+hv_vm_cpu_count: $HV_VM_CPU_COUNT
+hv_vm_memory_size: $HV_VM_MEMORY_SIZE
+hv_vm_disk_size: $HV_VM_DISK_SIZE
+hw_vm_counts:
+  $LAB:
+    $HV_HW_NAME:
+$HV_VM_DISK_YAML
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false

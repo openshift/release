@@ -3,6 +3,8 @@ base_images:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+prowgen:
+  disable_rehearsals: true
 resources:
   '*':
     limits:
@@ -21,9 +23,13 @@ tests:
     post:
     - as: 006-unlock-cluster
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci unlock_cluster
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -40,9 +46,13 @@ tests:
     pre:
     - as: 001-lock-cluster
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci lock_cluster
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -59,9 +69,13 @@ tests:
       timeout: 10h0m0s
     - as: 002-prepare-jump-ci
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci prepare_jump_ci
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -78,9 +92,13 @@ tests:
       timeout: 1h0m0s
     - as: 003-pre-cleanup
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci pre_cleanup
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -96,9 +114,13 @@ tests:
           memory: 500Mi
     - as: 004-prepare
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci prepare
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -116,9 +138,13 @@ tests:
     test:
     - as: 005-test
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci test
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -143,9 +169,13 @@ tests:
     post:
     - as: 006-unlock-cluster
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci unlock_cluster
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -162,9 +192,13 @@ tests:
     pre:
     - as: 001-lock-cluster
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci lock_cluster
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -182,8 +216,10 @@ tests:
     - as: 002-prepare-jump-ci
       commands: |
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci prepare_jump_ci
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci
@@ -201,9 +237,13 @@ tests:
     test:
     - as: 003-plot
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_JUMP_CI_SECRET_PATH=/var/run/psap-forge-jump-ci
+
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
+
         exec ./bin/run_ci jump_ci ci generate_plots_from_pr_args
       credentials:
       - mount_path: /var/run/psap-forge-jump-ci

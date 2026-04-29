@@ -21,6 +21,7 @@ images:
       RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
       RUN curl -L https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
       RUN python3 -m pip install kubernetes
+      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
     from: src
     to: openshift-pipelines-performance-runner
 releases:
@@ -38,21 +39,20 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: max-concurrency-downstream-nightly-daily
-  cron: 0 1 * * *
+- as: max-concurrency-downstream-nightly
+  cron: 0 1 * * 2,5
   steps:
     cluster_profile: aws-pipelines-performance
     env:
       DEPLOYMENT_TYPE: downstream
-      DEPLOYMENT_VERSION: "1.18"
       MUST_GATHER_TIMEOUT: 35m
       NIGHTLY_BUILD: "true"
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-nightly-daily-ha-10
-  cron: 0 2 * * *
+- as: max-concurrency-downstream-nightly-ha-10
+  cron: 0 2 * * 2,5
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -64,8 +64,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-nightly-daily-ha-10-state
-  cron: 0 3 * * *
+- as: max-concurrency-downstream-nightly-ha-10-state
+  cron: 0 3 * * 2,5
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -78,8 +78,39 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-19-daily
-  cron: 0 4 * * *
+- as: max-concurrency-downstream-nightly-qbt
+  cron: 0 4 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-ha-10-qbt
+  cron: 0 5 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19
+  cron: 0 6 1,15 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -90,8 +121,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-19-daily-ha-10
-  cron: 0 5 * * *
+- as: max-concurrency-downstream-pipelines1-19-ha-10
+  cron: 0 7 1,15 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -103,8 +134,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-19-daily-ha-10-state
-  cron: 0 6 * * *
+- as: max-concurrency-downstream-pipelines1-19-ha-10-state
+  cron: 0 8 1,15 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -117,8 +148,39 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-20-daily
-  cron: 0 7 * * *
+- as: max-concurrency-downstream-pipelines1-19-qbt
+  cron: 0 9 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-ha-10-qbt
+  cron: 0 10 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20
+  cron: 0 6 6,21 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -129,8 +191,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-20-daily-ha-10
-  cron: 0 8 * * *
+- as: max-concurrency-downstream-pipelines1-20-ha-10
+  cron: 0 7 6,21 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -142,8 +204,8 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-20-daily-ha-10-state
-  cron: 0 9 * * *
+- as: max-concurrency-downstream-pipelines1-20-ha-10-state
+  cron: 0 8 6,21 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
@@ -156,25 +218,102 @@ tests:
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines1-18-daily
-  cron: 0 10 * * *
+- as: max-concurrency-downstream-pipelines1-20-qbt
+  cron: 0 9 6,21 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
       DEPLOYMENT_TYPE: downstream
-      DEPLOYMENT_VERSION: "1.18"
+      DEPLOYMENT_VERSION: "1.20"
       MUST_GATHER_TIMEOUT: 35m
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
       TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
     workflow: openshift-pipelines-max-concurrency
-- as: max-concurrency-downstream-pipelines-1-17-daily
-  cron: 0 11 * * *
+- as: max-concurrency-downstream-pipelines1-20-ha-10-qbt
+  cron: 0 10 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21
+  cron: 0 6 11,26 * *
   steps:
     cluster_profile: aws-pipelines-performance
     env:
       DEPLOYMENT_TYPE: downstream
-      DEPLOYMENT_VERSION: "1.17"
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10
+  cron: 0 7 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10-state
+  cron: 0 8 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-qbt
+  cron: 0 9 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10-qbt
+  cron: 0 10 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
       MUST_GATHER_TIMEOUT: 35m
       TEST_NAMESPACE: "5"
       TEST_SCENARIO: math
@@ -2099,6 +2238,68 @@ tests:
       TEST_SCENARIO: cluster-resolver
       TEST_TOTAL: "200"
     workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: tkn-res-downstream-1-20-s3-locust-2-lsr
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_WAIT_TIME: "0"
+      DEPLOYMENT_RESULTS_WATCHER_DISABLE_STORING_INCOMPLETE_RUNS: "true"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_BURST: "100"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_QPS: "50.0"
+      DEPLOYMENT_RESULTS_WATCHER_THREADINESS: "16"
+      DEPLOYMENT_VERSION: "1.20"
+      INSTALL_RESULTS: "true"
+      LOCUST_DURATION: 8m
+      LOCUST_SPAWN_RATE: "2"
+      LOCUST_USERS: "500"
+      LOCUST_WAIT_TIME: "1800"
+      LOCUST_WORKERS: "30"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNER_WAIT_TIME: "0"
+      RUN_LOCUST: "true"
+      STORE_LOGS_IN_S3: "true"
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "10"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "30"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: timebased-sign-pruner
+      TOTAL_TIMEOUT: "2700"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- always_run: false
+  as: tkn-res-downstream-1-21-s3-locust-2-lsr
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_WAIT_TIME: "0"
+      DEPLOYMENT_RESULTS_WATCHER_DISABLE_STORING_INCOMPLETE_RUNS: "true"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_BURST: "100"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_QPS: "50.0"
+      DEPLOYMENT_RESULTS_WATCHER_THREADINESS: "16"
+      DEPLOYMENT_VERSION: "1.21"
+      INSTALL_RESULTS: "true"
+      LOCUST_DURATION: 8m
+      LOCUST_SPAWN_RATE: "2"
+      LOCUST_USERS: "500"
+      LOCUST_WAIT_TIME: "1800"
+      LOCUST_WORKERS: "30"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNER_WAIT_TIME: "0"
+      RUN_LOCUST: "true"
+      STORE_LOGS_IN_S3: "true"
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "10"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "30"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: timebased-sign-pruner
+      TOTAL_TIMEOUT: "2700"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-pipelines

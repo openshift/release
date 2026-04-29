@@ -3,6 +3,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: openstack-installer
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
@@ -22,6 +26,7 @@ images:
     dockerfile_path: Dockerfile
     from: ubi9-minimal-entitled
     to: hive
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 releases:
   latest:
     candidate:
@@ -133,11 +138,13 @@ tests:
 - as: e2e-gcp-weekly
   cron: 5 4 * * 3
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: CLOUD=gcp make test-e2e
+      commands: |
+        export BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")
+        CLOUD=gcp make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -168,6 +175,43 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-vsphere-weekly
+  cron: 5 4 * * 5
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      NETWORK_TYPE: single-tenant
+      VSPHERE_ADDITIONAL_CLUSTER: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        source $SHARED_DIR/vsphere_context.sh
+        source $SHARED_DIR/govc.sh
+        source $SHARED_DIR/additional_cluster.sh
+
+        export CLUSTER_NAME=$ADDITIONAL_CLUSTER_NAME
+        export VSPHERE_API_VIP=$ADDITIONAL_CLUSTER_API_VIP
+        export VSPHERE_INGRESS_VIP=$ADDITIONAL_CLUSTER_INGRESS_VIP
+        export VSPHERE_MACHINE_NETWORK=$(<"${SHARED_DIR}"/machinecidr.txt)
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(<"${SHARED_DIR}"/platform.json)
+
+        GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
+      credentials:
+      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
+        name: vsphere-ibmcloud-ci
+        namespace: test-credentials
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere
 - as: e2e-openstack-weekly
   cron: 10 23 * * 0
   steps:

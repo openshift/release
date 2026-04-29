@@ -352,6 +352,13 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
   if [[ "$T5CI_VERSION" =~ 4.1[2-5] ]]; then
     TEST_MODES=("${TEST_MODES[@]/dualnicbcha}")
   fi
+
+  # DualNICBoundaryClock test mode is only supported from 4.13 onwards,
+  # so if the version is less than 4.13, remove it from the list
+  if [[ "$T5CI_VERSION" == 4.12 ]]; then
+    TEST_MODES=("${TEST_MODES[@]/dualnicbc}")
+  fi
+
 else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
@@ -488,7 +495,16 @@ cd -
 
 python3 -m venv "${SHARED_DIR}"/myenv
 source "${SHARED_DIR}"/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed"
+  rm -rf "${SHARED_DIR}"/telco5gci
+  [[ ${attempt} -lt 5 ]] && sleep 10
+done
+if [[ ! -d "${SHARED_DIR}"/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
 # Create HTML reports for humans/aliens

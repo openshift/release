@@ -446,10 +446,10 @@ tests:
     workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 31 3 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
@@ -458,26 +458,28 @@ tests:
       ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 9 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
       ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-agent-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 7 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
@@ -485,8 +487,9 @@ tests:
       INSTALLER_TYPE: agent
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
       VOLUME_CAPACITY: 120G
-    workflow: openshift-e2e-libvirt-upi
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
   capabilities:
   - sshd-bastion
@@ -501,46 +504,49 @@ tests:
     workflow: openshift-e2e-libvirt-upi-heterogeneous
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 2 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 3 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 4 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 5 4 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.23"
@@ -548,7 +554,8 @@ tests:
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi-fips
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn-fips
 - as: ocp-e2e-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
@@ -737,7 +744,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-a-a
   cron: 0 11 * * 0
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
@@ -745,7 +752,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-x-x-to-a-x
   interval: 168h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       MIGRATION_CP_MACHINE_TYPE: t2a-standard-4
       MIGRATION_INFRA_MACHINE_TYPE: t2a-standard-4
@@ -769,7 +776,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-a-a-to-x-a
   interval: 168h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       MIGRATION_ARCHITECTURE: x86_64
@@ -796,7 +803,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   interval: 168h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
@@ -805,7 +812,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-x-ax
   cron: 0 11 * * 0
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
@@ -830,7 +837,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-day-0-a-x
   cron: 0 11 * * 0
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -852,7 +859,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   interval: 168h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4

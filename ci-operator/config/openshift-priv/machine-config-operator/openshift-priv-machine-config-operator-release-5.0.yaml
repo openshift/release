@@ -63,11 +63,14 @@ images:
     to: zacks-toolbox
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
     - zacks-toolbox
     name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -202,13 +205,13 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-rt-op
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     test:
@@ -224,7 +227,7 @@ tests:
   as: e2e-gcp-op
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -242,7 +245,7 @@ tests:
   as: e2e-gcp-op-part1
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -260,7 +263,7 @@ tests:
   as: e2e-gcp-op-part2
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -275,26 +278,10 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e-ocl
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h10m0s
-    workflow: ipi-gcp
 - as: e2e-gcp-op-ocl-part1
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -306,10 +293,9 @@ tests:
       timeout: 2h30m0s
     workflow: ipi-gcp
 - as: e2e-gcp-op-ocl-part2
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -324,7 +310,7 @@ tests:
   as: e2e-gcp-op-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -490,7 +476,7 @@ tests:
   as: e2e-gcp-rt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
@@ -498,19 +484,19 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-ovn-rt
 - always_run: false
   as: e2e-gcp-single-node
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -723,7 +709,7 @@ tests:
   as: e2e-gcp-mco-disruptive
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp

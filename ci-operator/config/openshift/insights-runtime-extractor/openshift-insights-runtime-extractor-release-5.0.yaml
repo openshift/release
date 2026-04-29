@@ -22,7 +22,7 @@ images:
 
       RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
           chmod g+w /opt/app-root/src/insights-runtime-extractor && \
-          dnf install -y gcc make rust-toolset rustfmt
+          dnf install -y gcc make rust-toolset rustfmt openssl-devel
 
       RUN mkdir -p $HOME/.cargo/git/ && \
           find $HOME/. -type d -exec chmod 777 {} \; && \
@@ -44,7 +44,8 @@ images:
     to: insights-runtime-exporter
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -101,12 +102,13 @@ tests:
   as: tls-scanner
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: openshift-insights
     test:
     - ref: tls-scanner-run
-    workflow: ipi-gcp
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

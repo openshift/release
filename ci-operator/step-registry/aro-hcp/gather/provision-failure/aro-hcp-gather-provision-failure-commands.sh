@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+
 # Load resource group names from config.yaml
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
   echo "ERROR: config.yaml not found at ${SHARED_DIR}/config.yaml"
@@ -27,7 +29,7 @@ fi
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-subscription-id")
+export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${INFRA_SHARD}-subscription-id")
 export AZURE_TOKEN_CREDENTIALS=prod
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none

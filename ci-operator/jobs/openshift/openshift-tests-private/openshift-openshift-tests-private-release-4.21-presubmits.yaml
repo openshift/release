@@ -242,7 +242,7 @@ presubmits:
     - ^release-4\.21$
     - ^release-4\.21-
     cluster: build11
-    context: ci/prow/debug-disasterrecovery-baremetal-upi
+    context: ci/prow/debug-disasterrecovery-metal-upi
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -253,9 +253,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-tests-private-release-4.21-debug-disasterrecovery-baremetal-upi
+    name: pull-ci-openshift-openshift-tests-private-release-4.21-debug-disasterrecovery-metal-upi
     optional: true
-    rerun_command: /test debug-disasterrecovery-baremetal-upi
+    rerun_command: /test debug-disasterrecovery-metal-upi
     run_if_changed: test/extended/disaster_recovery/
     spec:
       containers:
@@ -266,7 +266,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=debug-disasterrecovery-baremetal-upi
+        - --target=debug-disasterrecovery-metal-upi
         command:
         - ci-operator
         env:
@@ -328,7 +328,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )debug-disasterrecovery-baremetal-upi,?($|\s.*)
+    trigger: (?m)^/test( | .* )debug-disasterrecovery-metal-upi,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -886,6 +886,98 @@ presubmits:
     branches:
     - ^release-4\.21$
     - ^release-4\.21-
+    cluster: vsphere02
+    context: ci/prow/debug-winc-vsphere-ipi-disconnected
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-dis-2
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openshift-tests-private-release-4.21-debug-winc-vsphere-ipi-disconnected
+    optional: true
+    rerun_command: /test debug-winc-vsphere-ipi-disconnected
+    run_if_changed: test/extended/winc/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=debug-winc-vsphere-ipi-disconnected
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )debug-winc-vsphere-ipi-disconnected,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.21$
+    - ^release-4\.21-
     cluster: build10
     context: ci/prow/e2e-aws
     decorate: true
@@ -984,7 +1076,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1143,6 +1235,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-tests-private-release-4.21-images-images
+    optional: true
     rerun_command: /test images-images
     spec:
       containers:

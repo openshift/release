@@ -1,0 +1,40 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/mcp-lifecycle-operator
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: mcp-lifecycle-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 200Mi
+tag_specification:
+  name: 4.23-priv
+  namespace: ocp-private
+tests:
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make lint
+  container:
+    from: src
+- as: test
+  commands: GOFLAGS='-mod=readonly' make test
+  container:
+    from: src
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: mcp-lifecycle-operator

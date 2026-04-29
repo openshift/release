@@ -50,20 +50,34 @@ sudo subscription-manager repos --disable "rhocp-4.*-for-rhel-9-\$(uname -m)-rpm
 # Create dir as user, following sudo gen_gh_releases.sh script creates venv as root and prevents next command from creating a subdir.
 mkdir -p ./_output
 
-# sudo to allowe dnf to update the cache
+# sudo to allow dnf to update the cache
 sudo -E ./scripts/release-notes/gen_gh_releases.sh rhocp --ci-job-branch "${BRANCH}" query --output /tmp/releases.json
 
-cat /tmp/releases.json
+# gen_gh_release.sh rhocp is expected to only run against branches synced the main to not duplicate efforts.
+# For branches synced with main see https://github.com/openshift/microshift/issues/1239.
+# Otherwise, it exits with 0 and does not create /tmp/releases.json file.
+# We need to skip creation of GH releases and proceed to common_versions.sh update.
+if [ -f /tmp/releases.json ]; then
+    cat /tmp/releases.json
 
-APP_ID="\$(cat /tmp/app_id)"
-export APP_ID
-export CLIENT_KEY=/tmp/key.pem
-./scripts/release-notes/gen_gh_releases.sh rhocp --ci-job-branch "${BRANCH}" publish ${DRY_RUN} --input /tmp/releases.json
+    APP_ID="\$(cat /tmp/app_id)"
+    export APP_ID
+    export CLIENT_KEY=/tmp/key.pem
+    ./scripts/release-notes/gen_gh_releases.sh rhocp --ci-job-branch "${BRANCH}" publish ${DRY_RUN} --input /tmp/releases.json
+fi
 
 ./scripts/pyutils/create-venv.sh
 source ./_output/pyutils/bin/activate
 export KEY="/tmp/key.pem"
-xy="\$(echo "${BRANCH}" | awk -F'[-.]' '{ print \$3 }')"
+
+# Script is release agnostic but it clones specific branch, so it needs to provide correct argument based on the release.
+# 4.22 and older: xy=MINOR version
+# 5.0 and newer: xy=MAJOR.MINOR version
+if python ./test/bin/pyutils/generate_common_versions.py --help | grep -q "The minor version number"; then
+    xy="\$(echo "${BRANCH}" | awk -F'[-.]' '{ print \$3 }')"
+else
+    xy="\$(echo "${BRANCH}" | awk -F'-' '{ print \$2 }')"
+fi
 python ./test/bin/pyutils/generate_common_versions.py "\${xy}" --create-pr ${DRY_RUN}
 EOF
 chmod +x /tmp/run.sh

@@ -56,7 +56,7 @@ metadata:
     keel.sh/trigger: poll
     keel.sh/pollSchedule: "@every 5m"
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -101,8 +101,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.5"
+            memory: "5Gi"
+            cpu: "0.7"
       - name: slack-bot
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_slack-bot_latest
         imagePullPolicy: Always
@@ -113,11 +113,13 @@ spec:
         - --jira-endpoint=https://redhat.atlassian.net
         - --jira-username=aos-team-dp-testplatform@redhat.com
         - --jira-password-file=/etc/jira/password
+        - --pager-duty-token-file=/etc/pagerduty/token
         - --prow-config-path=/etc/prow-config/config.yaml
         - --supplemental-prow-config-dir=/etc/prow-config
         - --prow-job-config-path=/var/repo/release/ci-operator/jobs
         - --keywords-config-path=/etc/slack-bot-config/config.yaml
         - --helpdesk-alias=subteam^STSR51Q76
+        - --pager-duty-token-file=/etc/pagerduty/token
         ports:
         - name: main
           containerPort: 8888
@@ -130,6 +132,9 @@ spec:
         - name: jira
           mountPath: /etc/jira
           readOnly: true
+        - name: pagerduty
+          mountPath: /etc/pagerduty
+          readOnly: true
         - name: prow-config
           mountPath: /etc/prow-config
           readOnly: true
@@ -137,6 +142,9 @@ spec:
           mountPath: /var/repo
         - name: slack-bot-config
           mountPath: /etc/slack-bot-config
+          readOnly: true
+        - name: pagerduty
+          mountPath: /etc/pagerduty
           readOnly: true
         resources:
           requests:
@@ -149,6 +157,9 @@ spec:
       - name: jira
         secret:
           secretName: jira-token-dptp-bot
+      - name: pagerduty
+        secret:
+          secretName: pagerduty
       - name: prow-config
         configMap:
           name: config
@@ -157,3 +168,6 @@ spec:
       - name: slack-bot-config
         configMap:
           name: slack-bot-keyword-list
+      - name: pagerduty
+        secret:
+          secretName: pagerduty

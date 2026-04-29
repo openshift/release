@@ -39,6 +39,8 @@ promotion:
   to:
   - name: 4.23-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -66,6 +68,13 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
+- always_run: false
+  as: verify-bindata
+  commands: |
+    GOFLAGS=-mod=readonly make verify-bindata --warn-undefined-variables
+  container:
+    from: src
+  run_if_changed: ^vendor/
 - as: unit
   commands: |
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
@@ -77,7 +86,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-aws-disruptive
@@ -95,13 +104,13 @@ tests:
   as: e2e-gcp-disruptive
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-disruption
 - always_run: false
   as: e2e-gcp-disruptive-ovn
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-disruption-ovn
 - as: e2e-operator
   steps:
@@ -152,7 +161,7 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
@@ -208,7 +217,7 @@ tests:
   as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-etcd-scaling
 - always_run: false
   as: e2e-azure-ovn-etcd-scaling
@@ -238,7 +247,7 @@ tests:
   as: e2e-metal-ovn-sno-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "1825"
       CLUSTER_AGE_STEP: "365"
@@ -247,7 +256,7 @@ tests:
   as: e2e-metal-ovn-ha-cert-rotation-shutdown
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "1825"
       CLUSTER_AGE_STEP: "365"
@@ -268,7 +277,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-gcp-operator-disruptive
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-etcd-operator/operator/disruptive
@@ -277,7 +286,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/cluster-etcd-operator/operator/parallel
     test:
