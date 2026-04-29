@@ -46,13 +46,37 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |-
+  dnf -y module reset nodejs || true
+  dnf -y module enable nodejs:20
+  dnf -y install nodejs
+
+  npm install -g \
+  markdownlint@v0.40.0 \
+  markdownlint-cli2@v0.22.1 \
+  markdownlint-cli2-formatter-json \
+  markdownlint-cli2-formatter-pretty \
+  markdownlint-cli2-formatter-junit
 tests:
+- always_run: false
+  as: markdownlint
+  commands: |
+    set +e
+    make lint-markdown
+    rc=$?
+    if [[ -n "${ARTIFACT_DIR:-}" && -f markdownlint-cli2-junit.xml ]]; then
+      cp -f markdownlint-cli2-junit.xml "${ARTIFACT_DIR}/"
+    fi
+    exit "${rc}"
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
 - as: ocp-ci-monitor
-  cron: 0 9 * * *
+  cron: 0 7 * * *
   steps:
     workflow: openshift-edge-tooling-ci-monitor
 - as: pr-notifier
-  cron: 0 3 * * 0-5
+  cron: 0 7 * * 0-5
   restrict_network_access: false
   steps:
     env:

@@ -365,6 +365,7 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
+        repo:Azure/ARO-HCP
         -label:lifecycle/frozen
         -label:tide/merge-blocker
         label:lifecycle/rotten
@@ -457,6 +458,7 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
+        repo:Azure/ARO-HCP
         -label:tide/merge-blocker
         -label:lifecycle/frozen
         label:lifecycle/stale
@@ -558,6 +560,7 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
+        repo:Azure/ARO-HCP
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
@@ -929,13 +932,14 @@ periodics:
   spec:
     containers:
     - args:
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --confirm=true
-      - --git-name=openshift-bot
-      - --git-email=openshift-bot@redhat.com
+      - --git-name=openshift-merge-bot[bot]
+      - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
       - --current-release=5.0
@@ -946,6 +950,12 @@ periodics:
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       command:
       - /usr/bin/auto-config-brancher
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
       image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
       imagePullPolicy: Always
       name: auto-config-brancher
@@ -954,15 +964,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/prometheus
         name: prometheus
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-merge-bot
     - name: prometheus
       secret:
         items:
@@ -2140,270 +2150,6 @@ periodics:
         secretName: promoted-image-governor
 - agent: kubernetes
   cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-assisted-image-service
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/assisted-image-service
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-cluster-api-provider-agent
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-assisted-installer
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/assisted-installer
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-assisted-installer-agent
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-assisted-service
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/assisted-service
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  name: periodic-openshift-release-fast-forward-assisted-test-infra
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --config-dir=./ci-operator/config/openshift/assisted-test-infra
-      - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.17
-      - --future-release=ocm-2.17
-      - --confirm
-      - --username=openshift-merge-robot
-      - --token-path=/etc/github/oauth
-      command:
-      - repo-brancher
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
   cron: 30 1 * * *
   decorate: true
   decoration_config:
@@ -2866,7 +2612,7 @@ periodics:
         secretName: ci-data-bigquery-readonly
 - agent: kubernetes
   cluster: app.ci
-  cron: 0 1 * * 5
+  cron: 0 3 * * 5
   decorate: true
   extra_refs:
   - base_ref: main
