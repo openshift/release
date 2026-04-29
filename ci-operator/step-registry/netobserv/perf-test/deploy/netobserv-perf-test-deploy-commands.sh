@@ -63,12 +63,16 @@ fi
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
+    patch_netobserv "ebpf" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream@sha256:ac9caf5b05af4bcf267d2f374a14382cb84ace57578030716210f2d6910d51a2"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "$FLP_PR_IMAGE"
+    patch_netobserv "flp" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-ystream@sha256:5e1bbea92a691095b7ea451fc0322e02568b222bd535ab3fea3beec5d7ba56b5"
 fi
+
+patch_netobserv "operator" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-operator-ystream@sha256:f746c6f6a6579379c406087bcc800efe93b4898d67f357da17720864b0c8383c"
+
+patch_netobserv "plugin" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-ystream@sha256:82868052b45684155c3ff2ec5b250429bca0af593950523e13fd3054a053c2f2"
 
 # get NetObserv metadata
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
