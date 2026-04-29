@@ -127,6 +127,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
+    cluster: build08
     context: ci/prow/draft
     decorate: true
     labels:
@@ -141,6 +142,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/deploy-konflux-operator-art-image-share
         - --target=draft
         command:
         - ci-operator
@@ -159,6 +161,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/deploy-konflux-operator-art-image-share
+          name: deploy-konflux-operator-art-image-share
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -173,6 +178,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: deploy-konflux-operator-art-image-share
+        secret:
+          secretName: deploy-konflux-operator-art-image-share
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
