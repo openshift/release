@@ -19,6 +19,10 @@ images:
   - dockerfile_path: build/Dockerfile.coverage.prow
     from: clusterlifecycle-state-metrics
     to: clusterlifecycle-state-metrics-coverage
+promotion:
+  to:
+  - name: "5.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -37,12 +41,11 @@ resources:
       cpu: 81m
       memory: 200Mi
 tests:
-- as: sonar-pre-submit
+- as: sonarcloud
   commands: |
     export HOME="/tmp"
     export XDG_CONFIG_HOME="/tmp/xdg_config"
     export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -50,20 +53,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export HOME="/tmp"
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: check
   commands: make check
   container:
@@ -76,6 +66,14 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
+    env:
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
@@ -83,16 +81,37 @@ tests:
       SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
     env:
       IMAGE_REPO: clusterlifecycle-state-metrics
-      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
     env:
-      DESTINATION_BRANCH: backplane-5.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=clusterlifecycle-state-metrics
+        export OSCI_COMPONENT_VERSION=5.0.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: stolostron
   repo: clusterlifecycle-state-metrics
