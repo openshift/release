@@ -13,6 +13,10 @@ images:
   - dockerfile_path: Dockerfile
     from: base
     to: cluster-permission
+promotion:
+  to:
+  - name: "5.0"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -53,23 +57,50 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
-  postsubmit: true
+- as: pr-image-mirror
   steps:
-    env:
-      DESTINATION_BRANCH: backplane-5.0
-    workflow: ocm-ci-fastforward
-- as: latest-image-mirror
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: cluster-permission
     env:
       IMAGE_REPO: cluster-permission
-      IMAGE_TAG: latest
+      IMAGE_TAG: backplane-5.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
+    env:
+      IMAGE_REPO: cluster-permission
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=cluster-permission
+        export OSCI_COMPONENT_VERSION=5.0.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: stolostron
   repo: cluster-permission
