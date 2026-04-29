@@ -14,8 +14,8 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
     ' EXIT
 fi
 
-CONSOLE_URL=$(cat "${SHARED_DIR}/console.url")
-API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+CONSOLE_URL="$(oc whoami --show-console)"
+API_URL="$(oc whoami --show-server)"
 export CONSOLE_URL
 export API_URL
 export gauge_reports_dir="${ARTIFACT_DIR}"
