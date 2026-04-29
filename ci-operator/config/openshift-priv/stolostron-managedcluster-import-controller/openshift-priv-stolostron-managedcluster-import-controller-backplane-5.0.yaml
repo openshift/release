@@ -15,6 +15,11 @@ images:
   - dockerfile_path: build/Dockerfile
     from: base
     to: managedcluster-import-controller
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -64,7 +69,7 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
-        OCM_VERSION=main
+        OCM_VERSION=backplane-5.0
         export KUBECTL OCM_VERSION
         set -o pipefail
         make e2e-test-prow 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
@@ -78,7 +83,15 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: managedcluster-import-controller
+    env:
+      IMAGE_REPO: managedcluster-import-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-5.0
   org: openshift-priv
   repo: stolostron-managedcluster-import-controller
