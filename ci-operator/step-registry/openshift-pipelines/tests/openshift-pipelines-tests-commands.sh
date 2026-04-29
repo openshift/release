@@ -49,10 +49,4 @@ done
 
 gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true
 
-# Rename xml-report outputs to junit_test_*.xml for collectors
-readarray -t path <<< "$(find "${ARTIFACT_DIR}/xml-report" -name '*.xml')"
-for index in "${!path[@]}"; do
-  mv "${path[index]}" "${ARTIFACT_DIR}/junit_test_result$((index + 1)).xml"
-done
-
 true
