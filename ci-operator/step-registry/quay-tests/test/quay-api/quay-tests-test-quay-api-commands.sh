@@ -34,7 +34,3 @@ mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
 cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_report.xml || true
 cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
 cp cypress/videos/* $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
-
-echo "Sleeping 4 hours for debugging..." >&2
-echo "Console: $(oc whoami --show-console 2>/dev/null || true)" >&2
-sleep 14400

@@ -124,13 +124,6 @@ for _ in {1..30}; do
 done
 if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
   echo "Timed out waiting for QuayRegistry CRD" >&2
-  echo "Console: $(oc whoami --show-console 2>/dev/null || true)" >&2
-  oc get pods -n openshift-marketplace >&2 || true
-  oc get csv -n quay-enterprise >&2 || true
-  oc get catalogsource -n openshift-marketplace >&2 || true
-  oc get events -n quay-enterprise --sort-by='.lastTimestamp' 2>&1 | tail -20 >&2 || true
-  echo "Sleeping 4 hours for debugging..." >&2
-  sleep 14400
   exit 1
 fi
 
