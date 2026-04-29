@@ -14,15 +14,6 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
     ' EXIT
 fi
 
-CONSOLE_URL=$(cat "${SHARED_DIR}/console.url")
-API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-export CONSOLE_URL
-export API_URL
-export gauge_reports_dir="${ARTIFACT_DIR}"
-export overwrite_reports=false
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-export GOPROXY="https://proxy.golang.org/"
-
 # Add timeout to ignore runner connection error
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
@@ -47,6 +38,11 @@ for spec in "${specs[@]}"; do
   gauge run --log-level=debug --verbose --tags 'sanity & !tls' --max-retries-count=3 --retry-only 'sanity & !tls' "${spec}" || true
 done
 
-gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true
+CONSOLE_URL="$(oc whoami --show-console)" \
+    API_URL="$(oc whoami --show-server)" \
+    GOPROXY="https://proxy.golang.org/" \
+    gauge_reports_dir="${ARTIFACT_DIR}" \
+    overwrite_reports=false \
+    gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true
 
 true

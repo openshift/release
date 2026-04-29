@@ -14,14 +14,6 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
     ' EXIT
 fi
 
-CONSOLE_URL="$(oc whoami --show-console)"
-API_URL="$(oc whoami --show-server)"
-export CONSOLE_URL
-export API_URL
-export gauge_reports_dir="${ARTIFACT_DIR}"
-export overwrite_reports=false
-export GOPROXY="https://proxy.golang.org/"
-
 # Add timeout to ignore runner connection error
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
