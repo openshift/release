@@ -28,6 +28,9 @@ chain:
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
       default: ""
       documentation: "The Azure Marketplace image version."
+    - name: HYPERSHIFT_ETCD_STORAGE_CLASS
+      default: ""
+      documentation: "The persistent volume storage class for etcd data volumes."
     commands: |-
       set -exuo pipefail
 
@@ -65,6 +68,11 @@ chain:
       fi
 
       # Marketplace image flags
+      ETCD_STORAGE_CLASS_ARGS=""
+      if [[ -n "${HYPERSHIFT_ETCD_STORAGE_CLASS:-}" ]]; then
+        ETCD_STORAGE_CLASS_ARGS="--etcd-storage-class=${HYPERSHIFT_ETCD_STORAGE_CLASS}"
+      fi
+
       MARKETPLACE_ARGS=""
       if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" ]]; then
         MARKETPLACE_ARGS="--marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
@@ -94,7 +102,8 @@ chain:
         --dns-zone-rg-name=os4-common \
         --generate-ssh \
         ${EXTERNAL_DNS_ARGS} \
-        ${MARKETPLACE_ARGS}"
+        ${MARKETPLACE_ARGS} \
+        ${ETCD_STORAGE_CLASS_ARGS}"
 
       # Create public cluster
       echo "$(date) Creating public self-managed cluster: ${PUBLIC_NAME}"
