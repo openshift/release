@@ -179,37 +179,24 @@ until [[ -n "${csvName}" ]]; do
 done
 echo "[INFO] OLM installed CSV: ${csvName}"
 
-# Wait for the odf-operator deployment to be Available.
+# Wait for the storageclusters.ocs.openshift.io CRD to be Established.
 #
-# WHY THIS IS REQUIRED (root cause of the 2049108224325455872 failure):
-# installedCSV is set by OLM when the CSV transitions to Succeeded. That is a
-# control-plane event — it does NOT guarantee the operator pod has started and
-# registered its own CRDs. The 'storageclusters.ocs.openshift.io' CRD is
-# dynamically registered by the running odf-operator pod, NOT pre-shipped by
-# OLM. Applying a StorageCluster manifest before that CRD exists produces:
 #
-#   error: resource mapping not found for name: "ocs-storagecluster"
-#          namespace: "openshift-storage" from "STDIN":
-#          no matches for kind "StorageCluster" in version "ocs.openshift.io/v1"
-#          ensure CRDs are installed first
+# 1. oc wait deployment ocs-operator → NotFound.
+#    'ocs-operator' is a sub-component created only AFTER StorageSystem/StorageCluster
+#    exists. Waiting for it before applying the StorageCluster manifest was wrong.
 #
-# Waiting for odf-operator Available and then for the CRD Established condition
-# guarantees the API is ready before the StorageCluster manifest is applied.
+# 2. oc wait deployment odf-operator → NotFound.
+#    ODF 4.16+ restructured the operator packaging. The CSV
+#    odf-operator.v4.20.10-rhodf succeeds (installedCSV is populated) but does
+#    NOT create a deployment named 'odf-operator' in openshift-storage. The
+#    controller runs under a different name that varies between ODF releases.
+#    'oc wait' fails immediately on NotFound; it does not poll for creation.
 #
-# In ODF 4.x (4.12+) the CSV creates 'odf-operator', NOT 'ocs-operator'.
-# 'ocs-operator' is a sub-component started AFTER StorageSystem/StorageCluster
-# exists. Do NOT wait for 'ocs-operator' here — it doesn't exist yet.
-oc wait deployment odf-operator \
-    --namespace="${odfInstallNamespace}" \
-    --for=condition='Available' \
-    --timeout='5m'
 
-# Wait for the StorageCluster CRD to be fully established (Established=True).
-# The CRD is registered by the odf-operator pod at startup; this is the precise
-# gate that proves the API server will accept StorageCluster manifests.
 oc wait crd storageclusters.ocs.openshift.io \
     --for=condition='Established' \
-    --timeout='2m'
+    --timeout='5m'
 
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
     --selector='node-role.kubernetes.io/worker'
