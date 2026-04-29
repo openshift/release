@@ -63,7 +63,7 @@ fi
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream@sha256:ac9caf5b05af4bcf267d2f374a14382cb84ace57578030716210f2d6910d51a2"
+    patch_netobserv "ebpf" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream@sha256:c692b6f89bccad5cf71b975741f72441b2ed8d1e416fcf900cf26e91bf5b0767"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
