@@ -73,15 +73,17 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: ipi-aws
-- as: tls13-conformance
+- as: tls13-adherence
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
+      PQC_CHECK: "false"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     test:
     - ref: tls-scanner-run
-    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-tls-13
 - as: periodic-default-tls
   interval: 72h
@@ -92,25 +94,37 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: ipi-aws
-- as: periodic-tls13-conformance
+- as: periodic-pqc-readiness
   interval: 72h
   steps:
     cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
+      PQC_CHECK: "true"
     test:
     - ref: tls-scanner-run
-    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-tls-13
+- as: periodic-tls13-adherence
+  interval: 72h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      PQC_CHECK: "false"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-scanner-run
     workflow: openshift-e2e-aws-ovn-tls-13
 - as: tls13-pqc-readiness
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
       PQC_CHECK: "true"
     test:
     - ref: tls-scanner-run
-    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-tls-13
 zz_generated_metadata:
   branch: main
