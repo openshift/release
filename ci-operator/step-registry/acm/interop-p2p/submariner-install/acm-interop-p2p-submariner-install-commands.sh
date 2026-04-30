@@ -524,10 +524,10 @@ WaitAllSubmarinerComponentsReady() {
 # WaitGlobalnetHeadlessServiceReady
 #   Creates a canary headless service on the source cluster, exports it, and
 #   verifies that Lighthouse CoreDNS on the target cluster can resolve the
-#   service's Globalnet VIP via the cluster-ID qualified DNS format:
-#     <service>.<source-cluster-id>.<namespace>.svc.clusterset.local
+#   service's Globalnet VIP via the generic DNS format:
+#     <service>.<namespace>.svc.clusterset.local
 #
-#   WHY THIS IS REQUIRED (root cause of run 2049494878454288384 and earlier):
+#   WHY THIS IS REQUIRED:
 #
 #   WaitAllSubmarinerComponentsReady confirms that submariner-globalnet,
 #   submariner-lighthouse-agent, and submariner-lighthouse-coredns pods are
@@ -541,39 +541,31 @@ WaitAllSubmarinerComponentsReady() {
 #       with 'dig' returning "" for the full timeout in EVERY headless service
 #       test case in 'subctl verify'.
 #
-#   ROOT CAUSE (confirmed in run 2049578693226926080):
-#   In Submariner v0.23.1 with Globalnet enabled, the Lighthouse CoreDNS plugin
-#   indexes remote headless service endpoints using the CLUSTER-ID qualified key:
-#     <service>.<source-cluster-id>.<namespace>.svc.clusterset.local
-#   NOT the generic key:
-#     <service>.<namespace>.svc.clusterset.local
+#   ROOT CAUSE (confirmed in runs 2049578693226926080 and 2049703686443110400):
+#   The queries from the dig pod NEVER REACH the Lighthouse CoreDNS plugin.
+#   After 'subctl join', the submariner operator patches the OpenShift DNS
+#   operator to add a clusterset.local forwarding rule. The DNS operator then
+#   updates the dns-default ConfigMap and triggers a DaemonSet rollout. Until
+#   that rollout completes, the cluster CoreDNS at 172.30.0.10 silently drops
+#   all *.clusterset.local queries.
 #
-#   Evidence from the Lighthouse CoreDNS log in that run:
-#     Resolver Added IPv4 records for headless EndpointSlice
-#     "submariner-canary/canary-headless" from cluster "acm-spoke-0b350-2":
-#     [{ "IP": "242.1.255.253", "HostName": "242-1-255-253",
-#        "ClusterName": "acm-spoke-0b350-2" }]
-#   The ClusterName is part of the DNS key. dig against the generic name
-#   (no cluster-id) returned "" for the full 600s even though CoreDNS had
-#   already logged "Added IPv4 records" 9 seconds into the poll window.
+#   Evidence: Lighthouse CoreDNS logged "Added IPv4 records" within 60s of the
+#   canary start in both failing runs. Yet dig returned "" for the full 600s,
+#   and NO query-handling entries appeared in the Lighthouse CoreDNS logs —
+#   proving the queries never reached Lighthouse at all. Cluster CoreDNS
+#   dropped them because the forwarding rule hadn't been applied yet.
 #
-#   This is why 'subctl verify' headless service discovery tests also fail
-#   systematically — they use the generic format which is broken with Globalnet
-#   in v0.23.1 on OVNKubernetes. StatefulSet DNS tests pass because they
-#   always include the cluster-id in the query.
-#
-#   CANARY DNS FORMAT USED HERE (correct for Globalnet):
-#     <service>.<source-cluster-id>.<namespace>.svc.clusterset.local
-#   This mirrors the working StatefulSet format, minus the per-pod hostname.
+#   The WaitForDnsForwardingConfigured function (called before this canary in
+#   the main flow) resolves this by waiting for the dns-default DaemonSet to
+#   finish rolling out before any dig query is attempted.
 #
 #   By running this canary before 'subctl verify', we:
-#     (a) Confirm the cluster-ID qualified DNS path is functional;
+#     (a) Confirm the end-to-end DNS path is functional;
 #     (b) Capture GlobalIngressIP, ServiceImport, and Lighthouse agent logs
 #         immediately if the path is broken — rather than discovering failures
-#         only after 4+ minutes per test case;
-#     (c) Give the system additional time to fully initialise the
-#         GlobalIngressIP → ServiceImport update → Lighthouse DNS pipeline,
-#         which is slower on c5n.metal bare-metal nodes.
+#         only after 4+ minutes per test case in subctl verify;
+#     (c) Detect any remaining issue with the Lighthouse DNS resolution itself
+#         that is distinct from the DNS forwarding problem.
 #
 # Arguments:
 #   $1 - kubeconfig for the source cluster (headless service deployed here)
@@ -704,23 +696,27 @@ YAML
 
     # ----------------------------------------------------------------
     # Phase 2: Verify DNS from the TARGET cluster resolves the Globalnet VIP
-    # using the cluster-ID qualified headless service format:
-    #   <service>.<source-cluster-id>.<namespace>.svc.clusterset.local
+    # using the generic headless service format:
+    #   <service>.<namespace>.svc.clusterset.local
     #
-    # WHY CLUSTER-ID QUALIFIED (not generic <service>.<namespace>.svc.clusterset.local):
-    #   In Submariner v0.23.1 with Globalnet, the Lighthouse CoreDNS plugin
-    #   indexes remote headless service endpoints under the cluster-ID qualified
-    #   key. The generic format (no cluster-id) consistently returns "" even
-    #   when CoreDNS has already added the records — confirmed in run
-    #   2049578693226926080 where dig returned "" for the full 600s while
-    #   CoreDNS logs showed "Added IPv4 records" 9 seconds into the poll.
-    #   The cluster-ID qualified format mirrors the working StatefulSet DNS path.
+    # WHY GENERIC FORMAT (not cluster-ID qualified):
+    #   This is the EXACT format used by 'subctl verify' headless service tests.
+    #   Validating this specific path ensures the canary is a faithful proxy for
+    #   whether subctl verify will pass.
+    #
+    #   The cluster-ID qualified format was tried in run 2049703686443110400
+    #   and ALSO failed with "" for 600s — because the root cause was that
+    #   cluster CoreDNS had not yet loaded the clusterset.local forwarding rule
+    #   at all. WaitForDnsForwardingConfigured (added before this canary call)
+    #   resolves that by waiting for the dns-default DaemonSet rollout to
+    #   complete before any dig query runs.
     #
     # A successful resolution proves the full propagation pipeline:
     #   GlobalIngressIP (source) → lighthouse-agent (source) →
-    #   broker → lighthouse-agent (target) → lighthouse-coredns (target) → DNS
+    #   broker → lighthouse-agent (target) → lighthouse-coredns (target) →
+    #   cluster CoreDNS forwarding → dig returns VIP
     # ----------------------------------------------------------------
-    typeset canaryDnsName="${canarySvcName}.${sourceCluster}.${canaryNS}.svc.clusterset.local"
+    typeset canaryDnsName="${canarySvcName}.${canaryNS}.svc.clusterset.local"
 
     echo "[INFO] Creating dig pod on '${targetCluster}'"
     KUBECONFIG="${kcTarget}" oc -n "${canaryNS}" delete pod submariner-canary-dig \
@@ -805,6 +801,99 @@ YAML
         --ignore-not-found 2>/dev/null || true
 
     echo "[INFO] Globalnet headless service DNS canary test PASSED"
+    true
+}
+
+#=====================
+# WaitForDnsForwardingConfigured
+#   Waits for the OpenShift cluster CoreDNS to be configured with the
+#   clusterset.local forwarding rule injected by 'subctl join'.
+#
+#   WHAT HAPPENS AFTER subctl join:
+#     1. The submariner operator patches dns.operator.openshift.io/cluster
+#        to add a Servers entry forwarding *.clusterset.local to the
+#        Lighthouse CoreDNS service.
+#     2. The OpenShift DNS operator detects the change and updates the
+#        dns-default ConfigMap in openshift-dns.
+#     3. The DNS operator triggers a rolling restart of the dns-default
+#        DaemonSet so all cluster CoreDNS pods pick up the new Corefile.
+#
+#   WHY THIS IS CRITICAL (root cause of runs 2049578693226926080 and
+#   2049703686443110400):
+#     WaitAllSubmarinerComponentsReady only confirms that Submariner's own
+#     pods (globalnet, lighthouse-agent, lighthouse-coredns) are ready.
+#     It does NOT wait for the OpenShift cluster CoreDNS to finish rolling
+#     out with the forwarding rule.
+#
+#     On c5n.metal bare-metal nodes, this DaemonSet rollout can take
+#     10+ minutes — longer than the gap between subctl join and our canary.
+#     Until the rollout completes, the cluster CoreDNS at 172.30.0.10 does
+#     NOT forward *.clusterset.local queries to Lighthouse CoreDNS.
+#     All dig queries return "" — not because Lighthouse lacks the record,
+#     but because the query never reaches Lighthouse at all.
+#
+#     Evidence: across both runs, Lighthouse CoreDNS logged "Added IPv4
+#     records" within 60s, yet dig returned "" for the full 600s — with
+#     zero query-handling lines in the Lighthouse logs. Queries were
+#     silently dropped by cluster CoreDNS.
+#
+#   Phase 1 — wait for the ConfigMap to contain 'clusterset.local'.
+#             This confirms the DNS operator has applied the change.
+#   Phase 2 — wait for the dns-default DaemonSet rollout to complete.
+#             This confirms all CoreDNS pods have reloaded the new config.
+#
+# Arguments:
+#   $1 - kubeconfig for the spoke cluster
+#   $2 - cluster name (for logging)
+#=====================
+WaitForDnsForwardingConfigured() {
+    typeset kc="$1"
+    typeset clusterName="$2"
+    typeset -i maxWait=900  # 15 minutes — c5n.metal DaemonSet rollouts are slow
+    typeset -i elapsed=0
+    typeset -i interval=15
+
+    echo "[INFO] ============================================================"
+    echo "[INFO] Waiting for clusterset.local DNS forwarding on '${clusterName}'"
+    echo "[INFO]   Checks: dns-default ConfigMap + DaemonSet rollout"
+    echo "[INFO]   Timeout: ${maxWait}s"
+    echo "[INFO] ============================================================"
+
+    # Phase 1: Wait for the DNS operator to update the CoreDNS ConfigMap
+    # The ConfigMap's Corefile will contain 'clusterset.local' once the
+    # DNS operator has applied the forwarding server entry from subctl join.
+    echo "[INFO] Phase 1: Waiting for 'clusterset.local' in dns-default ConfigMap on '${clusterName}'"
+    until KUBECONFIG="${kc}" oc get configmap dns-default \
+            -n openshift-dns \
+            -o jsonpath='{.data.Corefile}' 2>/dev/null \
+            | grep -q 'clusterset'; do
+        if (( elapsed >= maxWait )); then
+            echo "[ERROR] clusterset.local forwarding rule not in dns-default ConfigMap on '${clusterName}' after ${maxWait}s" >&2
+            echo "[DEBUG] Current CoreDNS Corefile on '${clusterName}':" >&2
+            KUBECONFIG="${kc}" oc get configmap dns-default \
+                -n openshift-dns \
+                -o jsonpath='{.data.Corefile}' 2>&1 || true
+            echo "" >&2
+            echo "[DEBUG] DNS operator servers config on '${clusterName}':" >&2
+            KUBECONFIG="${kc}" oc get dns.operator.openshift.io/cluster \
+                -o jsonpath='{.spec.servers}' 2>&1 || true
+            return 1
+        fi
+        echo "[INFO]   clusterset.local not yet in CoreDNS config on '${clusterName}' (${elapsed}/${maxWait}s)"
+        sleep "${interval}"
+        (( elapsed += interval ))
+    done
+    echo "[INFO] Phase 1 PASSED: clusterset.local forwarding rule present in CoreDNS config on '${clusterName}' (after ${elapsed}s)"
+
+    # Phase 2: Wait for the dns-default DaemonSet to finish rolling out.
+    # The DNS operator triggers a rollout when it updates the ConfigMap.
+    # All CoreDNS pods must be restarted before they pick up the new config.
+    echo "[INFO] Phase 2: Waiting for dns-default DaemonSet rollout on '${clusterName}'"
+    KUBECONFIG="${kc}" oc rollout status daemonset/dns-default \
+        -n openshift-dns \
+        --timeout=10m
+
+    echo "[INFO] WaitForDnsForwardingConfigured PASSED on '${clusterName}'"
     true
 }
 
@@ -1051,6 +1140,15 @@ for ((i = 0; i < spokeCount; i++)); do
     WaitAllSubmarinerComponentsReady "${spokeKubeconfigs[i]}" "${spokeNames[i]}"
 done
 
+# Step 7: nginx service-discovery verification
+# Deploy nginx on spoke-2, export the service, curl it from spoke-1.
+# Mirrors the manual ClusterIP verification from the Submariner Globalnet docs.
+VerifyNginxConnectivity \
+    "${spokeKubeconfigs[1]}" \
+    "${spokeKubeconfigs[0]}" \
+    "${spokeNames[1]}" \
+    "${spokeNames[0]}"
+
 # Canary: verify that the generic headless service Globalnet DNS path
 # (service.namespace.svc.clusterset.local) works end-to-end before running
 # the full subctl verify suite (31 test specs, 4+ min each on failure).
@@ -1062,6 +1160,18 @@ done
 #   runs. StatefulSet pod DNS (different code path) always passed.
 #   The canary either confirms the path works or fails fast with diagnostics from
 #   GlobalIngressIP CRs, ServiceImport state, and lighthouse-agent/coredns logs.
+
+# Step 5a: wait for OpenShift cluster CoreDNS to reload the clusterset.local
+# forwarding rule that subctl join injects. Without this, all dig queries from
+# test pods return "" because the cluster CoreDNS at 172.30.0.10 silently drops
+# *.clusterset.local queries — even though Lighthouse CoreDNS already has the
+# records. This was the root cause of canary failures in runs
+# 2049578693226926080 and 2049703686443110400.
+for ((i = 0; i < spokeCount; i++)); do
+    WaitForDnsForwardingConfigured \
+        "${spokeKubeconfigs[i]}" \
+        "${spokeNames[i]}"
+done
 for ((i = 0; i < spokeCount - 1; i++)); do
     WaitGlobalnetHeadlessServiceReady \
         "${spokeKubeconfigs[$((i + 1))]}" \
@@ -1088,14 +1198,7 @@ for ((i = 0; i < spokeCount - 1; i++)); do
         "${spokeNames[$((i + 1))]}"
 done
 
-# Step 7: nginx service-discovery verification
-# Deploy nginx on spoke-2, export the service, curl it from spoke-1.
-# Mirrors the manual ClusterIP verification from the Submariner Globalnet docs.
-VerifyNginxConnectivity \
-    "${spokeKubeconfigs[1]}" \
-    "${spokeKubeconfigs[0]}" \
-    "${spokeNames[1]}" \
-    "${spokeNames[0]}"
+
 
 echo "[INFO] Submariner installation and connectivity verification complete"
 true
