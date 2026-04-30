@@ -1,3 +1,16 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.22"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -12,6 +25,12 @@ images:
   - context_dir: .
     dockerfile_path: tests/Dockerfile
     to: tracing-ui-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -31,19 +50,13 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.22"
   steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
     test:
     - ref: distributed-tracing-tests-tracing-ui-upstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: release-coo-ocp-4.22
   org: openshift
