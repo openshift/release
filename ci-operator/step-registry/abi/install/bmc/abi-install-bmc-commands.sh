@@ -26,6 +26,14 @@ typeset -i httpSvcPort=8080
 typeset -ai taskPIDs=()
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
+# Extract openshift-install from the release image.
+oc adm release extract \
+    -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
+    "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+    --command=openshift-install \
+    --to="/tmp"
+export PATH="/tmp:${PATH}"
+
 
 function openshift-install () {
     typeset -i es=0
