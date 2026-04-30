@@ -27,9 +27,9 @@ typeset -ai taskPIDs=()
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
 # Extract openshift-install from the release image.
-# Note: CI Operator automatically provides authentication for internal registry,
-# so we don't need to specify -a flag for CI registry images.
+# Use ci-pull-credentials which includes authentication for internal CI registry.
 oc adm release extract \
+    -a "/var/run/secrets/ci-pull-credentials/.dockerconfigjson" \
     "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
     --command=openshift-install \
     --to="/tmp"
