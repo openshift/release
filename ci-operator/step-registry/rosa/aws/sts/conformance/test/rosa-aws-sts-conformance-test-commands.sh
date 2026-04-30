@@ -38,10 +38,9 @@ set +x
 set -e
 
 if [[ "${SKIP_MONITOR_TEST:-}" == "true" ]] && [[ ${exit_code} -ne 0 ]]; then
-    total_failures=$(grep -c "Suite run returned error:" /tmp/openshift-tests.log || true)
-    monitor_failures=$(grep -c "failed due to a MonitorTest failure" /tmp/openshift-tests.log || true)
-    if [[ ${total_failures} -gt 0 ]] && [[ ${total_failures} -eq ${monitor_failures} ]]; then
-        echo "Overriding MonitorTest-only failure (SKIP_MONITOR_TEST=true, ${monitor_failures} monitor failure(s), no blocking test failures)"
+    if grep -q 'failed due to a MonitorTest failure' /tmp/openshift-tests.log && \
+       ! grep -q 'Blocking test failures:' /tmp/openshift-tests.log; then
+        echo "Overriding MonitorTest-only failure (SKIP_MONITOR_TEST=true, no blocking test failures)"
         exit_code=0
     fi
 fi
