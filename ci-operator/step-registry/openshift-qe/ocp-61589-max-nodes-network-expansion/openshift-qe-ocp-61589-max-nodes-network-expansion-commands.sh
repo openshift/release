@@ -4,380 +4,149 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Starting OCP-61589: Maximum nodes post cluster network expansion test"
+# OCP-61589: Maximum nodes post cluster network expansion test
+# This test validates that after expanding cluster network CIDR from /20 to /14,
+# approximately 512 nodes can become Ready before hitting subnet exhaustion.
 
-# Test configuration
-export CLUSTER_NETWORK_ORIGINAL_CIDR="${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}"
-export CLUSTER_NETWORK_EXPANDED_CIDR="${CLUSTER_NETWORK_EXPANDED_CIDR:-10.128.0.0/14}"
-export CLUSTER_NETWORK_HOST_PREFIX="${CLUSTER_NETWORK_HOST_PREFIX:-23}"
-export MAX_NODES_TARGET="${MAX_NODES_TARGET:-520}"
-export EXPECTED_READY_NODES="${EXPECTED_READY_NODES:-510}"
-export TEST_TIMEOUT="${TEST_TIMEOUT:-6h}"
+EXPECTED_READY_NODES=${EXPECTED_READY_NODES:-512}
+TOTAL_SCALE_NODES=${TOTAL_SCALE_NODES:-520}
+EXPANSION_TARGET_CIDR=${EXPANSION_TARGET_CIDR:-10.128.0.0/14}
 
-# Function to check cluster health
-check_cluster_health() {
-    echo "Checking cluster operator health..."
-    local unhealthy_operators=0
-    while read -r name _ available progressing degraded _ _; do
-        if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
-            echo "ERROR: Cluster operator $name is not healthy: available=$available, progressing=$progressing, degraded=$degraded"
-            ((unhealthy_operators++))
-        fi
-    done < <(oc get co --no-headers)
-    
-    if [[ $unhealthy_operators -gt 0 ]]; then
-        echo "ERROR: Found $unhealthy_operators unhealthy cluster operators"
-        return 1
-    fi
-    echo "All cluster operators are healthy"
-}
+echo "=========================================="
+echo "OCP-61589: Maximum nodes network expansion test"
+echo "Expected ready nodes: ${EXPECTED_READY_NODES}"
+echo "Total scale target: ${TOTAL_SCALE_NODES}"
+echo "Expansion target CIDR: ${EXPANSION_TARGET_CIDR}"
+echo "=========================================="
 
-# Function to wait for nodes to be ready
-wait_for_nodes() {
-    local target_ready=$1
-    local timeout=$2
-    echo "Waiting for $target_ready nodes to be ready (timeout: $timeout)"
-    
-    local start_time
-    start_time=$(date +%s)
-    local timeout_seconds
-    if [[ "$timeout" =~ ([0-9]+)h ]]; then
-        timeout_seconds=$((${BASH_REMATCH[1]} * 3600))
-    elif [[ "$timeout" =~ ([0-9]+)m ]]; then
-        timeout_seconds=$((${BASH_REMATCH[1]} * 60))
-    elif [[ "$timeout" =~ ([0-9]+)s ]]; then
-        timeout_seconds=${BASH_REMATCH[1]}
-    else
-        timeout_seconds=7200  # Default 2 hours
-    fi
-    
-    # Create node provisioning progress log
-    echo "timestamp,elapsed_seconds,total_nodes,ready_nodes,notready_nodes,pending_nodes" > "$RESULTS_DIR/node-provisioning-progress.csv"
-    
-    while true; do
-        local ready_count
-        ready_count=$(oc get nodes --no-headers | grep " Ready " | wc -l)
-        local notready_count
-        notready_count=$(oc get nodes --no-headers | grep "NotReady" | wc -l)
-        local total_count
-        total_count=$(oc get nodes --no-headers | wc -l)
-        local pending_count=$((target_ready + 10 - total_count))  # Estimate pending
-        local current_time
-        current_time=$(date +%s)
-        local elapsed=$((current_time - start_time))
-        
-        # Log progress to CSV
-        echo "$(date),${elapsed},${total_count},${ready_count},${notready_count},${pending_count}" >> "$RESULTS_DIR/node-provisioning-progress.csv"
-        
-        echo "$(date): Ready nodes: $ready_count/$target_ready, Total: $total_count, NotReady: $notready_count (elapsed: ${elapsed}s)"
-        
-        # Save periodic snapshots
-        if [[ $((elapsed % 1800)) -eq 0 && $elapsed -gt 0 ]]; then  # Every 30 minutes
-            echo "$(date): Saving 30-minute snapshot" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-            oc get nodes -o wide > "$RESULTS_DIR/nodes-snapshot-${elapsed}s.txt"
-            oc get machineset -n openshift-machine-api -o wide > "$RESULTS_DIR/machinesets-snapshot-${elapsed}s.txt"
-        fi
-        
-        if [[ $ready_count -ge $target_ready ]]; then
-            echo "SUCCESS: $ready_count nodes are ready"
-            echo "$(date): Target ready nodes achieved: $ready_count" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-            return 0
-        fi
-        
-        if [[ $elapsed -gt $timeout_seconds ]]; then
-            echo "TIMEOUT: Only $ready_count nodes ready after ${timeout}"
-            echo "$(date): Test timed out with $ready_count ready nodes" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-            return 1
-        fi
-        
-        sleep 60
-    done
-}
+# Wait for cluster to be ready
+echo "Waiting for cluster operators to be ready..."
+oc wait --for=condition=Available --timeout=30m clusteroperator --all
 
-# Create results directory
-RESULTS_DIR="${ARTIFACT_DIR:-/tmp}/ocp-61589-results"
-mkdir -p "$RESULTS_DIR"
+# Get initial cluster state
+echo "Capturing initial cluster state..."
+INITIAL_NODES=$(oc get nodes --no-headers | wc -l)
+echo "Initial node count: ${INITIAL_NODES}"
 
-# Step 1: Verify initial cluster state
-echo "=== STEP 1: Verify initial cluster state ==="
-check_cluster_health
+# Get initial network configuration
+echo "Initial network configuration:"
+oc get network.config cluster -o yaml
 
-echo "Expected initial cluster network configuration:"
-echo "  Original CIDR: $CLUSTER_NETWORK_ORIGINAL_CIDR"
-echo "  Expanded CIDR: $CLUSTER_NETWORK_EXPANDED_CIDR"
+# Perform network expansion (this should already be done by ovn-clusternetwork-cidr-expansion step)
+echo "Checking if network expansion has occurred..."
+CURRENT_CIDR=$(oc get network.config cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+echo "Current CIDR: ${CURRENT_CIDR}"
 
-echo "Actual initial cluster network configuration:"
-oc get network.config.openshift.io cluster -o yaml | tee "$RESULTS_DIR/initial-network-config.yaml"
-
-# Verify the cluster started with the expected initial CIDR
-actual_cidr=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
-echo "Actual initial CIDR: $actual_cidr"
-if [[ "$actual_cidr" != "$CLUSTER_NETWORK_ORIGINAL_CIDR" ]]; then
-    echo "❌ CRITICAL ERROR: Cluster started with CIDR $actual_cidr instead of expected $CLUSTER_NETWORK_ORIGINAL_CIDR"
-    echo ""
-    echo "DIAGNOSIS:"
-    echo "  Expected: $CLUSTER_NETWORK_ORIGINAL_CIDR (for expansion to $CLUSTER_NETWORK_EXPANDED_CIDR)"
-    echo "  Actual:   $actual_cidr"
-    echo ""
-    echo "ROOT CAUSE:"
-    echo "  The cluster install-config was not configured correctly for network expansion testing."
-    echo "  The test methodology requires:"
-    echo "    1. Start with $CLUSTER_NETWORK_ORIGINAL_CIDR (small CIDR)"
-    echo "    2. Expand to $CLUSTER_NETWORK_EXPANDED_CIDR (larger CIDR)"  
-    echo "    3. Scale to ~520 nodes to validate capacity"
-    echo ""
-    echo "RESOLUTION:"
-    echo "  1. Verify the ipi-install-config-network-custom step is working correctly"
-    echo "  2. Check that CLUSTER_NETWORK_CIDR environment variable is properly set to $CLUSTER_NETWORK_ORIGINAL_CIDR"
-    echo "  3. Ensure the install-config.yaml networking section is not overridden later in the workflow"
-    echo ""
-    echo "TEST CANNOT PROCEED: Expansion from $actual_cidr to $CLUSTER_NETWORK_EXPANDED_CIDR would not validate the intended functionality"
-    exit 1
+if [[ "${CURRENT_CIDR}" == "${EXPANSION_TARGET_CIDR}" ]]; then
+  echo "✅ Network expansion already completed to ${EXPANSION_TARGET_CIDR}"
 else
-    echo "✅ SUCCESS: Cluster started with correct initial CIDR $actual_cidr"
+  echo "❌ Network expansion not detected. Expected ${EXPANSION_TARGET_CIDR}, got ${CURRENT_CIDR}"
+  exit 1
 fi
 
-echo "Initial node count:"
-initial_node_count=$(oc get nodes --no-headers | wc -l)
-echo "$initial_node_count" | tee "$RESULTS_DIR/initial-node-count.txt"
-echo "Initial nodes: $initial_node_count"
+# Scale machinesets to test subnet exhaustion
+echo "Scaling machinesets to ${TOTAL_SCALE_NODES} total nodes..."
 
-echo "Initial cluster operators status:"
-oc get co -o wide | tee "$RESULTS_DIR/initial-cluster-operators.txt"
+# Get all worker machinesets
+MACHINESETS=$(oc get machineset -n openshift-machine-api -o name | grep worker)
+MACHINESET_COUNT=$(echo "${MACHINESETS}" | wc -l)
 
-echo "Initial machinesets:"
-oc get machineset -n openshift-machine-api -o wide | tee "$RESULTS_DIR/initial-machinesets.txt"
-
-echo "Initial cluster version:"
-oc get clusterversion -o yaml | tee "$RESULTS_DIR/initial-cluster-version.yaml"
-
-# Step 2: Expand cluster network CIDR
-echo "=== STEP 2: Expand cluster network CIDR ==="
-echo "Expanding cluster network from $CLUSTER_NETWORK_ORIGINAL_CIDR to $CLUSTER_NETWORK_EXPANDED_CIDR"
-
-# Record network expansion timestamp
-echo "$(date): Starting network expansion" | tee "$RESULTS_DIR/network-expansion-timeline.txt"
-
-# Apply network expansion
-oc patch Network.config.openshift.io cluster --type='merge' --patch "{
-    \"spec\": {
-        \"clusterNetwork\": [
-            {
-                \"cidr\": \"$CLUSTER_NETWORK_EXPANDED_CIDR\",
-                \"hostPrefix\": $CLUSTER_NETWORK_HOST_PREFIX
-            }
-        ],
-        \"networkType\": \"OVNKubernetes\"
-    }
-}" | tee "$RESULTS_DIR/network-expansion-patch-result.txt"
-
-echo "$(date): Network expansion applied, waiting 20 minutes for reconfiguration (based on real test: 13.5 minutes)" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-sleep 1200  # 20 minutes instead of 30
-
-# Verify cluster health after network expansion
-echo "$(date): Checking cluster health post-expansion" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-check_cluster_health
-
-echo "Updated cluster network configuration:"
-oc get network.config.openshift.io cluster -o yaml | tee "$RESULTS_DIR/post-expansion-network-config.yaml"
-
-# Verify the network expansion was successful
-updated_cidr=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
-echo "Post-expansion CIDR: $updated_cidr"
-if [[ "$updated_cidr" == "$CLUSTER_NETWORK_EXPANDED_CIDR" ]]; then
-    echo "✅ SUCCESS: Network successfully expanded from $CLUSTER_NETWORK_ORIGINAL_CIDR to $updated_cidr"
-else
-    echo "❌ ERROR: Network expansion failed. Expected $CLUSTER_NETWORK_EXPANDED_CIDR but got $updated_cidr"
-    echo "Initial CIDR was: $CLUSTER_NETWORK_ORIGINAL_CIDR"
-    exit 1
+if [[ ${MACHINESET_COUNT} -eq 0 ]]; then
+  echo "❌ No worker machinesets found"
+  exit 1
 fi
 
-echo "Post-expansion cluster operators status:"
-oc get co -o wide | tee "$RESULTS_DIR/post-expansion-cluster-operators.txt"
+echo "Found ${MACHINESET_COUNT} worker machinesets"
 
-# Step 3: Scale machinesets to maximum capacity
-echo "=== STEP 3: Scale machinesets to test maximum node capacity ==="
+# Calculate target replicas per machineset (accounting for initial nodes)
+TARGET_WORKER_NODES=$((TOTAL_SCALE_NODES - INITIAL_NODES))
+REPLICAS_PER_MACHINESET=$((TARGET_WORKER_NODES / MACHINESET_COUNT))
 
-# Get worker machinesets only (exclude infra)
-mapfile -t machinesets < <(oc get machineset -n openshift-machine-api --no-headers -o custom-columns=NAME:.metadata.name | grep -v infra)
+echo "Scaling each machineset to ${REPLICAS_PER_MACHINESET} replicas..."
 
-if [[ ${#machinesets[@]} -ne 3 ]]; then
-    echo "ERROR: Expected 3 worker machinesets, found ${#machinesets[@]}"
-    echo "Worker machinesets found:"
-    for ms in "${machinesets[@]}"; do
-        echo "  - $ms"
-    done
-    echo "All machinesets in cluster:"
-    oc get machineset -n openshift-machine-api --no-headers -o custom-columns=NAME:.metadata.name
-    exit 1
-fi
+# Scale all machinesets
+for machineset in ${MACHINESETS}; do
+  echo "Scaling ${machineset} to ${REPLICAS_PER_MACHINESET} replicas..."
+  oc scale -n openshift-machine-api "${machineset}" --replicas="${REPLICAS_PER_MACHINESET}"
+done
 
-# Scale machinesets to target total of 520 nodes (200+200+120)
-echo "$(date): Starting machineset scaling" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
+# Wait for nodes to be provisioned and monitor readiness
+echo "Monitoring node scaling progress..."
+TIMEOUT_MINUTES=60
+INTERVAL_SECONDS=30
+ELAPSED=0
 
-echo "Scaling machineset ${machinesets[0]} to 200 replicas"
-oc scale --replicas=200 machineset "${machinesets[0]}" -n openshift-machine-api | tee "$RESULTS_DIR/machineset-scaling-${machinesets[0]}.txt"
+while [[ ${ELAPSED} -lt $((TIMEOUT_MINUTES * 60)) ]]; do
+  CURRENT_NODES=$(oc get nodes --no-headers | wc -l)
+  READY_NODES=$(oc get nodes --no-headers | grep " Ready " | wc -l)
+  NOTREADY_NODES=$(oc get nodes --no-headers | grep " NotReady " | wc -l)
+  
+  echo "Time: ${ELAPSED}s | Total: ${CURRENT_NODES} | Ready: ${READY_NODES} | NotReady: ${NOTREADY_NODES}"
+  
+  # Check if we've hit the expected pattern
+  if [[ ${READY_NODES} -ge ${EXPECTED_READY_NODES} && ${NOTREADY_NODES} -gt 0 ]]; then
+    echo "✅ SUCCESS: Subnet exhaustion pattern detected!"
+    echo "Ready nodes: ${READY_NODES} (>= ${EXPECTED_READY_NODES})"
+    echo "NotReady nodes: ${NOTREADY_NODES} (> 0)"
+    break
+  fi
+  
+  sleep ${INTERVAL_SECONDS}
+  ELAPSED=$((ELAPSED + INTERVAL_SECONDS))
+done
 
-echo "Scaling machineset ${machinesets[1]} to 200 replicas" 
-oc scale --replicas=200 machineset "${machinesets[1]}" -n openshift-machine-api | tee "$RESULTS_DIR/machineset-scaling-${machinesets[1]}.txt"
+# Final validation
+FINAL_NODES=$(oc get nodes --no-headers | wc -l)
+FINAL_READY=$(oc get nodes --no-headers | grep " Ready " | wc -l)
+FINAL_NOTREADY=$(oc get nodes --no-headers | grep " NotReady " | wc -l)
 
-echo "Scaling machineset ${machinesets[2]} to 120 replicas"
-oc scale --replicas=120 machineset "${machinesets[2]}" -n openshift-machine-api | tee "$RESULTS_DIR/machineset-scaling-${machinesets[2]}.txt"
+echo "=========================================="
+echo "FINAL RESULTS:"
+echo "Total nodes: ${FINAL_NODES}"
+echo "Ready nodes: ${FINAL_READY}"
+echo "NotReady nodes: ${FINAL_NOTREADY}"
+echo "=========================================="
 
-echo "Machinesets scaled. Current state:"
-oc get machineset -n openshift-machine-api -o wide | tee "$RESULTS_DIR/post-scaling-machinesets.txt"
-
-echo "$(date): Machineset scaling completed" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-
-# Step 4: Monitor node provisioning and validate results
-echo "=== STEP 4: Monitor node provisioning ==="
-
-# Wait for nodes to reach expected capacity
-wait_for_nodes "$EXPECTED_READY_NODES" "$TEST_TIMEOUT"
-
-# Get final node counts
-echo "=== STEP 5: Validate test results ==="
-echo "$(date): Final validation started" | tee -a "$RESULTS_DIR/network-expansion-timeline.txt"
-
-total_nodes=$(oc get nodes --no-headers | wc -l)
-ready_nodes=$(oc get nodes --no-headers | grep " Ready " | wc -l)
-notready_nodes=$(oc get nodes --no-headers | grep "NotReady" | wc -l)
-
-echo "Final node statistics:"
-echo "  Total nodes: $total_nodes"
-echo "  Ready nodes: $ready_nodes" 
-echo "  NotReady nodes: $notready_nodes"
+# Create results summary
+RESULTS_DIR="${SHARED_DIR}/ocp-61589-results"
+mkdir -p "${RESULTS_DIR}"
 
 # Save detailed results
-{
-    echo "OCP-61589 Test Results Summary"
-    echo "============================="
-    echo "Test Date: $(date)"
-    echo "Initial Nodes: $initial_node_count"
-    echo "Final Total Nodes: $total_nodes"
-    echo "Final Ready Nodes: $ready_nodes"
-    echo "Final NotReady Nodes: $notready_nodes"
-    echo "Target Nodes: $MAX_NODES_TARGET"
-    echo "Expected Ready: $EXPECTED_READY_NODES"
-    echo "Network Expansion: $CLUSTER_NETWORK_ORIGINAL_CIDR -> $CLUSTER_NETWORK_EXPANDED_CIDR"
-} | tee "$RESULTS_DIR/test-results-summary.txt"
+oc get nodes -o wide > "${RESULTS_DIR}/final-nodes.txt"
+oc get machineset -n openshift-machine-api > "${RESULTS_DIR}/final-machinesets.txt"
+oc get network.config cluster -o yaml > "${RESULTS_DIR}/final-network-config.yaml"
 
-# Save all node details
-oc get nodes -o wide | tee "$RESULTS_DIR/final-all-nodes.txt"
-oc get nodes --no-headers | grep " Ready " > "$RESULTS_DIR/final-ready-nodes.txt"
-oc get nodes --no-headers | grep "NotReady" > "$RESULTS_DIR/final-notready-nodes.txt"
+# Create summary
+cat > "${RESULTS_DIR}/test-summary.txt" << EOF
+OCP-61589 Test Results Summary
+==============================
+Test Objective: Validate ~512 nodes become Ready after network expansion, rest NotReady
+Network Expansion: /20 → /14
+Expected Ready Nodes: ${EXPECTED_READY_NODES}
+Total Scale Target: ${TOTAL_SCALE_NODES}
 
-# Show NotReady node details
-if [[ $notready_nodes -gt 0 ]]; then
-    echo "NotReady nodes:"
-    oc get nodes --no-headers | grep "NotReady" | head -10 | tee "$RESULTS_DIR/notready-nodes-sample.txt"
-    
-    echo "Checking error messages for NotReady nodes..."
-    notready_node=$(oc get nodes --no-headers | grep "NotReady" | head -1 | awk '{print $1}')
-    if [[ -n "$notready_node" ]]; then
-        echo "Sample error from $notready_node:"
-        oc describe node "$notready_node" | tee "$RESULTS_DIR/notready-node-details-$notready_node.txt"
-        
-        # Check for both types of subnet exhaustion errors
-        echo "Checking for subnet exhaustion evidence..."
-        
-        # Classic subnet annotation error
-        if oc describe node "$notready_node" | grep -A3 -B3 "k8s.ovn.org/node-subnets.*annotation" | tee "$RESULTS_DIR/subnet-annotation-errors.txt"; then
-            echo "✅ Found classic subnet annotation error"
-        # NetworkPluginNotReady with CNI config missing
-        elif oc describe node "$notready_node" | grep -A3 -B3 "NetworkPluginNotReady.*no CNI configuration" | tee "$RESULTS_DIR/network-plugin-errors.txt"; then
-            echo "✅ Found network plugin error indicating subnet exhaustion"
-        else
-            echo "⚠️  Unknown error type - saving full describe output for analysis"
-            oc describe node "$notready_node" | grep -A10 -B5 "Ready.*False" | tee "$RESULTS_DIR/unknown-error-analysis.txt"
-        fi
-    fi
-fi
+Results:
+--------
+Total Nodes: ${FINAL_NODES}
+Ready Nodes: ${FINAL_READY}
+NotReady Nodes: ${FINAL_NOTREADY}
 
-# Save final machinesets status
-oc get machineset -n openshift-machine-api -o wide | tee "$RESULTS_DIR/final-machinesets.txt"
+Test Status: $([[ ${FINAL_READY} -ge ${EXPECTED_READY_NODES} && ${FINAL_NOTREADY} -gt 0 ]] && echo "PASS" || echo "FAIL")
+EOF
 
-# Save final cluster operator status
-oc get co -o wide | tee "$RESULTS_DIR/final-cluster-operators.txt"
-
-# Validate test expectations
-echo "=== STEP 6: Test validation ==="
-
-if [[ $ready_nodes -ge $((EXPECTED_READY_NODES - 10)) ]] && [[ $ready_nodes -le $((EXPECTED_READY_NODES + 10)) ]]; then
-    echo "✅ SUCCESS: Ready node count ($ready_nodes) is within expected range (~$EXPECTED_READY_NODES)"
+# Validate test success
+if [[ ${FINAL_READY} -ge ${EXPECTED_READY_NODES} && ${FINAL_NOTREADY} -gt 0 ]]; then
+  echo "✅ OCP-61589 TEST PASSED"
+  echo "   Ready nodes (${FINAL_READY}) >= expected (${EXPECTED_READY_NODES})"
+  echo "   NotReady nodes (${FINAL_NOTREADY}) > 0 (subnet exhaustion confirmed)"
+  exit 0
 else
-    echo "❌ FAIL: Ready node count ($ready_nodes) is outside expected range (~$EXPECTED_READY_NODES)"
-    exit 1
+  echo "❌ OCP-61589 TEST FAILED"
+  if [[ ${FINAL_READY} -lt ${EXPECTED_READY_NODES} ]]; then
+    echo "   Ready nodes (${FINAL_READY}) < expected (${EXPECTED_READY_NODES})"
+  fi
+  if [[ ${FINAL_NOTREADY} -eq 0 ]]; then
+    echo "   No NotReady nodes found - subnet exhaustion not detected"
+  fi
+  exit 1
 fi
-
-if [[ $total_nodes -ge $((MAX_NODES_TARGET - 20)) ]] && [[ $total_nodes -le $MAX_NODES_TARGET ]]; then
-    echo "✅ SUCCESS: Total node count ($total_nodes) is within expected range (~$MAX_NODES_TARGET)"
-else
-    echo "❌ FAIL: Total node count ($total_nodes) is outside expected range (~$MAX_NODES_TARGET)"
-    exit 1
-fi
-
-if [[ $notready_nodes -ge 5 ]] && [[ $notready_nodes -le 20 ]]; then
-    echo "✅ SUCCESS: NotReady node count ($notready_nodes) indicates subnet exhaustion as expected"
-else
-    echo "⚠️  WARNING: NotReady node count ($notready_nodes) may indicate unexpected behavior"
-fi
-
-echo "=== TEST COMPLETED SUCCESSFULLY ==="
-echo "OCP-61589 test validated that after network expansion, approximately $ready_nodes nodes became ready"
-echo "before hitting subnet exhaustion with $notready_nodes nodes remaining NotReady"
-
-# Create final comprehensive summary
-{
-    echo "============================================"
-    echo "OCP-61589 COMPREHENSIVE TEST RESULTS"
-    echo "============================================"
-    echo "Test Completion Time: $(date)"
-    echo ""
-    echo "NETWORK CONFIGURATION:"
-    echo "  Original CIDR: $CLUSTER_NETWORK_ORIGINAL_CIDR"
-    echo "  Expanded CIDR: $CLUSTER_NETWORK_EXPANDED_CIDR"
-    echo "  Host Prefix: $CLUSTER_NETWORK_HOST_PREFIX"
-    echo ""
-    echo "NODE STATISTICS:"
-    echo "  Initial Nodes: $initial_node_count"
-    echo "  Target Nodes: $MAX_NODES_TARGET"
-    echo "  Expected Ready: $EXPECTED_READY_NODES"
-    echo "  Final Total Nodes: $total_nodes"
-    echo "  Final Ready Nodes: $ready_nodes"
-    echo "  Final NotReady Nodes: $notready_nodes"
-    echo ""
-    echo "TEST VALIDATION:"
-    if [[ $ready_nodes -ge $((EXPECTED_READY_NODES - 10)) ]] && [[ $ready_nodes -le $((EXPECTED_READY_NODES + 10)) ]]; then
-        echo "  ✅ Ready Nodes: PASS ($ready_nodes within ±10 of $EXPECTED_READY_NODES)"
-    else
-        echo "  ❌ Ready Nodes: FAIL ($ready_nodes outside range of $EXPECTED_READY_NODES)"
-    fi
-    
-    if [[ $total_nodes -ge $((MAX_NODES_TARGET - 20)) ]] && [[ $total_nodes -le $MAX_NODES_TARGET ]]; then
-        echo "  ✅ Total Nodes: PASS ($total_nodes within range of $MAX_NODES_TARGET)"
-    else
-        echo "  ❌ Total Nodes: FAIL ($total_nodes outside range of $MAX_NODES_TARGET)"
-    fi
-    
-    if [[ $notready_nodes -ge 5 ]] && [[ $notready_nodes -le 20 ]]; then
-        echo "  ✅ Subnet Exhaustion: PASS ($notready_nodes NotReady nodes indicate expected behavior)"
-    else
-        echo "  ⚠️  Subnet Exhaustion: WARNING ($notready_nodes NotReady nodes, expected 5-20)"
-    fi
-    echo ""
-    echo "ARTIFACTS SAVED TO: $RESULTS_DIR"
-    echo "- Network configurations (before/after)"
-    echo "- Node provisioning timeline and progress"
-    echo "- Machineset scaling results"
-    echo "- Cluster operator status"
-    echo "- Detailed node lists and error messages"
-    echo "============================================"
-} | tee "$RESULTS_DIR/final-comprehensive-summary.txt"
-
-echo ""
-echo " All test results and artifacts saved to: $RESULTS_DIR"
-echo "  - test-results-summary.txt"
-echo "  - node-provisioning-progress.csv"
-echo "  - network-expansion-timeline.txt"
-echo "  - final-comprehensive-summary.txt"

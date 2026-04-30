@@ -57,6 +57,19 @@ wait_for_condition() {
             return 1
         fi
         
+        # Add EgressIP assignment debugging every 5 minutes (300 seconds)
+        if [[ $((elapsed % 300)) -eq 0 ]] && [[ $elapsed -gt 0 ]]; then
+            local assigned_count
+            assigned_count=$(oc get egressip -o jsonpath='{range .items[*]}{.status.items[0].node}{"\n"}{end}' 2>/dev/null | grep -v '^$' | wc -l || echo "0")
+            local total_count
+            total_count=$(oc get egressip --no-headers | wc -l || echo "0")
+            echo "📊 EgressIP Status: $assigned_count/$total_count assigned (target: $EXPECTED_ASSIGNED_EGRESSIPS)"
+            
+            # Show sample EgressIP status
+            echo "Sample EgressIP objects status:"
+            oc get egressip -o custom-columns=NAME:.metadata.name,NODE:.status.items[0].node,IP:.status.items[0].egressIP --no-headers | head -5 || echo "Failed to get EgressIP status"
+        fi
+        
         echo "$(date): Still waiting... (elapsed: ${elapsed}s)"
         sleep "$check_interval"
     done

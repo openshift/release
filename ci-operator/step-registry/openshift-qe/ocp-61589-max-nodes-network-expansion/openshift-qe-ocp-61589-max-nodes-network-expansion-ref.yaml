@@ -1,49 +1,25 @@
 ref:
   as: openshift-qe-ocp-61589-max-nodes-network-expansion
-  from_image:
-    namespace: ocp
-    name: "4.21" 
-    tag: cli
+  from: cli
   commands: openshift-qe-ocp-61589-max-nodes-network-expansion-commands.sh
   resources:
     requests:
-      cpu: 100m
-      memory: 200Mi
-  timeout: 8h0m0s
-  grace_period: 30m0s
+      cpu: 500m
+      memory: 1Gi
   env:
-  - name: CLUSTER_NETWORK_CIDR
-    default: "10.128.0.0/20"
-    documentation: "Original cluster network CIDR"
-  - name: CLUSTER_NETWORK_EXPANDED_CIDR
-    default: "10.128.0.0/14"
-    documentation: "Expanded cluster network CIDR for testing"
-  - name: CLUSTER_NETWORK_HOST_PREFIX
-    default: "23"
-    documentation: "Host prefix for cluster network"
+  - name: EXPECTED_READY_NODES
+    default: "512"
+  - name: TOTAL_SCALE_NODES
+    default: "520"
   - name: MAX_NODES_TARGET
     default: "520"
-    documentation: "Target total number of nodes to provision"
-  - name: EXPECTED_READY_NODES
-    default: "510" 
-    documentation: "Expected number of nodes that should become Ready"
+    documentation: "Maximum number of nodes to scale to during the test"
   - name: TEST_TIMEOUT
     default: "2h"
-    documentation: "Maximum time to wait for node provisioning (based on real test: 22min for 512 nodes)"
+    documentation: "Maximum time to wait for test completion"
+  - name: EXPANSION_TARGET_CIDR
+    default: "10.128.0.0/14"
   documentation: |-
-    Tests OCP-61589: Maximum nodes post cluster network expansion.
-    
-    This test validates that after expanding the cluster network CIDR from /20 to /14,
-    the cluster can provision approximately 512 nodes before hitting subnet exhaustion.
-    
-    Test steps:
-    1. Verify initial cluster health and network configuration
-    2. Expand cluster network CIDR (10.128.0.0/20 -> 10.128.0.0/14)
-    3. Scale machinesets to provision 520 total nodes (200+200+120)
-    4. Validate that ~510 nodes become Ready before subnet exhaustion
-    5. Verify remaining nodes stay NotReady due to missing node-subnets annotation
-    
-    Based on real test results (April 2026):
-    - Network expansion: ~15 minutes (not 30 minutes)  
-    - Node provisioning: ~22 minutes for 512 nodes (not 6+ hours)
-    - Total test time: ~40 minutes (significant optimization from original estimates)
+    This step implements the OCP-61589 test case for maximum nodes post cluster network expansion.
+    It validates that after expanding cluster network CIDR from /20 to /14, approximately 512 nodes 
+    can become Ready before hitting subnet exhaustion, with additional nodes staying NotReady.
