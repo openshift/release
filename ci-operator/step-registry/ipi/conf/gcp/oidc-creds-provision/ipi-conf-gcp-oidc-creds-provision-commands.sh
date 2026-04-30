@@ -101,6 +101,9 @@ ADDITIONAL_CCOCTL_ARGS=""
 if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
+if [[ -n "${KEY_STORAGE_METHOD:-}" ]]; then
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --key-storage-method=${KEY_STORAGE_METHOD}"
+fi
 
 ccoctl_ouptut="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
