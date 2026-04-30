@@ -144,6 +144,27 @@ chain:
         exit 1
       fi
 
+      # Patch the public cluster to set OperatorConfiguration for Ingress Operator.
+      # The v2 e2e test ValidateIngressOperatorConfiguration expects this to be set on
+      # public clusters (mirroring the BeforeApply hook used in the v1 CreateCluster test).
+      echo "$(date) Patching public cluster ${PUBLIC_NAME} with OperatorConfiguration..."
+      oc patch hostedcluster "${PUBLIC_NAME}" -n clusters --type=merge -p '
+      {
+        "spec": {
+          "operatorConfiguration": {
+            "ingressOperator": {
+              "endpointPublishingStrategy": {
+                "type": "LoadBalancerService",
+                "loadBalancer": {
+                  "scope": "Internal"
+                }
+              }
+            }
+          }
+        }
+      }'
+      echo "$(date) Public cluster ${PUBLIC_NAME} patched with OperatorConfiguration"
+
       # Wait for clusters to become available
       echo "$(date) Waiting for public cluster to become available..."
       oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${PUBLIC_NAME}"
