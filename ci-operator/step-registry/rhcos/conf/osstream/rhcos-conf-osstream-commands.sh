@@ -20,7 +20,7 @@ WORKER_STREAM="${OS_IMAGE_STREAM_MCP_WORKER:-${OSSTREAM:-}}"
 
 # If neither pool has a stream configured, skip
 if [[ -z "${MASTER_STREAM}" && -z "${WORKER_STREAM}" ]]; then
-  echo "No OS image stream configured for any pool, skipping MachineConfigPool osImageStream configuration"
+  echo "No OS Image Stream configured for any pool, skipping MachineConfigPool osImageStream configuration"
   exit 0
 fi
 
