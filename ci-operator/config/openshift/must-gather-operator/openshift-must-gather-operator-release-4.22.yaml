@@ -133,10 +133,7 @@ tests:
       OO_INSTALL_NAMESPACE: must-gather-operator
       OO_PACKAGE: support-log-gather-operator
       OO_TARGET_NAMESPACES: '!all'
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
+    test:
     - as: setup-konflux-image-access
       cli: latest
       commands: |
@@ -169,8 +166,7 @@ tests:
         requests:
           cpu: 100m
     - ref: optional-operators-subscribe
-    test:
-    - as: install
+    - as: verify-install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator --timeout=15m
@@ -191,22 +187,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-hypershift-operator-weekly
   cron: '@weekly'
   steps:
     cluster_profile: openshift-org-aws
-    dependencies:
-      OO_BUNDLE: must-gather-operator-bundle
+    dependency_overrides:
+      OO_INDEX: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__4.22__ose-support-log-gather-rhel9-operator
     env:
-      OO_INSTALL_MODE: OwnNamespace
+      OO_CHANNEL: tech-preview
       OO_INSTALL_NAMESPACE: must-gather-operator
-    post:
-    - chain: hypershift-hostedcluster-dump
-    - chain: hypershift-hostedcluster-destroy
-    pre:
-    - ref: openshift-cluster-bot-rbac
+      OO_PACKAGE: support-log-gather-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
     - ref: ipi-install-rbac
-    - chain: hypershift-hostedcluster-create
     - as: setup-konflux-image-access
       cli: latest
       commands: |
@@ -238,9 +232,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-    - ref: optional-operators-operator-sdk
-    test:
-    - as: install
+    - ref: optional-operators-subscribe
+    - as: verify-install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator
@@ -261,10 +254,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-rosa-operator-weekly
   cron: '@weekly'
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-sd-qe
     dependency_overrides:
       OO_INDEX: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__4.22__ose-support-log-gather-rhel9-operator
     env:
@@ -272,10 +266,8 @@ tests:
       OO_INSTALL_NAMESPACE: must-gather-operator
       OO_PACKAGE: support-log-gather-operator
       OO_TARGET_NAMESPACES: '!all'
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
+    test:
+    - ref: ipi-install-rbac
     - as: setup-konflux-image-access
       cli: latest
       commands: |
@@ -308,8 +300,7 @@ tests:
         requests:
           cpu: 100m
     - ref: optional-operators-subscribe
-    test:
-    - as: install
+    - as: verify-install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator --timeout=15m
@@ -330,6 +321,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: rosa-lifecycle
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
