@@ -72,6 +72,18 @@ virsh net-start test-infra-net-d55276d8
 virsh net-define "${GOLDEN_DIR}/virt/virt-network.xml"
 virsh net-start test-infra-net-ad07fc71
 
+echo "$(date +%T) Configuring cross-network forwarding..."
+echo "--- Host firewall state before fix ---"
+iptables -L FORWARD -n 2>&1 | head -5 || true
+firewall-cmd --zone=libvirt --list-all 2>&1 || echo "no firewalld libvirt zone"
+systemctl stop firewalld 2>/dev/null || true
+systemctl disable firewalld 2>/dev/null || true
+iptables -P FORWARD ACCEPT
+iptables -I FORWARD -s 192.168.131.0/24 -d 192.168.130.0/24 -j ACCEPT
+iptables -I FORWARD -s 192.168.130.0/24 -d 192.168.131.0/24 -j ACCEPT
+echo "--- Host firewall state after fix ---"
+iptables -L FORWARD -n 2>&1 | head -10 || true
+
 echo "$(date +%T) Fixing domain XMLs..."
 python3 "${GOLDEN_DIR}/hub/fix-domain-xml.py" \
   "${GOLDEN_DIR}/hub/hub-domain.xml" \
@@ -152,6 +164,15 @@ if [[ "${failed}" -ne 0 ]]; then
 fi
 
 echo "$(date +%T) All endpoints ready"
+
+echo "$(date +%T) Testing cross-VM connectivity (hub -> virt API)..."
+echo "From host:"
+curl -sk --connect-timeout 5 https://192.168.130.10:6443/readyz 2>&1 || echo "FAILED from host"
+echo ""
+echo "From hub VM:"
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 core@192.168.131.10 \
+  "curl -sk --connect-timeout 5 https://192.168.130.10:6443/readyz 2>&1" || echo "CROSS-VM CONNECTIVITY FAILED"
+echo ""
 
 mkdir -p /root/.kube
 cp "${GOLDEN_DIR}/hub/hub-kubeconfig" /root/.kube/config
