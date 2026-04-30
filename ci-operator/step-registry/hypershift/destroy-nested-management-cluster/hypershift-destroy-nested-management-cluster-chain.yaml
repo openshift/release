@@ -22,7 +22,17 @@ chain:
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-10)-mgmt"
       mkdir -p "${ARTIFACT_DIR}/output"
       bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
-      tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
+
+      # Azure dump logs trigger leaktk/gcs-filter censoring; exclude them so the tarball survives
+      TAR_EXCLUDES=""
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        TAR_EXCLUDES='--exclude=*ignition-server*.log --exclude=*audit-logs.log'
+        mkdir -p "${ARTIFACT_DIR}/excluded-logs"
+        find "${ARTIFACT_DIR}/output" -name "*ignition-server*.log" -o -name "*audit-logs.log" | while read f; do
+          cp "$f" "${ARTIFACT_DIR}/excluded-logs/"
+        done
+      fi
+      tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" ${TAR_EXCLUDES} "${ARTIFACT_DIR}/output"
       rm -rf "${ARTIFACT_DIR}/output"
     credentials:
     - mount_path: /etc/hypershift-kubeconfig
@@ -86,6 +96,7 @@ chain:
           --name="${CLUSTER_NAME}" \
           --namespace="${HYPERSHIFT_NAMESPACE}" \
           --location=${HYPERSHIFT_AZURE_LOCATION} \
+          --dns-zone-rg-name=os4-common \
           --cluster-grace-period 40m
       else
         echo "Destroying AWS management cluster ${CLUSTER_NAME}"
