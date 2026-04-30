@@ -27,8 +27,9 @@ typeset -ai taskPIDs=()
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
 # Extract openshift-install from the release image.
+# Note: CI Operator automatically provides authentication for internal registry,
+# so we don't need to specify -a flag for CI registry images.
 oc adm release extract \
-    -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
     "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
     --command=openshift-install \
     --to="/tmp"
