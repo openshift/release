@@ -92,18 +92,9 @@ images:
       USER root
       COPY /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-      ENV GOBIN="/usr/local/bin"
-      ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
       ENV GOFLAGS='-mod=readonly'
-      RUN make install-tools && \
-          make -C tooling/templatize templatize && \
-          make -C test/ aro-hcp-tests prow-job-executor && \
-          go clean -cache -modcache && \
-          rm -f go.work.sum
-      RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
-      RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
-      RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
-      RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
+      RUN make -C tooling/templatize templatize && \
+          go clean -cache -modcache && rm -f go.work.sum
       RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
     from: src
     inputs:
@@ -112,6 +103,9 @@ images:
         - destination_dir: src
           source_path: /go/src/github.com/Azure/ARO-HCP
     to: aro-hcp-e2e-tools
+  - dockerfile_path: test/Containerfile.e2e
+    from: src
+    to: aro-hcp-e2e-tests
   - dockerfile_literal: |
       FROM src
       USER root
@@ -133,7 +127,7 @@ images:
 promotion:
   to:
   - additional_images:
-      aro-hcp-e2e-tools: aro-hcp-e2e-tools
+      aro-hcp-e2e-tests: aro-hcp-e2e-tests
     excluded_images:
     - '*'
     namespace: aro-hcp
@@ -146,6 +140,13 @@ resources:
     requests:
       cpu: "3"
       memory: 4Gi
+  aro-hcp-e2e-tests:
+    limits:
+      cpu: "8"
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 10Gi
   aro-hcp-e2e-tools:
     limits:
       cpu: "8"
@@ -459,7 +460,23 @@ tests:
       resource_type: aro-hcp-dev-quota-slice
     workflow: aro-hcp-local-e2e
   timeout: 10h0m0s
+- always_run: false
+  as: e2e-parallel-infra-shard1
+  optional: true
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: prow
+      INFRA_SHARD: shard1
+      LOCATION: westus3
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-dev-quota-slice
+    workflow: aro-hcp-local-e2e
+  timeout: 10h0m0s
 - as: global-pipeline-postsubmit
+  max_concurrency: 4
   postsubmit: true
   run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
   steps:
@@ -471,12 +488,14 @@ tests:
       resource_type: aro-hcp-dev-global-pipeline-quota-slice
     test:
     - ref: aro-hcp-provision-global-pipeline
-- as: images-push
+- as: images-push-postsubmit
+  max_concurrency: 4
   postsubmit: true
   steps:
     test:
     - ref: aro-hcp-images-push
-- as: cspr
+- as: cspr-pipeline-postsubmit
+  max_concurrency: 4
   postsubmit: true
   steps:
     env:

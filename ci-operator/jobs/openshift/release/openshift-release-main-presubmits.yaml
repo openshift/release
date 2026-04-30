@@ -874,6 +874,61 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build12-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build12
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build12-dry
+    optional: true
+    rerun_command: /test build12-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build12
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build12_id
+          valueFrom:
+            secretKeyRef:
+              key: build12-id
+              name: build12-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build12.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build12-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: build07
     context: ci/prow/ci-operator-config
     decorate: true
@@ -1034,7 +1089,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260414-6691f5aff
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260429-8f72e9c5a
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

@@ -28,6 +28,9 @@ images:
         - destination_dir: .
           source_path: /go/src/github.com/openshift-online/rosa-claude-plugins
     to: prek-runner
+prowgen:
+  expose: true
+  private: true
 resources:
   '*':
     limits:
@@ -42,7 +45,11 @@ tests:
     cd /workspace/rosa-claude-plugins
     git init
     git add -A
-    prek run --all-files
+    if [ -x hack/ci.sh ]; then
+      ./hack/ci.sh
+    else
+      prek run --all-files
+    fi
   container:
     from: prek-runner
 zz_generated_metadata:
