@@ -29,19 +29,20 @@ fi
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${INFRA_SHARD}-subscription-id")
+export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
+export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
 export AZURE_TOKEN_CREDENTIALS=prod
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
-az account set --subscription "${SUBSCRIPTION_ID}"
+az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 
 # Any data is useful even if something goes wrong
 set +o errexit
 
-# List all prow resource groups
-echo "All hcp-underlay-prow- RGs:"
+# List all resource groups for this environment
+echo "All hcp-underlay-${DEPLOY_ENV}- RGs:"
 az group list --output table \
-  --query "sort_by([?starts_with(name, 'hcp-underlay-prow-')].{Name:name, Location:location, Status:properties.provisioningState, CreatedTime:tags.createdAt}, &Name)"
+  --query "sort_by([?starts_with(name, 'hcp-underlay-${DEPLOY_ENV}-')].{Name:name, Location:location, Status:properties.provisioningState, CreatedTime:tags.createdAt}, &Name)"
 
 # For each identified resource group, dump detailed information
 echo "Resource Group Details and Deployment Status:"
