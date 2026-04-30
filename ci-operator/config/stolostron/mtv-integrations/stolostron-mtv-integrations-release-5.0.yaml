@@ -11,7 +11,15 @@ build_root:
 images:
   items:
   - dockerfile_path: Dockerfile
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: mtv-integrations
+promotion:
+  to:
+  - name: "5.0"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -52,13 +60,32 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: mtv-integrations
     env:
-      DESTINATION_BRANCH: release-5.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: mtv-integrations
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="mtv-integrations"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-5.0
   org: stolostron
   repo: mtv-integrations
