@@ -133,6 +133,42 @@ tests:
       OO_INSTALL_NAMESPACE: must-gather-operator
       OO_PACKAGE: support-log-gather-operator
       OO_TARGET_NAMESPACES: '!all'
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - as: setup-konflux-image-access
+      cli: latest
+      commands: |
+        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-rhel9
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      credentials:
+      - mount_path: /var/run/secrets/pull-secret
+        name: deploy-konflux-operator-art-image-share
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-subscribe
     test:
     - as: install
       cli: latest
@@ -155,7 +191,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-gcp
 - as: e2e-hypershift-operator-weekly
   cron: '@weekly'
   steps:
@@ -165,6 +200,45 @@ tests:
     env:
       OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: must-gather-operator
+    post:
+    - chain: hypershift-hostedcluster-dump
+    - chain: hypershift-hostedcluster-destroy
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-rbac
+    - chain: hypershift-hostedcluster-create
+    - as: setup-konflux-image-access
+      cli: latest
+      commands: |
+        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-rhel9
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      credentials:
+      - mount_path: /var/run/secrets/pull-secret
+        name: deploy-konflux-operator-art-image-share
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-operator-sdk
     test:
     - as: install
       cli: latest
@@ -187,7 +261,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-hypershift
 - as: e2e-rosa-operator-weekly
   cron: '@weekly'
   steps:
@@ -199,6 +272,42 @@ tests:
       OO_INSTALL_NAMESPACE: must-gather-operator
       OO_PACKAGE: support-log-gather-operator
       OO_TARGET_NAMESPACES: '!all'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - as: setup-konflux-image-access
+      cli: latest
+      commands: |
+        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-rhel9
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      credentials:
+      - mount_path: /var/run/secrets/pull-secret
+        name: deploy-konflux-operator-art-image-share
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-subscribe
     test:
     - as: install
       cli: latest
@@ -221,7 +330,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
