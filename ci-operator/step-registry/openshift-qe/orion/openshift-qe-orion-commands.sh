@@ -32,7 +32,7 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    if [[ -f "/secret/qe/jira-api-key" ]]; then
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_NAME}" =~ (periodic|^pull-ci) ]] && [[ ${REPO_NAME} != "orion" ]]; then
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
