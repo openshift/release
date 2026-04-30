@@ -17,6 +17,8 @@ ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kub
 export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
 
 if [[ -n "${TEST_SKIPS:-}" ]]; then
+    # Strip whitespace around \| separators injected by YAML >- folding
+    TEST_SKIPS=$(echo "$TEST_SKIPS" | sed 's/ *\\|/\\|/g; s/\\| */\\|/g')
     TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
     echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests || { echo 'Error: all tests were filtered out by TEST_SKIPS regex:'; echo "$TEST_SKIPS"; exit 1; }
     echo "Skipping tests:"
@@ -36,10 +38,9 @@ set +x
 set -e
 
 if [[ "${SKIP_MONITOR_TEST:-}" == "true" ]] && [[ ${exit_code} -ne 0 ]]; then
-    total_failures=$(grep -c "Suite run returned error:" /tmp/openshift-tests.log || true)
-    monitor_failures=$(grep -c "failed due to a MonitorTest failure" /tmp/openshift-tests.log || true)
-    if [[ ${total_failures} -gt 0 ]] && [[ ${total_failures} -eq ${monitor_failures} ]]; then
-        echo "Overriding MonitorTest-only failure (SKIP_MONITOR_TEST=true, ${monitor_failures} monitor failure(s), no blocking test failures)"
+    if grep -q 'failed due to a MonitorTest failure' /tmp/openshift-tests.log && \
+       ! grep -q 'Blocking test failures:' /tmp/openshift-tests.log; then
+        echo "Overriding MonitorTest-only failure (SKIP_MONITOR_TEST=true, no blocking test failures)"
         exit_code=0
     fi
 fi
