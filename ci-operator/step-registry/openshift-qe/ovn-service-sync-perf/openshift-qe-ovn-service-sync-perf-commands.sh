@@ -233,9 +233,9 @@ test_ovn_service_sync() {
         node_name=$(oc get pod "$pod" -n openshift-ovn-kubernetes -o jsonpath='{.spec.nodeName}')
         echo "Node: $node_name"
         
-        # Record pre-restart timestamp
+        # Record pre-restart timestamp in RFC3339 format for oc logs --since-time
         local restart_timestamp
-        restart_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        restart_timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
         # Restart the ovnkube-node pod
         echo "Restarting ovnkube-node pod..."
@@ -284,9 +284,12 @@ test_ovn_service_sync() {
         echo "Analyzing service sync logs for pod $new_pod..."
         local sync_start_time sync_end_time sync_duration
         
-        # Get all gateway service sync logs
+        # Get all gateway service sync logs from the last 10 minutes (simpler approach)
+        # Try ovnkube-controller first, then ovnkube-node if not found
         local sync_logs
-        sync_logs=$(oc logs -n openshift-ovn-kubernetes "$new_pod" -c ovnkube-controller --since-time="$restart_timestamp" | grep -i "gateway service sync" || echo "")
+        sync_logs=$(oc logs -n openshift-ovn-kubernetes "$new_pod" -c ovnkube-controller --since=10m 2>/dev/null | grep -i "gateway service sync" || \
+                   oc logs -n openshift-ovn-kubernetes "$new_pod" -c ovnkube-node --since=10m 2>/dev/null | grep -i "gateway service sync" || \
+                   echo "")
         
         if [[ -n "$sync_logs" ]]; then
             echo "Gateway service sync logs:"
@@ -323,6 +326,13 @@ test_ovn_service_sync() {
             fi
         else
             echo "❌ ERROR: No gateway service sync logs found"
+            echo "Debugging: Checking containers in pod $new_pod:"
+            oc get pod "$new_pod" -n openshift-ovn-kubernetes -o jsonpath='{.spec.containers[*].name}' || echo "Failed to get container names"
+            echo ""
+            echo "Checking ovnkube-controller container:"
+            oc logs -n openshift-ovn-kubernetes "$new_pod" -c ovnkube-controller --since=10m 2>/dev/null | head -5 || echo "No ovnkube-controller logs"
+            echo "Checking ovnkube-node container:"
+            oc logs -n openshift-ovn-kubernetes "$new_pod" -c ovnkube-node --since=10m 2>/dev/null | head -5 || echo "No ovnkube-node logs"
             sync_results+=("$node_name:NO_LOGS")
             ((failed_syncs++))
         fi
