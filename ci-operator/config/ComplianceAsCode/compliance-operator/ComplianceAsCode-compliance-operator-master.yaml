@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -81,6 +85,9 @@ tests:
     cluster_profile: quay-aws
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-compliance
     test:
     - as: test
       cli: latest
@@ -96,7 +103,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-ovn-tls-13
 - as: e2e-aws-serial
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
