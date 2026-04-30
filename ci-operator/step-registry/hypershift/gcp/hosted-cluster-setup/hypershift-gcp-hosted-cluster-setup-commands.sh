@@ -115,8 +115,9 @@ NODEPOOL_SA=$(awk -F'"' '/"nodepool-mgmt"/{print $4}' "${IAM_OUTPUT}")
 CLOUDCONTROLLER_SA=$(awk -F'"' '/"cloud-controller"/{print $4}' "${IAM_OUTPUT}")
 STORAGE_SA=$(awk -F'"' '/"gcp-pd-csi"/{print $4}' "${IAM_OUTPUT}")
 IMAGEREGISTRY_SA=$(awk -F'"' '/"image-registry"/{print $4}' "${IAM_OUTPUT}")
+NETWORK_SA=$(awk -F'"' '/"cloud-network"/{print $4}' "${IAM_OUTPUT}")
 
-if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${PROVIDER_ID}" || -z "${CONTROLPLANE_SA}" || -z "${NODEPOOL_SA}" || -z "${CLOUDCONTROLLER_SA}" || -z "${STORAGE_SA}" || -z "${IMAGEREGISTRY_SA}" ]]; then
+if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${PROVIDER_ID}" || -z "${CONTROLPLANE_SA}" || -z "${NODEPOOL_SA}" || -z "${CLOUDCONTROLLER_SA}" || -z "${STORAGE_SA}" || -z "${IMAGEREGISTRY_SA}" || -z "${NETWORK_SA}" ]]; then
     echo "ERROR: Failed to parse WIF configuration from IAM output"
     cat "${IAM_OUTPUT}"
     exit 1
@@ -131,6 +132,7 @@ echo "${NODEPOOL_SA}" > "${SHARED_DIR}/nodepool-sa"
 echo "${CLOUDCONTROLLER_SA}" > "${SHARED_DIR}/cloudcontroller-sa"
 echo "${STORAGE_SA}" > "${SHARED_DIR}/storage-sa"
 echo "${IMAGEREGISTRY_SA}" > "${SHARED_DIR}/imageregistry-sa"
+echo "${NETWORK_SA}" > "${SHARED_DIR}/network-sa"
 
 echo "WIF configuration saved to SHARED_DIR"
 
@@ -181,6 +183,7 @@ echo "  Provider ID: ${PROVIDER_ID}"
 echo "  Control Plane SA: ${CONTROLPLANE_SA}"
 echo "  NodePool SA: ${NODEPOOL_SA}"
 echo "  Cloud Controller SA: ${CLOUDCONTROLLER_SA}"
+echo "  Network SA: ${NETWORK_SA}"
 echo ""
 echo "Network Configuration:"
 echo "  VPC: ${HC_VPC_NAME}"
