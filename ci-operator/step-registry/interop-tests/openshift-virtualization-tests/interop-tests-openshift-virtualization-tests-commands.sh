@@ -187,13 +187,13 @@ InstallYqIfNotExists() {
         echo "yq version: ${cmdYq}"
     else
         curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-            -o "${BIN_FOLDER}/yq" && chmod +x "${BIN_FOLDER}/yq"
+            -o "${binFolder}/yq" && chmod +x "${binFolder}/yq"
     fi
     true
 }
 
 MapTestsForComponentReadiness() {
-    [[ ${MAP_TESTS} != "true" ]] && return
+    [[ "${MAP_TESTS}" != "true" ]] && return
 
     typeset resultsFile="${1:-}"
     echo "Patching Tests Result File: ${resultsFile}"
@@ -207,7 +207,7 @@ MapTestsForComponentReadiness() {
 
 # Install and verify virtctl (same approach as redhat-lp-chaos)
 InstallAndVerifyVirtctl() {
-    [[ ${CNV_TESTS_UPGRADE_ONLY} != "true" ]] && return
+    [[ "${CNV_TESTS_UPGRADE_ONLY}" != "true" ]] && return
 
     typeset baseURL
     if ! baseURL="$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' | tr -d '\n\r')"; then
@@ -217,17 +217,17 @@ InstallAndVerifyVirtctl() {
 
     typeset dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
     # No tar -v: keep CI logs smaller (MPEX Section0).
-    if ! curl -kfsSL "${dlURL}" | tar -xzf - -C "${BIN_FOLDER}"; then
+    if ! curl -kfsSL "${dlURL}" | tar -xzf - -C "${binFolder}"; then
         echo "FATAL ERROR: Failed to download and extract virtctl."
         exit 1
     fi
 
     # Handle virtctl in subdirectory (archive may have virtctl-4.x.x/virtctl)
-    if [[ ! -x "${BIN_FOLDER}/virtctl" ]]; then
+    if [[ ! -x "${binFolder}/virtctl" ]]; then
         typeset virtctlPath
-        virtctlPath="$(find "${BIN_FOLDER}" -name virtctl -type f -executable | head -1)"
+        virtctlPath="$(find "${binFolder}" -name virtctl -type f -executable | head -1)"
         if [[ -n "${virtctlPath}" ]]; then
-            mv "${virtctlPath}" "${BIN_FOLDER}/virtctl"
+            mv "${virtctlPath}" "${binFolder}/virtctl"
         fi
     fi
 
@@ -238,12 +238,12 @@ InstallAndVerifyVirtctl() {
     true
 }
 
-typeset BIN_FOLDER
-BIN_FOLDER="$(mktemp -d /tmp/bin.XXXX)"
-typeset OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
+typeset binFolder
+binFolder="$(mktemp -d /tmp/bin.XXXX)"
+typeset ocUrl="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
 # Exports
-export PATH="${BIN_FOLDER}:${PATH}"
+export PATH="${binFolder}:${PATH}"
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
 export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
@@ -270,9 +270,9 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 ###########################################################################
 # Get oc binary
-curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzf - oc
+curl -sL "${ocUrl}" | tar -C "${binFolder}" -xzf - oc
 
-if [[ "${CNV_TESTS_UPGRADE_ONLY:-false}" == "true" ]]; then
+if [[ "${CNV_TESTS_UPGRADE_ONLY}" == "true" ]]; then
     if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
         echo "[ERROR] CNV_TESTS_UPGRADE_ONLY=true but ${SHARED_DIR}/managed-cluster-kubeconfig not found" >&2
         exit 1
@@ -293,7 +293,7 @@ InstallAndVerifyVirtctl
 
 typeset -i exitCode=0
 
-if [[ "${CNV_TESTS_UPGRADE_ONLY:-false}" == "true" ]]; then
+if [[ "${CNV_TESTS_UPGRADE_ONLY}" == "true" ]]; then
     uv --verbose --cache-dir /tmp/uv-cache \
         run pytest -o cache_dir=/tmp/pytest-cache \
         -s \
