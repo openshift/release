@@ -148,17 +148,36 @@ EOF
 )"
 
 # Wait for OLM to fully install the CSV.
-# installedCSV is set by OLM only when the CSV has reached Succeeded phase — it is the single field
-# that proves the operator is installed. currentCSV is set earlier (OLM's intent) but is not sufficient
-# proof of a successful install. Using installedCSV collapses the old two-step
-# (poll currentCSV → oc wait csv --for=Succeeded) into one authoritative check.
-# IMPORTANT: use the fully-qualified resource type 'subscriptions.operators.coreos.com' to avoid
-# ambiguity with 'subscriptions.apps.open-cluster-management.io' (ACM CRD) which registers the same
-# short name 'subscription'. When ACM is installed, unqualified 'oc get subscription' resolves to the
-# ACM CRD instead of the OLM CRD, returning empty output and causing the loop to spin until timeout.
-# oc get -o jsonpath returns exit 0 + empty string when the field is absent, so 2>/dev/null covers the
-# brief "not found" window right after apply; || true covers transient API server errors.
-# ODF install typically takes 10-15 minutes; 20m timeout covers slow CI nodes with headroom to spare.
+#
+# WHY A POLLING LOOP INSTEAD OF 'oc wait':
+#   'oc wait --for=jsonpath={.status.installedCSV}!=''  --timeout=20m' would be
+#   the MPEX-preferred single command, but 'oc wait' does not support "not-empty"
+#   jsonpath predicates — it only supports equality checks against a literal value.
+#   The installedCSV value is not known ahead of time (it varies per ODF release),
+#   so a polling loop is the only correct approach here.
+#
+# WHY installedCSV (not currentCSV):
+#   currentCSV is set immediately when OLM processes the Subscription (intent),
+#   but installedCSV is only populated after the CSV reaches the Succeeded phase
+#   (proof of a complete install). Using installedCSV collapses the old two-step
+#   (poll currentCSV → oc wait csv --for=condition=Succeeded) into one gate.
+#
+# IMPORTANT: use the fully-qualified resource type 'subscriptions.operators.coreos.com'
+#   to avoid ambiguity with 'subscriptions.apps.open-cluster-management.io' (ACM CRD)
+#   which registers the same short name 'subscription'. When ACM is installed, unqualified
+#   'oc get subscription' resolves to the ACM CRD, returning empty output and causing the
+#   loop to spin until timeout.
+#
+# TIMEOUT RATIONALE: 20 minutes (1200 s).
+#   ODF install on a fresh cluster typically takes 10-15 minutes. The 20-minute
+#   cap gives enough headroom for slow CI nodes (e.g. c5n.metal bare-metal with
+#   longer image-pull times) without blocking the pipeline indefinitely.
+#
+# || true / 2>/dev/null:
+#   'oc get -o jsonpath' returns exit 0 + empty string when the field is absent,
+#   but exits non-zero during the brief window right after 'oc apply' when the
+#   Subscription object itself does not yet exist. 2>/dev/null suppresses that
+#   transient "not found" noise; || true prevents set -e from aborting the loop.
 typeset csvName=''
 typeset -i csvDeadline
 csvDeadline=$(( $(date +%s) + 1200 ))
@@ -169,6 +188,8 @@ until [[ -n "${csvName}" ]]; do
     if [[ -z "${csvName}" ]]; then
         if (( $(date +%s) >= csvDeadline )); then
             echo "[ERROR] Timed out (20m) waiting for subscription '${subscriptionName}' to install CSV" >&2
+            # Diagnostic-only: dump subscription, catalogsource, and CSV state to stderr
+            # so the build log captures why OLM stalled before the hard exit 1.
             oc -n "${odfInstallNamespace}" get subscriptions.operators.coreos.com "${subscriptionName}" -o yaml >&2 || true
             oc -n openshift-marketplace get catalogsource "${odfCatalogName}" -o yaml >&2 || true
             oc -n "${odfInstallNamespace}" get csv -o wide >&2 || true
