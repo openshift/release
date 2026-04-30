@@ -64,16 +64,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
+- always_run: false
   as: cargo-check
   commands: cargo check
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
   as: cargo-clippy
   commands: cargo clippy
   container:
     from: recert-check
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
   steps:
@@ -177,7 +179,7 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: baremetal-lab-agent-install-pxe
 - as: ibu-e2e-flow
-  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
