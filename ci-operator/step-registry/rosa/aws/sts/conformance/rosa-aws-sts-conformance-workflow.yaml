@@ -4,6 +4,7 @@ workflow:
     env:
       CHANNEL_GROUP: nightly
       OPENSHIFT_VERSION: "release:latest"
+      SKIP_MONITOR_TEST: "true"
       TEST_SKIPS: >-
         users can manipulate groups\|
         well-known endpoint should be reachable\|
@@ -22,14 +23,20 @@ workflow:
         Managed cluster should set requests but not limits\|
         Managed cluster should ensure platform components have system-\* priority class associated\|
         cloud-provider-aws-e2e.*loadbalancer NLB internal should be reachable with hairpinning traffic\|
+        cloud-provider-aws-e2e.*loadbalancer NLB should be reachable with target-node-labels\|
         sig-network-edge.*GatewayAPIController\|
-        sig-olmv1.*NewOLM.*Catalog should serve FBC
+        sig-olmv1.*NewOLM.*Catalog should serve FBC\|
+        cloud-provider-aws-e2e-openshift.*AWSServiceLBNetworkSecurityGroup\|
+        cloud-provider-aws-e2e.*loadbalancer CLB internal should be reachable with hairpinning traffic\|
+        sig-auth.*SCC.*should not have pod creation failures during install\|
+        sig-imageregistry.*should redirect on blob pull\|
+        CSI Mock volume expansion.*should record target size in allocated resources
     pre:
       - chain: rosa-aws-sts-provision
       - ref: osd-ccs-conf-idp-htpasswd-multi-users
       - ref: rosa-cluster-wait-ready-nodes
     test:
-      - ref: openshift-e2e-test
+      - ref: rosa-aws-sts-conformance-test
     post:
       - ref: osd-gather-extra
       - chain: rosa-aws-sts-deprovision

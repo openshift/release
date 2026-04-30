@@ -190,6 +190,9 @@ fi
 if [[ "${WITH_TIMING}" == "true" ]]; then
     SKILL_ARGS+="--with-timing "
 fi
+if [[ -n "${PAYLOAD_COUNT}" ]]; then
+    SKILL_ARGS+="--payloads ${PAYLOAD_COUNT} "
+fi
 
 # ===========================================================================
 # Invoke Claude with the generate-dashboard skill
