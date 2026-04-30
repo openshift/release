@@ -1622,6 +1622,102 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(aws-4.21-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/aws-4.21-nightly-x86-data-path-9nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci-operator.openshift.io/variant: aws-4.21-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.21-nightly-x86-data-path-9nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test aws-4.21-nightly-x86-data-path-9nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=data-path-9nodes
+        - --variant=aws-4.21-nightly-x86
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aws-4.21-nightly-x86-data-path-9nodes,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -2132,6 +2228,102 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/aws-4.22-nightly-x86-data-path-9nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci-operator.openshift.io/variant: aws-4.22-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-data-path-9nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test aws-4.22-nightly-x86-data-path-9nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=data-path-9nodes
+        - --variant=aws-4.22-nightly-x86
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aws-4.22-nightly-x86-data-path-9nodes,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -8517,6 +8709,92 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(metal-4.19-nightly-x86-weekly-6nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/metal-4.21-nightly-x86-ingress2818-ipv6-proxy-retis
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-4.21-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.21-nightly-x86-ingress2818-ipv6-proxy-retis
+    rerun_command: /test metal-4.21-nightly-x86-ingress2818-ipv6-proxy-retis
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ingress2818-ipv6-proxy-retis
+        - --variant=metal-4.21-nightly-x86
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )metal-4.21-nightly-x86-ingress2818-ipv6-proxy-retis,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -9812,13 +10090,14 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 6h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: metal-perfscale-cpt
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-data-path-6nodes
     rerun_command: /test metal-x86-data-path-6nodes
@@ -9904,7 +10183,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-label-infra
     rerun_command: /test metal-x86-day2-label-infra
@@ -9990,7 +10269,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-label-webburner
     rerun_command: /test metal-x86-day2-label-webburner
@@ -10076,7 +10355,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-lso
     rerun_command: /test metal-x86-day2-lso
@@ -10162,7 +10441,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-metallb
     rerun_command: /test metal-x86-day2-metallb
@@ -10248,7 +10527,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-odf
     rerun_command: /test metal-x86-day2-odf
@@ -10334,7 +10613,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-perf-profile-rds-core
     rerun_command: /test metal-x86-day2-perf-profile-rds-core
@@ -10420,7 +10699,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-day2-sriov
     rerun_command: /test metal-x86-day2-sriov
@@ -10506,7 +10785,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-osp
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-deploy-foreman-osp
     rerun_command: /test metal-x86-deploy-foreman-osp
@@ -10592,7 +10871,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-deploy-hmno
     rerun_command: /test metal-x86-deploy-hmno
@@ -10678,7 +10957,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-deploy-vmno
     rerun_command: /test metal-x86-deploy-vmno
@@ -10764,7 +11043,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-deploy-vmno-private
     rerun_command: /test metal-x86-deploy-vmno-private
@@ -10850,7 +11129,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-egressip
     rerun_command: /test metal-x86-egressip
@@ -10936,7 +11215,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-foreman-1node
     rerun_command: /test metal-x86-foreman-1node
@@ -11022,7 +11301,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-health-check
     rerun_command: /test metal-x86-health-check
@@ -11108,7 +11387,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-jetlag
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-health-check-jetlagci
     rerun_command: /test metal-x86-health-check-jetlagci
@@ -11194,7 +11473,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-krkn-metal-pod-etcd-disruption
     rerun_command: /test metal-x86-krkn-metal-pod-etcd-disruption
@@ -11279,7 +11558,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-orion
     rerun_command: /test metal-x86-orion
@@ -11364,7 +11643,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-orion-datapath
     rerun_command: /test metal-x86-orion-datapath
@@ -11450,7 +11729,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-orion-ingress
     rerun_command: /test metal-x86-orion-ingress
@@ -11622,7 +11901,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-ping-bastion
     rerun_command: /test metal-x86-ping-bastion
@@ -11708,7 +11987,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-jetlag
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-poweroff
     rerun_command: /test metal-x86-poweroff
@@ -11794,7 +12073,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-virt-cnv-density
     rerun_command: /test metal-x86-virt-cnv-density
@@ -11880,7 +12159,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-virt-datapath
     rerun_command: /test metal-x86-virt-datapath
@@ -11966,7 +12245,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-virt-density
     rerun_command: /test metal-x86-virt-density
@@ -12052,7 +12331,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-web-burner-cluster-density-6nodes
     rerun_command: /test metal-x86-web-burner-cluster-density-6nodes
@@ -12138,7 +12417,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
       ci-operator.openshift.io/variant: metal-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-x86-web-burner-node-density-6nodes
     rerun_command: /test metal-x86-web-burner-node-density-6nodes
