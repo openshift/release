@@ -32,6 +32,14 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    if [[ -f "/secret/qe/jira-api-key" ]]; then
+        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+        JIRA_URL=https://redhat.atlassian.net/
+        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        # We use orion's default JIRA project and components
+        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+    fi
     ;;
   quay-qe)
     ES_PASSWORD=$(<"/secret/quay-qe/password")
@@ -54,15 +62,6 @@ case "$ES_TYPE" in
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
     ;;
 esac
-
-if [[ -f "${CLUSTER_PROFILE_DIR}/jira-api-key" ]]; then
-    JIRA_TOKEN=$(<"${CLUSTER_PROFILE_DIR}/jira-api-key")
-    JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
-    JIRA_URL=https://redhat.atlassian.net/
-    export JIRA_TOKEN JIRA_EMAIL JIRA_URL
-    # We use orion's default JIRA project and components
-    ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
-fi
 
 export ES_SERVER
 
