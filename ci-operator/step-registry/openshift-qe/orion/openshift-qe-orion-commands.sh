@@ -71,6 +71,25 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
+if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    export ORION_CONFIG="examples/${scale_prefix}-${ORION_WORKLOAD_TYPE}.yaml"
+    echo "Auto-selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix, workload: $ORION_WORKLOAD_TYPE)"
+fi
+
 # UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
 if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
     # Get current worker count (excluding infra and workload nodes)
