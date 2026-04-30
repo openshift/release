@@ -401,6 +401,7 @@ while IFS= read -r line; do
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
     --max-turns 100 \
+    --effort max \
     --model "$CLAUDE_MODEL" \
     --verbose \
     --output-format stream-json \
@@ -467,6 +468,7 @@ while IFS= read -r line; do
         --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob Task" \
         --max-turns 75 \
+        --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
         --output-format stream-json \
@@ -540,6 +542,7 @@ IMPORTANT:
         claude -p "$FIX_PROMPT" \
           --allowedTools "Bash Read Write Edit Grep Glob" \
           --max-turns 75 \
+          --effort max \
           --model "$CLAUDE_MODEL" \
           --verbose \
           --output-format stream-json \
@@ -631,6 +634,7 @@ IMPORTANT:
       claude -p "$PR_PROMPT" \
         --allowedTools "Bash Read Grep Glob" \
         --max-turns 15 \
+        --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
         --output-format stream-json \
