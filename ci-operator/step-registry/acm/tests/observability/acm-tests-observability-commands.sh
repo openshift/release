@@ -17,8 +17,9 @@ fi
 mkdir -p ~/.kube
 cp "${SHARED_DIR}/kubeconfig" ~/.kube/config
 
-: Remove the ACM Subscription to allow Observability interop tests full control of operators
-if oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub -o yaml > /tmp/acm-policy-subscription-backup.yaml 2>/dev/null; then
+# Remove the ACM Subscription to allow Observability interop tests full control of operators
+if oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub 2>/dev/null; then
+    oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub -o yaml > /tmp/acm-policy-subscription-backup.yaml
     oc delete subscription.apps.open-cluster-management.io -n policies openshift-plus-sub
 fi
 
@@ -50,7 +51,7 @@ bash +x ./execute_obs_interop_commands.sh || :
 
 unset PARAM_AWS_SECRET_ACCESS_KEY PARAM_AWS_ACCESS_KEY_ID OC_HUB_CLUSTER_PASS MANAGED_CLUSTER_PASS
 
-: Restore the ACM subscription
+# Restore the ACM subscription
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
     oc apply -f /tmp/acm-policy-subscription-backup.yaml || :
 fi
