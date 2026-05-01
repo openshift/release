@@ -1,0 +1,33 @@
+ref:
+  as: openshift-qe-mnp-ipblocks-loadtest
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: cli
+  commands: openshift-qe-mnp-ipblocks-loadtest-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MNP_TOTAL_PODS
+    default: "1400"
+    documentation: "Total number of pods to create across the cluster (customer: 1400 pods)"
+  - name: MNP_POLICY_COUNT
+    default: "385"
+    documentation: "Number of MultiNetworkPolicies to create (customer: 385 policies)"
+  - name: MNP_CIDRS_PER_POLICY
+    default: "450"
+    documentation: "Number of CIDR blocks per policy (customer: 450 CIDRs = ACL explosion)"
+  documentation: |-
+    This step reproduces the MNP-76500 ACL explosion case by deploying
+    MultiNetworkPolicies with massive ipBlock counts using the customer
+    reproduction scenario: 385 policies x 450 CIDR blocks = 173,250 ipBlocks.
+    
+    This test validates:
+    - ACL count explosion monitoring (target: detect >1M ACLs)
+    - OVN database growth tracking (target: detect >1.5Gi NBDB)
+    - System stability under CIDR-heavy MNP scenarios
+    - Logical flow recomputation performance degradation
+    
+    Based on customer case: 1000 VMs across 14 workers, each hosting 100 pods.
