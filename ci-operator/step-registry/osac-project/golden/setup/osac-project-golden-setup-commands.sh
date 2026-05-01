@@ -224,6 +224,14 @@ for i in $(seq 1 30); do
   fi
 done
 
+echo "$(date +%T) Restarting OSAC operator and fulfillment for clean state..."
+oc --kubeconfig="${HUB_KC}" rollout restart deployment/osac-operator-controller-manager -n osac-e2e-ci 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout restart deployment/fulfillment-controller -n osac-e2e-ci 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout restart deployment/fulfillment-grpc-server -n osac-e2e-ci 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout status deployment/osac-operator-controller-manager -n osac-e2e-ci --timeout=300s 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout status deployment/fulfillment-controller -n osac-e2e-ci --timeout=300s 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout status deployment/fulfillment-grpc-server -n osac-e2e-ci --timeout=300s 2>&1 || true
+
 echo "$(date +%T) Cluster health snapshot..."
 echo "--- Hub deployments in osac-e2e-ci ---"
 oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci 2>&1 || true
