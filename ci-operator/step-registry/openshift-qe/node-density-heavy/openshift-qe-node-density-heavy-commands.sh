@@ -57,7 +57,10 @@ fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
@@ -68,3 +71,5 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+exit ${RUN_EXIT_CODE}
