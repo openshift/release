@@ -10,27 +10,14 @@ build_root:
     tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
   items:
-  - dockerfile_literal: |
-      FROM cli
-      RUN set -exo pipefail && \
-          # Install openssh-clients, jq, and yq
-          declare pkgs='openssh-clients jq' && \
-          if command -v dnf 1> /dev/null; then \
-              dnf install --setopt tsflags=nodocs -y ${pkgs} && \
-              dnf clean all; \
-          else \
-              microdnf install -y ${pkgs} && \
-              microdnf clean all; \
-          fi && \
-          rm -rf /var/cache/dnf/* && \
-          curl -fsSL 'https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64.tar.gz' | \
-              tar zvx -C /usr/local/bin/ --transform 's|^\./yq_linux_amd64$|yq|' ./yq_linux_amd64 && \
-          # Download virtctl
-          export VERSION=$(curl -fsSL https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt) && \
-          curl -fsSL -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/virtctl-${VERSION}-linux-amd64 && \
-          chmod +x /usr/local/bin/virtctl
+  - context_dir: .
+    dockerfile_path: image/container/ocp-test/Dockerfile.cli-plus-tools
     from: cli
     to: cli-plus-tools
+promotion:
+  to:
+  - name: lp-chaos-images
+    namespace: ci
 releases:
   latest:
     candidate:
