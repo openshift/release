@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.22"
     namespace: ocp
@@ -5474,6 +5478,20 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-hypershift
+- as: baremetalds-hypershift-agent-mce-gui-f14
+  capabilities:
+  - intranet
+  cron: 27 15 5,8 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      E2E_RUN_TAGS: '@hypershift-bm-ui'
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MCE_VERSION: "2.11"
+    test:
+    - ref: openshift-extended-web-tests
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-prepared
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

@@ -43,6 +43,7 @@ finished()
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/extra_baremetalhosts.json" "${SHARED_DIR}/"
   # Save exit code for must-gather to generate junit. Make eats exit
   # codes, so we try to fetch it from the dev-scripts artifacts if we can.
   status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt
@@ -156,13 +157,13 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser" || echo "NA")
-BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass" || echo "NA")
 
 if [ -e "$CIRFILE" ] ; then
     # Get Extra data from CIR
     jq -r ".extra | select( . != \"\") // {}" < "$CIRFILE" > "$EXTRAFILE"
     if [[ "$(cat "$CIRFILE" | jq -r .type)" =~ cluster.* ]] ; then
+        BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser")
+        BMCPASS=$(cat "${CLUSTER_PROFILE_DIR}/bmcpass")
         prepare_bmcluster
     fi
 fi
@@ -476,3 +477,7 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+
+# Copy SSH key to SHARED_DIR for later test steps (e.g., Cypress tests that need to SSH to hypervisor)
+cp /run/secrets/ci.openshift.io/cluster-profile/packet-ssh-key "${SHARED_DIR}/hypervisor-ssh-key"
+chmod 600 "${SHARED_DIR}/hypervisor-ssh-key"
