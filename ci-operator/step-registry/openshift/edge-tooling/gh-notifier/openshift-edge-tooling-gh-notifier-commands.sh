@@ -41,14 +41,17 @@ echo "Working directory: ${PWD}"
 # webhook so rehearsals cannot notify the channel.
 # Periodics leave PULL_NUMBER unset and get both.
 job_base="https://prow.ci.openshift.org/view/gs/test-platform-results"
+html_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
 if [[ -z "${PULL_NUMBER:-}" ]]; then
   export PROW_JOB_URL="${job_base}/logs/${JOB_NAME}/${BUILD_ID}"
+  export PROW_HTML_URL="${html_base}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/pr-notifier/openshift-edge-tooling-gh-notifier/artifacts/edge-tooling-pr-summary.html"
   if [[ -n "${SLACK_WEBHOOK_SECRET_FILE:-}" ]] && [[ -f "${SLACK_WEBHOOK_SECRET_FILE}" ]]; then
     SLACK_WEBHOOK_URL="$(<"${SLACK_WEBHOOK_SECRET_FILE}")"
     export SLACK_WEBHOOK_URL
   fi
 else
   unset PROW_JOB_URL
+  unset PROW_HTML_URL
   unset SLACK_WEBHOOK_URL
 fi
 
