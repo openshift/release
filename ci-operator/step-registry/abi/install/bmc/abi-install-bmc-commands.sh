@@ -248,7 +248,8 @@ rm -f "${SHARED_DIR}/ocpClusterInf.tgz"
 [ -n "${OCP__ABI__TUN_SVC__DP_BASE_URL}" ] && [ -n "${OCP__ABI__TUN_SVC__DP_PORT}" ] && [ -n "${OCP__ABI__TUN_SVC__CP_URL}" ]
 
 # ISO Creation Phase.
-openshift-install agent create image
+# Set writable cache directory (baremetal-qe-base sets HOME=/output which may not be writable).
+XDG_CACHE_HOME=/tmp/abi openshift-install agent create image
 isoFile="$(
     shopt -s nullglob
     echo "${OCP__ABI__CLUSTER_DIR}"/agent.*.iso
