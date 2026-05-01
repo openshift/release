@@ -291,6 +291,8 @@ vm_template=${vm_template}-hw${target_hw_version}
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >> "${SHARED_DIR}"/vsphere_context.sh
 
+# Populated by the generated vsphere_context.sh (see ipi-conf-vsphere-check-vcm); default satisfies shellcheck before source.
+vsphere_resource_pool=""
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
@@ -516,6 +518,9 @@ if [ "${Z_VERSION}" -lt 20 ]; then
     compute_cpu=4
 fi
 
+# Short pool name for PowerCLI (matches GOVC_RESOURCE_POOL / vsphere_resource_pool path suffix).
+vsphere_install_resource_pool_name="${vsphere_resource_pool##*/}"
+
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
 cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$clustername = "${cluster_name}"
@@ -534,6 +539,7 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
+\$vsphere_install_resource_pool_name = "${vsphere_install_resource_pool_name}"
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 
