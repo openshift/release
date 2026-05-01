@@ -25,6 +25,9 @@ source "${SHARED_DIR}/proxy-conf.sh"
 RENDEZVOUS_NODE="yes"
 SSH_PRIVATE_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-privatekey)
 export SSH_PRIVATE_KEY
+
+sed -i '/Rendezvous/d' agent-tui/core/session_handler.py
+
 pids=()
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   CURRENT_RENDEZVOUS_NODE="$RENDEZVOUS_NODE"
