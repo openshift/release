@@ -2,7 +2,7 @@ ref:
   as: interop-tests-openshift-virtualization-tests
   documentation: |-
     Run Verification tests for Openshift Virtualization
-  from: openshift-virtualization-tests
+  from: openshift-virtualization-tests-sshpass
   commands: interop-tests-openshift-virtualization-tests-commands.sh
   timeout: 4h0m0s
   grace_period: 2h
@@ -21,6 +21,9 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
   env:
   - name: BW_PATH
     default: "/bw"
@@ -44,3 +47,9 @@ ref:
   - name: MAP_TESTS
     default: "false"
     documentation: Specify whether to update the test suite name for reporting tools
+  - name: CNV_TESTS_UPGRADE_ONLY
+    default: "false"
+    documentation: |-
+      When true, require managed-cluster-kubeconfig and run OCP upgrade tests only
+      Set ORIGINAL_RELEASE_IMAGE_LATEST for --ocp-image. When false, use default kubeconfig and smoke tests;
+      mapTestsForComponentReadiness still runs when MAP_TESTS=true.
