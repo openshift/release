@@ -63,11 +63,11 @@ fi
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/netobserv-ebpf-agent-ystream:693e0f4dbfab29ec62f48711007cb5c7902f7234"
+    patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "quay.io/redhat-user-workloads/ocp-network-observab-tenant/flowlogs-pipeline-ystream@sha256:5e1bbea92a691095b7ea451fc0322e02568b222bd535ab3fea3beec5d7ba56b5"
+    patch_netobserv "flp" "$FLP_PR_IMAGE"
 fi
 
 # get NetObserv metadata
