@@ -75,6 +75,37 @@ chain:
         [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       else
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        if [[ "${HOSTED_CP:-}" == "true" ]]; then
+          # Verify prerequisites for ROSA HCP conformance tests
+          if [ ! -s "${SHARED_DIR}/hs-mc.kubeconfig" ]; then
+            echo "ERROR: ROSA HCP requires management cluster kubeconfig"
+            echo "Expected: ${SHARED_DIR}/hs-mc.kubeconfig"
+            echo "Ensure rosa-cluster-credentials-hypershift-mgmt step is included"
+            exit 1
+          fi
+
+          if [ ! -s "${SHARED_DIR}/cluster-name" ]; then
+            echo "ERROR: ROSA HCP cluster name not found"
+            echo "Expected: ${SHARED_DIR}/cluster-name"
+            echo "This should be created by rosa-cluster-provision step"
+            exit 1
+          fi
+
+          # Read the actual ROSA cluster name (NOT a hash)
+          export CLUSTER_NAME="$(cat ${SHARED_DIR}/cluster-name)"
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+          # Temporarily switch to management cluster
+          GUEST_KUBECONFIG="${KUBECONFIG}"
+          export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+          # Query using the ACTUAL cluster name
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
+          export HYPERSHIFT_NAMESPACE="${HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE}"
+
+          # Switch back to guest cluster
+          export KUBECONFIG="${GUEST_KUBECONFIG}"
+        fi
       fi
 
       if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
