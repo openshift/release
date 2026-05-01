@@ -1,0 +1,50 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+canonical_go_repository: github.com/stolostron/cluster-proxy
+images:
+  items:
+  - dockerfile_path: ./cmd/pure.Dockerfile
+    from: base
+    to: cluster-proxy
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit-test
+  commands: export XDG_CACHE_HOME="/tmp" && make test
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: integration
+  commands: export XDG_CACHE_HOME="/tmp" && make test-integration
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: backplane-5.0
+  org: openshift-priv
+  repo: stolostron-cluster-proxy

@@ -28,7 +28,14 @@ resources:
       memory: 200Mi
 tests:
 - as: vendor
-  commands: go mod vendor && make unused && git diff --exit-code
+  commands: |
+    VENDOR_MODE="mod"
+    if [[ -f "go.work" ]]; then
+      echo "Detected go workspace; using \"go work vendor\"."
+      VENDOR_MODE="work"
+    fi
+    echo "Running: go ${VENDOR_MODE} vendor"
+    go "${VENDOR_MODE}" vendor && make unused && git diff --exit-code
   container:
     from: src
 - as: common-test

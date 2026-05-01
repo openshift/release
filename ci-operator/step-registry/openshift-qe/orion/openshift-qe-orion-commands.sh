@@ -32,6 +32,14 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]]; then
+        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+        JIRA_URL=https://redhat.atlassian.net/
+        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        # We use orion's default JIRA project and components
+        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+    fi
     ;;
   quay-qe)
     ES_PASSWORD=$(<"/secret/quay-qe/password")
@@ -194,6 +202,7 @@ set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
+export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{.data.install-config}' | yq -r '.fips // false')}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi

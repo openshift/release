@@ -1,0 +1,84 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: |-
+  GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
+  GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/stolostron/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+canonical_go_repository: github.com/stolostron/clusterlifecycle-state-metrics
+images:
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: clusterlifecycle-state-metrics
+  - dockerfile_path: build/Dockerfile.coverage.prow
+    from: clusterlifecycle-state-metrics
+    to: clusterlifecycle-state-metrics-coverage
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 81m
+      memory: 200Mi
+tests:
+- as: sonarcloud
+  commands: |
+    export HOME="/tmp"
+    export XDG_CONFIG_HOME="/tmp/xdg_config"
+    export SONAR_GO_TEST_ARGS="./..."
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: check
+  commands: make check
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit
+  commands: |
+    export HOME="/tmp"
+    make test
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
+    env:
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-5.0
+  org: openshift-priv
+  repo: stolostron-clusterlifecycle-state-metrics
