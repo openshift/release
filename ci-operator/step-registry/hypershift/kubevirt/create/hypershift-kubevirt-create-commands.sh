@@ -112,7 +112,6 @@ then
 
   PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
   RELEASE_IMAGE="${PAYLOADIMAGE}"
-
   if [ ! -f "${SHARED_DIR}/ho_operator_image" ] ; then
       echo "Warning: Can not find ho_operator_image, abort !!!"
       exit 1
@@ -128,10 +127,8 @@ then
         exit 1
     fi
     CAPI_PROVIDER_KUBEVIRT_IMAGE=$(cat "${SHARED_DIR}/capi_provider_kubevirt_image")
-
     EXTRA_ARGS="${EXTRA_ARGS} --annotations=hypershift.openshift.io/capi-provider-kubevirt-image=${CAPI_PROVIDER_KUBEVIRT_IMAGE}"
   fi
-  ###
 
 fi
 

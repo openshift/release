@@ -59,17 +59,16 @@ jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret 
 ./oc-mirror version
 
 # mirror to disk first
-./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
 
 # push to the internal registry
-./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
 
 # apply IDMS
 cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
 ###
-
 ### workaround for https://issues.redhat.com/browse/OCPBUGS-29466
 echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29466"
 mkdir -p /home/idms
@@ -101,21 +100,89 @@ if [[ -z ${MCE} ]] ; then
   echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
 fi
 
+### workaround for https://issues.redhat.com/browse/CNTRLPLANE-1200
+### Mirror specific release containing cluster-api images for disconnected environments
+echo "workaround for https://issues.redhat.com/browse/CNTRLPLANE-1200"
+
+# Get the cluster version
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f 1,2)
+
+# Workaround for https://issues.redhat.com/browse/OCPBUGS-74263
+# Use oc adm release mirror which preserves digests in the target registry
+# Same as the one defined in support/backwardcompat/backwardcompat.go in openshift/hypershift
+if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth  \
+    --from quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962 \
+    --to ${mirror_registry}/localimages/local-release-image
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth  \
+    --from quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58 \
+    --to ${mirror_registry}/localimages/local-release-image
+fi
+
+# Create ImageContentSourcePolicy to redirect ocp-v4.0-art-dev pulls to local mirror
+oc apply -f - <<EOF2
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${mirror_registry}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+EOF2
+
+# Wait for machine-config-operator to process the ICSP
+# Poll for MachineConfigPool updates with timeout
+echo "Waiting for MachineConfigPools to update (timeout: 25 minutes)..."
+TIMEOUT=1500  # 25 minutes
+ELAPSED=0
+INTERVAL=30
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  # Check if all MachineConfigPools are updated and not degraded
+  UPDATING=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Updating" and .status=="True")) | .metadata.name')
+  DEGRADED=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Degraded" and .status=="True")) | .metadata.name')
+
+  if [[ -z "$UPDATING" && -z "$DEGRADED" ]]; then
+    echo "All MachineConfigPools are ready (elapsed: ${ELAPSED}s)"
+    break
+  fi
+
+  if [[ -n "$UPDATING" ]]; then
+    echo "MachineConfigPools still updating: $UPDATING (elapsed: ${ELAPSED}s)"
+  fi
+  if [[ -n "$DEGRADED" ]]; then
+    echo "Warning: MachineConfigPools degraded: $DEGRADED"
+  fi
+
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+  echo "Warning: Timeout waiting for MachineConfigPools (waited ${ELAPSED}s)"
+  oc get machineconfigpool
+fi
+###
 
 EOF
-
 scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
 ### workaround for https://issues.redhat.com/browse/CNV-38194
 echo "workaround for https://issues.redhat.com/browse/CNV-38194"
 scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
 ###
-
 ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
 if [[ -z ${MCE} ]] ; then
   echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
   scp "${SSHOPTS[@]}" "root@${IP}:/home/capi_provider_kubevirt_image" "${SHARED_DIR}/capi_provider_kubevirt_image"
 fi
-###
 
 ###
 # For some reason operator-ose-csi-external-snapshotter-rhel8 is not correctly appearing
@@ -132,7 +199,30 @@ spec:
     - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-snapshotter-rhel8
     source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8
 EOF
-sleep 120
+
+# Wait for IDMS to be applied and pods to stabilize
+echo "Waiting for ImageDigestMirrorSet to be processed (timeout: 5 minutes)..."
+TIMEOUT=300  # 5 minutes
+ELAPSED=0
+INTERVAL=15
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  # Check if machine-config is still updating due to IDMS
+  UPDATING=$(oc get machineconfigpool -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Updating" and .status=="True")) | .metadata.name')
+
+  if [[ -z "$UPDATING" ]]; then
+    echo "IDMS applied and machine configs stable (elapsed: ${ELAPSED}s)"
+    break
+  fi
+
+  echo "Machine configs still updating after IDMS: $UPDATING (elapsed: ${ELAPSED}s)"
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+  echo "Warning: Timeout waiting for IDMS processing (waited ${ELAPSED}s)"
+fi
+
 oc delete pods -n openshift-storage -l=app=csi-rbdplugin-provisioner
 oc delete pods -n openshift-storage -l=app=csi-cephfsplugin-provisioner
 ###
