@@ -18,6 +18,9 @@ shopt -s inherit_errexit
 eval "$(
     curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
+eval "$(
+    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden--UploadAttachment.sh"
+)"
 
 
 typeset bmcInfo="${SHARED_DIR}/ocp--bmc--info.json"; [ -f "${bmcInfo}" ]
@@ -26,8 +29,8 @@ typeset -i httpSvcPort=8080
 typeset -ai taskPIDs=()
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
-# Extract openshift-install from the release image.
-# RELEASE_IMAGE_LATEST is automatically set by CI Operator based on releases.latest in config.
+# Extract `openshift-install` from the release image.
+# The `RELEASE_IMAGE_LATEST` is set by CI Operator based on `.releases.latest` in CI Conf.
 oc adm release extract \
     -a /var/run/secrets/registry-pull--build-farms/.dockerconfigjson \
     "${RELEASE_IMAGE_LATEST}" \
@@ -535,7 +538,9 @@ cp -f "${OCP__ABI__CLUSTER_DIR}/auth/kube"{config,admin-password} "${SHARED_DIR}
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -f "${KUBECONFIG}" ]
 
-# TODO: Update secret store with `KUBECONFIG`.
+# Upload `KUBECONFIG` to BitWarden.
+[ -z "${BW__OBJ_NAME}" ] || Vault--BitWarden--UploadAttachment \
+    "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW "${KUBECONFIG}"
 
 # Ensure Nodes readiness before Day-2 customization.
 oc wait node --all --for=condition=Ready --timeout=300s
