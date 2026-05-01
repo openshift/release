@@ -1,0 +1,47 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocpbugs-77510-rst-validation
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      TEST_SCALE: progressive
+      TIMEOUT: +5 hours
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    - ref: wait
+    workflow: openshift-qe-installer-aws
+  timeout: 7h0m0s
+- as: ocpbugs-77510-rst-etcd-encryption
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-ocpbugs-77510-e2e-test
+    workflow: openshift-qe-installer-aws-etcd-encryption
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.17-nightly-x86
