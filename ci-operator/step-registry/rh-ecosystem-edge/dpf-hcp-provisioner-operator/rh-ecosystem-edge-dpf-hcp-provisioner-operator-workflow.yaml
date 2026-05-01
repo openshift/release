@@ -1,0 +1,71 @@
+workflow:
+  as: rh-ecosystem-edge-dpf-hcp-provisioner-operator
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - chain: ipi-install
+    test:
+      - as: dpf-hcp-provisioner-e2e
+        commands: |
+          unset GOFLAGS
+          make test-e2e
+        from: dpf-hcp-provisioner-operator-ci
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+        timeout: 3h0m0s
+        dependencies:
+          - name: dpf-hcp-provisioner-operator
+            env: IMAGE_DPF_HCP_PROVISIONER_OPERATOR_CI
+        env:
+          - name: BASE_DOMAIN
+            default: ""
+            documentation: |-
+              Base domain for HostedCluster DNS.
+          - name: E2E_TEST_TIMEOUT
+            default: "60m"
+            documentation: |-
+              Timeout for the e2e test suite.
+          - name: CONTROL_PLANE_AVAILABILITY
+            default: "SingleReplica"
+            documentation: |-
+              Control plane availability policy for the HostedCluster.
+              SingleReplica avoids MetalLB dependency.
+          - name: MACHINE_OS_URL
+            default: ""
+            documentation: |-
+              URL for the DPU machine OS image. If set, skips
+              BlueField OCP layer registry lookup.
+          - name: HYPERSHIFT_IMAGE
+            default: "quay.io/hypershift/hypershift-operator:latest"
+            documentation: |-
+              HyperShift operator image used to deploy the hypershift operator.
+    post:
+      - ref: gather-must-gather
+      - as: gather-dpf-namespaces
+        best_effort: true
+        commands: |
+          oc adm inspect \
+            ns/dpf-hcp-provisioner-system \
+            ns/dpf-hcp-provisioner-system-e2e-test-provisioner \
+            --dest-dir="${ARTIFACT_DIR}/dpf-namespaces"
+        from: cli
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        timeout: 10m
+      - ref: ipi-deprovision-deprovision
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      CONTROL_PLANE_REPLICAS: "3"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
+      COMPUTE_NODE_REPLICAS: "0"
+  documentation: |-
+    This workflow provisions an OpenShift cluster on AWS, then runs
+    e2e tests which deploys the HyperShift operator and dpf-hcp-provisioner-operator
+    and then create a real HostedCluster with stub DPF CRs to
+    validate the full provisioner lifecycle including ignition generation
+    and CSR auto-approval.
