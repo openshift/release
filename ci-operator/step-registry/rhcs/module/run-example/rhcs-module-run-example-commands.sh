@@ -16,25 +16,29 @@ RHCS_URL=https://api.stage.openshift.com
 export RHCS_URL
 
 AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-if [ ! -f ${AWS_SHARED_CREDENTIALS_FILE} ];then
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ];then
     error_exit "missing mandatory aws credential file ${AWS_SHARED_CREDENTIALS_FILE}"
 fi
 export AWS_SHARED_CREDENTIALS_FILE
 
 shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-if [ ! -f ${shared_vpc_aws_cred} ];then
+if [ ! -f "${shared_vpc_aws_cred}" ];then
     error_exit "missing mandatory aws credential file ${shared_vpc_aws_cred}"
 fi
-TF_VAR_shared_vpc_aws_access_key_id=$(cat ${shared_vpc_aws_cred} | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f2)
+TF_VAR_shared_vpc_aws_access_key_id=$(grep -m1 '^aws_access_key_id' "${shared_vpc_aws_cred}" | tr -d ' ' | cut -d '=' -f2)
 export TF_VAR_shared_vpc_aws_access_key_id
-TF_VAR_shared_vpc_aws_secret_access_key=$(cat ${shared_vpc_aws_cred} | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f2)
+TF_VAR_shared_vpc_aws_secret_access_key=$(grep -m1 '^aws_secret_access_key' "${shared_vpc_aws_cred}" | tr -d ' ' | cut -d '=' -f2)
 export TF_VAR_shared_vpc_aws_secret_access_key
 
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export TF_VAR_shared_vpc_aws_region="${TF_VAR_shared_vpc_aws_region:-us-east-1}"
 
 random_md5sum=$(echo "$RANDOM" | md5sum)
-random_string=$(printf '%s' ${random_md5sum} | cut -c 1-4)
+random_string=$(printf '%s' "${random_md5sum}" | cut -c 1-4)
 export TF_VAR_cluster_name="${TF_VAR_cluster_name:-tf-ci-${random_string}}"
+
+if [ -n "${MODULE_VERSION}" ]; then
+    make change-module-version MODULE_VERSION="${MODULE_VERSION}"
+fi
 
 make run-example EXAMPLE_NAME="${EXAMPLE_NAME}"
