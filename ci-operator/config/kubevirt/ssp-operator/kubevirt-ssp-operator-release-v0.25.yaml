@@ -26,12 +26,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -44,7 +44,7 @@ tests:
 - as: unittests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp-virtualization
+    cluster_profile: azure-virtualization
     test:
     - as: unittests
       commands: export GOFLAGS= && make unittest
@@ -63,9 +63,9 @@ tests:
 - as: e2e-functests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp-virtualization
+    cluster_profile: azure-virtualization
     env:
-      COMPUTE_NODE_TYPE: n2-standard-4
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
     test:
     - as: e2e-functests
       cli: latest
@@ -85,13 +85,13 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp
+    workflow: ipi-azure
 - as: e2e-upgrade-functests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp-virtualization
+    cluster_profile: azure-virtualization
     env:
-      COMPUTE_NODE_TYPE: n2-standard-4
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
     test:
     - as: e2e-upgrade-functests
       cli: latest
@@ -111,11 +111,20 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp
+    workflow: ipi-azure
 - as: e2e-single-node-functests
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp-virtualization
+    cluster_profile: azure-virtualization
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: single-node-conf-azure
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: e2e-single-node-functests
       cli: latest
@@ -136,7 +145,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp-single-node
 zz_generated_metadata:
   branch: release-v0.25
   org: kubevirt
