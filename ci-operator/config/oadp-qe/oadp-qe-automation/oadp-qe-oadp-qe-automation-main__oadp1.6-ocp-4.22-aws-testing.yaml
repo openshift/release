@@ -1,0 +1,59 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  oadp-runner:
+    name: oadp-runner
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.17
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: oadp-qe-aws-fips
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aws-oadp-qe
+    env:
+      BASE_DOMAIN: mig-qe-aws.devcluster.openshift.com
+      BUCKET_NAME: oadp-fips
+      EXECUTE_KUBEVIRT_TESTS: "false"
+      FIPS_ENABLED: "true"
+      IIB_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:v4.22__operator_nvr__oadp-operator-container-1.6.0-202603271629.p2.gb74f410.assembly.stream.el9
+      OADP_TEST_FOCUS: Tier0
+      OADP_VERSION: 1.6.0
+      RE_TRIGGER_ON_FAILURE: "false"
+      REPORTPORTAL_HOSTNAME: reportportal-migration-qe.apps.dno.ocp-hub.prod.psi.redhat.com
+      REPORTPORTAL_PROJECT: OADP
+      REPOSITORY: stage
+      USER_TAGS: |
+        scenario oadp oadp-qe
+    test:
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws-oadp-qe-konflux
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation
+  variant: oadp1.6-ocp-4.22-aws-testing
