@@ -74,14 +74,27 @@ virsh net-start test-infra-net-ad07fc71
 
 echo "$(date +%T) Configuring cross-network forwarding..."
 echo "--- Host firewall state before fix ---"
-iptables -L FORWARD -n 2>&1 | head -5 || true
+systemctl is-active firewalld 2>&1 || true
 firewall-cmd --zone=libvirt --list-all 2>&1 || echo "no firewalld libvirt zone"
-systemctl stop firewalld 2>/dev/null || true
-systemctl disable firewalld 2>/dev/null || true
-iptables -P FORWARD ACCEPT
+iptables -L FORWARD -n 2>&1 | head -5 || true
+
+if ! systemctl is-active --quiet firewalld 2>/dev/null; then
+  echo "$(date +%T) firewalld not running, installing and starting..."
+  dnf install -y firewalld 2>&1 | tail -3 || true
+  systemctl enable --now firewalld
+  systemctl restart libvirtd
+  virsh net-start test-infra-net-d55276d8 2>/dev/null || true
+  virsh net-start test-infra-net-ad07fc71 2>/dev/null || true
+fi
+
+firewall-cmd --zone=libvirt --change-interface=tt4 2>/dev/null || true
+firewall-cmd --zone=libvirt --change-interface=tt3 2>/dev/null || true
 iptables -I FORWARD -s 192.168.131.0/24 -d 192.168.130.0/24 -j ACCEPT
 iptables -I FORWARD -s 192.168.130.0/24 -d 192.168.131.0/24 -j ACCEPT
+
 echo "--- Host firewall state after fix ---"
+systemctl is-active firewalld 2>&1 || true
+firewall-cmd --zone=libvirt --list-all 2>&1 || echo "no firewalld libvirt zone"
 iptables -L FORWARD -n 2>&1 | head -10 || true
 
 echo "$(date +%T) Fixing domain XMLs..."
