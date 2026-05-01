@@ -22,9 +22,9 @@ additional_worker_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/aarch
 case "${architecture}" in
   "amd64")
     if [ "${additional_worker_arch}" != "arm64" ]; then
-        echo "Error: An 'arm64' additional worker is expected for a multi-arch ${architecture} \
-        cluster. Worker architecture given is ${additional_worker_arch}. Exiting."
-        exit 1
+      echo "[INFO]: An 'arm64' additional worker is expected for a multi-arch ${architecture} \
+      cluster. Additional worker architecture given is ${additional_worker_arch}. Exiting."
+      exit 0
     fi
     ;;
   "arm64")
@@ -52,9 +52,12 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     bmhlist+=("${name}")
     if check_prov_vmedia; then
       prov_address="${redfish_scheme}://${bmc_address}${redfish_base_uri}"
-    else
+    elif [[ "${name}" == *-a-01* ]]; then
       prov_address="${bmc_scheme}://${bmc_address}${bmc_base_uri}"
+    else
+      prov_address="redfish+https://${bmc_address}${bmc_base_uri}"
     fi
+
     cat > "${DIR}/${name}.yaml" <<EOF
 ---
 apiVersion: v1
