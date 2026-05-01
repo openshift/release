@@ -5,9 +5,11 @@ set -o errexit
 set -o pipefail
 
 function check_workers_updated() {
-    # Wait up to 2 minutes for PAO to update the worker config
-    INTERVAL=5
-    CNT=24
+    # Wait up to 30 minutes for the performance profile to be applied.
+    # This includes time for NTO to create the MachineConfig and for
+    # the MCO to roll it out to worker nodes (which requires a reboot).
+    INTERVAL=30
+    CNT=60
 
     while [ $((CNT)) -gt 0 ]; do
         READY=false
@@ -15,13 +17,15 @@ function check_workers_updated() {
         do
             name=$(echo "${i}" | awk '{print $1}')
             current_config=$(echo "${i}" | awk '{print $2}')
+            updated=$(echo "${i}" | awk '{print $3}')
+            updating=$(echo "${i}" | awk '{print $4}')
             degraded=$(echo "${i}" | awk '{print $5}')
             degraded_machine_cnt=$(echo "${i}" | awk '{print $9}')
 
-            if [[ "${old_config}" != "${current_config}" && "${degraded}" == "False" && $((degraded_machine_cnt)) -eq 0 ]]; then
+            if [[ "${old_config}" != "${current_config}" && "${updated}" == "True" && "${updating}" == "False" && "${degraded}" == "False" && $((degraded_machine_cnt)) -eq 0 ]]; then
                 READY=true
             else
-                echo "Waiting for mcp ${name} to rollout"
+                echo "Waiting for mcp ${name} to rollout (updated=${updated} updating=${updating} degraded=${degraded})"
                 READY=false
             fi
         done <<< "$(oc get mcp worker --no-headers)"
