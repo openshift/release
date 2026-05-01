@@ -16,17 +16,15 @@ mkdir -p "${OCP__ABI__CLUSTER_DIR}"
 eval "$(
     curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
-
 eval "$(
     curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
-)"
-EnsureReqs yq
+)"; EnsureReqs yq
 
 
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
-# Extract openshift-install from the release image.
-# RELEASE_IMAGE_LATEST is automatically set by CI Operator based on releases.latest in config.
+# Extract `openshift-install` from the release image.
+# The `RELEASE_IMAGE_LATEST` is set by CI Operator based on `.releases.latest` in CI Conf.
 oc adm release extract \
     -a /var/run/secrets/registry-pull--build-farms/.dockerconfigjson \
     "${RELEASE_IMAGE_LATEST}" \
