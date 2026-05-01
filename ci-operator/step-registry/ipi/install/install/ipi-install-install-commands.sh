@@ -102,12 +102,96 @@ function set-cluster-version-spec-update-service() {
     fi
 }
 
+function sanitize_secret_yaml() {
+  local file_path=${1}
+  local tmp_file
+  tmp_file=$(mktemp)
+
+  awk '
+  BEGIN { in_secret_block=0 }
+  {
+    if ($0 ~ /^(data|stringdata|binarydata):[[:space:]]*$/) {
+      print $0
+      print "  redacted: true"
+      in_secret_block=1
+      next
+    }
+
+    if (in_secret_block == 1) {
+      if ($0 ~ /^[^[:space:]][^:]*:[[:space:]]*/) {
+        in_secret_block=0
+      } else {
+        next
+      }
+    }
+
+    print $0
+  }
+  ' "${file_path}" > "${tmp_file}" && mv "${tmp_file}" "${file_path}"
+}
+
+function sanitize_log_bundle() {
+  local source_bundle=${1}
+  local output_dir=${2}
+  local bundle_name tmp_dir unpack_dir output_bundle
+  bundle_name=$(basename "${source_bundle}")
+  output_bundle="${output_dir}/${bundle_name}"
+  tmp_dir=$(mktemp -d)
+  unpack_dir="${tmp_dir}/bundle"
+
+  mkdir -p "${unpack_dir}"
+  if ! tar -xzf "${source_bundle}" -C "${unpack_dir}"; then
+    echo "WARNING: Failed to extract ${source_bundle}" >&2
+    rm -rf "${tmp_dir}"
+    return 1
+  fi
+
+  while IFS= read -r -d '' file; do
+    sed -i -E '
+      s/(password:[[:space:]]*).*/\1REDACTED/Ig;
+      s/("password"[[:space:]]*:[[:space:]]*")[^"]*"/\1REDACTED"/Ig;
+      s/(client-secret:[[:space:]]*).*/\1REDACTED/Ig;
+      s/("client-secret"[[:space:]]*:[[:space:]]*")[^"]*"/\1REDACTED"/Ig;
+      s/(token:[[:space:]]*).*/\1REDACTED/Ig;
+      s/("token"[[:space:]]*:[[:space:]]*")[^"]*"/\1REDACTED"/Ig;
+      s/(--oidc\.client-secret=)[^"[:space:]]+/\1REDACTED/g;
+      s/(CLIENT_SECRET=)[^"[:space:]]+/\1REDACTED/g;
+      s/(X-Auth-Token[":[:space:]]+)[^"[:space:]]+/\1REDACTED/Ig;
+      s/(Authorization:[[:space:]]*Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1REDACTED/Ig;
+      s/(UserData:)[^,]*,/\1 REDACTED,/Ig;
+    ' "${file}" || true
+  done < <(find "${unpack_dir}" -type f \( -name "*.log" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" -o -name "*.txt" -o -name "*.inspect" \) -print0)
+
+  while IFS= read -r -d '' yaml_file; do
+    if grep -Eq '^[[:space:]]*kind:[[:space:]]*Secret[[:space:]]*$' "${yaml_file}"; then
+      sanitize_secret_yaml "${yaml_file}" || true
+    fi
+  done < <(find "${unpack_dir}" -type f \( -name "*.yaml" -o -name "*.yml" \) -print0)
+
+  if ! (cd "${unpack_dir}" && tar -czf "${output_bundle}" .); then
+    echo "WARNING: Failed to repack sanitized bundle ${bundle_name}" >&2
+    rm -rf "${tmp_dir}"
+    return 1
+  fi
+
+  rm -rf "${tmp_dir}"
+  return 0
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
 
   current_time=$(date +%s)
-  cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  for bundle in "${dir}"/log-bundle-*.tar.gz; do
+    if [[ ! -e "${bundle}" ]]; then
+      continue
+    fi
+
+    if ! sanitize_log_bundle "${bundle}" "${ARTIFACT_DIR}"; then
+      echo "WARNING: Sanitization failed for ${bundle}, skipping bundle copy." >&2
+    fi
+  done
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
