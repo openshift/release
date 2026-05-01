@@ -413,7 +413,8 @@ if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export SUSHY_TOOLS_IMAGE=quay.io/multi-arch/sushy-tools:muiltarch" >> /root/dev-scripts/config_root.sh
   echo "export VBMC_IMAGE=quay.io/multi-arch/vbmc:arm" >> /root/dev-scripts/config_root.sh
 else
-  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+  ##echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+  echo "export OPENSHIFT_RELEASE_IMAGE=registry.build09.ci.openshift.org/ci-ln-t4zvmvt/release:latest" >> /root/dev-scripts/config_root.sh
 fi
 
 # Inject PR additional configuration, if available
