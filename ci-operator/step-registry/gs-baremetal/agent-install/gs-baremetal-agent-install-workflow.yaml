@@ -1,0 +1,15 @@
+workflow:
+  as: gs-baremetal-agent-install
+  steps:
+    cluster_profile: metal-redhat-gs
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: abi-conf-bm
+      - ref: abi-install-bmc
+    post: []
+  documentation: |-
+    Agent-Based Installation (ABI) on bare metal in RDU2 (metal-redhat-gs) without a bastion.
+    Pre: (1) **abi-conf-bm** — install-config / agent-config, DAY0/DAY1 YAML, **bmc--info.json**, strip **.bmc** credentials, **`openshift-install agent create cluster-manifests`**, pack **`ocpClusterInf.tgz`**;
+    (2) **abi-install-bmc** — unpack, **`agent create image`**, HTTP + Chisel, Redfish from **bmc--info.json**, **`wait-for bootstrap-complete`** / **`install-complete`** (retry counts **OCP__ABI__WAIT__BOOTSTRAP__H**, **OCP__ABI__WAIT__CLUSTER__H**), virtual-media **EjectMedia** after install, kubeconfig handoff to **SHARED_DIR**, **nodes** Ready, **OCP__ABI__DAY2_SCRIPTS_YAML** (post-install health is **`steps.test`**, e.g. **cucushift-installer-check-cluster-health**).
+    This workflow does not define a test phase; the job must set `steps.test` (e.g. `chain: cucushift-installer-check-cluster-health`). Capabilities: intranet.
+    Red Hat reference for manifests and agent installer commands: https://docs.redhat.com/en/documentation/openshift_container_platform/4.12/html/installing_an_on-premise_cluster_with_the_agent-based_installer/preparing-to-install-with-the-agent-based-installer

@@ -1,0 +1,66 @@
+base_images:
+  baremetal-qe-base:
+    name: baremetal-qe-base
+    namespace: ci
+    tag: latest
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: abi-test-conf-bm
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: metal-redhat-gs
+    env:
+      OCP__ABI__BM__BASE_DOM: sys.eng.rdu2.dc.redhat.com
+      OCP__ABI__BM__CLS_NAME: integrity
+      OCP__ABI__CLUSTER_DIR: /tmp/ocpClusterDir
+      OCP__ABI__DAY0_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__DAY1_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__INSTLR_LOG_LEVEL: info
+      OCP__ABI__TUN_SVC__DP_BASE_URL: https://50.18.200.61/dp
+      OCP__ABI__TUN_SVC__DP_PORT: "20000"
+    test:
+    - ref: abi-conf-bm
+  timeout: 1h0m0s
+- as: abi-test-install-bmc
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: metal-redhat-gs
+    env:
+      OCP__ABI__CLUSTER_DIR: /tmp/ocpClusterDir
+      OCP__ABI__DAY2_SCRIPTS_YAML: |
+        Scripts: []
+      OCP__ABI__INSTLR_LOG_LEVEL: info
+      OCP__ABI__TEAM_NAME: lp-interop
+      OCP__ABI__TUN_SVC__CP_URL: https://chisel.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/cp
+      OCP__ABI__TUN_SVC__DP_BASE_URL: https://50.18.200.61/dp
+      OCP__ABI__TUN_SVC__DP_PORT: "20000"
+      OCP__ABI__WAIT__BOOTSTRAP__H: "2"
+      OCP__ABI__WAIT__CLUSTER__H: "2"
+    test:
+    - ref: abi-install-bmc
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: abi-test
