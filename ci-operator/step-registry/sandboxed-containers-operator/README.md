@@ -25,6 +25,12 @@ base_images:
 
 The [sandboxed-containers-operator-peerpods-param-cm](./peerpods/param-cm/) step creates the peerpods-param-cm configmap. Currently only Azure is supported and it will do the needed networking setup for OSC to work properly on this cloud provider.
 
+### sandboxed-containers-operator-kata-test
+
+The [sandboxed-containers-operator-kata-test](./kata/test/) step runs kata-containers upstream integration tests (bats) from the openshift/kata-containers repository. It clones the repo, installs bats and yq if needed, and executes the test wrapper at `redhat/tests/run-tests.sh`.
+
+This step only runs when `WORKLOAD_TO_TEST=kata`; otherwise it exits immediately. The repo and branch can be configured via `KATA_REPO` and `KATA_BRANCH` (defaults to `osc-release`). Use `KATA_TESTS_FILTER` to select a subset of tests and `KATA_TESTS_FAIL_FAST` to stop on first failure.
+
 ### sandboxed-containers-operator-env-cm
 
 The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-config configmap which is actually used by the OSC tests in `platform-extended-tests` to control many aspects of the execution. In case this step is not reference, default values will be used by the tests.
@@ -52,7 +58,7 @@ Here is the list of workflows.
 
 ### sandboxed-containers-operator-e2e-azure
 
-The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow implements an entire e2e execution for testing OSC on Azure. It will deploy Openshift on Azure, evoke the [sandboxed-containers-operator-pre](#sandboxed-containers-operator-pre) chain for preparing the environment and finally execute the `platform-extended-tests`.
+The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow implements an entire e2e execution for testing OSC on Azure. It will deploy Openshift on Azure, evoke the [sandboxed-containers-operator-pre](#sandboxed-containers-operator-pre) chain for preparing the environment, execute the `platform-extended-tests`, and then run the kata-containers upstream tests (when `WORKLOAD_TO_TEST=kata`).
 
 As the [openshift-extended-test](../openshift-extended/test/) step is referenced in the `test` condition, any job using this workflow should import the `tests-private` image. This is done by adding an entry to the `base_images` section in the job's yaml, as for example:
 
