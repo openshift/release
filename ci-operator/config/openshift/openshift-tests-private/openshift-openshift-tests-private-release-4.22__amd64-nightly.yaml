@@ -128,6 +128,14 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: openstack-ipi-debug
+  cron: 11 7 11,25 * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      USE_RAMFS: "false"
+    workflow: openshift-e2e-openstack-ipi
 - as: olmv1-benchmark-test
   capabilities:
   - intranet
@@ -3199,6 +3207,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
+- as: gcp-ipi-disc-priv-confidential-secureboot-mini-perm-f14
+  cron: 44 2 2,16 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      COMPUTE_NODE_TYPE: n2d-standard-2
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualization
+      CONTROL_PLANE_NODE_TYPE: c3d-standard-4
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0hziwft/release:latest
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-disc-priv-secureboot-cc
 - as: gcp-ipi-confidential-fips-rhcos10-tp-f14-destructive
   cron: 6 9 9,23 * *
   steps:

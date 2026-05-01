@@ -1,0 +1,39 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-disc-priv-secureboot-cc-provision
+  steps:
+  - ref: gcp-provision-minimal-permission
+  - ref: openshift-cluster-bot-rbac
+  - ref: gcp-provision-vpc
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: mirror-images-by-oc-adm
+  - ref: proxy-config-generate
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-gcp-confidential-computing
+  - ref: ipi-conf-gcp-secureboot
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - ref: cucushift-installer-check-gcp-machine-type
+  - ref: cucushift-installer-check-gcp-confidential-computing
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-private
+  - ref: multiarch-validate-nodes
+  env:
+  - name: PUBLISH
+    default: "Internal"
+  - name: RESTRICTED_NETWORK
+    default: "yes"
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: CONFIDENTIAL_COMPUTE
+    default: "Enabled"
+  - name: ON_HOST_MAINTENANCE
+    default: "Terminate"
+  documentation: |-
+    Launch an IPI disconnected & private cluster on GCP with Shielded VMs
+    (secure boot) & Confidential VMs for QE e2e tests.
