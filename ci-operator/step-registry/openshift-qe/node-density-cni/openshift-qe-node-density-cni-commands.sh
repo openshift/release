@@ -62,7 +62,10 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
 METRICS_FOLDER="collected-metrics-${UUID}"
 if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
@@ -82,3 +85,5 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+exit ${RUN_EXIT_CODE}
