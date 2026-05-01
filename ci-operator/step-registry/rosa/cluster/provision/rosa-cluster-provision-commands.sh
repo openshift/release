@@ -540,11 +540,15 @@ PROXY_SWITCH=""
 if [[ "$ENABLE_PROXY" == "true" ]]; then
   # In step aws-provision-bastionhos, the values for proxy_private_url and proxy_public_url are same
   proxy_private_url=$(< "${SHARED_DIR}/proxy_private_url")
-  if [[ -z "${proxy_private_url}" ]]; then
-    echo -e "The http_proxy, and https_proxy URLs are mandatory when specifying use of proxy."
+  proxy_private_https_url=$(< "${SHARED_DIR}/proxy_private_https_url")
+  if [[ -z "${proxy_private_url}" || -z "${proxy_private_https_url}" ]]; then
+    echo -e "ERROR: Both http_proxy and https_proxy URLs are mandatory when specifying use of proxy."
+    [[ -z "${proxy_private_url}" ]] && echo -e "  - HTTP proxy URL is missing or empty"
+    [[ -z "${proxy_private_https_url}" ]] && echo -e "  - HTTPS proxy URL is missing or empty"
     exit 1
   fi
-  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
+
+  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_https_url}"
 
   trust_bundle_file="${SHARED_DIR}/bundle_file"
   if [[ -f "${trust_bundle_file}" ]]; then
@@ -555,7 +559,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
 
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
-  record_cluster "proxy" "https" $proxy_private_url
+  record_cluster "proxy" "https" $proxy_private_https_url
   record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
