@@ -11,6 +11,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.13
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
 build_root:
   from_repository: true
 images:
@@ -266,6 +274,22 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
+- as: e2e-aws-ovn-fdp-qe-all-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      E2E_RUN_TAGS: ""
+      EXTRA_MG_ARGS: --host-network
+      PARALLEL: "1"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-krsynxb/release:latest
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~DisconnectedOnly&;~MicroShiftOnly&;~Disruptive&
+      TEST_SCENARIOS: SDN
+      TEST_TIMEOUT: "60"
+    test:
+    - chain: openshift-e2e-test-qe-longduration
+    workflow: openshift-e2e-aws-ovn
+  timeout: 14h0m0s
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
