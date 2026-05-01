@@ -47,7 +47,7 @@ EOF
 cat > rhel-8-server-beta-rpms.repo.j2 <<-'EOF'
 [rhel-8-for-x86_64-beta-baseos-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 Beta - BaseOS (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-beta-baseos-rpms/
+baseurl = https://openshift-mirror-list.ci-systems.workers.dev/enterprise/reposync/ci-deps/rhel-8-beta-baseos-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 gpgcheck = 0
@@ -59,7 +59,7 @@ module_hotfixes = 1
 
 [rhel-8-for-x86_64-beta-appstream-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 Beta - AppStream (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-beta-appstream-rpms/
+baseurl = https://openshift-mirror-list.ci-systems.workers.dev/enterprise/reposync/ci-deps/rhel-8-beta-appstream-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 gpgcheck = 0
