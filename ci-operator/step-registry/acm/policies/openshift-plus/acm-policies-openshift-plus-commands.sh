@@ -22,15 +22,24 @@ sleep 120
 RETRIES=40
 for try in $(seq "${RETRIES}"); do
   results=$(oc get policies -n policies)
+  data_rows=$(echo "$results" | tail -n +2)
+  row_count=$(echo "$data_rows" | grep -c . || true)
+  if [ "$row_count" -eq 0 ]; then
+    echo "Try ${try}/${RETRIES}: No policy rows found. Checking again in 30 seconds"
+    sleep 30
+    continue
+  fi
   notready=$(echo "$results" | grep -E 'NonCompliant|Pending' || true)
-  if [ "$notready" == "" ]; then
+  unevaluated=$(echo "$data_rows" | grep -v 'Compliant' || true)
+  if [ "$notready" == "" ] && [ "$unevaluated" == "" ]; then
     echo "OPP policyset is applied and compliant"
     break
   else
     if [ $try == $RETRIES ]; then
       if [ "$IGNORE_SECONDARY_POLICIES" == "true" ]; then
-        CANDIDATES=$(echo "$notready" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
-        if [ -z "$CANDIDATES" ]; then
+        filtered_notready=$(echo "$notready" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
+        filtered_unevaluated=$(echo "$unevaluated" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
+        if [ -z "$filtered_notready" ] && [ -z "$filtered_unevaluated" ]; then
           echo "Warning: Proceeding with OPP QE tests with some policy failures"
           exit 0
         else
@@ -42,7 +51,11 @@ for try in $(seq "${RETRIES}"); do
         exit 1
       fi
     fi
-    echo "Try ${try}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
+    if [ "$notready" != "" ]; then
+      echo "Try ${try}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
+    else
+      echo "Try ${try}/${RETRIES}: Policies have not been evaluated yet. Checking again in 30 seconds"
+    fi
     sleep 30
   fi
 done
