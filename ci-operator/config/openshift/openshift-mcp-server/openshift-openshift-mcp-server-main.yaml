@@ -38,6 +38,30 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: mcpchecker-eval-google
+  optional: true
+  commands: |
+    # Build MCP server binary
+    GOFLAGS='-mod=readonly' make build
+
+    # Install mcpchecker
+    make mcpchecker
+
+    # Start MCP server in background (no cluster needed for this step)
+    make run-server TOOLSETS=core,config
+
+    # Run mcpchecker evaluation with Google Gemini agent
+    # NOTE: This will fail until Vault credentials are wired (follow-up PR)
+    _output/tools/bin/mcpchecker check \
+      evals/core-eval-testing/builtin-google/eval-kubernetes.yaml \
+      --label-selector suite=kubernetes \
+      --output json \
+      || true
+
+    # Cleanup
+    make stop-server || true
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift
