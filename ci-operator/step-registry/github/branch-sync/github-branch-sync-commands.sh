@@ -74,11 +74,11 @@ echo "🧹 Deleting stale branch ${BRANCH}, if any…"
 curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
   "https://api.github.com/repos/${REPO}/git/refs/heads/${BRANCH}" || true
 
-# create branch off TARGET, merge SOURCE with -X theirs
+# create branch off TARGET, merge SOURCE
 git checkout -b "$BRANCH" "origin/${TARGET_BRANCH}"
 CONFLICT=false
-if ! git merge -X theirs "origin/${SOURCE_BRANCH}" --no-edit; then
-  echo "Merge conflict (even with -X theirs)."
+if ! git merge "origin/${SOURCE_BRANCH}" --no-edit; then
+  echo "⚠️  Merge conflict detected"
   git add -A
   git commit -m "Sync ${SOURCE_BRANCH} to ${TARGET_BRANCH} with conflicts (${TITLE_DATE})"
   CONFLICT=true
