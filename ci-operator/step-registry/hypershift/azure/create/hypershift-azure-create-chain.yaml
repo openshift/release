@@ -31,6 +31,9 @@ chain:
     - name: ENABLE_ICSP
       default: "false"
       documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: ENDPOINT_ACCESS
+      default: "Public"
+      documentation: "Access for control plane endpoints (Public, PublicAndPrivate, Private)"
     - name: GUEST_FEATURE_SET
       default: ""
       documentation: This field sets the cluster feature set. This is used to enable custom features such as tech preview features
@@ -384,10 +387,34 @@ chain:
         COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
       fi
 
+      # Configure self-managed Azure with workload identities
       if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
           COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
-      fi
 
+          # Configure Private Link endpoint access for Private/PublicAndPrivate topologies
+          NAT_SUBNET=""
+          if [[ -f "${SHARED_DIR}/azure_private_nat_subnet_id" ]]; then
+              NAT_SUBNET="$(cat "${SHARED_DIR}/azure_private_nat_subnet_id")"
+          fi
+
+          if [[ "${ENDPOINT_ACCESS}" == "Private" || "${ENDPOINT_ACCESS}" == "PublicAndPrivate" ]]; then
+              if [[ -z "${NAT_SUBNET}" ]]; then
+                  echo "ERROR: NAT subnet ID is required for ${ENDPOINT_ACCESS} endpoint access"
+                  exit 1
+              fi
+
+              COMMAND+=(--endpoint-access "${ENDPOINT_ACCESS}")
+              COMMAND+=(--endpoint-access-private-nat-subnet-id "${NAT_SUBNET}")
+
+              # Optional: Add additional allowed subscriptions if needed
+              if [[ -f "${SHARED_DIR}/azure_private_additional_subscriptions" ]]; then
+                  ADDITIONAL_SUBS="$(cat "${SHARED_DIR}/azure_private_additional_subscriptions")"
+                  if [[ -n "${ADDITIONAL_SUBS}" ]]; then
+                      COMMAND+=(--endpoint-access-private-additional-allowed-subscriptions "${ADDITIONAL_SUBS}")
+                  fi
+              fi
+          fi
+      fi
 
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
@@ -407,6 +434,13 @@ chain:
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
       echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       
+
+      if [[ "$ENDPOINT_ACCESS" == "Private" ]]; then
+        # With Private access the cluster is not yet accessible (the Proxy bastion
+        # node was not yet configured). Let's exit and check the guest cluster health later.
+        exit 0
+      fi
+
       # In case of BYO CNI, the HC will never be ready before CNI components are up and running
       if [[ $HYPERSHIFT_NETWORK_TYPE == "Other" || $HYPERSHIFT_NETWORK_TYPE == "Calico" ]]; then
         echo "Waiting for nodes to join the hosted cluster"

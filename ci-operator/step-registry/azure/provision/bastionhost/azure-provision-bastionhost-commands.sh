@@ -96,7 +96,7 @@ if [ -z "${VNET_NAME}" ]; then
   elif [ -f "${metadata_file}" ]; then
     infra_id=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
     bastion_vnet_name="${infra_id}-vnet"
-    bastion_subnet="${infra_id}-master-subnet"    
+    bastion_subnet="${infra_id}-master-subnet"
     bastion_nsg="${infra_id}-nsg"
   else
     echo "Could not determine the bastion vnet name!"
@@ -104,6 +104,15 @@ if [ -z "${VNET_NAME}" ]; then
   fi
 else
   bastion_vnet_name="${VNET_NAME}"
+fi
+
+# For HyperShift scenarios, NSG is created by azure-provision-vnet-hypershift
+# and saved to ${SHARED_DIR}/azure_nsg_id. Extract NSG name from the ID.
+if [ -f "${SHARED_DIR}/azure_nsg_id" ]; then
+  nsg_id=$(cat "${SHARED_DIR}/azure_nsg_id")
+  # NSG ID format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/networkSecurityGroups/{nsg-name}
+  bastion_nsg=$(basename "${nsg_id}")
+  echo "Using NSG from HyperShift provision: ${bastion_nsg}"
 fi
 
 #####################################
@@ -199,11 +208,19 @@ else
 fi
 
 open_port="22 873 3128 3129 5000 6001 6002"
+
+# For HyperShift scenarios, NSG might be in a separate resource group
+nsg_rg="${bastion_rg}"
+if [ -f "${SHARED_DIR}/resourcegroup_nsg" ]; then
+  nsg_rg=$(cat "${SHARED_DIR}/resourcegroup_nsg")
+  echo "Using NSG resource group from HyperShift provision: ${nsg_rg}"
+fi
+
 if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     echo "Create bastion subnet"
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
-    run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
-    run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
+    run_command "az network nsg create -g ${nsg_rg} -n ${bastion_nsg}"
+    run_command "az network nsg rule create -g ${nsg_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
     #subnet cidr for int service is xx.xx.99.0/24, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
     bastion_subnet_cidr=$(echo ${AZURE_VNET_ADDRESS_PREFIXES%/*} | awk -F'.' '{print $1"."$2".99.0/24"}')
     if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -219,7 +236,7 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 else
     # bastion subnet and nsg already exist, create additional nsg rule
-    run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
+    run_command "az network nsg rule create -g ${nsg_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
 fi
 
 echo "Create bastion vm"

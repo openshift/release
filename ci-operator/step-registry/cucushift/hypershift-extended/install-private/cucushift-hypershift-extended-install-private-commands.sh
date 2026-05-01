@@ -100,6 +100,22 @@ case "${CLUSTER_TYPE,,}" in
             --external-dns-domain-filter="$HYPERSHIFT_EXTERNAL_DNS_DOMAIN"
         )
     fi
+    PLS_RG="${AZURE_PLS_RESOURCE_GROUP:-}"
+    if [ -z "${PLS_RG}" ] && [ -f "${SHARED_DIR}/azure_pls_resource_group" ]; then
+        PLS_RG="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
+    fi
+    PRIVATE_CREDS="${AZURE_PRIVATE_CREDS_FILE:-}"
+
+    if [ -z "${PRIVATE_CREDS}" ] && [ -f "${SHARED_DIR}/azure_private_link_creds_file" ]; then
+        PRIVATE_CREDS="$(cat "${SHARED_DIR}/azure_private_link_creds_file")"
+    fi
+    if [ -n "${PRIVATE_CREDS}" ] && [ -f "${PRIVATE_CREDS}" ] && [ -n "${PLS_RG}" ]; then
+        COMMAND+=(
+            --private-platform=Azure
+            --azure-private-creds=${PRIVATE_CREDS}
+            --azure-pls-resource-group=${PLS_RG}
+        )
+    fi
     ;;
 *)
     echo "Unsupported platform ${CLUSTER_TYPE}" >&2
