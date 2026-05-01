@@ -3,8 +3,12 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
   upi-installer:
-    name: "4.14"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
@@ -242,6 +246,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-openstack
+- as: aws-ipi-f7-longduration-hive-sd-rosa
+  cron: 0 6 * * 6
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;HiveSDRosa&;
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
+    - as: deploy-hive
+      cli: latest
+      commands: |
+        make deploy
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
