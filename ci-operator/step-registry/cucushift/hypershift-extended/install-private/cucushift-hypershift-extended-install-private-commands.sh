@@ -14,6 +14,11 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+if [[ -n "$CUSTOM_OPERATOR_IMAGE" ]] ; then
+  OPERATOR_IMAGE=$CUSTOM_OPERATOR_IMAGE
+fi
+
+
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install

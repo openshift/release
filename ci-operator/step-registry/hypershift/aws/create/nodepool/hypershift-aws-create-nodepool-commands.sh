@@ -33,8 +33,13 @@ function config_nodepool() {
     if [[ -n "${NODEPOOL_TENANCY}" || -n "${NODEPOOL_CAPACITY_RESERVATION}" ]]; then
       EXTRA_FLARGS+=" && oc apply -f /tmp/np.yaml"
     fi
-    echo "$EXTRA_FLARGS"  
+    echo "$EXTRA_FLARGS"
 }
+
+if [[ -z "${ADDITIONAL_HYPERSHIFT_NODE_COUNT}" || "${ADDITIONAL_HYPERSHIFT_NODE_COUNT}" == "0" ]]; then
+  echo "Skip: no additional hypershift nodes requested"
+  exit 0
+fi
 
 eval "/usr/bin/hypershift create nodepool aws \
   --cluster-name  ${CLUSTER_NAME} \
