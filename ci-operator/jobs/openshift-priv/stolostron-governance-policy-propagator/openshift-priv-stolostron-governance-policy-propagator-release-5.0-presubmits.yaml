@@ -1,26 +1,26 @@
-postsubmits:
-  openshift-priv/stolostron-multicluster-role-assignment:
+presubmits:
+  openshift-priv/stolostron-governance-policy-propagator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
+    - ^release-5\.0$
+    - ^release-5\.0-
     cluster: build03
+    context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      capability/arm64: arm64
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-priv-stolostron-multicluster-role-assignment-main-images
-    path_alias: github.com/stolostron/multicluster-role-assignment
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-stolostron-governance-policy-propagator-release-5.0-images
+    optional: true
+    path_alias: github.com/stolostron/governance-policy-propagator
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -41,9 +41,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -55,9 +52,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
