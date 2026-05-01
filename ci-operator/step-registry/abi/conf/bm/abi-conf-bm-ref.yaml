@@ -10,6 +10,10 @@ ref:
       cpu: "1"
       memory: 256Mi
   grace_period: 5m
+  credentials:
+    - namespace: test-credentials
+      name: registry-pull-credentials
+      mount_path: /var/run/secrets/registry-pull--build-farms
   env:
     - name: OCP__ABI__CLUSTER_DIR
       default: ocpClusterDir
@@ -37,6 +41,12 @@ ref:
       default: "1"
       documentation: |-
         When non-zero, patches `agent-config.yaml` with `.minimalISO=true` and `.bootArtifactsBaseURL` (boot artifacts served via Chisel tunnel) before `agent create image`. Set to `0` to embed all artifacts in the ISO.
+    - name: OCP__ABI__TUN_SVC__DP_BASE_URL
+      documentation: |-
+        Required when OCP__ABI__MIN_ISO is non-zero. BMC-facing HTTPS prefix for boot artifacts on the data plane (no trailing slash), e.g. `https://<svcFQDN>/dp`.
+    - name: OCP__ABI__TUN_SVC__DP_PORT
+      documentation: |-
+        Required when OCP__ABI__MIN_ISO is non-zero. Server-side data-plane port in the Chisel reverse tunnel for serving boot artifacts.
   documentation: |-
     The `${CLUSTER_PROFILE_DIR}/` MUST contain files: `pull-secret`, `ssh-publickey`, `cred--bmc--usr`, `cred--bmc--pwd`, and `ocp--abi--cfg.yaml`.
 

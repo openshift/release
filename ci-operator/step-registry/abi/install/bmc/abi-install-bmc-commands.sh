@@ -26,6 +26,15 @@ typeset -i httpSvcPort=8080
 typeset -ai taskPIDs=()
 export OCP__ABI__CFG="${CLUSTER_PROFILE_DIR}/ocp--abi--cfg.yaml"; [ -r "${OCP__ABI__CFG}" ]
 
+# Extract openshift-install from the release image.
+# RELEASE_IMAGE_LATEST is automatically set by CI Operator based on releases.latest in config.
+oc adm release extract \
+    -a /var/run/secrets/registry-pull--build-farms/.dockerconfigjson \
+    "${RELEASE_IMAGE_LATEST}" \
+    --command=openshift-install \
+    --to="/tmp"
+export PATH="/tmp:${PATH}"
+
 
 function openshift-install () {
     typeset -i es=0
