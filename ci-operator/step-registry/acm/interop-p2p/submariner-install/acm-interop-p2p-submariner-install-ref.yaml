@@ -1,0 +1,47 @@
+ref:
+  as: acm-interop-p2p-submariner-install
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: acm-interop-p2p-submariner-install-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  env:
+    - name: SUBMARINER_GLOBALNET
+      default: "true"
+      documentation: |-
+        Enable Submariner Globalnet mode to support overlapping pod/service CIDRs
+        across spoke clusters. Required when spokes share the same default CIDR
+        ranges (e.g. both using 10.128.0.0/14).
+    - name: SUBMARINER_CABLE_DRIVER
+      default: "libreswan"
+      documentation: |-
+        Cable driver for Submariner tunnels. Options: libreswan, vxlan, wireguard.
+    - name: SUBMARINER_BROKER_NAMESPACE
+      default: "submariner-k8s-broker"
+      documentation: |-
+        Namespace on the hub cluster where the Submariner broker is deployed.
+    - name: SUBMARINER_VERIFY_TIMEOUT
+      default: "300"
+      documentation: |-
+        Timeout in seconds passed to subctl verify for the connectivity check.
+  documentation: |-
+    Installs and configures Submariner for a 1-hub + 2-spoke cluster topology.
+
+    Steps performed:
+      1. Downloads the latest subctl and yq binaries from GitHub releases.
+      2. Prepares AWS security groups on each spoke (opens Submariner UDP ports).
+      3. Deploys the Submariner broker on the hub cluster (Globalnet enabled by default).
+      4. Joins both spoke clusters to the broker.
+      5. Waits for Submariner gateways to become active on both spokes.
+      6. Runs subctl verify to confirm spoke-to-spoke connectivity.
+
+    Requires the following files written by acm-interop-p2p-cluster-install:
+      ${SHARED_DIR}/managed-cluster-name-{1,2}
+      ${SHARED_DIR}/managed-cluster-kubeconfig-{1,2}
+      ${SHARED_DIR}/managed-cluster-metadata-{1,2}.json
