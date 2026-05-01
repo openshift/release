@@ -31,29 +31,13 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     test:
-    - as: install-operator
-      cli: latest
-      commands: make -f Makefile-ocp.mk e2e-install-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: deploy-mcp-server
+    - as: e2e-test
       cli: latest
       commands: |
-        MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}" make -f Makefile-ocp.mk e2e-deploy-mcp-server
+        MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}" make -f Makefile-ocp.mk e2e-test
       dependencies:
       - env: IMAGE_OPENSHIFT_MCP_SERVER
         name: openshift-mcp-server
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: wait-ready
-      cli: latest
-      commands: make -f Makefile-ocp.mk e2e-wait-ready
       from: src
       resources:
         requests:
