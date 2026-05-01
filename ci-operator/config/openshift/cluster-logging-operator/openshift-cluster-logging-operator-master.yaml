@@ -106,6 +106,39 @@ tests:
   commands: ARTIFACTS_DIR=${ARTIFACT_DIR} make coverage
   container:
     from: src
+- as: e2e-aws-techpreview-rhcos10
+  optional: true
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+    test:
+    - as: test
+      cli: latest
+      commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
+        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      - env: IMAGE_LOKI_OPERATOR
+        name: pipeline:loki-operator
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-logging-rhcos
 - as: e2e-target
   cluster_claim:
     architecture: amd64
