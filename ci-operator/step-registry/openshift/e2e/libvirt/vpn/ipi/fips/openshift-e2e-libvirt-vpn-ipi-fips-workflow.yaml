@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-ipi-fips
+  steps:
+    env:
+      IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: ipi-libvirt-pre
+    - ref: fips-check
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - chain: ipi-libvirt-post
+  documentation: |-
+    IBM Z VPN (phc-cicd) CI with IPI libvirt provisioning and FIPS validation. Same as
+    openshift-e2e-libvirt-fips (ipi-libvirt-pre then fips-check) but prefixed with
+    upi-libvirt-cleanup-pre like openshift-e2e-libvirt-vpn-ipi. Set USE_EXTERNAL_DNS=true
+    and cluster_profile libvirt-s390x-vpn so install-config matches UPI VPN naming.
+
+    See openshift-e2e-libvirt-vpn-ipi workflow documentation for the s390x ACPI / QEMU machine-type
+    caveat on some hypervisors (terraform-provider-libvirt vs s390-ccw-virtio-rhel9.*).
