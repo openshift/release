@@ -3,6 +3,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -102,6 +106,11 @@ tests:
   container:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
+- as: shellcheck
+  commands: make lint-shellcheck
+  container:
+    from: shellcheck
+  run_if_changed: .sh$
 - as: ocp-ci-monitor
   cron: 0 7 * * *
   steps:
