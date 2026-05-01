@@ -347,6 +347,7 @@ Found 3 relevant components for "openshift-e2e-test":
 **Environment Variables**:
 - TEST_SUITE: conformance/parallel (which test suite to run)
 - TEST_SKIPS: Optional tests to skip
+- TEST_FOCUS: Optional regex to filter tests to run
 
 **Used By** (Reverse Dependencies): Found in 156 workflows/chains:
 - openshift-upgrade-aws-workflow.yaml (test phase)
