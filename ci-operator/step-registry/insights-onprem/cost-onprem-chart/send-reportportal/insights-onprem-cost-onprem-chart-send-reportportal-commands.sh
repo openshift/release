@@ -24,6 +24,24 @@ fi
 DYNAMIC_LAUNCH_NAME=""
 RUN_TYPE=""
 RELEASE_TYPE=""
+CHART_REF_RESOLVED=""
+USE_HELM_DEVEL=""
+USE_LOCAL_CHART=""
+
+load_chart_resolution_state() {
+    # Load chart resolution state from SHARED_DIR (persisted by e2e step)
+    # Environment variables don't persist across Prow steps
+    if [[ -f "${SHARED_DIR}/chart_ref_resolved" ]]; then
+        CHART_REF_RESOLVED=$(cat "${SHARED_DIR}/chart_ref_resolved")
+    fi
+    if [[ -f "${SHARED_DIR}/use_helm_devel" ]]; then
+        USE_HELM_DEVEL=$(cat "${SHARED_DIR}/use_helm_devel")
+    fi
+    if [[ -f "${SHARED_DIR}/use_local_chart" ]]; then
+        USE_LOCAL_CHART=$(cat "${SHARED_DIR}/use_local_chart")
+    fi
+    echo "Loaded chart resolution state: CHART_REF_RESOLVED=${CHART_REF_RESOLVED:-}, USE_HELM_DEVEL=${USE_HELM_DEVEL:-}, USE_LOCAL_CHART=${USE_LOCAL_CHART:-}"
+}
 
 get_chart_version() {
     # Returns chart version from env var or version_info.json
@@ -65,6 +83,9 @@ determine_release_type() {
     elif [[ -n "${CHART_REF_RESOLVED:-}" ]] && [[ "${CHART_REF_RESOLVED}" == *"-rc"* ]]; then
         # Resolved ref contains RC indicator (explicit version like 0.2.20-rc1)
         RELEASE_TYPE="rc"
+    elif [[ -n "${CHART_REF_RESOLVED:-}" ]]; then
+        # Any other non-empty resolved ref is a concrete release tag (e.g., cost-onprem-0.2.19)
+        RELEASE_TYPE="release"
     else
         # Fall back to inferring from chart version (for PRs using local chart)
         local chart_version
@@ -125,7 +146,14 @@ validate_prerequisites() {
 
     local errors=0
 
-    # JUnit files are passed via SHARED_DIR (not ARTIFACT_DIR which is step-specific)
+    # JUnit files are passed via SHARED_DIR as a compressed tarball
+    # (SHARED_DIR has 1MB limit, JUnit files can exceed this)
+    if [[ -f "${SHARED_DIR}/junit_files.tar.gz" ]]; then
+        echo "Found compressed JUnit archive, extracting..."
+        tar -xzf "${SHARED_DIR}/junit_files.tar.gz" -C "${SHARED_DIR}/" 2>/dev/null || true
+        rm -f "${SHARED_DIR}/junit_files.tar.gz"
+    fi
+    
     if ! ls "${SHARED_DIR}"/junit_*.xml &>/dev/null; then
         echo "ERROR: No junit_*.xml files found in ${SHARED_DIR}"
         echo "  Tests may not have run or artifact collection failed"
@@ -263,6 +291,9 @@ generate_datarouter_metadata() {
 
     local metadata_file="${ARTIFACT_DIR}/datarouter_metadata.json"
 
+    # Load chart resolution state from e2e step (env vars don't persist across steps)
+    load_chart_resolution_state
+    
     # Determine run type, release type, and launch name (sets global variables)
     determine_run_type
     determine_release_type
