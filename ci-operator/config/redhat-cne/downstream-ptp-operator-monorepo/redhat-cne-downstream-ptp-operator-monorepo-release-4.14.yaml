@@ -55,6 +55,26 @@ images:
         as:
         - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
     to: ptp-operator-must-gather-mono
+  - dockerfile_literal: |
+      FROM src AS builder
+      WORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator
+      RUN find manifests/stable -name '*.yaml' -exec sed -i \
+        -e 's|quay.io/openshift/origin-ptp-operator-must-gather:|quay.io/openshift/origin-ptp-operator-must-gather-mono:|g' \
+        -e 's|quay.io/openshift/origin-ptp-operator:|quay.io/openshift/origin-ptp-operator-mono:|g' \
+        -e 's|quay.io/openshift/origin-ptp:|quay.io/openshift/origin-ptp-mono:|g' \
+        -e 's|quay.io/openshift/origin-cloud-event-proxy:|quay.io/openshift/origin-cloud-event-proxy-mono:|g' \
+        {} + && \
+        VER=$(grep -oP 'origin-ptp-operator-mono:\K[0-9.]+' manifests/stable/ptp-operator.clusterserviceversion.yaml | head -1) && \
+        printf '\n  relatedImages:\n' >> manifests/stable/ptp-operator.clusterserviceversion.yaml && \
+        printf '  - image: quay.io/openshift/origin-ptp-operator-mono:%s\n    name: ptp-operator\n' "$VER" >> manifests/stable/ptp-operator.clusterserviceversion.yaml && \
+        printf '  - image: quay.io/openshift/origin-ptp-mono:%s\n    name: ptp\n' "$VER" >> manifests/stable/ptp-operator.clusterserviceversion.yaml && \
+        printf '  - image: quay.io/openshift/origin-cloud-event-proxy-mono:%s\n    name: cloud-event-proxy\n' "$VER" >> manifests/stable/ptp-operator.clusterserviceversion.yaml && \
+        printf '  - image: quay.io/openshift/origin-ptp-operator-must-gather-mono:%s\n    name: ptp-operator-must-gather\n' "$VER" >> manifests/stable/ptp-operator.clusterserviceversion.yaml
+      FROM scratch
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/manifests/stable/*.yaml /manifests/
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/bundle/metadata /metadata/
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/bundle/tests/scorecard /tests/scorecard/
+    to: ptp-operator-mono-bundle
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
