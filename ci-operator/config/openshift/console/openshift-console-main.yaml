@@ -16,6 +16,21 @@ images:
   - dockerfile_path: Dockerfile.plugins.demo
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     to: console-plugin-demo
+  - dockerfile_literal: |
+      FROM src
+      USER root
+      RUN dnf install -y \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      WORKDIR /go/src/github.com/openshift/console/frontend
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN node .yarn/releases/yarn-4.12.0.cjs install --immutable && \
+          npx playwright install chromium
+    from: src
+    to: console-playwright-runner
 promotion:
   to:
   - additional_images:
@@ -45,6 +60,10 @@ resources:
     requests:
       cpu: "2"
       memory: 10Gi
+  console-playwright-runner:
+    requests:
+      cpu: "1"
+      memory: 12Gi
   frontend:
     requests:
       cpu: "2"
@@ -101,6 +120,24 @@ tests:
           cpu: "4"
           memory: 10Gi
       timeout: 6h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-playwright
+  optional: true
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        ./test-playwright-e2e.sh
+      from: console-playwright-runner
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 2h0m0s
     workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
