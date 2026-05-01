@@ -1,0 +1,112 @@
+base_images:
+  tools:
+    name: "4.21"
+    namespace: ocp
+    tag: tools
+binary_build_commands: make build WHAT=cmd/openshift-tests
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/tests/Dockerfile.rhel
+    from: tools-openstack
+    to: tests
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-21.ocp.svc > /etc/yum.repos.art/ci/base-openstack-4-21.repo
+    from: tools
+    to: tools-openstack
+releases:
+  4-21-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-nvidia-dra
+  optional: true
+  run_if_changed: ^test/extended/(node/dra/nvidia|dra/nvidia)/.*
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
+    post:
+    - ref: nvidia-cleanup
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: nvidia-nfd-operator-install
+    - ref: nvidia-gpu-operator-install
+    - ref: nvidia-dra-driver-install
+    test:
+    - as: nvidia-dra-tests
+      commands: |
+        #!/bin/bash
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export OPENSHIFT_SKIP_EXTERNAL_TESTS=1
+
+        # Install Helm (required by test prerequisite checks)
+        echo "Installing Helm..."
+        HELM_VERSION="3.14.0"
+        curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz
+        tar -xzf /tmp/helm.tar.gz -C /tmp
+        mkdir -p /tmp/bin
+        mv /tmp/linux-amd64/helm /tmp/bin/helm
+        chmod +x /tmp/bin/helm
+        export PATH="/tmp/bin:$PATH"
+        rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
+        echo "Helm installed: $(helm version --short)"
+
+        readonly GPU_LABEL="nvidia.com/gpu.present=true"
+
+        # Verify GPU nodes are available
+        readonly GPU_NODES=$(oc get nodes -l "${GPU_LABEL}" -o name 2>/dev/null | wc -l)
+        if [ "${GPU_NODES}" -eq 0 ]; then
+          echo "ERROR: No GPU nodes found with label ${GPU_LABEL}"
+          oc get nodes --show-labels
+          exit 1
+        fi
+        echo "Found ${GPU_NODES} GPU node(s)"
+
+        # Run NVIDIA DRA tests (disable monitors for focused testing)
+        mkdir -p "${ARTIFACT_DIR}/nvidia-dra"
+        openshift-tests run --dry-run all 2>&1 | \
+          grep "\[Feature:NVIDIA-DRA\]" | \
+          openshift-tests run -f - \
+            -o "${ARTIFACT_DIR}/nvidia-dra/test-output.log" \
+            --junit-dir="${ARTIFACT_DIR}/nvidia-dra/junit" \
+            --disable-monitor=true
+      from: tests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: origin
+  variant: nvidia-dra

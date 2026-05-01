@@ -281,6 +281,64 @@ fi
 DEFAULT_RUNTIME=$(oc get clusterpolicy gpu-cluster-policy -o jsonpath='{.spec.operator.defaultRuntime}')
 echo "✓ Default runtime: ${DEFAULT_RUNTIME}"
 
+# Step 13: Verify driver DaemonSet is actually ready
+echo ""
+echo "Step 13: Verifying NVIDIA driver DaemonSet is ready..."
+echo "  Waiting up to 30 minutes for driver pods to be ready..."
+echo "  (Driver pods may take significant time to start after ClusterPolicy becomes ready)"
+DRIVER_READY=false
+for i in $(seq 1 360); do
+  # Get the driver daemonset name (it has a version suffix)
+  DRIVER_DS=$(oc get daemonset -n nvidia-gpu-operator -o name 2>/dev/null | grep nvidia-driver-daemonset || echo "")
+
+  if [ -z "${DRIVER_DS}" ]; then
+    echo "  Attempt ${i}/360: Driver DaemonSet not found yet, waiting..."
+    sleep 5
+    continue
+  fi
+
+  # Get daemonset status
+  DESIRED=$(oc get "${DRIVER_DS}" -n nvidia-gpu-operator -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
+  READY=$(oc get "${DRIVER_DS}" -n nvidia-gpu-operator -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+
+  if [ "${DESIRED}" -gt 0 ] && [ "${READY}" -eq "${DESIRED}" ]; then
+    DRIVER_READY=true
+    echo "✓ Driver DaemonSet is ready: ${READY}/${DESIRED} pods"
+    break
+  fi
+
+  echo "  Attempt ${i}/360: Driver pods ready: ${READY}/${DESIRED}"
+  sleep 5
+done
+
+if [ "${DRIVER_READY}" == "false" ]; then
+  echo "✗ ERROR: Driver DaemonSet did not become ready within timeout"
+  echo ""
+  echo "Driver DaemonSet status:"
+  oc get daemonsets -n nvidia-gpu-operator -o wide 2>/dev/null || echo "  No daemonsets found"
+  echo ""
+  echo "Driver pods status:"
+  # Get the actual selector from the DaemonSet (it includes the version suffix)
+  DRIVER_DS=$(oc get daemonset -n nvidia-gpu-operator -o name 2>/dev/null | grep nvidia-driver-daemonset || echo "")
+  if [ -n "${DRIVER_DS}" ]; then
+    DRIVER_SELECTOR=$(oc get "${DRIVER_DS}" -n nvidia-gpu-operator -o jsonpath='{.spec.selector.matchLabels.app}' 2>/dev/null || echo "")
+    if [ -n "${DRIVER_SELECTOR}" ]; then
+      oc get pods -n nvidia-gpu-operator -l "app=${DRIVER_SELECTOR}" -o wide 2>/dev/null || echo "  No driver pods found"
+      echo ""
+      echo "Driver pod logs (if available):"
+      DRIVER_POD=$(oc get pods -n nvidia-gpu-operator -l "app=${DRIVER_SELECTOR}" -o name 2>/dev/null | head -1 || echo "")
+      if [ -n "${DRIVER_POD}" ]; then
+        oc logs "${DRIVER_POD}" -n nvidia-gpu-operator --tail=100 2>/dev/null || echo "  Could not retrieve logs"
+      fi
+    else
+      echo "  Could not determine driver pod selector"
+    fi
+  else
+    echo "  No driver DaemonSet found"
+  fi
+  exit 1
+fi
+
 echo ""
 echo "========================================="
 echo "GPU Operator Installation Complete"
@@ -293,4 +351,5 @@ echo "  - ClusterPolicy: gpu-cluster-policy"
 echo "  - CDI Enabled: ${CDI_ENABLED}"
 echo "  - Default Runtime: ${DEFAULT_RUNTIME}"
 echo "  - GPU Nodes: ${GPU_NODES}"
+echo "  - Driver DaemonSet: Ready"
 echo ""

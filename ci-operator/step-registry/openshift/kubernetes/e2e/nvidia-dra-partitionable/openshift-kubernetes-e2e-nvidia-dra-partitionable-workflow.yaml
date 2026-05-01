@@ -1,0 +1,54 @@
+workflow:
+  as: openshift-kubernetes-e2e-nvidia-dra-partitionable
+  documentation: |-
+    Tests upstream Kubernetes DRA Partitionable Devices functionality
+    with NVIDIA H100 GPUs (DynamicMIG-capable) on GCP.
+
+    This workflow provisions a GCP cluster with H100 GPU and runs upstream
+    Kubernetes DRA Partitionable Devices e2e tests from test/e2e/dra/.
+
+    Architecture:
+    1. Provision GCP cluster with H100 GPU (a3-highgpu-1g)
+       - DRAPartitionableDevices feature gate enabled via install-config.yaml
+    2. Install NFD Operator (via OLM) - shared with openshift/origin
+    3. Install NVIDIA GPU Operator (via OLM with CDI) - shared with openshift/origin
+    4. Install NVIDIA DRA driver (via Helm) with DynamicMIG feature gate
+    5. Run upstream Kubernetes DRA Partitionable Devices e2e tests
+
+    GPU Instance: a3-highgpu-1g (1x H100 80GB) (~$12.50/hr)
+    Test Duration: ~1.5 hours
+    Cost per run: ~$18-20
+
+    Note: H100 is required for DynamicMIG/partitionable devices testing.
+    A100 GPUs cannot reset in cloud environments, blocking DynamicMIG mode.
+    See: https://github.com/NVIDIA/k8s-dra-driver-gpu/issues/883
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: "${COMPUTE_NODE_TYPE}"
+      COMPUTE_NODE_REPLICAS: "${COMPUTE_NODE_REPLICAS}"
+      COMPUTE_ON_HOST_MAINTENANCE: "${COMPUTE_ON_HOST_MAINTENANCE}"
+      COMPUTE_ZONES: "${COMPUTE_ZONES}"
+      NVIDIA_DRA_DRIVER_VERSION: "${NVIDIA_DRA_DRIVER_VERSION}"
+      DRA_TEST_FOCUS: "${DRA_TEST_FOCUS}"
+    pre:
+    # 1. Provision GCP cluster with DRAPartitionableDevices feature gate
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-confidential-computing
+    - chain: ipi-install
+
+    # 2. Install prerequisites (reusable NVIDIA components)
+    - ref: nvidia-nfd-operator-install
+    - ref: nvidia-gpu-operator-install
+
+    # 3. Install NVIDIA DRA driver via Helm
+    - ref: nvidia-dra-driver-install
+
+    test:
+    # 5. Run upstream Kubernetes DRA Partitionable Devices e2e tests
+    - ref: openshift-kubernetes-e2e-nvidia-dra-partitionable
+
+    post:
+    - chain: gather-core-dump
+    - ref: nvidia-cleanup
+    - chain: ipi-gcp-post
