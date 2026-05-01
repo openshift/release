@@ -345,16 +345,20 @@ CONFIG = {
         'us-east1': 60,
     },
     'gcp-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 55,
+        'europe-west4': 15,
     },
     'gcp-3-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 55,
+        'europe-west4': 15,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 55,
+        'europe-west4': 15,
     },
     'gcp-arm64-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 24,
+        'europe-west4': 6,
     },
     'gcp-opendatahub-quota-slice': {
         'us-central1': 30,
