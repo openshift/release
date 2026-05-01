@@ -408,6 +408,7 @@ echo "SERVICE_INSTANCE=${SERVICE_INSTANCE}"
 cat > "${CONFIG}" << EOF
 apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
+credentialsMode: Manual
 metadata:
   name: ${CLUSTER_NAME}
 compute:
