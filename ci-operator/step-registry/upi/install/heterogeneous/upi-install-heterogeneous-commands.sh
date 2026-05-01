@@ -236,6 +236,7 @@ case "$CLUSTER_TYPE" in
 EOF
   echo "Wiping the disks and releasing the nodes for further reservations in other jobs..."
 
+  # shellcheck disable=SC2154 # bmc_*, host, vendor, etc. assigned by sourcing bmhost JSON from hosts.yaml
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker-\"))" "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
