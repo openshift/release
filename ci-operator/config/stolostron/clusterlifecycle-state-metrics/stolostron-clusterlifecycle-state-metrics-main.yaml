@@ -19,20 +19,15 @@ images:
   - dockerfile_path: build/Dockerfile.coverage.prow
     from: clusterlifecycle-state-metrics
     to: clusterlifecycle-state-metrics-coverage
-promotion:
-  to:
-  - disabled: true
-    name: "2.17"
-    namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -81,14 +76,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
-    env:
-      IMAGE_REPO: clusterlifecycle-state-metrics
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
@@ -103,7 +90,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.17
+      DESTINATION_BRANCH: backplane-5.0
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
