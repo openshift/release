@@ -373,6 +373,45 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
+- as: network-expansion-520nodes
+  cron: 0 8 * * 0
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/20
+      CLUSTER_NETWORK_HOST_PREFIX: "23"
+      EXPECTED_READY_NODES: "510"
+      MACHINE_NETWORK_CIDR: 10.0.0.0/16
+      MAX_NODES_TARGET: "520"
+      NETWORK_TYPE: OVNKubernetes
+      SERVICE_NETWORK_CIDR: 172.30.0.0/16
+      TEST_TIMEOUT: 2h
+      USER_TAGS: |
+        TicketId OCP-61589
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-ocp-61589-max-nodes-network-expansion
+    workflow: openshift-qe-installer-aws-network-expansion
+- as: egress-ip-scale-2xlnodes
+  cron: 0 10 * * 0
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6a.16xlarge
+      EXPECTED_ASSIGNED_EGRESSIPS: "30"
+      EXPECTED_WORKER_NODES: "2"
+      TEST_TIMEOUT: 90m
+      TOTAL_EGRESSIP_OBJECTS: "30"
+      WORKER_VM_TYPE: m6a.16xlarge
+      ZONES_COUNT: "2"
+    test:
+    - ref: openshift-qe-ocpbugs-45891-egress-ip-scale
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: main
   org: openshift-eng

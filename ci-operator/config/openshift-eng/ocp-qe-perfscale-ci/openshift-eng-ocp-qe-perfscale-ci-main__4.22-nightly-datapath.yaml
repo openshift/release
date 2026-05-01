@@ -1,0 +1,79 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ibmcloud-data-path-9nodes
+  cron: 0 10 3,18 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      COMPUTE_NODE_TYPE: bx2-8x32
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bx2-16x64
+      SET_ENV_BY_PLATFORM: custom
+      WORKERS: "9"
+    test:
+    - ref: workers-scale
+    - ref: openshift-qe-perfscale-ibm-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- as: nutanix-data-path-9nodes
+  capabilities:
+  - sshd-bastion
+  cron: 0 11 4,19 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      API_CALL_TIMEOUT: "30"
+      COMPUTE_CPU: "8"
+      COMPUTE_MEMORY: "32000"
+      COMPUTE_REPLICAS: "3"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "6"
+    test:
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-data-path-tests
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+- as: gcp-data-path-9nodes
+  cron: 0 12 5,20 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-perfscale-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: n1-standard-8
+      CONTROL_PLANE_NODE_TYPE: n1-standard-8
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: n1-standard-16
+    test:
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: 4.22-nightly-datapath
