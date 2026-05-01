@@ -87,6 +87,14 @@ fips: true
 EOF
 fi
 
+if [ "${IPV6_SINGLESTACK:-false}" == "true" ]; then
+	echo "Applying IPv6 single-stack networking to install-config.yaml..."
+	IPV6_CLUSTER_HP="$(yq-v4 -r ".\"${LEASED_RESOURCE}\".ipv6.cluster_host_prefix // 64" "${CLUSTER_PROFILE_DIR}/leases")"
+	yq-v4 eval -i ".networking.machineNetwork = [{\"cidr\": \"$(leaseLookup 'ipv6.machine_network_cidr')\"}]" "${SHARED_DIR}/install-config.yaml"
+	yq-v4 eval -i ".networking.clusterNetwork = [{\"cidr\": \"$(leaseLookup 'ipv6.cluster_network_cidr')\", \"hostPrefix\": ${IPV6_CLUSTER_HP}}]" "${SHARED_DIR}/install-config.yaml"
+	yq-v4 eval -i ".networking.serviceNetwork = [\"$(leaseLookup 'ipv6.service_network_cidr')\"]" "${SHARED_DIR}/install-config.yaml"
+fi
+
 if [ ! -z "${OS_IMAGE_STREAM}" ]; then
 	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
