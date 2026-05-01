@@ -19,7 +19,7 @@ images:
       RUN pip install --no-cache-dir \
           "firewatch @ git+https://github.com/amp-rh/firewatch.git@interop-8976/token-rotation-alerts" \
           && firewatch --help > /dev/null \
-          && echo "CACHE_BUST=2026-05-01a"
+          && echo "CACHE_BUST=2026-05-01b"
     from: firewatch-base
     to: main
 releases:
@@ -49,7 +49,23 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
     post:
-    - ref: firewatch-report-issues
+    - as: firewatch-report-issues
+      from: main
+      commands: firewatch-report-issues-commands.sh
+      credentials:
+      - namespace: test-credentials
+        name: firewatch-tool-jira-credentials
+        mount_path: /tmp/secrets/jira
+      - namespace: test-credentials
+        name: firewatch-tool-private-deck-credentials
+        mount_path: /tmp/secrets/private-deck
+      - namespace: test-credentials
+        name: firewatch-slack-notify-webhook-url
+        mount_path: /tmp/secrets/slack
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
     pre:
     - ref: ipi-conf
     - ref: ipi-conf-aws
