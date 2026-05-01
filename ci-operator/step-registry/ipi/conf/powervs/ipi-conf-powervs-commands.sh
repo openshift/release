@@ -316,6 +316,8 @@ echo "PERSISTENT_TG=${PERSISTENT_TG}"
 echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
 
 echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
+# Hardcoded for testing - change worker replicas to 3
+WORKER_REPLICAS=3
 echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
 # Are we performing a Single Node OpenShift cluster deploy?
 if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
