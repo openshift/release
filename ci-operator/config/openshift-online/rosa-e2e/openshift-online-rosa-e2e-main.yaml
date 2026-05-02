@@ -51,7 +51,7 @@ tests:
   commands: |
     env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
-    export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
     export ENABLE_JIRA_REPORTING=true
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
@@ -92,7 +92,7 @@ tests:
     export ENABLE_JIRA_REPORTING=true
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
-      JOB_LINK="${JOB_LINK}/pr-logs/pull/openshift-online_rosa-e2e/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
       JOB_LINK="${JOB_LINK}/logs/${JOB_NAME}/${BUILD_ID}"
     fi
@@ -114,7 +114,7 @@ tests:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
-  cron: 0 8 * * *
+  cron: 30 7 * * *
   nested_podman: true
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
@@ -129,7 +129,7 @@ tests:
     export ENABLE_JIRA_REPORTING=true
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
-      JOB_LINK="${JOB_LINK}/pr-logs/pull/openshift-online_rosa-e2e/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
       JOB_LINK="${JOB_LINK}/logs/${JOB_NAME}/${BUILD_ID}"
     fi
@@ -151,7 +151,7 @@ tests:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
-  cron: 0 8 * * *
+  cron: 0 7 * * *
   nested_podman: true
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
@@ -166,7 +166,7 @@ tests:
     export ENABLE_JIRA_REPORTING=true
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
-      JOB_LINK="${JOB_LINK}/pr-logs/pull/openshift-online_rosa-e2e/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
       JOB_LINK="${JOB_LINK}/logs/${JOB_NAME}/${BUILD_ID}"
     fi
@@ -188,12 +188,12 @@ tests:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
-  cron: 0 8 * * *
+  cron: 30 6 * * *
   nested_podman: true
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
-- as: ocm-fvt-periodic-cs-osd-rh-aws-staging-main
+- as: ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main
   capabilities:
   - nested-podman
   commands: |
@@ -205,7 +205,7 @@ tests:
     if [ -n "${PULL_NUMBER:-}" ]; then
       JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
-      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+      JOB_LINK="${JOB_LINK}/logs/${JOB_NAME}/${BUILD_ID}"
     fi
     echo "JOB_LINK=${JOB_LINK}"
     export JOB_LINK=${JOB_LINK}
@@ -220,12 +220,12 @@ tests:
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-osd-rh-aws-staging-main --reportJiraTicket
+    ocmtest test --service cms --job cs-rosa-hcp-y-upgrade-staging-main --reportJiraTicket
   container:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
-  cron: 30 9 * * *
+  cron: 0 9 * * *
   nested_podman: true
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
