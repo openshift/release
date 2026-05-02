@@ -129,25 +129,32 @@ else
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
+dir=$(mktemp -d)
+pushd "${dir}"
+
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" pull-secret
+oc registry login --to pull-secret
+
+# Extract oc binary from the release image
+OC_DIR=$(mktemp -d)
+export PATH="${OC_DIR}:${PATH}"
+echo "Extracting oc from release image..."
+oc adm release extract --registry-config pull-secret --command=oc --to="${OC_DIR}" "${TESTING_RELEASE_IMAGE}" || exit 1
+echo "OC Version:"
+which oc
+oc version --client
+
 prefix="${NAMESPACE}-${UNIQUE_HASH}-`echo $RANDOM`"
 cr_yaml_d=`mktemp -d`
 cr_json_d=`mktemp -d`
 resources_d=`mktemp -d`
 credentials_requests_files=`mktemp`
-echo "OC Version:"
-export PATH=${CLI_DIR:-}:$PATH
-which oc
-oc version --client
-oc adm release extract --help
 ADDITIONAL_OC_EXTRACT_ARGS=""
 if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
   ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
 fi
 
-dir=$(mktemp -d)
-pushd "${dir}"
-cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
-oc registry login --to pull-secret
+# Extract the credentialsRequest manifests
 cmd="oc adm release extract --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --credentials-requests --cloud=aws --to '$cr_yaml_d' ${ADDITIONAL_OC_EXTRACT_ARGS}"
 run_command "${cmd}" || exit 1
 rm pull-secret
