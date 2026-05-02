@@ -224,6 +224,34 @@ for i in $(seq 1 30); do
   fi
 done
 
+echo "$(date +%T) Waiting for in-cluster DNS to resolve keycloak..."
+for i in $(seq 1 30); do
+  if oc --kubeconfig="${HUB_KC}" exec deployment/authorino -n osac-e2e-ci -- \
+    sh -c 'nslookup keycloak.keycloak.svc.cluster.local 2>/dev/null | grep -q "Address"' 2>/dev/null; then
+    echo "$(date +%T) In-cluster DNS ready (${i}0s)"
+    break
+  fi
+  echo "$(date +%T) DNS not ready yet..."
+  sleep 10
+done
+
+echo "$(date +%T) Waiting for Authorino AuthConfig to be ready..."
+for i in $(seq 1 30); do
+  ready=$(oc --kubeconfig="${HUB_KC}" get authconfig -n osac-e2e-ci \
+    -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+  if [[ "${ready}" == "True" ]]; then
+    echo "$(date +%T) AuthConfig ready (${i}0s)"
+    break
+  fi
+  if [[ $i -eq 6 ]]; then
+    echo "$(date +%T) AuthConfig not ready after 60s, restarting Authorino..."
+    oc --kubeconfig="${HUB_KC}" rollout restart deployment/authorino -n osac-e2e-ci 2>&1 || true
+    oc --kubeconfig="${HUB_KC}" rollout status deployment/authorino -n osac-e2e-ci --timeout=120s 2>&1 || true
+  fi
+  echo "$(date +%T) AuthConfig not ready (status=${ready:-unknown})"
+  sleep 10
+done
+
 echo "$(date +%T) Cluster health snapshot..."
 echo "--- Hub deployments in osac-e2e-ci ---"
 oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci 2>&1 || true
