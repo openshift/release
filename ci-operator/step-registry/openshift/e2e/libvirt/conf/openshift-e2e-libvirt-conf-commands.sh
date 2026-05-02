@@ -299,12 +299,14 @@ EOF
     # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
     # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
     # Skip the ResourceQuota testcase for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-65786. is fixed.
+    # Skip the CCO test for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-29840 is fixed.
     if [ "${INSTALLER}" == "powervs" ]; then
        cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[bz-etcd][invariant] alert/etcdMemberCommunicationSlow should not be at or above info"
 "[sig-etcd] etcd should not log excessive took too long messages"
 "[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is enabled [Suite:cco/conformance/parallel][OTP][PolarionID:34470] NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Critical-Cloud credential operator health check"
 EOF
        # Skip the PodObservedGenerationTracking test for 4.21 only until https://redhat.atlassian.net/browse/OCPBUGS-83561 is fixed
        # This test has timeout issues while pulling non-existent image on PowerVS for 4.21 (fixed in 4.22 with K8s 1.35)
