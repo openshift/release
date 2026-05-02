@@ -37,6 +37,8 @@ oc --kubeconfig="${KUBECONFIG}" logs -f deployment/authorino -n "${E2E_NAMESPACE
 AUTH_LOG_PID=$!
 
 osac_gather() {
+  REDACT='s/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/[TOKEN]/g'
+
   echo ""
   echo "$(date +%T) ========== OSAC MUST-GATHER =========="
 
@@ -69,11 +71,11 @@ osac_gather() {
   oc --kubeconfig="${KUBECONFIG}" get deployments -n "${E2E_NAMESPACE}" 2>&1 || true
 
   echo "--- ComputeInstance CRs ---"
-  oc --kubeconfig="${KUBECONFIG}" get computeinstance -n "${E2E_NAMESPACE}" -o yaml 2>&1 || true
+  oc --kubeconfig="${KUBECONFIG}" get computeinstance -n "${E2E_NAMESPACE}" -o yaml 2>&1 | sed -E "${REDACT}" || true
   echo "--- VirtualNetwork CRs ---"
-  oc --kubeconfig="${KUBECONFIG}" get virtualnetwork -n "${E2E_NAMESPACE}" -o yaml 2>&1 || true
+  oc --kubeconfig="${KUBECONFIG}" get virtualnetwork -n "${E2E_NAMESPACE}" -o yaml 2>&1 | sed -E "${REDACT}" || true
   echo "--- Subnet CRs ---"
-  oc --kubeconfig="${KUBECONFIG}" get subnet -n "${E2E_NAMESPACE}" -o yaml 2>&1 || true
+  oc --kubeconfig="${KUBECONFIG}" get subnet -n "${E2E_NAMESPACE}" -o yaml 2>&1 | sed -E "${REDACT}" || true
 
   echo "--- Recent events (last 50) ---"
   oc --kubeconfig="${KUBECONFIG}" get events -n "${E2E_NAMESPACE}" --sort-by=.lastTimestamp 2>&1 | tail -50 || true
@@ -90,16 +92,16 @@ osac_gather() {
 
   echo ""
   echo "========== OSAC OPERATOR LOG (full) =========="
-  cat "${DIAG_DIR}/operator.log" 2>/dev/null || echo "no operator log"
+  sed -E "${REDACT}" "${DIAG_DIR}/operator.log" 2>/dev/null || echo "no operator log"
   echo ""
   echo "========== FULFILLMENT CONTROLLER LOG (full) =========="
-  cat "${DIAG_DIR}/fulfillment-controller.log" 2>/dev/null || echo "no fulfillment controller log"
+  sed -E "${REDACT}" "${DIAG_DIR}/fulfillment-controller.log" 2>/dev/null || echo "no fulfillment controller log"
   echo ""
   echo "========== FULFILLMENT GRPC LOG (full) =========="
-  cat "${DIAG_DIR}/fulfillment-grpc.log" 2>/dev/null || echo "no grpc log"
+  sed -E "${REDACT}" "${DIAG_DIR}/fulfillment-grpc.log" 2>/dev/null || echo "no grpc log"
   echo ""
   echo "========== AUTHORINO LOG (full) =========="
-  cat "${DIAG_DIR}/authorino.log" 2>/dev/null || echo "no authorino log"
+  sed -E "${REDACT}" "${DIAG_DIR}/authorino.log" 2>/dev/null || echo "no authorino log"
 
   echo ""
   echo "$(date +%T) ========== END OSAC MUST-GATHER =========="
