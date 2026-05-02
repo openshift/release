@@ -32,6 +32,8 @@ tests:
           {"name":"multicluster-engine","catalog":"redhat-operators","nsname":"multicluster-engine","channel":"stable-2.8","default_channel":"stable-2.9","og_name":"multicluster-engine","subscription_name":"multicluster-engine","deploy_default_config":true,"og_spec":{}},
           {"name":"topology-aware-lifecycle-manager","catalog":"topology-aware-lifecycle-manager-fbc","og_name":"global-operators","nsname":"openshift-operators","fbc_iib_repo":"latest","channel":"stable","deploy_default_config":false,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/telco-5g-tenant/topology-aware-lifecycle-manager-fbc-4-16"}
         ]
+      JOB_NAME: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-ran-two-sno-4.18-cnf-ran-ztp-tests
+      JOB_TYPE: "1"
       RAN_METRICS_LIST: spoke_general_ocp,hub_general_ocp,sriov,sriov_fec,ptp,acm,talm,gitops,local_storage,logging
       REPORTER_TEMPLATE_NAME: Telco 5G RAN Regression 4_16 - Telco 5G RAN Regression
         - <build> - 4.16
@@ -48,14 +50,18 @@ tests:
         ]
       VERSION: "4.16"
       ZTP_GIT_BRANCH: two_sno
+    post:
+    - ref: telcov10n-functional-cnf-ran-report-compact
+    - ref: telcov10n-functional-cnf-ran-send-slack-notification
+    - ref: telcov10n-functional-cnf-network-trigger-job
+    - ref: telcov10n-verify-junit-reports
     pre:
     - ref: telcov10n-functional-cnf-ran-hub-deploy
     - ref: telcov10n-functional-cnf-ran-hub-config
     - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
     - ref: telcov10n-functional-cnf-ran-deploy-spoke-sno
+    test:
     - ref: telcov10n-functional-cnf-ran-eco-gotests-two-sno
-    - ref: telcov10n-functional-cnf-ran-report-compact
-    - ref: telcov10n-functional-cnf-ran-send-slack-notification
 zz_generated_metadata:
   branch: main
   org: openshift-kni
