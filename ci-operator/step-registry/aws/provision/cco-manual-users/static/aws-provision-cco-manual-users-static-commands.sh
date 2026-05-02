@@ -156,8 +156,20 @@ popd
 echo "CR manifest files:"
 ls "$cr_yaml_d"
 
-if [[ "${EXTRACT_MANIFEST_INCLUDED}" != "true" ]] && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" != "true" ]] && [[ "${FEATURE_SET:-}" != "TechPreviewNoUpgrade" ]] && [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
   remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
+fi
+
+# TODO(OCPBUGS-77845): Temporary workaround - must be reverted when the bug is resolved.
+# The cluster-api credentials request changed from feature-set to feature-gate
+# annotation, but oc adm release extract does not yet filter on feature-gate.
+# Remove the cluster-api CR when FEATURE_SET is not set.
+if [[ -z "${FEATURE_SET:-}" ]]; then
+  capi_cr="$cr_yaml_d/0000_30_cluster-api_01_credentials-request.yaml"
+  if [[ -f "${capi_cr}" ]]; then
+    echo "Removing cluster-api credentials request (feature-gate not supported by current tooling)"
+    rm -f "${capi_cr}"
+  fi
 fi
 
 ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
