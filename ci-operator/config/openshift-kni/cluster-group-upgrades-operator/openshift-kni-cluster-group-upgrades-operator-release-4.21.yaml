@@ -21,6 +21,7 @@ images:
     to: cluster-group-upgrades-operator-recovery
   - dockerfile_path: bundle.Dockerfile
     to: cluster-group-upgrades-operator-bundle
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -80,7 +81,7 @@ tests:
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch release-4.21
-        ci-job-fullname openshift-kni-cluster-group-upgrades-operator-main
+        ci-job-fullname openshift-kni-cluster-group-upgrades-operator-release-4.21
         ci-job-type optional-operators-ci-aws
         ci-repo-name cluster-group-upgrades-operator
         ci-org-name openshift-kni
@@ -125,19 +126,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: tekton-linting
-  commands: |
-    unset VERSION
-    export XDG_CACHE_HOME=/tmp/.cache
-    export XDG_CONFIG_HOME=/tmp/.config
-    export XDG_DATA_HOME=/tmp/.local/share
-    make yamllint
-  container:
-    from: src
-  optional: true
-  run_if_changed: ^(?:.*/)?(?:\.tekton/.*|\.konflux/.*)$
 - as: security
   optional: true
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     env:
       PROJECT_NAME: cluster-group-upgrades-operator

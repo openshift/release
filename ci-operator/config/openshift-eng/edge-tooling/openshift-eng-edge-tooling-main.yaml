@@ -3,6 +3,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -11,36 +15,67 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM root
+      ARG GH_TOKEN_VER=2.0.8
+      ARG GH_TOKEN_SHA=867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f
+      RUN set -eu; \
+            f=/tmp/gh-token.download; rm -f "$f"; \
+            n=1; max=5; delay=1; \
+            until curl -sSL --fail --connect-timeout 10 --max-time 120 \
+              --retry 3 --retry-delay 2 \
+              "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" \
+              -o "$f"; do \
+              rm -f "$f"; \
+              [ "$n" -ge "$max" ] && exit 1; \
+              sleep "$delay"; \
+              delay=$((delay * 2)); \
+              n=$((n+1)); \
+            done; \
+            echo "${GH_TOKEN_SHA}  $f" | sha256sum -c -; \
+            install -m 0755 "$f" /usr/local/bin/gh-token; \
+            rm -f "$f"
+    from: root
+    to: gh-token
+  - dockerfile_literal: |
       FROM src
       USER 0:0
-      RUN GH_TOKEN_VER=2.0.8 && GH_TOKEN_SHA=867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f && \
-          curl -sSL --connect-timeout 10 --max-time 120 --fail \
-            "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" \
-            -o /usr/local/bin/gh-token && \
-          echo "${GH_TOKEN_SHA}  /usr/local/bin/gh-token" | sha256sum -c - && \
-          chmod +x /usr/local/bin/gh-token
+      COPY ghtoken/gh-token /usr/local/bin/gh-token
+      RUN chmod +x /usr/local/bin/gh-token
       COPY . /opt/app-root/src/
       WORKDIR /opt/app-root/src/
     from: src
+    inputs:
+      gh-token:
+        paths:
+        - destination_dir: ghtoken
+          source_path: /usr/local/bin/gh-token
     to: edge-tooling
   - dockerfile_literal: |
       FROM pipeline:claude-ai-helpers
       USER 0:0
-      COPY gotoken/gh-token /usr/local/bin/gh-token
+      COPY ghtoken/gh-token /usr/local/bin/gh-token
       RUN chmod +x /usr/local/bin/gh-token
       COPY repo/ /opt/app-root/src/edge-tooling
       WORKDIR /opt/app-root/src/edge-tooling
     from: claude-ai-helpers
     inputs:
-      edge-tooling:
+      gh-token:
         paths:
-        - destination_dir: gotoken
+        - destination_dir: ghtoken
           source_path: /usr/local/bin/gh-token
       src:
         paths:
         - destination_dir: repo
           source_path: /go/src/github.com/openshift-eng/edge-tooling/.
     to: edge-tooling-ai-helpers
+promotion:
+  to:
+  - additional_images:
+      gh-token: gh-token
+    excluded_images:
+    - '*'
+    namespace: ci
+    tag: latest
 resources:
   '*':
     requests:
@@ -71,6 +106,11 @@ tests:
   container:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
+- as: shellcheck
+  commands: make lint-shellcheck
+  container:
+    from: shellcheck
+  run_if_changed: .sh$
 - as: ocp-ci-monitor
   cron: 0 7 * * *
   steps:
