@@ -95,11 +95,11 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
     "fran-powervs-8-quota-slice-3")
       CLUSTER_NAME="p-fran-3-${CLUSTER_NAME_MODIFIER}"
     ;;
-    "sao04-powervs-9-quota-slice-0")
-      CLUSTER_NAME="p-sao04-0-${CLUSTER_NAME_MODIFIER}"
+    "wdc04-powervs-9-quota-slice-0")
+      CLUSTER_NAME="p-wdc04-0-${CLUSTER_NAME_MODIFIER}"
     ;;
-    "sao04-powervs-9-quota-slice-1")
-      CLUSTER_NAME="p-sao04-1-${CLUSTER_NAME_MODIFIER}"
+    "wdc04-powervs-9-quota-slice-1")
+      CLUSTER_NAME="p-wdc04-1-${CLUSTER_NAME_MODIFIER}"
     ;;
     "mad02-powervs-5-quota-slice-0")
       CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
@@ -166,17 +166,17 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=eu-de-2
       VPCREGION=eu-de
    ;;
-   "sao04-powervs-9-quota-slice-0")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-0")
-      POWERVS_REGION=sao
-      POWERVS_ZONE=sao04
-      VPCREGION=br-sao
+   "wdc04-powervs-9-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC04-0")
+      POWERVS_REGION=us-east
+      POWERVS_ZONE=wdc04
+      VPCREGION=us-east
    ;;
-   "sao04-powervs-9-quota-slice-1")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-1")
-      POWERVS_REGION=sao
-      POWERVS_ZONE=sao04
-      VPCREGION=br-sao
+   "wdc04-powervs-9-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC04-1")
+      POWERVS_REGION=us-east
+      POWERVS_ZONE=wdc04
+      VPCREGION=us-east
    ;;
    "lon04-powervs-6-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-0")
