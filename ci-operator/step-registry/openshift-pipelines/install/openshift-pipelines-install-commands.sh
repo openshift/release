@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-typeset CONSOLE_URL=''
-typeset API_URL=''
+typeset -x CONSOLE_URL=''
+typeset -x API_URL=''
 typeset -x gauge_reports_dir="${ARTIFACT_DIR}"
 typeset -x CHANNEL="${OLM_CHANNEL:-latest}"
 typeset -x overwrite_reports='false'

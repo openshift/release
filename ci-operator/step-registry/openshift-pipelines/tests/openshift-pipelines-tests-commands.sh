@@ -3,8 +3,8 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 typeset -a specs=()
 typeset spec=''
-typeset CONSOLE_URL=''
-typeset API_URL=''
+typeset -x CONSOLE_URL=''
+typeset -x API_URL=''
 typeset -x GOPROXY='https://proxy.golang.org/'
 typeset -x gauge_reports_dir="${ARTIFACT_DIR}"
 typeset -x overwrite_reports='false'
