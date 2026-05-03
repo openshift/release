@@ -22,6 +22,16 @@ PULL_SECRET_PATH="/root/pull-secret"
 DIAG_DIR="/tmp/osac-diagnostics"
 mkdir -p "${DIAG_DIR}"
 
+echo "$(date +%T) Pre-flight: verifying hub API is reachable..."
+for i in $(seq 1 30); do
+  if curl -sk --connect-timeout 5 https://192.168.131.10:6443/readyz 2>/dev/null | grep -q ok; then
+    echo "$(date +%T) Hub API ready"
+    break
+  fi
+  echo "$(date +%T) Hub API not ready, waiting... (${i})"
+  sleep 10
+done
+
 echo "$(date +%T) Starting background log collection..."
 oc --kubeconfig="${KUBECONFIG}" logs -f deployment/osac-operator-controller-manager -n "${E2E_NAMESPACE}" \
   > "${DIAG_DIR}/operator.log" 2>&1 &
@@ -56,6 +66,17 @@ osac_gather() {
   for vm in $(virsh list --name 2>/dev/null); do
     echo "--- virsh dommemstat ${vm} ---"
     virsh dommemstat "${vm}" 2>&1 || true
+  done
+
+  echo "--- resolv.conf (DNS config) ---"
+  cat /etc/resolv.conf 2>&1 || true
+
+  echo "--- VM disk I/O stats ---"
+  for vm in $(virsh list --name 2>/dev/null); do
+    echo "--- virsh domblkstat ${vm} ---"
+    virsh domblkstat "${vm}" 2>&1 || true
+    echo "--- virsh domstats ${vm} (cpu/balloon) ---"
+    virsh domstats "${vm}" --cpu-total --balloon 2>&1 || true
   done
 
   echo "--- Hub API reachable? ---"
