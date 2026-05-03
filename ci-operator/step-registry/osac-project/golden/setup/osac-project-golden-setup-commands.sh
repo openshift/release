@@ -93,15 +93,33 @@ python3 "${GOLDEN_DIR}/virt/fix-domain-xml.py" \
   "disk2" \
   "test-infra-net-ad07fc71"
 
+echo "$(date +%T) Setting disk cache=writeback for QCOW2 performance..."
+sed -i "s|<driver name='qemu' type='qcow2'/>|<driver name='qemu' type='qcow2' cache='writeback' io='native'/>|g" \
+  "${GOLDEN_DIR}/hub/hub-domain-fixed.xml" \
+  "${GOLDEN_DIR}/virt/virt-domain-fixed.xml"
+
 echo "$(date +%T) Configuring DNS for cluster hostnames..."
 cat > /etc/dnsmasq.d/golden-clusters.conf <<DNSEOF
 address=/test-infra-cluster-d55276d8.redhat.com/192.168.131.10
 address=/test-infra-cluster-ad07fc71.redhat.com/192.168.130.10
 DNSEOF
+systemctl stop dnsmasq 2>/dev/null || true
+systemctl stop systemd-resolved 2>/dev/null || true
+systemctl disable systemd-resolved 2>/dev/null || true
+cat > /etc/NetworkManager/conf.d/golden-dns.conf <<NMEOF
+[main]
+dns=none
+NMEOF
+systemctl reload NetworkManager
+echo "nameserver 127.0.0.1" > /etc/resolv.conf
+grep '^nameserver' /etc/resolv.conf.bak 2>/dev/null >> /etc/resolv.conf || \
+  grep '^nameserver' /run/NetworkManager/no-stub-resolv.conf 2>/dev/null >> /etc/resolv.conf || \
+  echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+chattr +i /etc/resolv.conf
 systemctl enable --now dnsmasq
-echo "nameserver 127.0.0.1" > /etc/resolv.conf.golden
-cat /etc/resolv.conf >> /etc/resolv.conf.golden
-cp /etc/resolv.conf.golden /etc/resolv.conf
+echo "$(date +%T) DNS configured. resolv.conf:"
+cat /etc/resolv.conf
+echo "dnsmasq status: $(systemctl is-active dnsmasq)"
 
 echo "$(date +%T) Starting VMs..."
 virsh define "${GOLDEN_DIR}/hub/hub-domain-fixed.xml"
