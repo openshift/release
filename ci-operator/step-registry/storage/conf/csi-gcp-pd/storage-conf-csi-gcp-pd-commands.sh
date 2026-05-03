@@ -4,7 +4,11 @@ set -o nounset
 set -o pipefail
 
 cd /go/src/github.com/openshift/gcp-pd-csi-driver-operator
-if [ "${COMPUTE_DISK_TYPE}" == "hyperdisk-balanced" ]; then
+if [ "${IMAGE_VOLUME_SNAPSHOT_MANIFEST:-}" = "image-snapshot" ]; then
+    echo "Copying image-snapshot-manifest.yaml to ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
+    cp "test/e2e/image-snapshot-manifest.yaml" "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
+    cat "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
+elif [ "${COMPUTE_DISK_TYPE}" == "hyperdisk-balanced" ]; then
     # Using hyperdisk-balanced worker
     cp test/e2e/hyperdisk-manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 else
