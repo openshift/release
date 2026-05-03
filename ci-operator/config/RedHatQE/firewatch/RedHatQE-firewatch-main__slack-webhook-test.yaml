@@ -1,0 +1,125 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  firewatch-base:
+    name: firewatch
+    namespace: firewatch
+    tag: main
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.19-openshift-4.15
+images:
+  items:
+  - dockerfile_literal: |
+      FROM firewatch-base
+      RUN pip install --no-cache-dir \
+          "firewatch @ git+https://github.com/amp-rh/firewatch.git@interop-8976/token-rotation-alerts" \
+          && firewatch --help > /dev/null \
+          && echo "CACHE_BUST=2026-05-01b"
+    from: firewatch-base
+    to: main
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: slack-webhook-test
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules": [
+            {"step": "*", "failure_type": "all", "classification": "Test", "jira_project": "INTEROP", "slack_user": "mpruitt@redhat.com"}
+          ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: INTEROP
+    post:
+    - as: firewatch-report-issues
+      from: main
+      commands: firewatch-report-issues-commands.sh
+      credentials:
+      - namespace: test-credentials
+        name: firewatch-tool-jira-credentials
+        mount_path: /tmp/secrets/jira
+      - namespace: test-credentials
+        name: firewatch-tool-private-deck-credentials
+        mount_path: /tmp/secrets/private-deck
+      - namespace: test-credentials
+        name: firewatch-slack-notify-webhook-url
+        mount_path: /tmp/secrets/slack
+      env:
+      - name: FIREWATCH_JIRA_SERVER
+        default: https://redhat.atlassian.net
+      - name: FIREWATCH_JIRA_API_TOKEN_PATH
+        default: /tmp/secrets/jira/access_token
+      - name: FIREWATCH_JIRA_EMAIL_PATH
+        default: /tmp/secrets/jira/email
+      - name: FIREWATCH_FAIL_WITH_TEST_FAILURES
+        default: "false"
+      - name: FIREWATCH_FAIL_WITH_POD_FAILURES
+        default: "false"
+      - name: FIREWATCH_CONFIG
+        default: ""
+      - name: FIREWATCH_PRIVATE_DECK
+        default: "false"
+      - name: FIREWATCH_DEFAULT_JIRA_PROJECT
+      - name: FIREWATCH_DEFAULT_JIRA_EPIC
+        default: ""
+      - name: FIREWATCH_DEFAULT_JIRA_COMPONENT
+        default: ""
+      - name: FIREWATCH_DEFAULT_JIRA_AFFECTS_VERSION
+        default: ""
+      - name: FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS
+        default: ""
+      - name: FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE
+        default: firewatch-additional-labels
+      - name: FIREWATCH_DEFAULT_JIRA_ASSIGNEE
+        default: ""
+      - name: FIREWATCH_DEFAULT_JIRA_PRIORITY
+        default: ""
+      - name: FIREWATCH_DEFAULT_JIRA_SECURITY_LEVEL
+        default: ""
+      - name: FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING
+        default: "false"
+      - name: FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING_LIMIT
+        default: "10"
+      - name: FIREWATCH_CONFIG_FILE_PATH
+        default: ""
+      - name: SLACK_WEBHOOK_URL
+        default: ""
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws
+    - chain: ipi-install
+    test:
+    - as: fail-to-trigger-webhook
+      commands: exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+zz_generated_metadata:
+  branch: main
+  org: RedHatQE
+  repo: firewatch
+  variant: slack-webhook-test
