@@ -3,6 +3,7 @@
 set -o nounset
 set +o errexit
 set +o pipefail
+sleep 10
 
 function populate_artifact_dir() {
   # https://bash.cyberciti.biz/bash-reference-manual/Programmable-Completion-Builtins.html
