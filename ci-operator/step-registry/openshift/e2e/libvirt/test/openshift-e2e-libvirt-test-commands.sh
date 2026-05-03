@@ -334,6 +334,8 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
 	libvirt-ppc64le*)
         TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
         ;;
+	powervc*)
+		TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 10"
 	esac
 
     VERBOSITY="" # "--v 9"
