@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset CONSOLE_URL=''
+typeset API_URL=''
+typeset -x gauge_reports_dir="${ARTIFACT_DIR}"
+typeset -x CHANNEL="${OLM_CHANNEL:-latest}"
+typeset -x overwrite_reports='false'
+typeset -x CATALOG_SOURCE='redhat-operators'
+
 # Map results by setting identifier prefix in tests suites names for reporting tools
 # Merge original results into a single file and compress
 # Send modified file to shared dir for Data Router Reporter step
@@ -27,10 +34,6 @@ fi
 # Install openshift-pipelines operator (olm.spec)
 CONSOLE_URL="$(oc whoami --show-console)" \
     API_URL="$(oc whoami --show-server)" \
-    CATALOG_SOURCE=redhat-operators \
-    CHANNEL="${OLM_CHANNEL:-latest}" \
-    gauge_reports_dir="${ARTIFACT_DIR}" \
-    overwrite_reports=false \
     gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
 
 true

@@ -1,6 +1,15 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset -a specs=()
+typeset spec=''
+typeset CONSOLE_URL=''
+typeset API_URL=''
+typeset -x GOPROXY='https://proxy.golang.org/'
+typeset -x gauge_reports_dir="${ARTIFACT_DIR}"
+typeset -x overwrite_reports='false'
+
+
 # Map results by setting identifier prefix in tests suites names for reporting tools
 # Merge original results into a single file and compress
 # Send modified file to shared dir for Data Router Reporter step
@@ -35,9 +44,6 @@ done
 
 CONSOLE_URL="$(oc whoami --show-console)" \
     API_URL="$(oc whoami --show-server)" \
-    GOPROXY="https://proxy.golang.org/" \
-    gauge_reports_dir="${ARTIFACT_DIR}" \
-    overwrite_reports=false \
     gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true
 
 true
