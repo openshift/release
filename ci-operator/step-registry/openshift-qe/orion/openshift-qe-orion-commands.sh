@@ -10,20 +10,8 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
-else
-    LATEST_TAG=$TAG
-fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+git clone --branch fix/hover-uuid https://github.com/mmnabeel317/orion.git --depth 1
 pushd orion
-
-# Invoked from orion repo by the openshift-ci bot
-if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
-  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
-  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
-  git switch ${PULL_NUMBER}
-fi
 
 pip install -r requirements.txt
 

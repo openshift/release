@@ -3,6 +3,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+echo "hi"
+
 cat /etc/os-release
 oc config view
 oc projects
