@@ -73,16 +73,8 @@ virsh net-define "${GOLDEN_DIR}/virt/virt-network.xml"
 virsh net-start test-infra-net-ad07fc71
 
 echo "$(date +%T) Configuring cross-network forwarding..."
-echo "--- Host firewall state before fix ---"
-iptables -L FORWARD -n 2>&1 | head -5 || true
-firewall-cmd --zone=libvirt --list-all 2>&1 || echo "no firewalld libvirt zone"
-systemctl stop firewalld 2>/dev/null || true
-systemctl disable firewalld 2>/dev/null || true
-iptables -P FORWARD ACCEPT
 iptables -I FORWARD -s 192.168.131.0/24 -d 192.168.130.0/24 -j ACCEPT
 iptables -I FORWARD -s 192.168.130.0/24 -d 192.168.131.0/24 -j ACCEPT
-echo "--- Host firewall state after fix ---"
-iptables -L FORWARD -n 2>&1 | head -10 || true
 
 echo "$(date +%T) Fixing domain XMLs..."
 python3 "${GOLDEN_DIR}/hub/fix-domain-xml.py" \
@@ -182,71 +174,86 @@ echo 'export KUBECONFIG=/root/.kube/config' >> /root/.bashrc
 HUB_KC="/root/.kube/config"
 VIRT_KC="/root/virt-kubeconfig"
 
-echo "$(date +%T) Waiting for ingress router..."
-oc --kubeconfig="${HUB_KC}" rollout status deployment/router-default -n openshift-ingress --timeout=300s 2>&1 || true
+wait_ingress() {
+  oc --kubeconfig="${HUB_KC}" rollout status deployment/router-default \
+    -n openshift-ingress --timeout=300s 2>&1 || true
+  echo "$(date +%T) Ingress router ready"
+}
 
-echo "$(date +%T) Waiting for OSAC deployments to be available..."
-for dep in $(oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci -o name 2>/dev/null); do
-  echo "$(date +%T) Waiting for ${dep}..."
-  oc --kubeconfig="${HUB_KC}" rollout status "${dep}" -n osac-e2e-ci --timeout=300s 2>&1 || true
-done
+wait_osac_deployments() {
+  for dep in $(oc --kubeconfig="${HUB_KC}" get deployments -n osac-e2e-ci -o name 2>/dev/null); do
+    oc --kubeconfig="${HUB_KC}" rollout status "${dep}" -n osac-e2e-ci --timeout=300s 2>&1 || true
+  done
+  echo "$(date +%T) OSAC deployments ready"
+}
 
-echo "$(date +%T) Waiting for cluster operators to stabilize..."
-for i in $(seq 1 30); do
-  progressing=$(oc --kubeconfig="${HUB_KC}" get co -o jsonpath='{range .items[*]}{.metadata.name}={.status.conditions[?(@.type=="Progressing")].status}{" "}{end}' 2>/dev/null \
-    | tr ' ' '\n' | grep '=True' || true)
-  if [[ -z "${progressing}" ]]; then
-    echo "$(date +%T) All cluster operators stable (${i}0s)"
-    break
-  fi
-  echo "$(date +%T) Still progressing: ${progressing}"
-  sleep 10
-done
-
-echo "$(date +%T) Waiting for OSAC operator pod to stabilize..."
-for i in $(seq 1 30); do
-  restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
-    -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
-  ready=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
-    -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
-  if [[ "${ready}" == "true" ]]; then
-    sleep 10
-    new_restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
-      -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
-    if [[ "${restarts}" == "${new_restarts}" ]]; then
-      echo "$(date +%T) OSAC operator stable (ready, no restarts in 10s, total restarts: ${restarts})"
-      break
+wait_cluster_operators() {
+  for i in $(seq 1 30); do
+    progressing=$(oc --kubeconfig="${HUB_KC}" get co \
+      -o jsonpath='{range .items[*]}{.metadata.name}={.status.conditions[?(@.type=="Progressing")].status}{" "}{end}' 2>/dev/null \
+      | tr ' ' '\n' | grep '=True' || true)
+    if [[ -z "${progressing}" ]]; then
+      echo "$(date +%T) Cluster operators stable"
+      return 0
     fi
-    echo "$(date +%T) OSAC operator restarted (${restarts} -> ${new_restarts}), waiting..."
-  else
-    echo "$(date +%T) OSAC operator not ready yet (restarts: ${restarts})"
     sleep 10
-  fi
-done
+  done
+}
 
-echo "$(date +%T) Waiting for in-cluster DNS to resolve keycloak..."
-for i in $(seq 1 30); do
-  if oc --kubeconfig="${HUB_KC}" exec deployment/authorino -n osac-e2e-ci -- \
-    sh -c 'nslookup keycloak.keycloak.svc.cluster.local 2>/dev/null | grep -q "Address"' 2>/dev/null; then
-    echo "$(date +%T) In-cluster DNS ready (${i}0s)"
-    break
-  fi
-  echo "$(date +%T) DNS not ready yet..."
-  sleep 10
-done
+wait_operator_stable() {
+  for i in $(seq 1 30); do
+    ready=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+      -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+    if [[ "${ready}" == "true" ]]; then
+      restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+        -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
+      sleep 10
+      new_restarts=$(oc --kubeconfig="${HUB_KC}" get pods -n osac-e2e-ci -l control-plane=controller-manager \
+        -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "-1")
+      if [[ "${restarts}" == "${new_restarts}" ]]; then
+        echo "$(date +%T) OSAC operator stable (restarts: ${restarts})"
+        return 0
+      fi
+    fi
+    sleep 10
+  done
+}
 
-echo "$(date +%T) Waiting for Authorino AuthConfig to be ready..."
+wait_keycloak() {
+  oc --kubeconfig="${HUB_KC}" rollout status deployment/keycloak-service \
+    -n keycloak --timeout=300s 2>&1 || true
+  for i in $(seq 1 30); do
+    if oc --kubeconfig="${HUB_KC}" exec deployment/keycloak-service -n keycloak -- \
+      curl -sk -o /dev/null -w '%{http_code}' \
+      https://localhost:8443/realms/osac/.well-known/openid-configuration 2>/dev/null | grep -q "200"; then
+      echo "$(date +%T) Keycloak OIDC endpoint ready"
+      return 0
+    fi
+    sleep 10
+  done
+  echo "$(date +%T) WARNING: Keycloak OIDC endpoint did not respond in time"
+}
+
+echo "$(date +%T) Waiting for cluster stabilization (parallel)..."
+wait_ingress &
+wait_osac_deployments &
+wait_cluster_operators &
+wait_operator_stable &
+wait_keycloak &
+wait
+echo "$(date +%T) All parallel waits complete"
+
+echo "$(date +%T) Restarting Authorino for clean OIDC discovery..."
+oc --kubeconfig="${HUB_KC}" rollout restart deployment/authorino -n osac-e2e-ci 2>&1 || true
+oc --kubeconfig="${HUB_KC}" rollout status deployment/authorino -n osac-e2e-ci --timeout=120s 2>&1 || true
+
+echo "$(date +%T) Waiting for AuthConfig ready..."
 for i in $(seq 1 30); do
   ready=$(oc --kubeconfig="${HUB_KC}" get authconfig -n osac-e2e-ci \
     -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
   if [[ "${ready}" == "True" ]]; then
     echo "$(date +%T) AuthConfig ready (${i}0s)"
     break
-  fi
-  if [[ $i -eq 6 ]]; then
-    echo "$(date +%T) AuthConfig not ready after 60s, restarting Authorino..."
-    oc --kubeconfig="${HUB_KC}" rollout restart deployment/authorino -n osac-e2e-ci 2>&1 || true
-    oc --kubeconfig="${HUB_KC}" rollout status deployment/authorino -n osac-e2e-ci --timeout=120s 2>&1 || true
   fi
   echo "$(date +%T) AuthConfig not ready (status=${ready:-unknown})"
   sleep 10
