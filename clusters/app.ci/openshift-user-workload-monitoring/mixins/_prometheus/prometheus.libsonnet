@@ -10,4 +10,5 @@
 (import 'prow_alerts.libsonnet') +
 (import 'ci_chat_bot_alerts.libsonnet') +
 (import 'release_controller_alerts.libsonnet') +
-(import 'tide_alerts.libsonnet')
+(import 'tide_alerts.libsonnet') +
+(import 'odh_alerts.libsonnet')

@@ -1,0 +1,1095 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  labels:
+    app: grafana
+  name: odh-hive-dashboard
+  namespace: ci-grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  json: |
+    {
+       "__inputs": [ ],
+       "__requires": [ ],
+       "annotations": {
+          "list": [ ]
+       },
+       "editable": false,
+       "gnetId": null,
+       "graphTooltip": 0,
+       "hideControls": false,
+       "id": null,
+       "links": [ ],
+       "panels": [
+          {
+             "collapse": false,
+             "collapsed": false,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+             },
+             "id": 2,
+             "panels": [ ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Pool Capacity Overview",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Total clusters (claimed + unclaimed) in each ODH Hive pool",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 1
+             },
+             "id": 3,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "sum(hive_clusterpool_clusterdeployments_claimed{clusterpool_name=~\"odh-.*|opendatahub-.*\"}) by (clusterpool_name)+sum(hive_clusterpool_clusterdeployments_unclaimed{clusterpool_name=~\"odh-.*|opendatahub-.*\"}) by (clusterpool_name)",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Total Clusters per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Claimed and unclaimed clusters per pool. Dashed lines show the configured target unclaimed count (spec.size) for each pool.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 1
+             },
+             "id": 4,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [
+                {
+                   "alias": "/target-.*/",
+                   "dashes": true,
+                   "fill": 0,
+                   "linewidth": 2
+                }
+             ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "sum(hive_clusterpool_clusterdeployments_claimed{clusterpool_name=~\"odh-.*|opendatahub-.*\"}) by (clusterpool_name)",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "claimed-{{clusterpool_name}}",
+                   "refId": "A"
+                },
+                {
+                   "expr": "sum(hive_clusterpool_clusterdeployments_unclaimed{clusterpool_name=~\"odh-.*|opendatahub-.*\"}) by (clusterpool_name)",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "unclaimed-{{clusterpool_name}}",
+                   "refId": "B"
+                },
+                {
+                   "expr": "vector(12) and on() hive_clusterpool_clusterdeployments_unclaimed{clusterpool_name=\"odh-4-20-aws\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "target-odh-4-20-aws (size=12)",
+                   "refId": "C"
+                },
+                {
+                   "expr": "vector(2) and on() hive_clusterpool_clusterdeployments_unclaimed{clusterpool_name=\"odh-4-19-aws\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "target-odh-4-19-aws (size=2)",
+                   "refId": "D"
+                },
+                {
+                   "expr": "vector(1) and on() hive_clusterpool_clusterdeployments_unclaimed{clusterpool_name=\"opendatahub-ocp-4-18-amd64-aws\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "target-4-18 (size=1)",
+                   "refId": "E"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Claimed vs Unclaimed per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "collapse": false,
+             "collapsed": false,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 10
+             },
+             "id": 5,
+             "panels": [ ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Unclaimed State Breakdown (assignable + installing + standby + broken = unclaimed)",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Clusters ready to be claimed right now, per pool. Red zone = pool-exhausted alert (assignable == 0 for 10m).",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 11
+             },
+             "id": 6,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "hive_clusterpool_clusterdeployments_assignable{clusterpool_name=~\"odh-.*|opendatahub-.*\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [
+                {
+                   "colorMode": "critical",
+                   "fill": true,
+                   "line": true,
+                   "op": "lt",
+                   "value": 1,
+                   "yaxis": "left"
+                }
+             ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Assignable Clusters per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Clusters being provisioned per pool. Dashed line = maxConcurrent (6). Orange zone = stuck-installing alert (> 5 for 30m).",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 11
+             },
+             "id": 7,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [
+                {
+                   "alias": "maxConcurrent (6)",
+                   "dashes": true,
+                   "fill": 0,
+                   "linewidth": 2
+                }
+             ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "hive_clusterpool_clusterdeployments_installing{clusterpool_name=~\"odh-.*|opendatahub-.*\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                },
+                {
+                   "expr": "vector(6) and on() hive_clusterpool_clusterdeployments_installing{clusterpool_name=\"odh-4-20-aws\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "maxConcurrent (6)",
+                   "refId": "B"
+                }
+             ],
+             "thresholds": [
+                {
+                   "colorMode": "warning",
+                   "fill": true,
+                   "line": true,
+                   "op": "gt",
+                   "value": 5,
+                   "yaxis": "left"
+                }
+             ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Installing Clusters per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Clusters hibernated and waiting to resume per pool. These need ~20 min to wake up before they can be claimed.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 20
+             },
+             "id": 8,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "hive_clusterpool_clusterdeployments_standby{clusterpool_name=~\"odh-.*|opendatahub-.*\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Standby (Hibernated) Clusters per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Failed clusters per pool. Should be 0. If non-zero, check ClusterDeployment errors on hosted-mgmt in namespace opendatahub-cluster-pool.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 20
+             },
+             "id": 9,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "hive_clusterpool_clusterdeployments_broken{clusterpool_name=~\"odh-.*|opendatahub-.*\"}",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Broken Clusters per Pool",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "collapse": false,
+             "collapsed": false,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 29
+             },
+             "id": 10,
+             "panels": [ ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Cluster Activity & Prow Job Health",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus-k8s-on-hive",
+             "description": "Number of times the claimed count changed per pool in a 30m window. Each claim and each release counts as one change, so the value is roughly 2x actual claims. Higher = busier pool.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 30
+             },
+             "id": 11,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "changes(hive_clusterpool_clusterdeployments_claimed{clusterpool_name=~\"odh-.*|opendatahub-.*\"}[30m])",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{clusterpool_name}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Pool Activity (Claims + Releases)",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus",
+             "description": "Number of successful, failed, and aborted ODH e2e Prow jobs in the last 1h window.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 30
+             },
+             "id": 12,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "sum(increase(prowjob_state_transitions{job_name=~\".*opendatahub.*e2e.*\",state=\"success\"}[1h]))",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "success",
+                   "refId": "A"
+                },
+                {
+                   "expr": "sum(increase(prowjob_state_transitions{job_name=~\".*opendatahub.*e2e.*\",state=\"failure\"}[1h]))",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "failure",
+                   "refId": "B"
+                },
+                {
+                   "expr": "sum(increase(prowjob_state_transitions{job_name=~\".*opendatahub.*e2e.*\",state=\"aborted\"}[1h]))",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "aborted",
+                   "refId": "C"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH E2E Job Success/Failure Count",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus",
+             "description": "Success, failure, and aborted counts for all ODH Prow jobs (not just e2e) in the last 1h window, stacked by state.",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 39
+             },
+             "id": 13,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": true,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "sum(increase(prowjob_state_transitions{job_name=~\".*opendatahub.*\",state=~\"success|failure|aborted\"}[1h])) by (state)",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "{{state}}",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [ ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH Job Outcome Count (All Jobs)",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": null,
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          },
+          {
+             "aliasColors": { },
+             "bars": false,
+             "dashLength": 10,
+             "dashes": false,
+             "datasource": "prometheus",
+             "description": "Percentage of ODH e2e jobs that failed over a 2h window. Red zone = high-failure-rate alert (> 50% for 30m).",
+             "fill": 1,
+             "fillGradient": 0,
+             "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 39
+             },
+             "id": 14,
+             "interval": "1m",
+             "legend": {
+                "alignAsTable": true,
+                "avg": false,
+                "current": true,
+                "max": true,
+                "min": true,
+                "rightSide": false,
+                "show": true,
+                "sideWidth": null,
+                "sortDesc": true,
+                "total": false,
+                "values": true
+             },
+             "lines": true,
+             "linewidth": 1,
+             "links": [ ],
+             "nullPointMode": "null",
+             "percentage": false,
+             "pointradius": 5,
+             "points": false,
+             "renderer": "flot",
+             "repeat": null,
+             "seriesOverrides": [ ],
+             "spaceLength": 10,
+             "stack": false,
+             "steppedLine": false,
+             "targets": [
+                {
+                   "expr": "sum(rate(prowjob_state_transitions{job_name=~\".*opendatahub.*e2e.*\",state=\"failure\"}[2h])) / sum(rate(prowjob_state_transitions{job_name=~\".*opendatahub.*e2e.*\",state=~\"success|failure\"}[2h])) * 100",
+                   "format": "time_series",
+                   "intervalFactor": 2,
+                   "legendFormat": "failure rate %",
+                   "refId": "A"
+                }
+             ],
+             "thresholds": [
+                {
+                   "colorMode": "critical",
+                   "fill": true,
+                   "line": true,
+                   "op": "gt",
+                   "value": 50,
+                   "yaxis": "left"
+                }
+             ],
+             "timeFrom": null,
+             "timeShift": null,
+             "title": "ODH E2E Failure Rate %",
+             "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+             },
+             "type": "graph",
+             "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": [ ]
+             },
+             "yaxes": [
+                {
+                   "format": "percent",
+                   "label": null,
+                   "logBase": 1,
+                   "max": "100",
+                   "min": "0",
+                   "show": true
+                },
+                {
+                   "format": "short",
+                   "label": null,
+                   "logBase": 1,
+                   "max": "100",
+                   "min": "0",
+                   "show": true
+                }
+             ]
+          }
+       ],
+       "refresh": "1m",
+       "rows": [ ],
+       "schemaVersion": 18,
+       "style": "dark",
+       "tags": [ ],
+       "templating": {
+          "list": [ ]
+       },
+       "time": {
+          "from": "now-1d",
+          "to": "now"
+       },
+       "timepicker": {
+          "refresh_intervals": [
+             "5s",
+             "10s",
+             "30s",
+             "1m",
+             "5m",
+             "15m",
+             "30m",
+             "1h",
+             "2h",
+             "1d"
+          ],
+          "time_options": [
+             "5m",
+             "15m",
+             "1h",
+             "6h",
+             "12h",
+             "24h",
+             "2d",
+             "7d",
+             "30d"
+          ]
+       },
+       "timezone": "browser",
+       "title": "ODH Hive Pools & CI Health",
+       "uid": "066cdc06b370b6ac50dbfdec774bb8fe",
+       "version": 0
+    }
