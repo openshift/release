@@ -4,18 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Version comparison functions using sort -V
-function version_ge() {
-  # Returns 0 (true) if $1 >= $2
-  [[ "$1" == "$2" ]] && return 0
-  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
-}
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-if test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
+if ! test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
 
-  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found, so infra-manager is preferred."
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files not found, nothing to do."
   exit 0
 
 fi
@@ -24,7 +17,7 @@ export HOME=/tmp
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
 # release:initial image, once that, use 'oc get istag release:inital' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
@@ -34,8 +27,8 @@ elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
     tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
     echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
-# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -45,20 +38,58 @@ else
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
-dir=$(mktemp -d)
-pushd "${dir}"
+# check if OCP version will be equal to or greater than the minimum version
+# $1 - the minimum version to be compared with
+# return 0 if OCP version >= the minimum version, otherwise 1
+function version_check() {
+  local -r minimum_version="$1"
+  local ret
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
-KUBECONFIG="" oc registry login --to pull-secret
-ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-rm pull-secret
+  dir=$(mktemp -d)
+  pushd "${dir}"
 
-echo "[DEBUG] current OCP version: '${ocp_version}'"
+  cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+  KUBECONFIG="" oc registry login --to pull-secret
+  ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  rm pull-secret
 
-popd
+  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
+  echo "[DEBUG] current OCP version: '${ocp_version}'"
+  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
+  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
+  min_x=$(echo "${minimum_version}" | cut -d. -f1)
+  min_y=$(echo "${minimum_version}" | cut -d. -f2)
+
+  if [ ${curr_x} -gt ${min_x} ] || ( [ ${curr_x} -eq ${min_x} ] && [ ${curr_y} -ge ${min_y} ] ); then
+    echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
+    ret=0
+  else
+    echo "[DEBUG] version_check result: ${ocp_version} < ${minimum_version}"
+    ret=1
+  fi
+
+  popd
+  return ${ret}
+}
+
+function run_command() {
+  local CMD="$1"
+  echo "$(date -u --rfc-3339=seconds) - Running command: ${CMD}"
+  eval "${CMD}"
+}
+
+# UPI resources directory names
+UPI_RESOURCE_DIR_VPC="01_vpc"
+UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE="02_dns"
+UPI_RESOURCE_DIR_INFRA_INTERNAL_LB="02_lb_int"
+UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB="02_lb_ext"
+UPI_RESOURCE_DIR_SECURITY="03_security"
+UPI_RESOURCE_DIR_BOOTSTRAP="04_bootstrap"
+UPI_RESOURCE_DIR_CONTROL_PLANE="05_control_plane"
+UPI_RESOURCE_DIR_WORKER="06_worker"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
-if version_ge "${ocp_version}" "4.12"; then
+if version_check "4.12"; then
   GCLOUD_SDK_VERSION="563"
 else
   GCLOUD_SDK_VERSION="256"
@@ -100,6 +131,7 @@ BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 CLUSTER_NAME="$(jq -r .clusterName "${SHARED_DIR}/metadata.json")"
 INFRA_ID="$(jq -r .infraID "${SHARED_DIR}/metadata.json")"
+REGION="$(jq -r .gcp.region "${SHARED_DIR}/metadata.json")"
 PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
 
 ### Read XPN config, if exists
@@ -129,12 +161,9 @@ fi
 
 # Delete the bootstrap resources, but expect it to error.
 set +e
-if [[ -f "${SHARED_DIR}/04_bootstrap_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap resources (errors when bootstrap-complete)..."
-  source "${SHARED_DIR}/04_bootstrap_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/04_bootstrap_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap resources (errors when bootstrap-complete)..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_BOOTSTRAP//_/-} --location=${REGION}"
+run_command "${CMD}"
 set -e
 
 # Delete XPN DNS entries
@@ -182,59 +211,31 @@ set -e
 # Delete other resources of the cluster, but expect it to error.
 echo "$(date -u --rfc-3339=seconds) - FYI Below deletions may error because the resources are expected to be deleted during 'ipi-deprovision-deprovision' already."
 set +e
-if [[ -f "${SHARED_DIR}/06_worker_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting compute/worker machines..."
-  source "${SHARED_DIR}/06_worker_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/06_worker_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting compute/worker machines..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_WORKER//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/05_control_plane_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane machines..."
-  source "${SHARED_DIR}/05_control_plane_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/05_control_plane_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting control-plane machines..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_CONTROL_PLANE//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/03_firewall_rules_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting firewall-rules..."
-  source "${SHARED_DIR}/03_firewall_rules_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_firewall_rules_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting firewall-rules and IAM service accounts..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_SECURITY//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/03_iam_sa_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane and compute/worker service accounts..."
-  source "${SHARED_DIR}/03_iam_sa_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_iam_sa_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting external load balancer resources..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_external_lb_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting external load balancer resources..."
-  source "${SHARED_DIR}/02_external_lb_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_external_lb_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting internal load balancer resources..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_INTERNAL_LB//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_internal_lb_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting internal load balancer resources..."
-  source "${SHARED_DIR}/02_internal_lb_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_internal_lb_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting DNS private zone..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting DNS private zone..."
-  source "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_dns_priv_zone_deprovision.sh' not found, skipped..."
-fi
-
-if [[ -f "${SHARED_DIR}/01_vpc_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting VPC..."
-  source "${SHARED_DIR}/01_vpc_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/01_vpc_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting VPC..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_VPC//_/-} --location=${REGION}"
+run_command "${CMD}"
 set -e
