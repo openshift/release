@@ -1,13 +1,22 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-start_time=$SECONDS
+set -euo pipefail; shopt -s inherit_errexit
 
 # This trap will be executed when the script exits for any reason (successful, error, or signal).
 trap 'debug_on_exit' EXIT
+
+typeset start_time=${SECONDS}
+typeset binFolder=''
+typeset ocUrl=''
+typeset hcoSubscription=''
+typeset rc=0
+typeset ARTIFACTORY_USER=''
+typeset ARTIFACTORY_TOKEN=''
+typeset ARTIFACTORY_SERVER=''
+typeset ACCESS_TOKEN=''
+typeset ORGANIZATION_ID=''
+typeset -x OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
+typeset -x JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
+typeset -x HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
 
 # shellcheck disable=SC2329
 debug_on_exit() {
@@ -63,7 +72,6 @@ function getMustGatherImage() {
             | .spec.relatedImages[]
             | select(.name | contains("must-gather"))
             | .image'
-
 }
 
 # shellcheck disable=SC2329
@@ -90,11 +98,11 @@ function retry() {
     until "$@"; do
         exit_code=$?
         count=$((count + 1))
-        if [ $count -lt $max_retries ]; then
-            echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
-            sleep $delay
+        if [ "${count}" -lt "${max_retries}" ]; then
+            # Command failed. Attempt ${count}/${max_retries}.
+            sleep "${delay}"
         else
-            echo "Command failed after $max_retries attempts."
+            # Command failed after $max_retries attempts.
             return $exit_code
         fi
     done
@@ -146,6 +154,7 @@ function cnv::reimport_datavolumes() {
   local retry_count=0
   local max_retries=10
   local interval=30
+  local volumesnapshotcontent_name=''
   while [[ $retry_count -lt $max_retries ]]; do
       echo "Attempting to delete all volumesnapshots in namespace ${dvnamespace} (Attempt $((retry_count + 1)) of ${max_retries})..."
 
@@ -182,42 +191,11 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-
-    [[ ${MAP_TESTS:-false} != "true" ]] && return
-
-    results_file="${1}"
-    echo "Patching Tests Result File: ${results_file}"
-    if [ -f "${results_file}" ]; then
-        install_yq_if_not_exists
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
-    fi
-}
-
-BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
-OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
+binFolder="$(mktemp -d /tmp/bin.XXXX)"
+ocUrl='https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz'
 
 # Exports
-export PATH="${BIN_FOLDER}:${PATH}"
-export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
-export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
-export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
+export PATH="${binFolder}:${PATH}"
 set +x # We don't want to see it in the logs
 ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
@@ -239,10 +217,10 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 ###########################################################################
 # Get oc binary
-curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
+curl -sL "${ocUrl}" | tar -C "${binFolder}" -xzvf - oc
 
 oc whoami --show-console
-HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
+hcoSubscription="$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')"
 
 oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
@@ -262,7 +240,7 @@ uv --verbose --cache-dir /tmp/uv-cache \
     --tb=native \
     --tc default_storage_class:ocs-storagecluster-ceph-rbd-virtualization \
     --tc default_volume_mode:Block \
-    --tc "hco_subscription:${HCO_SUBSCRIPTION}" \
+    --tc "hco_subscription:${hcoSubscription}" \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
@@ -277,10 +255,16 @@ uv --verbose --cache-dir /tmp/uv-cache \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
 
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
+# Map results by setting identifier prefix in tests suites names for reporting tools
+# Merge original results into a single file and compress
+# Send modified file to shared dir for Data Router Reporter step (run here so EXIT stays debug_on_exit).
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
+        ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-tests.xml
+fi
 
-# Send junit file to shared dir for Data Router Reporter step
-cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
-
-exit ${rc}
+exit "${rc}"
