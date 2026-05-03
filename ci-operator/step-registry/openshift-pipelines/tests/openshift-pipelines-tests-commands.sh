@@ -18,15 +18,10 @@ fi
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
 # login for interop
-if test -f "${SHARED_DIR}/kubeadmin-password"
-then
-  OCP_CRED_USR="kubeadmin"
-  export OCP_CRED_USR
-  OCP_CRED_PSW="$(cat "${SHARED_DIR}/kubeadmin-password")"
-  export OCP_CRED_PSW
-  oc login -u kubeadmin -p "$(cat "${SHARED_DIR}/kubeadmin-password")" "${API_URL}" --insecure-skip-tls-verify=true
+if [ -s "${KUBECONFIG}" ]; then
+    oc whoami
 else #login for ROSA & Hypershift platforms
-  set +x; eval "$(cat "${SHARED_DIR}/api.login")"; set -x
+    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
 fi
 
 gauge uninstall xml-report
