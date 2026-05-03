@@ -1,12 +1,106 @@
+base_images:
+  assisted-image-service:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  origin-cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/centos/centos:stream9
+
+      RUN dnf install -y python3.12 python3.12-pip python3.12-devel \
+          git-core bind-utils krb5-devel gcc systemd-libs systemd-devel && \
+          dnf clean all
+
+      COPY execution-environment/requirements.txt /tmp/requirements.txt
+      RUN python3.12 -m pip install --no-cache-dir \
+          ansible-core ansible-runner dumb-init==1.2.5 \
+          -r /tmp/requirements.txt
+
+      COPY collections/ /usr/share/ansible/collections/
+      COPY vendor/ /usr/share/ansible/collections/
+
+      COPY oc /usr/local/bin/oc
+      RUN ln -s /usr/local/bin/oc /usr/local/bin/kubectl
+
+      RUN mkdir -p /runner && chgrp 0 /runner && chmod -R ug+rwx /runner
+      RUN chmod ug+rw /etc/passwd
+      WORKDIR /runner
+      LABEL ansible-execution-environment=true
+      USER 1000
+      ENTRYPOINT ["dumb-init"]
+      CMD ["bash"]
+    inputs:
+      origin-cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: osac-aap-pr
+  - dockerfile_literal: |
+      FROM osac-installer
+      COPY config/ /installer/base/osac-aap/config/
+    inputs:
+      osac-installer:
+        as:
+        - osac-installer
+    to: osac-installer-with-pr
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
       memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  osac-aap-pr:
+    limits:
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -15,6 +109,182 @@ tests:
   commands: echo "Test"
   container:
     from: src
+- as: e2e-metal-vmaas-compute-instance-creation
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_creation.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-api-fields
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_api_fields.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-cli-fields
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_cli_fields.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-delete-during-provision
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_delete_during_provision.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-restart
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_restart.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-restart-negative
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_compute_instance_restart_negative.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-subnet-lifecycle
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_subnet_lifecycle.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-virtual-network-lifecycle
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      AAP_EE_IMAGE_OVERRIDE: "true"
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: osac-aap
+      TEST: test_virtual_network_lifecycle.py
+    workflow: osac-project-ofcir-baremetal-component
 zz_generated_metadata:
   branch: main
   org: osac-project
