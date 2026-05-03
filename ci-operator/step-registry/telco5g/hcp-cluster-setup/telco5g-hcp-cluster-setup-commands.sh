@@ -168,12 +168,7 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
   tasks:
 
     - name: Remove existing SNO
-      include_role:
-        name: virtual_sno
-        tasks_from: deletion.yml
-      vars:
-        vsno_name: $SNO_NAME
-        vsno_domain_name: $SNO_DOMAIN
+      command: echo "Not deleting sno $SNO_NAME"
 
 EOF
 

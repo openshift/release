@@ -146,12 +146,7 @@ cat << EOF > $SHARED_DIR/delete-sno.yml
   tasks:
 
     - name: Remove existing SNO
-      include_role:
-        name: virtual_sno
-        tasks_from: deletion.yml
-      vars:
-        vsno_name: $SNO_NAME
-        vsno_domain_name: $SNO_DOMAIN
+      command: echo "Not deleting $SNO_NAME"
 
 EOF
 
@@ -181,7 +176,7 @@ cat << EOF > $SHARED_DIR/delete-mno-hosts.yml
       register: vms
 
     - name: Delete virtual machines if exists
-      command: kcli delete vm {{ item }} --yes
+      command: echo 'Not deleting {{ item }}'
       when: vms.stdout != ""
       loop: "{{ vms.stdout_lines }}"
 
@@ -195,7 +190,7 @@ if [[ -n "$ADD_BM_HOST" ]]; then
       register: vms
 
     - name: Delete virtual machines if exists
-      command: kcli delete vm {{ item }} --yes
+      command: echo 'Not deleting {{ item }}'
       when: vms.stdout != ""
       loop: "{{ vms.stdout_lines }}"
 
