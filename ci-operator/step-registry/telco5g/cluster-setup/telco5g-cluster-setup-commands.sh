@@ -306,7 +306,7 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
   tasks:
 
   - name: Delete deployment plan
-    shell: kcli delete plan -y ${PLAN_NAME}
+    shell: echo "Not destroying ${PLAN_NAME}"
     args:
       chdir: ~/kcli-openshift4-baremetal
 
