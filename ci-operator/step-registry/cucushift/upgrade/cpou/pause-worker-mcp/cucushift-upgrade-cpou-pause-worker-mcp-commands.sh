@@ -40,6 +40,17 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
+# which is available from 4.21+
+installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+echo "The installed version is $installed_version"
+if [[ $installed_version == "4.20."* ]]; then
+    echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
+    oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
+    echo "Showing the ClusterVersion spec"
+    oc get clusterversion version -o jsonpath='{.spec}{"\n"}'
+fi
+
 # check all actual mcp, if any of them unknown then break the job.
 echo "Checking if there are unexpected mcps..."
 expected_mcp=("master" "worker")
