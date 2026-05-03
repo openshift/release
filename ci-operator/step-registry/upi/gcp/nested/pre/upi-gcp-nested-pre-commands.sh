@@ -37,10 +37,11 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
-# image-family openshift4-libvirt-rhel9 must exist in ${GOOGLE_PROJECT_ID} for this template
-# for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family openshift4-libvirt-rhel9 \
+  --image-family rhel-9 \
+  --image-project rhel-cloud \
+  --enable-nested-virtualization \
+  --min-cpu-platform "Intel Haswell" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type "${MACHINE_TYPE}" \
   --boot-disk-type pd-ssd \
