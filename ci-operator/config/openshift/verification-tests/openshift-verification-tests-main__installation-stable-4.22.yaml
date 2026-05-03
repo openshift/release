@@ -1,0 +1,474 @@
+base_images:
+  ansible:
+    name: "4.22"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tools:
+    name: "4.22"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  arm64-stable:
+    release:
+      architecture: arm64
+      channel: candidate
+      version: "4.22"
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.22"
+  multi-stable:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.22"
+  stable:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.22"
+  target:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      cpu: "1"
+      memory: 4Gi
+    requests:
+      cpu: 400m
+      memory: 800Mi
+tests:
+- as: aws-ipi-all-regions-f1
+  cron: 56 4 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_OBJECT: Regions
+    workflow: cucushift-installer-rehearse-aws-cases-clusters
+- as: aws-ipi-all-localzones-f1
+  cron: 34 18 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_OBJECT: LocalZones
+    workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
+- as: aws-ipi-all-wavelength-zones-f1
+  cron: 21 23 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_OBJECT: WavelengthZones
+    workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
+- as: aws-ipi-all-instance-types-f1
+  cron: 19 7 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: "57148"
+      TEST_OBJECT: InstanceTypes
+    test:
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-cases-clusters
+- as: aws-ipi-custom-proxy-creds-arm-f28
+  cron: 6 12 27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      CUSTOM_PROXY_CREDENTIAL: "true"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-byo-iam-profile-master-arm-f28
+  cron: 13 12 17 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_PROFILE_CONTROL_PLANE: "true"
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "false"
+      ENABLE_BYO_IAM_PROFILE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
+- as: aws-ipi-byo-iam-profile-worker-arm-f28
+  cron: 55 9 9 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_PROFILE_CONTROL_PLANE: "false"
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "true"
+      ENABLE_BYO_IAM_PROFILE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-profile
+- as: aws-ipi-byo-iam-role-master-arm-f28
+  cron: 56 18 29 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_ROLE_CONTROL_PLANE: "true"
+      ENABLE_BYO_IAM_ROLE_CUMPUTE: "false"
+      ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-iam-role-worker-arm-f28
+  cron: 27 17 14 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_BYO_IAM_ROLE_CONTROL_PLANE: "false"
+      ENABLE_BYO_IAM_ROLE_CUMPUTE: "true"
+      ENABLE_BYO_IAM_ROLE_DEFAULT_MACHINE: "false"
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-subnets-role-only-public-mini-perm-arm-f14
+  cron: 36 1 1,15 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      ADDITIONAL_SUBNETS_COUNT: "1"
+      ASSIGN_ROLES_TO_SUBNETS: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+      SUBNET_ROLES: |-
+        [
+          [
+            {
+              "private": "",
+              "public": "ControlPlaneInternalLB"
+            },
+            {
+              "private": "",
+              "public": "ControlPlaneExternalLB IngressControllerLB BootstrapNode ClusterNode"
+            }
+          ]
+        ]
+      ZONES_COUNT: "1"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-subnets
+- as: aws-ipi-default-mini-perm-arm-f7
+  cron: 52 21 3,12,19,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-ipi-default
+- as: aws-ipi-valid-lb-subnet-f14
+  cron: 22 14 2,16 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-aws-cases-valid-lb-subnet
+- as: aws-ipi-multi-cidr-arm-f14
+  cron: 33 18 7,21 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-cases-multi-cidr
+- as: aws-ipi-multi-clusters-one-phz-arm-f14
+  cron: 19 12 4,18 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-aws-cases-multi-clusters-one-phz
+- as: aws-ipi-valid-endpoints-f14
+  cron: 7 4 12,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-aws-cases-valid-endpoints
+- as: aws-ipi-only-public-subnets-mini-perm-arm-f14
+  cron: 57 4 10,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+    test:
+    - ref: cucushift-installer-check-aws-only-public-subnets
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-proxy-whitelist-arm-f14
+  cron: 26 4 2,18 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
+- as: aws-ipi-proxy-blocklist-arm-f28-ota
+  cron: 38 4 8 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PROXY_BLOCKLIST: api.openshift.com
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-blocklist
+- as: aws-ipi-proxy-reboot-nodes-arm-f28
+  cron: 56 23 7 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_REBOOT_CHECK: "true"
+      OCP_ARCH: arm64
+      REBOOT_TYPE: HARD_REBOOT
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: aws-ipi-shared-phz-f14
+  cron: 31 8 14,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-phz
+- as: aws-ipi-shared-phz-sts-f14
+  cron: 10 3 15,29 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: aws-ipi-custom-dns-mini-perm-arm-f7
+  cron: 11 3 1,8,15,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns
+- as: aws-ipi-custom-dns-priv-mini-perm-arm-f7
+  cron: 19 11 1,8,15,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: custom-dns.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-custom-dns-private
+- as: aws-usgov-ipi-custom-dns-mini-perm-arm-f7
+  cron: 41 19 5,12,19,26 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
+- as: aws-ipi-additional-ca-always-arm-f14
+  cron: 45 1 13,27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-additional-ca-policy
+- as: aws-ipi-arm-f28-ota
+  cron: 35 7 11 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-47200
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-zone-consistency-f14
+  cron: 16 22 10,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-aws-cases-zone-consistency
+- as: aws-upi-reboot-nodes-f28
+  cron: 1 4 12 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:stable
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+      REBOOT_TYPE: HARD_REBOOT
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-upi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: installation-stable-4.22
