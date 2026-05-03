@@ -26,6 +26,18 @@ images:
     dockerfile_path: Dockerfile
     from: ubi9-minimal-entitled
     to: hive
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 as builder
+      RUN mkdir -p /go/src/github.com/openshift/hive
+      WORKDIR /go/src/github.com/openshift/hive
+      RUN git clone --branch fix-ote-init --depth 1 https://github.com/miyadav/hive.git .
+      RUN make -C test/ote build
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      RUN microdnf install -y gzip jq && microdnf clean all
+      COPY --from=builder /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
+      RUN gzip -f -k /usr/bin/openshift-tests-extension
+      WORKDIR /tmp
+    to: hive-tests
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
@@ -291,6 +303,133 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-openstack
+- as: e2e-ote
+  cluster_claim:
+    architecture: amd64
+    as: unused
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
+        export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
+        export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
+        export SKIP_LONG_RUNNING_TESTS=true
+        export PLATFORM=aws
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+      credentials:
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
+        namespace: test-credentials
+      - mount_path: /tmp/secret/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h30m0s
+    workflow: generic-claim
+  timeout: 4h0m0s
+- as: e2e-gcp-ote
+  run_if_changed: gcp
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")
+        export PLATFORM=gcp
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-gcp
+- as: e2e-azure-ote
+  run_if_changed: azure
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export PLATFORM=azure
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-azure
+  timeout: 4h30m0s
+- as: e2e-vsphere-ote
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      NETWORK_TYPE: single-tenant
+      VSPHERE_ADDITIONAL_CLUSTER: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        source $SHARED_DIR/vsphere_context.sh
+        source $SHARED_DIR/govc.sh
+        source $SHARED_DIR/additional_cluster.sh
+
+        export CLUSTER_NAME=$ADDITIONAL_CLUSTER_NAME
+        export VSPHERE_API_VIP=$ADDITIONAL_CLUSTER_API_VIP
+        export VSPHERE_INGRESS_VIP=$ADDITIONAL_CLUSTER_INGRESS_VIP
+        export VSPHERE_MACHINE_NETWORK=$(<"${SHARED_DIR}"/machinecidr.txt)
+        export BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
+        export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(<"${SHARED_DIR}"/platform.json)
+
+        export PLATFORM=vsphere
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift
