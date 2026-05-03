@@ -54,12 +54,27 @@ fi
 # Patch the install-config.yaml
 #
 log "Creating install-config.yaml patch"
-cat > "${PATCH}" << EOF
-baseDomain: ${CLUSTER_BASE_DOMAIN}
+
+# Setting up platform type
+if [[ "${PLATFORM_NONE_ENFORCE}" == "yes" ]]; then
+  log "Setting up platform type: none"
+  cat > "${PATCH}" << EOF
+platform:
+  none: {}
+EOF
+else
+  log "Setting up platform type: external with provider name: ${PROVIDER_NAME} and cloud controller manager: ${CONFIG_PLATFORM_EXTERNAL_CCM}"
+  cat > "${PATCH}" << EOF
 platform:
   external:
     platformName: ${PROVIDER_NAME}
     cloudControllerManager: ${CONFIG_PLATFORM_EXTERNAL_CCM}
+EOF
+fi
+
+log "Configuring domain, publish, and node topology"
+cat >> "${PATCH}" << EOF
+baseDomain: ${CLUSTER_BASE_DOMAIN}
 compute:
 - name: worker
   replicas: 3
