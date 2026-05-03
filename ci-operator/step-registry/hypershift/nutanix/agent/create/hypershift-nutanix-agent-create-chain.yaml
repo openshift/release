@@ -1,0 +1,32 @@
+chain:
+  as: hypershift-nutanix-agent-create
+  steps:
+  - ref: hypershift-mce-install
+  - ref: hypershift-mce-conf-os-images
+  - ref: hypershift-mce-agent-create-agentserviceconfig
+  - ref: hypershift-nutanix-agent-create-hostedcluster
+  - ref: wait
+  - ref: hypershift-nutanix-conf-dns
+  - ref: hypershift-nutanix-agent-download-iso
+  - ref: hypershift-nutanix-agent-create-vms-terraform
+  - ref: hypershift-agent-wait-workers
+  documentation: |-
+    Create a HyperShift hosted cluster on Nutanix using Agent-based installation.
+
+    This chain:
+    1. Installs MCE (Multicluster Engine) with Assisted Service
+    2. Configures OS images for the hosted cluster
+    3. Deploys AgentServiceConfig for Agent-based installation
+    4. Creates the HostedCluster and NodePool CRs with Route publishing strategy
+    5. Configures Route 53 DNS pointing to management cluster INGRESS_VIP
+    6. Downloads Agent ISO from Assisted Service
+    7. Creates Nutanix worker VMs using Terraform
+    8. Waits for workers to join the hosted cluster
+
+    Architecture:
+    - All hosted cluster services (API, OAuth, Konnectivity, Ignition) are exposed via Routes
+    - Routes are served by the management cluster's Ingress Controller
+    - DNS points to the management cluster's INGRESS_VIP (configured by IPI)
+    - Traffic flows: Client -> INGRESS_VIP -> Ingress Controller -> Route -> Hosted Cluster Service
+
+    Uses Terraform from assisted-test-infra to automate VM creation and ISO mounting.

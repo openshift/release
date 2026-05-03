@@ -7,12 +7,30 @@ set -x
 
 echo "************ baremetals agentserviceconfig config command ************"
 
+# Debug mode workaround: Skip if AgentServiceConfig already exists
+if oc get agentserviceconfig agent &>/dev/null; then
+  echo "INFO: AgentServiceConfig 'agent' already exists, skipping creation (debug mode)"
+  exit 0
+fi
+
 if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   source "${SHARED_DIR}/packet-conf.sh"
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
+# Get cluster version
+# Priority: 1. Extract from HYPERSHIFT_HC_RELEASE_IMAGE if it's a public image
+#           2. Query registry
+#           3. Error
+if [[ -n "${HYPERSHIFT_HC_RELEASE_IMAGE:-}" && "${HYPERSHIFT_HC_RELEASE_IMAGE}" =~ quay\.io.*(4\.[0-9]+) ]]; then
+  CLUSTER_VERSION="${BASH_REMATCH[1]}"
+  echo "Extracted cluster version from HYPERSHIFT_HC_RELEASE_IMAGE: ${CLUSTER_VERSION}"
+elif ! CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json 2>/dev/null | jq -r '.metadata.version' | cut -d '.' -f 1,2); then
+  echo "ERROR: Failed to get version from registry"
+  echo "In debug mode, set HYPERSHIFT_HC_RELEASE_IMAGE to a public image like quay.io/openshift-release-dev/ocp-release:4.21.8-x86_64"
+  exit 1
+fi
+echo "Using cluster version: ${CLUSTER_VERSION}"
 
 function registry_config() {
   src_image=${1}
@@ -263,10 +281,15 @@ oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
 oc wait --timeout=5m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
 oc wait --timeout=15m --for=condition=Ready pod -l app=assisted-image-service -n "${ASSISTED_NAMESPACE}"
 
-echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
-oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true}}'
-sleep 10 # Wait for the operator to notice our patch
-timeout 15m oc rollout status -n openshift-machine-api deployment/metal3
-oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/cluster-baremetal-operator=metal3-state --for=condition=Ready
+# Enable BMH configuration outside of openshift-machine-api namespace (only for bare metal platforms)
+if oc get provisioning provisioning-configuration &>/dev/null; then
+  echo "Enabling configuration of BMH resources outside of openshift-machine-api namespace"
+  oc patch provisioning provisioning-configuration --type merge -p '{"spec":{"watchAllNamespaces": true}}'
+  sleep 10 # Wait for the operator to notice our patch
+  timeout 15m oc rollout status -n openshift-machine-api deployment/metal3
+  oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/cluster-baremetal-operator=metal3-state --for=condition=Ready
+else
+  echo "Provisioning resource not found - skipping BMH configuration (not a bare metal platform)"
+fi
 
 echo "Configuration of Assisted Installer operator passed successfully!"

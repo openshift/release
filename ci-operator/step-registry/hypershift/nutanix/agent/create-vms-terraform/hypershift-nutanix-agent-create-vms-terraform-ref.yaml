@@ -1,0 +1,35 @@
+ref:
+  as: hypershift-nutanix-agent-create-vms-terraform
+  from_image:
+    namespace: edge-infrastructure
+    name: ocm-2.17
+    tag: assisted-test-infra-internal
+  commands: hypershift-nutanix-agent-create-vms-terraform-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+  - name: NUM_EXTRA_WORKERS
+    default: "2"
+    documentation: "Number of worker VMs to create for the hosted cluster"
+  documentation: |-
+    Create Nutanix worker VMs for HyperShift hosted cluster using Terraform.
+
+    This step uses assisted-test-infra's Terraform configuration to:
+    1. Upload Agent ISO to Nutanix Image Service (from local file)
+    2. Create worker VMs with the ISO mounted as CDROM
+    3. Configure boot order: DISK, CDROM, NETWORK
+    4. Power on VMs automatically
+
+    The VMs will boot from the Agent ISO, register with Assisted Service,
+    and then be installed with the hosted cluster worker configuration.
+
+    Prerequisites:
+    - Downloaded ISO at ${SHARED_DIR}/agent-worker.iso
+    - Nutanix credentials from nutanix_context.sh
+    - HostedCluster and InfraEnv already created
+
+    Outputs:
+    - ${SHARED_DIR}/worker-vm-uuids.txt: VM UUIDs
+    - ${SHARED_DIR}/terraform-state.tgz: Terraform state for cleanup

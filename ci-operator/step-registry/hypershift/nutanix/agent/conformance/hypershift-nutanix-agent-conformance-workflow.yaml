@@ -1,0 +1,38 @@
+workflow:
+  as: hypershift-nutanix-agent-conformance
+  documentation: |-
+    The HyperShift Nutanix Agent conformance workflow provisions a Nutanix IPI
+    management cluster, installs HyperShift, creates a hosted cluster using
+    Agent-based installation with Nutanix worker VMs, and runs conformance tests.
+
+    Architecture:
+      Management Cluster: OpenShift on Nutanix (IPI)
+      Hosted Cluster: HyperShift with Agent-based workers on Nutanix VMs
+
+    Flow:
+      1. Provision Nutanix management cluster (IPI)
+      2. Install HyperShift operator
+      3. Install Assisted Service (for Agent support)
+      4. Create hosted cluster control plane
+      5. Provision Nutanix worker VMs using Agent ISO
+      6. Run conformance tests
+      7. Cleanup all resources
+
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+    # Management cluster provision
+    - chain: cucushift-installer-rehearse-nutanix-ipi-provision
+    - chain: nutanix-provision-bastionhost
+
+    # Hosted cluster creation (includes MCE installation)
+    - chain: hypershift-nutanix-agent-create
+
+    test:
+    # Run conformance tests on the hosted cluster
+    - chain: hypershift-conformance
+
+    post:
+    # Cleanup
+    - chain: hypershift-nutanix-agent-deprovision

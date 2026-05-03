@@ -1,0 +1,24 @@
+ref:
+  as: hypershift-nutanix-conf-dns
+  from: tools
+  commands: hypershift-nutanix-conf-dns-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: ci-route-53-nutanix
+    mount_path: /var/run/vault/nutanix-dns
+  documentation: |-
+    Configure Route 53 DNS for HyperShift hosted cluster on Nutanix.
+
+    This step creates DNS records pointing to management cluster worker node IPs
+    (for NodePort access to the hosted cluster API server).
+
+    Creates:
+    - api.${CLUSTER_NAME}.${BASE_DOMAIN} → management worker IPs
+    - *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} → management worker IPs
+
+    Note: HyperShift uses NodePort by default, so DNS points to multiple worker IPs
+    instead of a single VIP like IPI installations.
