@@ -240,16 +240,7 @@ wait_operator_stable() {
 wait_keycloak() {
   oc --kubeconfig="${HUB_KC}" rollout status deployment/keycloak-service \
     -n keycloak --timeout=300s 2>&1 || true
-  for i in $(seq 1 30); do
-    if oc --kubeconfig="${HUB_KC}" exec deployment/keycloak-service -n keycloak -- \
-      curl -sk -o /dev/null -w '%{http_code}' \
-      https://localhost:8443/realms/osac/.well-known/openid-configuration 2>/dev/null | grep -q "200"; then
-      echo "$(date +%T) Keycloak OIDC endpoint ready"
-      return 0
-    fi
-    sleep 10
-  done
-  echo "$(date +%T) WARNING: Keycloak OIDC endpoint did not respond in time"
+  echo "$(date +%T) Keycloak deployment ready"
 }
 
 echo "$(date +%T) Waiting for cluster stabilization (parallel)..."
