@@ -1,0 +1,23 @@
+workflow:
+  as: osac-project-golden-baremetal
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - ref: ipi-install-rbac
+      - ref: osac-project-golden-setup
+    test:
+      - ref: osac-project-golden-test
+    post:
+      - ref: osac-project-golden-gather
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+  documentation: |-
+    Executes OSAC E2E tests using pre-built golden QCOW2 images instead of
+    installing OCP and OSAC from scratch. Acquires a bare metal host via OFCIR,
+    boots golden VMs with pre-installed clusters, and runs the test suite.
