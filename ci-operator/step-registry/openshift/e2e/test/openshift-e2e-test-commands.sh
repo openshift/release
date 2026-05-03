@@ -548,6 +548,9 @@ done
 
 echo "[$(date)] All imagestreams are imported."
 
+echo "sleep for 5h"
+sleep 5h
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance
