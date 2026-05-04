@@ -1,0 +1,172 @@
+base_images:
+  ansible:
+    name: "4.22"
+    namespace: ocp
+    tag: ansible
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  openstack-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-installer
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "5.0"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tools:
+    name: "4.22"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM cerberus.prow
+      RUN ls
+    from: cerberus.prow
+    to: cerberus-main-prow-50-up
+  - dockerfile_literal: |-
+      FROM prow-scripts.prow
+      RUN ls
+    from: prow-scripts.prow
+    to: prow-scripts-422-up
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.22"
+  target:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aws-ipi-amd-f28
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-30087
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: cucushift-ota-preupgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+- always_run: false
+  as: aws-ipi-amd-tolatest-f28
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-23799
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: cucushift-upgrade-setchannel
+    - ref: cucushift-ota-preupgrade
+    - ref: cucushift-upgrade-toversion
+    - ref: cucushift-ota-postupgrade
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi
+- always_run: false
+  as: azure-ipi-amd-mixarch-f28
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_OTA_TEST: OCP-53907
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: cucushift-installer-check-cluster-health
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: cucushift-upgrade-setchannel
+    - ref: cucushift-ota-preupgrade
+    - ref: cucushift-upgrade-toversion
+    - ref: cucushift-upgrade-healthcheck
+    - ref: cucushift-ota-postupgrade
+    workflow: cucushift-installer-rehearse-azure-ipi
+- always_run: false
+  as: gcp-ipi-retarget-f28
+  steps:
+    cluster_profile: gcp-qe
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: cucushift-upgrade-retarget
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: ota-chaos-5.0-upgrade-from-stable-4.22
