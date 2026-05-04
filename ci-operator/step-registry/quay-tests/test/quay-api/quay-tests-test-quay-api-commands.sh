@@ -20,7 +20,8 @@ npm install
 
 # Determine which Cypress spec to use based on Quay version
 CYPRESS_SPEC="cypress/e2e/quay_api_testing_all.cy.js"
-if [[ "${QUAY_VERSION}" == "3.16" || "${QUAY_VERSION}" == "3.17" ]]; then
+QUAY_MINOR_VERSION=$(echo "${QUAY_VERSION}" | cut -d'.' -f2)
+if [[ "${QUAY_MINOR_VERSION}" -ge 16 ]]; then
     echo "Using new UI spec for Quay version ${QUAY_VERSION}"
     CYPRESS_SPEC="cypress/e2e/quay_api_testing_all_new_ui.cy.js"
 else
