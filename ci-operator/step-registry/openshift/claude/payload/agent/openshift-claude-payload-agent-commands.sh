@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
+echo "Model: ${CLAUDE_MODEL}"
 
 # Load secrets with xtrace disabled to prevent leaking credentials in logs
 set +x
@@ -111,7 +112,8 @@ while true; do
 
                 SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
-All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
+All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}
+_Agent: ${CLAUDE_MODEL}_"
 
                 set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
@@ -356,7 +358,8 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
 
 ${SUMMARY:-No summary available.}
 
-<${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
+<${PROW_JOB_URL}|:point_right: View Full Analysis Report>
+_Agent: ${CLAUDE_MODEL}_"
 
     set +x
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
