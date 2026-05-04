@@ -1,0 +1,38 @@
+ref:
+  as: sippy-e2e-sippy-e2e-claude-post-analysis
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  best_effort: true
+  commands: sippy-e2e-sippy-e2e-claude-post-analysis-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: claude-payload-agent-github-token
+    mount_path: /var/run/github-token
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "us-east5"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-sonnet-4-6"
+  - name: GITHUB_TOKEN_PATH
+    default: "/var/run/github-token/token"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  timeout: 15m0s
+  grace_period: 1m0s
+  documentation: |-
+    Best-effort post step that uses Claude AI to analyze e2e test failures
+    in presubmit jobs and leaves a comment on the PR explaining the failure
+    and whether the PR's changes are likely responsible.
