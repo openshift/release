@@ -1,0 +1,34 @@
+ref:
+  as: osac-project-installer-component
+  from: dev-scripts
+  dependencies:
+  - name: osac-installer
+    env: OSAC_INSTALLER_IMAGE
+  - name: component-image
+    env: COMPONENT_IMAGE
+  grace_period: 10m
+  timeout: 3h0m0s
+  commands: osac-project-installer-component-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: osac-installer-aap
+    mount_path: /var/run/osac-installer-aap
+  env:
+  - name: E2E_NAMESPACE
+    default: "osac-e2e-ci"
+    documentation: The namespace to use for the e2e tests
+  - name: E2E_KUSTOMIZE_OVERLAY
+    default: "vmaas-ci"
+    documentation: The kustomize overlay to use for the e2e tests
+  - name: E2E_VM_TEMPLATE
+    default: "osac.templates.ocp_virt_vm"
+    documentation: The template to use for the e2e tests
+  - name: COMPONENT_IMAGE_NAME
+    documentation: The image name in base/kustomization.yaml to replace (e.g. ghcr.io/osac-project/fulfillment-service)
+  - name: AAP_EE_IMAGE_OVERRIDE
+    default: ""
+    documentation: If non-empty, also override AAP_EE_IMAGE in the overlay kustomization to use COMPONENT_IMAGE
