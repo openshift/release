@@ -19,7 +19,8 @@ images:
       RUN pip install --no-cache-dir \
           "firewatch @ git+https://github.com/amp-rh/firewatch.git@interop-8976/token-rotation-alerts" \
           && firewatch --help > /dev/null \
-          && echo "CACHE_BUST=2026-05-01b"
+          && echo "PIPELINE_IMAGE_MARKER=2026-05-04" > /tmp/.pipeline-image-marker \
+          && python3 -c "from src.report.report import Report; print('IMPORT CHECK: Report has _notify_failure_webhooks:', hasattr(Report, '_notify_failure_webhooks'))"
     from: firewatch-base
     to: main
 releases:
@@ -59,8 +60,15 @@ tests:
 
         echo "=== Firewatch Debug Info ==="
         firewatch --version 2>&1 || echo "WARNING: firewatch --version not supported"
-        pip show firewatch 2>/dev/null | grep -E '^(Name|Version|Location)' || true
+        pip show firewatch 2>/dev/null | grep -E '^(Name|Version|Location|Requires)' || true
         python3 -c "import firewatch; print('firewatch package path:', firewatch.__file__)" 2>/dev/null || true
+        echo "=== Pipeline Image Check ==="
+        if [ -f /tmp/.pipeline-image-marker ]; then
+            echo "PIPELINE IMAGE CONFIRMED: $(cat /tmp/.pipeline-image-marker)"
+        else
+            echo "WARNING: NOT running pipeline image (marker file missing)"
+        fi
+        python3 -c "from src.report.report import Report; print('has _notify_failure_webhooks:', hasattr(Report, '_notify_failure_webhooks'))" 2>/dev/null || echo "WARNING: could not import Report"
         echo "=== End Debug Info ==="
 
         jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
