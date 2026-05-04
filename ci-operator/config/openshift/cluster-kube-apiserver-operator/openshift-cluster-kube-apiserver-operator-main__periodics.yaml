@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
@@ -21,13 +21,13 @@ images:
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -77,6 +77,123 @@ tests:
         FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/event-ttl
     workflow: baremetalds-e2e
+- as: e2e-aws-encryption-kms
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export VAULT_LICENSE=$(cat /var/run/vault/tests-private-account/kms-vault-license)
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+- as: e2e-azure-encryption-kms
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export VAULT_LICENSE=$(cat /var/run/vault/tests-private-account/kms-vault-license)
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-azure
+- as: e2e-gcp-encryption-kms
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export VAULT_LICENSE=$(cat /var/run/vault/tests-private-account/kms-vault-license)
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-vsphere-encryption-kms
+  cron: 12 7 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export VAULT_LICENSE=$(cat /var/run/vault/tests-private-account/kms-vault-license)
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal-encryption-kms
+  capabilities:
+  - intranet
+  cron: 12 7 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export VAULT_LICENSE=$(cat /var/run/vault/tests-private-account/kms-vault-license)
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: main
   org: openshift
