@@ -501,13 +501,23 @@ tests:
   skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
   steps:
     env:
+      ALLOWED_LOCATIONS: centralus
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription)
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: ci01
-      LOCATION: centralus
-    leases:
-    - count: 1
-      env: ENV_QUOTA_LEASED_RESOURCE
-      resource_type: aro-hcp-dev-quota-slice
+      ARO_HCP_SLOT_MANAGER_GIT_REF: slot-manager-part-2
+    workflow: aro-hcp-local-e2e
+  timeout: 10h0m0s
+- always_run: false
+  as: e2e-parallel-multipool
+  optional: true
+  steps:
+    env:
+      ALLOWED_LOCATIONS: centralus,canadacentral
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters 2 (EA Subscription)
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_SLOT_MANAGER_GIT_REF: slot-manager-part-2
     workflow: aro-hcp-local-e2e
   timeout: 10h0m0s
 - as: global-pipeline-postsubmit

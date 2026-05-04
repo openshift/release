@@ -1,0 +1,70 @@
+ref:
+  as: aro-hcp-lease-acquire
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-lease-acquire-commands.sh
+  grace_period: 15s
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-int
+      mount_path: /var/run/aro-hcp-int
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-stg
+      mount_path: /var/run/aro-hcp-stg
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-prod
+      mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: |-
+        Selects which environment's cluster secrets to use (dev, int, stg, prod).
+    - name: ALLOWED_SUBSCRIPTIONS
+      default: ""
+      documentation: |-
+        Optional comma-separated allowlist of catalog `subscription_name`
+        values that `slot-manager acquire` may consider for candidate pool
+        selection.
+    - name: ALLOWED_LOCATIONS
+      default: ""
+      documentation: |-
+        Optional comma-separated allowlist of Azure regions for fixed-mode
+        candidate pool selection (for example, `centralus,canadacentral`).
+    - name: MULTISTAGE_PARAM_OVERRIDE_LOCATION
+      default: ""
+      documentation: |-
+        Highest-precedence concrete location override for the runtime slot.
+        When set, it takes precedence over `ALLOWED_LOCATIONS`.
+    - name: ARO_HCP_DEPLOY_ENV
+      default: ""
+      documentation: Config environment name (prow, ci01, int, stg, prod).
+    - name: ARO_HCP_SLOT_MANAGER_GIT_REF
+      default: ""
+      documentation: |-
+        Temporary opt-in override for release-side rehearsals. When set,
+        the lease step fetches this ref from github.com/roivaz/ARO-HCP and
+        runs `slot-manager` via `go run` instead of the built binary.
+        Normal ARO-HCP PR jobs should leave this unset because the
+        `aro-hcp-e2e-tests` image is already built from the PR source.
+    - name: ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE
+      default: ""
+      documentation: |-
+        Optional override for `slot-manager acquire --max-wait-for-lease`.
+        Leave unset to use the binary default (currently 30m). Set to `0s`
+        to wait forever after a full exhausted pass across all candidate pools.
+    - name: ARO_HCP_SLOT_MANAGER_LEASE_WAIT_INTERVAL
+      default: ""
+      documentation: |-
+        Optional override for `slot-manager acquire --lease-wait-interval`.
+        Leave unset to use the binary default (currently 1m). This controls
+        the delay between retries after a full exhausted pass across all
+        candidate pools.
+  documentation: |-
+    Acquire the runtime Boskos leases required by ARO HCP E2E workflows and
+    persist the runtime slot env contract into SHARED_DIR for later steps.
