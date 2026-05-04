@@ -1,78 +1,27 @@
 presubmits:
-  openshift-kni/lifecycle-agent:
+  stolostron/cluster-backup-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build11
-    context: ci/prow/ci-index-lifecycle-agent-operator-bundle-pipeline
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
+    context: ci/prow/crd-and-gen-files-check
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-ci-index-lifecycle-agent-operator-bundle-pipeline
-    rerun_command: /test ci-index-lifecycle-agent-operator-bundle-pipeline
+    name: pull-ci-stolostron-cluster-backup-operator-release-5.1-crd-and-gen-files-check
+    rerun_command: /test crd-and-gen-files-check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-lifecycle-agent-operator-bundle-pipeline
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-lifecycle-agent-operator-bundle-pipeline,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build11
-    context: ci/prow/ci-job
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-ci-job
-    rerun_command: /test ci-job
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-job
+        - --target=crd-and-gen-files-check
         command:
         - ci-operator
         env:
@@ -113,101 +62,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-job,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build05
-    context: ci/prow/ibu-e2e-flow
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-ibu-e2e-flow
-    optional: true
-    rerun_command: /test ibu-e2e-flow
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ibu-e2e-flow
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ibu-e2e-flow,?($|\s.*)
+    trigger: (?m)^/test( | .* )crd-and-gen-files-check,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build11
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-images
+    name: pull-ci-stolostron-cluster-backup-operator-release-5.1-images
     rerun_command: /test images
     spec:
       containers:
@@ -250,21 +119,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build05
-    context: ci/prow/integration
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
+    context: ci/prow/pr-image-mirror
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-telco
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-integration
-    rerun_command: /test integration
-    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    name: pull-ci-stolostron-cluster-backup-operator-release-5.1-pr-image-mirror
+    rerun_command: /test pr-image-mirror
     spec:
       containers:
       - args:
@@ -272,8 +140,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=integration
+        - --target=pr-image-mirror
         command:
         - ci-operator
         env:
@@ -293,9 +160,6 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -317,9 +181,6 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -329,28 +190,99 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build11
-    context: ci/prow/markdownlint
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
+    context: ci/prow/sonar
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-markdownlint
-    rerun_command: /test markdownlint
-    run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+    name: pull-ci-stolostron-cluster-backup-operator-release-5.1-sonar
+    rerun_command: /test sonar
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=markdownlint
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonar,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
+    context: ci/prow/unit-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-cluster-backup-operator-release-5.1-unit-tests
+    rerun_command: /test unit-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit-tests
         command:
         - ci-operator
         env:
@@ -391,84 +323,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )markdownlint,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build11
-    context: ci/prow/security
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-lifecycle-agent-release-4.15-security
-    optional: true
-    rerun_command: /test security
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)

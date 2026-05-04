@@ -647,7 +647,7 @@ else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
     export TARGET_RELEASE=$CNF_BRANCH
-    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
