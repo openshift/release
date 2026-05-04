@@ -192,8 +192,18 @@ fi
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
 #there will be two kind of machinesets when cluster-api is enabled, using full name to get the correct machinesets
+# Count worker machinesets and randomly select one to distribute load across zones
+WORKER_MACHINESET_COUNT=$(oc -n openshift-machine-api get machinesets.machine.openshift.io -o yaml | \
+  yq-v4 '[.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")] | length')
+if (( WORKER_MACHINESET_COUNT == 0 )); then
+  echo >&2 "Error: No worker machinesets found in cluster"
+  exit 1
+fi
+RANDOM_INDEX=$(( RANDOM % WORKER_MACHINESET_COUNT ))
+echo "Found ${WORKER_MACHINESET_COUNT} worker machinesets, randomly selected index ${RANDOM_INDEX} to avoid zone capacity issues"
+
 MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
-  [.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0]
+  [.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][${RANDOM_INDEX}]
   | .metadata.name += "-additional"
   | .spec.replicas = ${ADDITIONAL_WORKERS}
   | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
@@ -373,6 +383,12 @@ EOF
   MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.machineType = \"${ADDITIONAL_WORKER_VM_TYPE}\"
                      | .spec.template.spec.providerSpec.value.disks[0].image = \"projects/$workers_addi_rhcos_image_project/global/images/$workers_addi_rhcos_image_name\"
               " <<< "${MACHINE_SET}")
+
+  # Set disk type if ADDITIONAL_WORKER_DISK_TYPE is specified
+  if [[ -n "${ADDITIONAL_WORKER_DISK_TYPE}" ]]; then
+    echo "Setting disk type to ${ADDITIONAL_WORKER_DISK_TYPE} for additional workers..."
+    MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.disks[0].type = \"${ADDITIONAL_WORKER_DISK_TYPE}\"" <<< "${MACHINE_SET}")
+  fi
 ;;
 *ibmcloud*)
   FULL_CLUSTER_NAME=$(yq-v4 '.metadata.labels."machine.openshift.io/cluster-api-cluster"' <<< $MACHINE_SET)
