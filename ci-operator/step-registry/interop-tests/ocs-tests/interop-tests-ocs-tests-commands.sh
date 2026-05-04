@@ -38,34 +38,6 @@ cleanup() {
 # Set trap to catch EXIT and run cleanup on any exit code
 trap cleanup EXIT SIGINT
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            export REPORTPORTAL_CMP
-            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
-    fi
-}
-
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
@@ -145,11 +117,17 @@ FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
 
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
-
-# Send junit file to shared dir for Data Router Reporter step
-cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
+# Map results by setting identifier prefix in tests suites names for reporting tools
+# Merge original results into a single file and compress
+# Send modified file to shared dir for Data Router Reporter step
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
+        ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+fi
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
