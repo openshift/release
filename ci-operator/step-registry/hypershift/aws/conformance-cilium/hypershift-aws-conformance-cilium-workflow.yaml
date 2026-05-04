@@ -26,6 +26,9 @@ workflow:
     env:
       HYPERSHIFT_NETWORK_TYPE: "Other" # Required for Cilium.
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+      # CLB tests: health check port 10256 unavailable with Cilium (OCPBUGS-62226)
+      # NLB tests: DNS resolution failure for VPC endpoints in HyperShift (OCPBUGS-74537)
+      # CCO tests: broken test binary missing testdata/credentials_request.yaml (OCPBUGS-84630)
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
         access to server in CIDR block \[Feature:NetworkPolicy\]\|
         Netpol NetworkPolicy between server and client should ensure an IP
@@ -41,10 +44,54 @@ workflow:
         should work with TCP (when fully idled)\|
         Unidling with Deployments \[apigroup:route.openshift.io\] should work with UDP\|
         DNS should answer queries using the local DNS endpoint\|
-        Ensure HTTPRoute object is created
+        Ensure HTTPRoute object is created\|
+        loadbalancer CLB should be reachable with default configurations\|
+        loadbalancer CLB internal should be reachable with hairpinning traffic\|
+        loadbalancer NLB internal should be reachable with hairpinning traffic\|
+        loadbalancer NLB should be reachable with target-node-labels\|
+        Critical-CCO-based flow for olm managed operators and AWS STS\|
+        NonHyperShiftHOST-High-CCO metrics endpoint validation
     post:
     - chain: hypershift-dump
     - chain: gather
+    - as: dump-cilium-debug
+      cli: latest
+      commands: |-
+        set -xuo pipefail
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        mkdir -p ${ARTIFACT_DIR}/cilium-debug
+
+        oc get networkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/networkpolicies.yaml 2>&1 || true
+        oc get ciliumnetworkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/ciliumnetworkpolicies.yaml 2>&1 || true
+        oc get ciliumclusterwidenetworkpolicy -A -o yaml > ${ARTIFACT_DIR}/cilium-debug/ciliumclusterwidenetworkpolicies.yaml 2>&1 || true
+        oc get ciliumendpoint -A > ${ARTIFACT_DIR}/cilium-debug/ciliumendpoints.txt 2>&1 || true
+        oc version > ${ARTIFACT_DIR}/cilium-debug/oc-version.txt 2>&1 || true
+        oc get ns openshift-monitoring -o yaml > ${ARTIFACT_DIR}/cilium-debug/ns-openshift-monitoring.yaml 2>&1 || true
+        oc get pods -n cilium -o wide > ${ARTIFACT_DIR}/cilium-debug/cilium-pods.txt 2>&1 || true
+        oc logs -n cilium -l k8s-app=cilium --tail=500 > ${ARTIFACT_DIR}/cilium-debug/cilium-agent-logs.txt 2>&1 || true
+
+        # CLB/LoadBalancer debug
+        oc get svc -A -o wide > ${ARTIFACT_DIR}/cilium-debug/services.txt 2>&1 || true
+        oc get svc -A -o yaml | grep -A 20 "type: LoadBalancer" > ${ARTIFACT_DIR}/cilium-debug/loadbalancer-svcs.txt 2>&1 || true
+        oc get endpoints -A > ${ARTIFACT_DIR}/cilium-debug/endpoints.txt 2>&1 || true
+
+        # Cilium service handling
+        CILIUM_POD=$(oc get pods -n cilium -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
+        if [[ -n "${CILIUM_POD}" ]]; then
+          oc exec -n cilium ${CILIUM_POD} -- cilium status > ${ARTIFACT_DIR}/cilium-debug/cilium-status.txt 2>&1 || true
+          oc exec -n cilium ${CILIUM_POD} -- cilium service list > ${ARTIFACT_DIR}/cilium-debug/cilium-service-list.txt 2>&1 || true
+          oc exec -n cilium ${CILIUM_POD} -- cilium bpf lb list > ${ARTIFACT_DIR}/cilium-debug/cilium-bpf-lb-list.txt 2>&1 || true
+          oc exec -n cilium ${CILIUM_POD} -- cilium config | grep -i -E "kube-proxy|nodeport|lb|loadbalancer|masquerade|snat" > ${ARTIFACT_DIR}/cilium-debug/cilium-lb-config.txt 2>&1 || true
+        fi
+
+        # CiliumConfig
+        oc get ciliumconfig -n cilium -o yaml > ${ARTIFACT_DIR}/cilium-debug/ciliumconfig.yaml 2>&1 || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 5m0s
     - chain: hypershift-aws-destroy
     - chain: hypershift-destroy-nested-management-cluster
     test:
@@ -56,3 +103,4 @@ workflow:
     - chain: hypershift-aws-create
     - ref: cucushift-hypershift-extended-cilium
     - ref: cucushift-hypershift-extended-cilium-health-check
+    - ref: cucushift-hypershift-extended-cilium-network-policies
