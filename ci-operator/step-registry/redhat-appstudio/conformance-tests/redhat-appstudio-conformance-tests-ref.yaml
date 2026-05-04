@@ -1,0 +1,35 @@
+ref:
+  as: redhat-appstudio-conformance-tests
+  cli: latest
+  commands: redhat-appstudio-conformance-tests-commands.sh
+  from: e2e-test-runner
+  timeout: 1h
+  grace_period: 1m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MULTISTAGE_PARAM_OVERRIDE_OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Gangway API override for OPERATOR_IMAGE. When set, the script derives
+      KONFLUX_REF from the image tag to checkout the matching git ref.
+      Required for release gating.
+  - name: GINKGO_LABEL_FILTER
+    default: ""
+    documentation: |-
+      Optional Ginkgo label filter expression to select a subset of tests.
+      For example "upstream-konflux" or "konflux".
+  - name: GINKGO_TEST_TIMEOUT
+    default: "30m"
+    documentation: |-
+      Timeout for the Go test execution.
+  credentials:
+  - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+    name: konflux-ci-secrets-new
+    namespace: test-credentials
+  documentation: |-
+    Deploys test resources and runs Go conformance tests from
+    konflux-ci/konflux-ci test/go-tests/tests/conformance.
+    Run after konflux-ci-install-operator.
