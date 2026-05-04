@@ -1,0 +1,45 @@
+ref:
+  as: hypershift-kubevirt-baremetalds-check-shared-nothing-isolation
+  from: hypershift-operator
+  grace_period: 5m0s
+  timeout: 3h0m0s
+  cli: latest
+  commands: hypershift-kubevirt-baremetalds-check-shared-nothing-isolation-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+  env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "1"
+      documentation: "Number of worker nodes per hosted cluster."
+    - name: HYPERSHIFT_NODE_MEMORY
+      default: "8"
+      documentation: "RAM in Gi per hosted cluster node."
+    - name: HYPERSHIFT_NODE_CPU_CORES
+      default: "2"
+      documentation: "CPU cores per hosted cluster node."
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: "OVNKubernetes"
+      documentation: "SDN provider for hosted clusters."
+    - name: ETCD_STORAGE_CLASS
+      default: ""
+      documentation: "Storage class for etcd on the hosted control plane."
+    - name: HYPERSHIFT_HC_RELEASE_IMAGE
+      default: ""
+      documentation: "Release image for hosted clusters. Defaults to release:latest."
+  documentation: |-
+    Verifies VM-level kernel isolation in Shared Nothing topology.
+    Labels management cluster nodes into two dedicated sets using a custom label,
+    creates two KubeVirt hosted clusters, patches each HostedCluster and NodePool
+    with per-cluster nodeSelector, then asserts that control-plane VMIs land on
+    their designated nodes and that those node sets are disjoint.
+    Cluster-a is destroyed by the post-chain (hypershift-kubevirt-destroy).
+    Cluster-b is cleaned up via a trap on exit.
