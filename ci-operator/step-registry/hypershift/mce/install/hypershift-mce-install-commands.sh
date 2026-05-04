@@ -18,6 +18,12 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Debug mode workaround: Skip if MCE is already installed
+if oc get multiclusterengine multiclusterengine &>/dev/null; then
+  echo "INFO: MCE already installed, skipping installation (debug mode)"
+  exit 0
+fi
+
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
     MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
 fi

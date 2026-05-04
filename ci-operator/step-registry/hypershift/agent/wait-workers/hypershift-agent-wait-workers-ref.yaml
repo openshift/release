@@ -1,0 +1,28 @@
+ref:
+  as: hypershift-agent-wait-workers
+  from: tools
+  commands: hypershift-agent-wait-workers-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: NUM_EXTRA_WORKERS
+    default: "2"
+    documentation: "Number of workers expected to join the hosted cluster"
+  documentation: |-
+    Wait for Agent workers to join HyperShift hosted cluster.
+
+    This step:
+    1. Waits for Agent CRs to be created (VMs booting from ISO)
+    2. Approves all Agents
+    3. Scales NodePool to the desired replica count
+    4. Waits for Agents to complete installation and join the cluster
+
+    The Agent workflow:
+    - VM boots from ISO → Agent registers → Agent CR created
+    - Agent approved → Assisted Service generates ignition
+    - Agent downloads ignition → Installs to disk → Reboots
+    - Node joins cluster → Agent status: added-to-existing-cluster
+
+    Timeout: 40 minutes (installation can take 20-40 minutes)

@@ -1,0 +1,43 @@
+ref:
+  as: hypershift-nutanix-destroy
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  grace_period: 10m
+  commands: hypershift-nutanix-destroy-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: nutanix-pc
+    mount_path: /var/run/vault/nutanix
+  env:
+  - name: NUTANIX_ENDPOINT
+    default: ""
+    documentation: "Nutanix Prism Central endpoint"
+  - name: NUTANIX_USER
+    default: "admin"
+    documentation: "Nutanix username"
+  - name: NUTANIX_DELETE_WORKER_VMS
+    default: "false"
+    documentation: "Set to 'true' to delete Nutanix worker VMs. Leave 'false' if VMs are pre-created and should be preserved."
+  - name: NUTANIX_WORKER_VM_PREFIX
+    default: "hypershift-worker"
+    documentation: "Prefix pattern for worker VM names to cleanup (only used if NUTANIX_DELETE_WORKER_VMS=true)"
+  documentation: |-
+    Destroy a HyperShift hosted cluster on Nutanix and cleanup resources.
+
+    This step:
+    1. Scales down the NodePool to 0
+    2. Deletes the HostedCluster CR (triggers cascading deletion)
+    3. Cleans up InfraEnv and Agent resources
+    4. Deletes Agent ISO images from Nutanix
+    5. Optionally powers off and deletes worker VMs (if NUTANIX_DELETE_WORKER_VMS=true)
+    6. Force-deletes the hosted control plane namespace if needed
+
+    Note: By default, Nutanix worker VMs are NOT deleted. This is to preserve
+    pre-created VMs. Set NUTANIX_DELETE_WORKER_VMS=true if VMs were dynamically
+    created and should be cleaned up.

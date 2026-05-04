@@ -1,4 +1,8 @@
 base_images:
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -378,6 +382,32 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
+- as: e2e-nutanix-agent-conformance
+  cluster: build01
+  cron: 0 6 * * 0
+  steps:
+    cluster_profile: nutanix-qe
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-4-20
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.21.8-x86_64
+      MCE_VERSION: "2.11"
+      OVERRIDE_HO_IMAGE: quay.io/hypershift/hypershift-operator:latest
+    workflow: hypershift-nutanix-agent-conformance
+- as: e2e-nutanix-agent-conformance-debug
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: nutanix-qe
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-4-20
+    env:
+      ARTIFACTS_SOURCE_URL: s3://hcp-test-0204/
+      AWS_REGION: us-east-2
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.21.8-x86_64
+      MCE_VERSION: "2.11"
+      OVERRIDE_HO_IMAGE: quay.io/hypershift/hypershift-operator:latest
+    workflow: hypershift-nutanix-agent-conformance-debug
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

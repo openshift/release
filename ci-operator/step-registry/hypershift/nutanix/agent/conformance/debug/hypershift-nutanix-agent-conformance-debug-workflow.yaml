@@ -1,0 +1,43 @@
+workflow:
+  as: hypershift-nutanix-agent-conformance-debug
+  steps:
+    pre:
+    # Load pre-existing management cluster artifacts
+    - ref: hypershift-nutanix-agent-load-shared-dir
+    # Create hosted cluster
+    - chain: hypershift-nutanix-agent-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - chain: hypershift-nutanix-agent-deprovision-debug
+  documentation: |-
+    Debug workflow for Nutanix HyperShift Agent conformance tests.
+
+    This workflow SKIPS the management cluster provision phase and loads
+    pre-existing cluster artifacts from an external source.
+
+    Workflow:
+    1. Load management cluster artifacts (kubeconfig, nutanix_context.sh, proxy-conf.sh)
+    2. Create HyperShift hosted cluster with Agent-based workers
+    3. Run conformance tests
+    4. Clean up hosted cluster resources
+
+    Prerequisites:
+    - A Nutanix management cluster must already exist
+    - Artifacts must be available at ARTIFACTS_SOURCE_URL
+
+    Required artifacts:
+    - kubeconfig: Management cluster kubeconfig
+    - nutanix_context.sh: Nutanix environment variables
+    - proxy-conf.sh: Proxy configuration (optional)
+
+    Usage:
+    Set ARTIFACTS_SOURCE_URL to point to your artifacts:
+    - GCS: gs://bucket/path/to/artifacts/
+    - HTTP: https://server.com/artifacts/
+    - Local: /path/to/artifacts/
+
+    Benefits:
+    - Skip 45-minute provision phase
+    - Fast iteration (20 minutes per test)
+    - Reuse existing management cluster
