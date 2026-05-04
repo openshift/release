@@ -35,8 +35,19 @@ cleanup() {
     echo "Cleaning up..."
     [[ -d "${CLUSTER_PATH}/auth" ]] && rm -fvr "${CLUSTER_PATH}/auth"
 }
-# Set trap to catch EXIT and run cleanup on any exit code
-trap cleanup EXIT SIGINT
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        cleanup
+        LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
+        ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+    ' EXIT
+else
+    trap 'cleanup' EXIT
+fi
 
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
@@ -116,18 +127,6 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
-
-# Map results by setting identifier prefix in tests suites names for reporting tools
-# Merge original results into a single file and compress
-# Send modified file to shared dir for Data Router Reporter step
-if [ "${MAP_TESTS}" = "true" ]; then
-    eval "$(
-        curl -fsSL \
-https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"
-    LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
-        ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
-fi
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
