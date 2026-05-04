@@ -45,6 +45,7 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
 - as: gcp-etcd-fips-24nodes
   cron: 0 4 12 * *
   steps:
@@ -56,6 +57,7 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 7h0m0s
 - as: azure-multi-24nodes
   cron: 0 4 19 * *
   steps:
@@ -82,10 +84,12 @@ tests:
     - ref: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-azure
-- as: baremetal-multi-3nodes
+  timeout: 8h0m0s
+- always_run: false
+  as: baremetal-multi-3nodes
   capabilities:
   - intranet
-  cron: 0 4 26 * *
+  cron: 0 0 26 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
@@ -102,6 +106,22 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
+  timeout: 8h0m0s
+- always_run: false
+  as: vsphere-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      BURST: "5"
+      PODS_PER_NODE: "100"
+      QPS: "5"
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 7h0m0s
 - as: ibmcloud-24nodes
   cron: 0 6 5 * *
   steps:
@@ -114,7 +134,7 @@ tests:
     - ref: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
-  timeout: 8h0m0s
+  timeout: 7h0m0s
 - as: nutanix-24nodes
   capabilities:
   - sshd-bastion
@@ -135,6 +155,7 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-node-density-heavy
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+  timeout: 8h0m0s
 - always_run: false
   as: baremetal-3nodes
   capabilities:
