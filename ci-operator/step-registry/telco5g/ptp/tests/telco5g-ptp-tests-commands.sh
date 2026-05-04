@@ -172,7 +172,9 @@ spec:
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
   dockercgf=""
   for i in $(seq 1 80); do
-    dockercgf=$(oc -n openshift-ptp get secret -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep '^builder-dockercfg-' || true)
+    dockercgf=$(oc --request-timeout=10s -n openshift-ptp get secret \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+      | grep '^builder-dockercfg-' | head -1 || true)
     if [[ -n "${dockercgf}" ]]; then
       break
     fi
@@ -183,7 +185,7 @@ spec:
     echo "[ERROR] builder-dockercfg secret not found after 400s"
     exit 1
   fi
-  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
+  jobdefinition=${jobdefinition//BUILDER_DOCKERCFG/${dockercgf}}
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
