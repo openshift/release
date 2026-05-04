@@ -325,7 +325,7 @@ if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
   echo "Using override: JIRA_AGENT_ISSUE_KEY=$JIRA_AGENT_ISSUE_KEY"
   JQL="key = ${JIRA_AGENT_ISSUE_KEY}"
 else
-  JQL='project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed'
+  JQL='project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels = ready-to-solve AND labels != agent-processed'
 fi
 SEARCH_PAYLOAD=$(jq -n --arg jql "$JQL" --argjson max "$MAX_ISSUES" \
   '{jql: $jql, fields: ["key", "summary"], maxResults: $max}')
