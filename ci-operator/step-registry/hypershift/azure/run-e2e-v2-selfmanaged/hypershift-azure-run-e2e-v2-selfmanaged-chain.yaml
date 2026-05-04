@@ -1,0 +1,69 @@
+chain:
+  as: hypershift-azure-run-e2e-v2-selfmanaged
+  steps:
+  - as: tests
+    cli: latest
+    commands: |-
+      set -xuo pipefail
+
+      # Use the nested management cluster kubeconfig
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      export EVENTUALLY_VERBOSE="false"
+
+      # Export private NAT subnet ID for private topology tests
+      AZURE_PRIVATE_NAT_SUBNET_ID=""
+      if [[ -f "${SHARED_DIR}/azure_private_nat_subnet_id" ]]; then
+        AZURE_PRIVATE_NAT_SUBNET_ID="$(cat "${SHARED_DIR}/azure_private_nat_subnet_id")"
+      fi
+      export AZURE_PRIVATE_NAT_SUBNET_ID
+
+      PUBLIC_NAME="$(cat "${SHARED_DIR}/cluster-name-public")"
+      PRIVATE_NAME="$(cat "${SHARED_DIR}/cluster-name-private")"
+      OAUTH_LB_NAME="$(cat "${SHARED_DIR}/cluster-name-oauth-lb")"
+
+      # Run all 3 test suites in parallel (clusters are independent)
+      echo "$(date) Running public cluster tests against ${PUBLIC_NAME}..."
+      E2E_HOSTED_CLUSTER_NAME="${PUBLIC_NAME}" \
+      E2E_HOSTED_CLUSTER_NAMESPACE=clusters \
+      bin/test-e2e-v2 \
+        --ginkgo.label-filter="self-managed-azure-public" \
+        --ginkgo.skip="KAS allowed CIDRs" \
+        --ginkgo.junit-report="${ARTIFACT_DIR}/junit_self_managed_azure_public.xml" \
+        --ginkgo.v &
+      PID_PUB=$!
+
+      echo "$(date) Running private topology tests against ${PRIVATE_NAME}..."
+      E2E_HOSTED_CLUSTER_NAME="${PRIVATE_NAME}" \
+      E2E_HOSTED_CLUSTER_NAMESPACE=clusters \
+      bin/test-e2e-v2 \
+        --ginkgo.label-filter="self-managed-azure-private" \
+        --ginkgo.junit-report="${ARTIFACT_DIR}/junit_self_managed_azure_private.xml" \
+        --ginkgo.v &
+      PID_PRV=$!
+
+      echo "$(date) Running OAuth LB tests against ${OAUTH_LB_NAME}..."
+      E2E_HOSTED_CLUSTER_NAME="${OAUTH_LB_NAME}" \
+      E2E_HOSTED_CLUSTER_NAMESPACE=clusters \
+      bin/test-e2e-v2 \
+        --ginkgo.label-filter="self-managed-azure-oauth-lb" \
+        --ginkgo.junit-report="${ARTIFACT_DIR}/junit_self_managed_azure_oauth_lb.xml" \
+        --ginkgo.v &
+      PID_OAU=$!
+
+      echo "$(date) Waiting for all test suites to complete..."
+      OVERALL_EXIT=0
+      wait ${PID_PUB} || OVERALL_EXIT=1
+      echo "$(date) Public cluster tests finished (exit=$?)"
+      wait ${PID_PRV} || OVERALL_EXIT=1
+      echo "$(date) Private topology tests finished (exit=$?)"
+      wait ${PID_OAU} || OVERALL_EXIT=1
+      echo "$(date) OAuth LB tests finished (exit=$?)"
+
+      exit ${OVERALL_EXIT}
+    timeout: 45m
+    grace_period: 5m
+    from: hypershift-tests
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi

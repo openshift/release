@@ -97,7 +97,9 @@ case "${CLOUD_PROVIDER}" in
 
     if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
       AZURE_MANAGED_SERVICE_ARGS=""
-      # Keep external DNS enabled - domain filter is set via HYPERSHIFT_EXTERNAL_DNS_DOMAIN env var
+      AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+        --external-dns-credentials=/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json \
+        --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
 
       # Enable Azure private platform support (Private Link Services) if credentials and resource group are provided.
       # Values can come from env vars or from SHARED_DIR files written by the

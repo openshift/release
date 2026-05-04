@@ -1,0 +1,52 @@
+base_images:
+  cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+  items:
+  - to: hypershift-operator
+  - dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
+  - dockerfile_literal: |
+      FROM hypershift-operator
+      RUN yum install -y jq && yum clean all
+    from: hypershift-operator
+    to: hypershift-cli
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "5.0"
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: e2e-azure-v2-self-managed
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-e2e-v2-self-managed
+zz_generated_metadata:
+  branch: azure-self-managed-e2e
+  org: openshift
+  repo: hypershift
