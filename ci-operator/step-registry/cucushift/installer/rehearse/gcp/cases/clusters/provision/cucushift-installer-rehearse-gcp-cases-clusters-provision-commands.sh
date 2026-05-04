@@ -78,10 +78,11 @@ function post_actions() {
   
   update_result "Region" "${REGION}"
   update_result "CPType" "${CONTROL_PLANE_INSTANCE_TYPE}"
-  update_result "CPamily" "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}"
+  update_result "CPFamily" "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}"
+  update_result "CPArch" "${CONTROL_PLANE_ARCH}"
   update_result "CType" "${COMPUTE_INSTANCE_TYPE}"
   update_result "CFamily" "${COMPUTE_INSTANCE_TYPE_FAMILY}"
-  update_result "Arch" "${ARCH}"
+  update_result "CArch" "${COMPUTE_ARCH}"
   update_result "Install" "${INSTALL_RESULT}"
   update_result "CreatedDate" "${CREATED_DATE}"
   update_result "Job" "$(echo "${JOB_SPEC}" | jq -r '.job')"
@@ -106,23 +107,27 @@ if [[ -n "${BASE_DOMAIN}" ]]; then
   GCP_BASE_DOMAIN="${BASE_DOMAIN}"
 fi
 REGION="$(jq -r '.Region' "${OUT_SELECT_DICT}")"
-ARCH="$(jq -r '.Arch' "${OUT_SELECT_DICT}")"
 
 CONTROL_PLANE_INSTANCE_TYPE="$(jq -r '.CPType' "${OUT_SELECT_DICT}")"
 CONTROL_PLANE_INSTANCE_TYPE_FAMILY="$(jq -r '.CPFamily' "${OUT_SELECT_DICT}")"
+CONTROL_PLANE_ARCH="$(jq -r '.CPArch' "${OUT_SELECT_DICT}")"
 
 COMPUTE_INSTANCE_TYPE="$(jq -r '.CType' "${OUT_SELECT_DICT}")"
 COMPUTE_INSTANCE_TYPE_FAMILY="$(jq -r '.CFamily' "${OUT_SELECT_DICT}")"
+COMPUTE_ARCH="$(jq -r '.CArch' "${OUT_SELECT_DICT}")"
 
-if is_empty "$ARCH"; then
-  # Default ARCH is determined by each plarform.
-  # For most of cased, default is arm.
-  # For the resgions which do not support arm64, then set amd64
-  ARCH="arm64"
+# Set default architectures if not specified
+if is_empty "$CONTROL_PLANE_ARCH"; then
+  CONTROL_PLANE_ARCH="arm64"
+fi
+
+if is_empty "$COMPUTE_ARCH"; then
+  COMPUTE_ARCH="arm64"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating cluster in region ${REGION}:"
-echo "$(date -u --rfc-3339=seconds) - ARCH: $ARCH"
+echo "$(date -u --rfc-3339=seconds) - CONTROL_PLANE_ARCH: $CONTROL_PLANE_ARCH"
+echo "$(date -u --rfc-3339=seconds) - COMPUTE_ARCH: $COMPUTE_ARCH"
 echo "$(date -u --rfc-3339=seconds) - CONTROL_PLANE_INSTANCE*: $CONTROL_PLANE_INSTANCE_TYPE $CONTROL_PLANE_INSTANCE_TYPE_FAMILY"
 echo "$(date -u --rfc-3339=seconds) - COMPUTE_INSTANCE*: $COMPUTE_INSTANCE_TYPE $COMPUTE_INSTANCE_TYPE_FAMILY"
 
@@ -140,13 +145,13 @@ function create_install_config() {
 apiVersion: v1
 baseDomain: ${GCP_BASE_DOMAIN}
 compute:
-- architecture: ${ARCH}
+- architecture: ${COMPUTE_ARCH}
   hyperthreading: Enabled
   name: worker
   platform: {}
   replicas: ${IC_COMPUTE_NODE_COUNT}
 controlPlane:
-  architecture: ${ARCH}
+  architecture: ${CONTROL_PLANE_ARCH}
   hyperthreading: Enabled
   name: master
   platform: {}

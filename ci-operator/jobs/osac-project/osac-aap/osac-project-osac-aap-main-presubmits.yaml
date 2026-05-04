@@ -5,36 +5,28 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
-    context: ci/prow/temp
+    cluster: build06
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-osac-project-osac-aap-main-temp
-    rerun_command: /test temp
+    name: pull-ci-osac-project-osac-aap-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=temp
+        - --target=[images]
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
@@ -62,4 +54,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )temp,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
