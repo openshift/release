@@ -144,9 +144,9 @@ END
 pushd /home
 # cleanup leftovers from previous executions
 rm -rf oc-mirror-workspace
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"

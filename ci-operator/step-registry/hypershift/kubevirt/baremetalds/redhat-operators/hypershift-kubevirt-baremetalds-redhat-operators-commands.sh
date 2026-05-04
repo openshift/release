@@ -5,6 +5,11 @@ set -o errexit
 set -o pipefail
 set -x
 
+export REDHAT_OPERATORS_INDEX_TAG="${REDHAT_OPERATORS_INDEX_TAG:-v4.15}"
+export DISCONNECTED="${DISCONNECTED:-false}"
+export CCS_OPERATOR_PACKAGES="${CCS_OPERATOR_PACKAGES:-}"
+export CCS_OPERATOR_CHANNELS="${CCS_OPERATOR_CHANNELS:-}"
+
 function mirror_ccs() {
     echo "### Mirroring the selected operators to the internal registry"
     source "${SHARED_DIR}/packet-conf.sh"
@@ -24,7 +29,14 @@ function mirror_ccs() {
     set -xeo pipefail
 
     echo "1. Get mirror registry"
-    mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+    mirror_registry=""
+    set +e
+    for attempt in 1 2 3; do
+        mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]') && break
+        echo "Attempt ${attempt}/3 failed to get imagecontentsourcepolicy, retrying in 30s..."
+        sleep 30
+    done
+    set -e
     mirror_registry=${mirror_registry%%/*}
     if [[ $mirror_registry == "" ]] ; then
         echo "Warning: Can not find the mirror registry, abort !!!"
@@ -49,18 +61,19 @@ function mirror_ccs() {
     echo "3: Check skopeo and registry credentials"
     if [[ ! -f /usr/bin/skopeo ]]; then
         yum install -y skopeo
-        oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
-        set +x
-        mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
-        skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
-        REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
-        REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
-        skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
-        set -x
     fi
 
+    oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
+    set +x
+    mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+    skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
+    REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
+    REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
+    skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
+    set -x
+
     echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures --authfile /home/pull-secret
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
@@ -125,9 +138,9 @@ END
     # cleanup leftovers from previous executions
     rm -rf oc-mirror-workspace
     # try at least 3 times to be sure to get all the images...
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
     popd
 
     echo "6: Create imageconentsourcepolicy and catalogsource"

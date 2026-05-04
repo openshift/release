@@ -59,10 +59,10 @@ jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret 
 ./oc-mirror version
 
 # mirror to disk first
-./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
 
 # push to the internal registry
-./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
 
 # apply IDMS
 cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
@@ -101,6 +101,37 @@ if [[ -z ${MCE} ]] ; then
   echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
 fi
 
+echo "Workaround for https://issues.redhat.com/browse/OCPBUGS-74263"
+CLUSTER_VERSION=$(oc get clusterversion version -ojsonpath='{.status.desired.version}' | grep -oP '^\d+\.\d+')
+
+
+if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+  mirror_image="quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962"
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+  mirror_image="quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58"
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" || "${CLUSTER_VERSION}" == "4.22" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth \
+    --from "${mirror_image}" \
+    --to ${mirror_registry}/${LOCALIMAGES}/local-release-image
+  
+  oc apply -f - <<END
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${mirror_registry}/${LOCALIMAGES}/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+END
+fi
 
 EOF
 
