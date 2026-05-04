@@ -43,7 +43,7 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
     )"; trap '
         cleanup
         LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
-        ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+            ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
     ' EXIT
 else
     trap 'cleanup' EXIT
