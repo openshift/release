@@ -277,6 +277,62 @@ function collect_diagnostic_data {
     v_idx=$((v_idx+1));
   done
 
+  # Collect diagnostics from bastion host if one was provisioned (bastion is often on a network not in failure domains)
+  if [[ -f "${SHARED_DIR}/bastion_host_path" ]]; then
+    bastion_path=$(< "${SHARED_DIR}/bastion_host_path")
+    bastion_vmname=$(echo "$bastion_path" | rev | cut -d'/' -f 1 | rev)
+    bastion_datacenter=$(echo "$bastion_path" | cut -d'/' -f 2)
+    echo "$(date -u --rfc-3339=seconds) - Collecting diagnostics from bastion host ${bastion_path}"
+    v_idx=0
+    while [[ $v_idx -lt $VCENTER_COUNT ]]; do
+      VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
+      GOVC_URL=$(echo $VCENTER | jq -r '.server')
+      # shellcheck disable=SC2034
+      GOVC_USERNAME=$(echo $VCENTER | jq -r '.user')
+      # shellcheck disable=SC2034
+      GOVC_PASSWORD=$(echo $VCENTER | jq -r '.password')
+      if govc vm.info -dc="${bastion_datacenter}" "${bastion_path}" &>/dev/null; then
+        echo "Bastion found on vCenter ${GOVC_URL}"
+        IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
+        bastion_vm_host="$(govc vm.info -dc="${bastion_datacenter}" "${bastion_path}" | grep "Host:" | awk -F "Host:         " '{print $2}')"
+        if [ -n "${bastion_vm_host}" ]; then
+          bastion_hostname=$(echo "${bastion_vm_host}" | rev | cut -d'/' -f 1 | rev)
+          if [ ! -f "${vcenter_state}/${bastion_hostname}.metrics.txt" ]; then
+            full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${bastion_vm_host}; done)
+            if [ -n "${full_hostpath:-}" ]; then
+              echo "Collecting Host metrics for ${bastion_vm_host}"
+              govc metric.sample -dc="${bastion_datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > "${vcenter_state}/${bastion_hostname}.metrics.txt"
+              govc metric.sample -dc="${bastion_datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > "${vcenter_state}/${bastion_hostname}.metrics.json"
+              govc object.collect -dc="${bastion_datacenter}" "${bastion_vm_host}" triggeredAlarmState &> "${vcenter_state}/${bastion_hostname}_alarms.log"
+              HOST_METRIC_FILE="${vcenter_state}/${bastion_hostname}.metrics.json"
+              JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$bastion_hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
+            fi
+          fi
+        fi
+        echo "Collecting VM metrics for bastion ${bastion_path}"
+        govc metric.sample -dc="${bastion_datacenter}" -d=80 -n=180 "${bastion_path}" ${vm_metrics} > "${vcenter_state}/${bastion_vmname}.metrics.txt"
+        govc metric.sample -dc="${bastion_datacenter}" -d=80 -n=180 -t=true -json=true "${bastion_path}" ${vm_metrics} > "${vcenter_state}/${bastion_vmname}.metrics.json"
+        govc object.collect -dc="${bastion_datacenter}" "${bastion_path}" triggeredAlarmState &> "${vcenter_state}/${bastion_vmname}_alarms.log"
+        echo "Keystoke enter in ${bastion_vmname} console"
+        govc vm.keystrokes -dc="${bastion_datacenter}" -vm.ipath="${bastion_path}" -c 0x28
+        echo "$(date -u --rfc-3339=seconds) - capture console image from bastion ${bastion_path}"
+        govc vm.console -dc="${bastion_datacenter}" -vm.ipath="${bastion_path}" -capture "${vcenter_state}/${bastion_vmname}.png"
+        curl -H "node-id: ${bastion_vmname}" -o "${vcenter_state}/${bastion_vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000 || true
+        curl -X DELETE -H "node-id: ${bastion_vmname}" http://log-gather.vmc.ci.openshift.org:8000 || true
+        METRIC_FILE="${vcenter_state}/${bastion_vmname}.metrics.json"
+        if [[ -f "${vcenter_state}/${bastion_vmname}.png" ]]; then
+          SCREENSHOT_B64=$(base64 -w0 < "${vcenter_state}/${bastion_vmname}.png")
+        else
+          SCREENSHOT_B64=""
+        fi
+        JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$bastion_vmname" --arg screenshot "$SCREENSHOT_B64" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
+        echo "${JSON_DATA}" > "${vcenter_state}/metric-files.json"
+        break
+      fi
+      v_idx=$((v_idx+1))
+    done
+  fi
+
   write_html
 
 }
