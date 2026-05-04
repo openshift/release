@@ -2,15 +2,9 @@ workflow:
   as: aro-hcp-local-e2e
   steps:
     allow_best_effort_post_steps: true
-    leases:
-    - resource_type: aro-hcp-test-msi-containers-dev
-      env: LEASED_MSI_CONTAINERS
-      count: 20
-    - resource_type: aro-hcp-msi-mock-cs-sp-dev
-      env: LEASED_MSI_MOCK_SP
-      count: 1
     pre:
       - ref: aro-hcp-write-config
+      - ref: aro-hcp-lease-acquire
       - ref: aro-hcp-provision-environment
     test:
       - ref: aro-hcp-test-local
@@ -21,5 +15,6 @@ workflow:
       - ref: aro-hcp-gather-custom-link-tools
       - ref: aro-hcp-gather-observability
       - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-lease-release
   documentation: |-
     The local ARO HCP e2e workflow starts an ARO HCP environment and runs the full end-to-end suite against it.

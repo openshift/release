@@ -4,6 +4,9 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+source ci-operator/step-registry/aro-hcp/lease/common/aro-hcp-lease-common-commands.sh
+aro_hcp_lease::source_env_exports
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
