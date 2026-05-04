@@ -45,7 +45,7 @@ if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then
     echo "export KCLI_PARAM='-P openshift_image=$IMG_URL'" >> "$MAINENV"
     echo "export SNO_PARAM='-f ${IMG}'" >> "$MAINENV"
 elif [[ "$JOB_TYPE" == "periodic" ]]; then
-    IMG_URL=$(curl -q -L -s \
+    IMG_URL=$(curl -q -L -s --retry 5 --retry-delay 10 \
         "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${T5CI_VERSION}.0-0.nightly/latest" \
         | jq -r ".pullSpec")
 
@@ -56,7 +56,7 @@ elif [[ "$JOB_TYPE" == "periodic" ]]; then
     echo "export KCLI_PARAM='-P tag=${T5CI_VERSION} -P version=nightly'" >> "$MAINENV"
     echo "export SNO_PARAM='-t ${T5CI_VERSION} -r nightly'" >> "$MAINENV"
 elif [[ "$JOB_TYPE" == "presubmit" ]] || [[ "$JOB_NAME" == *"rehears"* ]]; then
-    IMG_URL=$(curl -q -L -s \
+    IMG_URL=$(curl -q -L -s --retry 5 --retry-delay 10 \
         "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${T5CI_VERSION}.0-0.nightly/latest" \
         | jq -r ".pullSpec")
 
