@@ -73,7 +73,7 @@ spec:
         --csv-file /results/results.csv \
         --junit-file /results/junit_tls_scan.xml \
         --log-file /results/scan.log 2>&1 | tee /results/output.log
-      echo "Scan complete. Exit code: \$?"
+      echo "Scan complete. Exit code: \$?" | tee -a /results/output.log
       # Keep pod alive for artifact collection
       sleep 120
     resources:
@@ -106,17 +106,19 @@ echo "Streaming scanner logs (live)..."
 oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
 LOGS_PID=$!
 
-echo "Waiting for scan to finish (artifacts appear when scan completes, pod stays alive 120s for collection)..."
+echo "Waiting for scan to finish (pod stays alive 120s after scan for artifact collection)..."
 while true; do
     phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+    echo "Poll: phase=${phase}"
+    # Sentinel check first — must copy artifacts while pod is still running.
+    if oc exec pod/tls-scanner -n "${NAMESPACE}" -- grep -q "Scan complete" /results/output.log 2>/dev/null; then
+        echo "Sentinel found in /results/output.log — proceeding to copy artifacts"
         break
     fi
-    if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/output.log 2>/dev/null; then
-        if oc exec pod/tls-scanner -n "${NAMESPACE}" -- grep -q "Scan complete" /results/output.log 2>/dev/null; then
-            echo "Scan complete detected, collecting artifacts..."
-            break
-        fi
+    # Fallback: pod already exited (sleep window expired or crash).
+    if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+        echo "Warning: pod ${phase} before artifact collection — oc cp will likely fail"
+        break
     fi
     sleep 15
 done
@@ -130,6 +132,12 @@ if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
 fi
 
 wait $LOGS_PID 2>/dev/null || true
+
+if [[ "$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null)" == "Failed" ]]; then
+    echo "Scanner pod failed"
+    oc describe pod/tls-scanner -n "${NAMESPACE}"
+    exit 1
+fi
 
 oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
     echo "Scanner did not complete successfully"
