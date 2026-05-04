@@ -41,6 +41,13 @@ tests:
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-publish-release-notes
+- as: update-versions-releases
+  cron: 0 5 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: t3.medium
+    workflow: openshift-microshift-manage-versions-releases
 - as: e2e-aws-tests-cache-nightly
   capabilities:
   - intranet
@@ -131,24 +138,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      MICROSHIFT_OS: rhel-9.6
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-microshift-e2e-origin-conformance
-- as: e2e-aws-ovn-ocp-conformance-arm64
-  cron: 0 4 * * 1-5
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
-      MICROSHIFT_OS: rhel-9.6
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-microshift-e2e-origin-conformance
-- as: e2e-aws-ovn-ocp-conformance-serial-arm64
-  cron: 0 4 * * 1-5
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.6
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-microshift-e2e-origin-conformance

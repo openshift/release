@@ -35,6 +35,29 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-rhcos10-techpreview
   interval: 168h
   steps:
@@ -62,6 +85,7 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-no-capabilities
   interval: 168h
   steps:
@@ -108,6 +132,31 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-rhcos9-techpreview-serial
+  interval: 12h
+  shard_count: 3
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-rhcos9-10-techpreview-serial
+  interval: 12h
+  shard_count: 3
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
     observers:
       enable:
       - observers-resource-watch
@@ -188,6 +237,29 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+- as: e2e-azure-ovn-serial-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial
+- as: e2e-azure-ovn-serial-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial
 - as: e2e-azure-ovn-techpreview-serial
   interval: 168h
   steps:
@@ -198,6 +270,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-rhcos10-techpreview-serial
   interval: 168h
   steps:
@@ -209,6 +282,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-upgrade
   interval: 168h
   steps:
@@ -219,6 +293,39 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ovn-conf
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install-stableinitial
+    - ref: ipi-azure-rbac
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-techpreview-upgrade
   interval: 168h
@@ -295,6 +402,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-xpn
   interval: 168h
   steps:
@@ -325,6 +457,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-rhcos10-techpreview-serial
   interval: 168h
   steps:
@@ -336,6 +469,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-usernamespace
   cron: '@daily'
   steps:

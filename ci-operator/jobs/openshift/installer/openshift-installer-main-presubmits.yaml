@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/artifacts-images
     decorate: true
     labels:
@@ -143,7 +143,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/azure-ovn-marketplace-images
     decorate: true
     labels:
@@ -225,7 +225,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/azure-private
     decorate: true
     labels:
@@ -307,7 +307,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-4control-ipv4
     decorate: true
     labels:
@@ -390,7 +390,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-5control-ipv4
     decorate: true
     labels:
@@ -473,7 +473,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     labels:
@@ -555,7 +555,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-compact-ipv4-appliance-diskimage
     decorate: true
     labels:
@@ -638,7 +638,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-compact-ipv4-iso-no-registry
     decorate: true
     labels:
@@ -721,7 +721,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-compact-ipv4-none-platform
     decorate: true
     labels:
@@ -804,7 +804,90 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
+    context: ci/prow/e2e-agent-compact-ipv4-rhel10-techpreview
+    decorate: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-agent-compact-ipv4-rhel10-techpreview
+    optional: true
+    rerun_command: /test e2e-agent-compact-ipv4-rhel10-techpreview
+    run_if_changed: ^(cmd|pkg|data).*/agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-compact-ipv4-rhel10-techpreview
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4-rhel10-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-agent-compact-ipv6-minimaliso
     decorate: true
     labels:
@@ -887,7 +970,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-ha-dualstack
     decorate: true
     labels:
@@ -970,7 +1053,90 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
+    context: ci/prow/e2e-agent-ha-dualstack-rhel10-techpreview
+    decorate: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-agent-ha-dualstack-rhel10-techpreview
+    optional: true
+    rerun_command: /test e2e-agent-ha-dualstack-rhel10-techpreview
+    run_if_changed: ^(cmd|pkg|data).*/agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-ha-dualstack-rhel10-techpreview
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-ha-dualstack-rhel10-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-agent-sno-ipv4-pxe
     decorate: true
     labels:
@@ -1053,7 +1219,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-agent-sno-ipv6
     decorate: true
     labels:
@@ -1136,7 +1302,90 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
+    context: ci/prow/e2e-agent-sno-ipv6-rhel10-techpreview
+    decorate: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-agent-sno-ipv6-rhel10-techpreview
+    optional: true
+    rerun_command: /test e2e-agent-sno-ipv6-rhel10-techpreview
+    run_if_changed: ^(cmd|pkg|data).*/agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-sno-ipv6-rhel10-techpreview
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6-rhel10-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-agent-two-node-fencing-ipv4
     decorate: true
     labels:
@@ -1464,7 +1713,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-aws-eusc-techpreview
     decorate: true
     labels:
@@ -3578,7 +3827,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-confidential-trustedlaunch
     decorate: true
     labels:
@@ -3659,7 +3908,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-custom-dns-techpreview
     decorate: true
     labels:
@@ -3740,7 +3989,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-default-config
     decorate: true
     labels:
@@ -3822,7 +4071,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-nat-gateway-single-zone
     decorate: true
     labels:
@@ -3902,7 +4151,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -3983,7 +4232,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-devpreview
     decorate: true
     labels:
@@ -4064,7 +4313,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-dualstack-ipv4-primary-techpreview
     decorate: true
     labels:
@@ -4145,7 +4394,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-dualstack-ipv6-primary-techpreview
     decorate: true
     labels:
@@ -4226,7 +4475,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-multidisk-techpreview
     decorate: true
     labels:
@@ -4307,7 +4556,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     labels:
@@ -4388,7 +4637,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     labels:
@@ -4470,7 +4719,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     labels:
@@ -4551,7 +4800,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     labels:
@@ -6266,7 +6515,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     labels:
@@ -6348,7 +6597,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-assisted
     decorate: true
     labels:
@@ -6431,7 +6680,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ipi-ovn
     decorate: true
     labels:
@@ -6514,7 +6763,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     labels:
@@ -6597,7 +6846,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
@@ -6679,7 +6928,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ipi-ovn-swapped-hosts
     decorate: true
     labels:
@@ -6762,7 +7011,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ipi-ovn-virtualmedia
     decorate: true
     labels:
@@ -6845,7 +7094,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ovn-two-node-arbiter
     decorate: true
     labels:
@@ -6928,7 +7177,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build03
     context: ci/prow/e2e-metal-ovn-two-node-fencing
     decorate: true
     labels:
@@ -7011,7 +7260,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     labels:
@@ -7257,7 +7506,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-dualstack
     decorate: true
     labels:
@@ -7338,7 +7587,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-dualstack-upi
     decorate: true
     labels:
@@ -7420,7 +7669,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-externallb
     decorate: true
     labels:
@@ -7501,7 +7750,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-nfv-intel
     decorate: true
     labels:
@@ -7664,7 +7913,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     labels:
@@ -7746,7 +7995,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/e2e-openstack-singlestackv6
     decorate: true
     labels:
@@ -9394,7 +9643,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -9456,7 +9705,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/golint
     decorate: true
     labels:
@@ -9518,7 +9767,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     labels:
@@ -9580,7 +9829,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -9634,7 +9883,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/integration-tests
     decorate: true
     labels:
@@ -9713,7 +9962,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/integration-tests-nodejoiner
     decorate: true
     labels:
@@ -9877,7 +10126,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -10016,7 +10265,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -10078,7 +10327,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     labels:
@@ -10140,7 +10389,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/verify-codegen
     decorate: true
     labels:
@@ -10201,7 +10450,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -10279,7 +10528,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/verify-vendor
     decorate: true
     labels:
@@ -10341,7 +10590,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     labels:

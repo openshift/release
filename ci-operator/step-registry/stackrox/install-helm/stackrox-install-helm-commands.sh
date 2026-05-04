@@ -249,7 +249,15 @@ function install_secured_cluster_with_helm() {
 }
 
 echo '>>> Begin setup'
-fetch_last_nightly_tag
+
+# Check if a PR image tag was exported by a previous step
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/acs_image_tag" ]]; then
+  ACS_VERSION_TAG="$(cat "${SHARED_DIR}/acs_image_tag")"
+  echo "Using PR image tag from previous step: ${ACS_VERSION_TAG}"
+else
+  fetch_last_nightly_tag
+fi
+
 prepare_helm_templates
 helm version || install_helm
 

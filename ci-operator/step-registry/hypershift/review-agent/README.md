@@ -1,15 +1,21 @@
 # HyperShift Review Agent Workflow
 
-Automated periodic job that addresses review comments on PRs created by the HyperShift Jira Agent using Claude Code.
+Automated periodic job that addresses review comments, rebases branches, and fixes CI failures on PRs created by the HyperShift Jira Agent using Claude Code.
 
 ## Overview
 
-This workflow implements a fully automated system for addressing PR review comments:
+This workflow implements a fully automated system for PR maintenance:
 
 1. **Query**: Searches GitHub for open PRs from the hypershift-community fork that were created by the Jira Agent
-2. **Filter**: Identifies PRs with unresolved review threads that need attention
-3. **Process**: For each PR, runs the `/utils:address-reviews` command to analyze and address review comments
-4. **Push**: Commits and pushes changes back to the PR branch
+2. **Detect**: For each PR, checks three independent concerns (all API-only, no checkout needed):
+   - **Reviews**: Identifies unresolved review threads needing attention
+   - **Rebase**: Detects when the PR branch is behind its base branch
+   - **CI Failures**: Detects failing verify/unit/lint CI checks
+3. **Process**: Checks out the branch and handles each detected concern in order:
+   - Rebase onto upstream base branch (skip PR on conflict)
+   - Address review comments using `/utils:address-reviews`
+   - Reproduce and fix CI failures locally using Claude
+4. **Push**: Single force-push at the end if any phase made changes
 
 ## Data Flow Diagram
 
@@ -37,37 +43,58 @@ flowchart TD
 
         CheckPRs{PRs<br/>Found?}:::decision
         CheckMax{Processed <<br/>MAX_PRS<br/>Default: 10}:::decision
-        CheckReviews{Has Unresolved<br/>Reviews?}:::decision
-        CheckSuccess{Processing<br/>Successful?}:::decision
 
-        ProcessPR[Run Claude Code CLI<br/>/utils:address-reviews PR_NUMBER<br/>--max-turns 50]:::ai
+        %% Detection phase (API-only)
+        DetectReviews[Check review<br/>comments]:::process
+        DetectRebase[Check rebase<br/>status]:::process
+        DetectCI[Check CI<br/>status]:::process
+        CheckAnyAction{Any action<br/>needed?}:::decision
 
-        LogSuccess[Log success<br/>Push changes]:::success
-        LogSkip[Skip PR<br/>No pending reviews]:::skip
-        LogFailure[Log failure<br/>Will retry next run]:::failure
+        %% Processing phases
+        Checkout[Checkout<br/>PR branch]:::process
+        DoRebase{Needs<br/>rebase?}:::decision
+        PerformRebase[Rebase onto<br/>upstream base]:::process
+        RebaseConflict[Rebase conflict<br/>Skip PR]:::failure
+        DoReviews{Needs<br/>reviews?}:::decision
+        ProcessReviews[Claude: Address<br/>review comments]:::ai
+        DoCIFix{Needs<br/>CI fix?}:::decision
+        ProcessCIFix[Claude: Reproduce<br/>and fix CI failures]:::ai
+        Push[Push changes<br/>--force-with-lease]:::process
 
+        LogSkip[Skip PR<br/>Nothing to do]:::skip
         RateLimit[Wait 60 seconds<br/>Rate limiting]:::process
-        Summary[Print Summary<br/>Processed/Skipped/Failed counts]:::process
+        Summary[Print Summary]:::process
 
         QueryGitHub --> CheckPRs
         CheckPRs -->|No| Summary
         CheckPRs -->|Yes| CheckMax
         CheckMax -->|No| Summary
-        CheckMax -->|Yes| CheckReviews
-        CheckReviews -->|No| LogSkip
-        CheckReviews -->|Yes| ProcessPR
-        ProcessPR --> CheckSuccess
-        CheckSuccess -->|Yes| LogSuccess
-        CheckSuccess -->|No| LogFailure
-        LogSuccess --> RateLimit
+        CheckMax -->|Yes| DetectReviews
+        DetectReviews --> DetectRebase
+        DetectRebase --> DetectCI
+        DetectCI --> CheckAnyAction
+        CheckAnyAction -->|No| LogSkip
+        CheckAnyAction -->|Yes| Checkout
+        Checkout --> DoRebase
+        DoRebase -->|Yes| PerformRebase
+        DoRebase -->|No| DoReviews
+        PerformRebase -->|Conflict| RebaseConflict
+        PerformRebase -->|Success| DoReviews
+        DoReviews -->|Yes| ProcessReviews
+        DoReviews -->|No| DoCIFix
+        ProcessReviews --> DoCIFix
+        DoCIFix -->|Yes| ProcessCIFix
+        DoCIFix -->|No| Push
+        ProcessCIFix --> Push
+        Push --> RateLimit
         LogSkip --> RateLimit
-        LogFailure --> RateLimit
+        RebaseConflict --> RateLimit
         RateLimit --> CheckMax
     end
 
     %% External Systems
     GitHubAPI[(GitHub API<br/>openshift/hypershift)]:::external -.->|Return PRs & reviews| QueryGitHub
-    ClaudeAPI[(Claude API<br/>via Vertex AI)]:::external -.->|Address comments| ProcessPR
+    ClaudeAPI[(Claude API<br/>via Vertex AI)]:::external -.->|Address comments<br/>Fix CI failures| ProcessReviews
 
     TestPhase --> End([Workflow Complete]):::trigger
     Summary --> End
@@ -85,11 +112,27 @@ flowchart TD
     classDef secret fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000
 ```
 
+## Processing Order
+
+For each PR, phases execute in this order:
+
+1. **Rebase** (if branch is behind base)
+   - Fetches upstream and rebases
+   - On conflict: logs failure, skips remaining phases for this PR
+2. **Reviews** (if unresolved review threads exist)
+   - Uses existing `/utils:address-reviews` Claude invocation
+   - Posts replies and makes code changes as requested
+3. **CI Fixes** (if verify/unit/lint checks are failing and `REVIEW_AGENT_ENABLE_CI_FIXES=true`)
+   - Claude reproduces failures locally using `make verify`, `go test`, etc.
+   - Fixes code iteratively until checks pass
+4. **Push** (single push at end)
+   - `git push --force-with-lease` if any phase made changes
+
 ## Components
 
 ### Workflow
 - **File**: `hypershift-review-agent-workflow.yaml`
-- **Description**: Defines the two-phase workflow (pre/test)
+- **Description**: Defines the three-phase workflow (pre/test/post)
 
 ### Steps
 
@@ -100,15 +143,60 @@ flowchart TD
 #### 2. Process (`hypershift-review-agent-process`)
 - Clones ai-helpers and hypershift repositories
 - Queries GitHub API for agent-created PRs
-- Runs `comment_analyzer.py` to identify comments needing attention (prevents duplicate responses)
-- Runs `/utils:address-reviews` for each PR with pending reviews
-- Implements rate limiting (60s between PRs)
+- For each PR, detects needs (reviews, rebase, CI fixes)
+- Runs `comment_analyzer.py` to identify comments needing attention
+- Runs `/utils:address-reviews` for PRs with pending reviews
+- Runs Claude CI fix invocation for PRs with failing checks
+- Performs rebase for PRs with branches behind base
+- Single push at end of all phases
 
-#### 3. Comment Analyzer (`comment_analyzer.py`)
+#### 3. Report (`hypershift-review-agent-report`)
+- Reads per-PR actions JSON and Claude summaries
+- Generates HTML report with per-phase token usage and cost
+- Shows action badges (Rebased, Reviews, CI Fix) per PR
+
+#### 4. Comment Analyzer (`comment_analyzer.py`)
 - Python script that analyzes PR comments to prevent duplicate bot responses
 - Fetches review threads and issue comments via GitHub API
 - Compares timestamps to determine if bot already replied
 - Outputs JSON list of threads/comments that need attention
+
+## CI Failure Handling
+
+The agent detects and fixes CI check failures matching `verify`, `unit`, or `lint` patterns.
+
+### How It Works
+
+1. **Detection**: Uses `gh pr checks` to find failed checks matching the patterns
+2. **Local Reproduction**: Claude runs the same commands CI uses (`make verify`, `go test`, linters)
+3. **Fix**: Claude diagnoses the root cause and makes targeted code changes
+4. **Verification**: Claude re-runs the failing command to confirm the fix works
+
+### Available Build Tools
+
+The `claude-ai-helpers` container image is based on `ocp/builder:rhel-9-golang-1.25-openshift-4.22`, providing:
+- Go 1.25 toolchain
+- `make` and standard build tools
+- All dependencies needed to build and test HyperShift
+
+### Check Types Handled
+
+| Check Pattern | Reproduction Command | Common Fixes |
+|---------------|---------------------|--------------|
+| `verify` | `make verify` | Formatting, imports, generated files |
+| `unit` | `make test` / `go test ./...` | Test logic, API changes |
+| `lint` / `gitlint` | Linter / `gitlint` | Code style, commit messages |
+
+## Rebase Handling
+
+### When Triggered
+- PR's `mergeStateStatus` is `BEHIND` (branch behind base, no conflicts)
+- PR's `mergeStateStatus` is `DIRTY` (branch behind base, may have conflicts)
+
+### Conflict Handling
+- If `git rebase` fails, the rebase is aborted (`git rebase --abort`)
+- The PR is logged as `FAILED rebase_conflict`
+- Remaining phases (reviews, CI fix) are skipped for that PR
 
 ## Configuration
 
@@ -163,6 +251,10 @@ This is useful for:
   - Maximum number of PRs to process per run
   - Includes both processed and skipped PRs in the count
 
+- **`REVIEW_AGENT_ENABLE_CI_FIXES`** (default: `true`)
+  - Controls whether CI failure detection and fixing is active
+  - When enabled, the agent detects failing verify/unit/lint checks and invokes Claude to reproduce and fix failures locally
+
 - **`REVIEW_AGENT_TARGET_PR`** (optional)
   - Explicit PR number to process
   - If set, only this PR will be processed regardless of author
@@ -189,7 +281,7 @@ The workflow uses Claude Code CLI's non-interactive mode:
 claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
   --system-prompt "$SKILL_CONTENT" \
   --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
-  --max-turns 50 \
+  --max-turns 150 \
   --output-format stream-json
 ```
 
@@ -218,22 +310,6 @@ A comment/thread needs attention when:
 | Thread is resolved | Skip (marked complete by reviewer) |
 | Thread is outdated (code changed) | Skip (likely addressed by code change) |
 
-#### What Counts as an Unresolved Review Thread
-
-A review thread is considered **unresolved** when:
-
-1. **Inline code comments**: A reviewer left a comment on a specific line of code in the "Files changed" tab, and no one has clicked "Resolve conversation"
-2. **Review comments with suggestions**: Comments that include suggested code changes that haven't been resolved
-3. **Threaded discussions**: Any reply chain started from a code review that remains open
-
-A review thread is **NOT** created by:
-
-- General PR comments (comments in the main "Conversation" tab that aren't attached to code)
-- PR reviews that only contain an approval/request changes without inline comments
-- Commit comments
-
-**Visual indicator**: In GitHub's UI, unresolved threads show an "Unresolved" label and a "Resolve conversation" button. Resolved threads are collapsed and show "Resolved".
-
 #### Response Rules
 
 When addressing feedback, the bot follows these rules:
@@ -244,7 +320,7 @@ When addressing feedback, the bot follows these rules:
 ### Rate Limiting
 
 - 60 seconds between processing each PR
-- Maximum 50 agentic turns per PR
+- Maximum 150 agentic turns per PR per phase
 - Maximum PRs per run: configurable via `REVIEW_AGENT_MAX_PRS`
 - Runs once daily at 10:00 AM UTC (1 hour after jira-agent)
 
@@ -253,6 +329,7 @@ When addressing feedback, the bot follows these rules:
 Uses the `claude-ai-helpers` image from OpenShift CI containing:
 - Claude Code CLI
 - GitHub CLI (gh)
+- Go 1.25 toolchain, make, and standard build tools
 - jq, git, curl
 - Required dependencies
 
@@ -262,11 +339,11 @@ This workflow is a companion to the `hypershift-jira-agent` workflow:
 
 | Aspect | Jira Agent | Review Agent |
 |--------|------------|--------------|
-| Purpose | Create PRs from Jira issues | Address review comments on PRs |
+| Purpose | Create PRs from Jira issues | Address reviews, rebase, fix CI |
 | Schedule | Daily 9:00 AM UTC | Daily 10:00 AM UTC |
 | Input | Jira issues with `issue-for-agent` label | PRs created by Jira Agent |
 | Output | Draft PRs | Updated PR branches |
-| Command | `/jira-solve` | `/utils:address-reviews` |
+| Command | `/jira-solve` | `/utils:address-reviews` + CI fix |
 
 ## Monitoring
 
@@ -274,16 +351,20 @@ This workflow is a companion to the `hypershift-jira-agent` workflow:
 - PRs processed successfully with changes pushed
 - No authentication errors
 - Review comments addressed
+- CI failures fixed
+- Branches rebased
 
 ### Failure Indicators
 - Failed to authenticate with Claude API
 - Failed to push changes (GitHub auth issues)
+- Rebase conflicts
 - Individual PR processing failures
 
 ### Logs
 Check Prow job logs for:
 - GitHub query results
-- Processing output for each PR
+- Detection phase results (reviews, rebase, CI status)
+- Processing output for each PR and phase
 - Error messages
 
 ## Troubleshooting
@@ -292,9 +373,18 @@ Check Prow job logs for:
 - Check that jira-agent has created PRs
 - Verify PRs are open and authored by `app/hypershift-jira-solve-ci`
 
-### Issue: PRs skipped (no pending reviews)
-- This is normal - PRs without unresolved review threads are skipped
-- Check GitHub for actual review status
+### Issue: PRs skipped (no action needed)
+- This is normal - PRs without reviews, rebase needs, or CI failures are skipped
+- Check GitHub for actual review/CI/merge status
+
+### Issue: Rebase conflicts
+- The agent will abort the rebase and skip the PR
+- Manual intervention is needed to resolve conflicts
+
+### Issue: CI fixes not working
+- Verify `REVIEW_AGENT_ENABLE_CI_FIXES` is set to `true`
+- Check that the failing checks match `verify|unit|lint` patterns
+- Review Claude's CI fix output in the HTML report for diagnosis details
 
 ### Issue: Authentication failures
 - Verify secrets are mounted correctly
@@ -304,10 +394,3 @@ Check Prow job logs for:
 ### Issue: Push fails
 - Check GitHub App installation permissions for fork
 - Verify branch exists and is not protected
-
-## Future Enhancements
-
-- Slack notifications for addressed reviews
-- Priority-based processing (older reviews first)
-- Automatic retry for transient failures
-- Metrics push to Prometheus

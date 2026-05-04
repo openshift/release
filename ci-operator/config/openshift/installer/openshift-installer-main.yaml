@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -1172,6 +1172,51 @@ tests:
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-compact-ipv4-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_DISK=100
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-ha-dualstack-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-sno-ipv6-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+        AGENT_USE_ZTP_MANIFESTS=true
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
     workflow: agent-e2e-compact-ipv4
 - always_run: false
   as: e2e-agent-compact-ipv4-none-platform

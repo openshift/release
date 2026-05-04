@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-operator-disruptive-single-node
     decorate: true
     labels:
@@ -86,7 +86,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -166,7 +166,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     labels:
@@ -247,7 +247,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-2of2
     decorate: true
     labels:
@@ -328,7 +328,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     labels:
@@ -409,7 +409,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -489,7 +489,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -570,7 +570,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
@@ -650,7 +650,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-aescbc
     decorate: true
     labels:
@@ -732,7 +732,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-aesgcm
     decorate: true
     labels:
@@ -814,7 +814,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-kms
     decorate: true
     labels:
@@ -896,7 +896,88 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
+    context: ci/prow/e2e-gcp-operator-encryption-kms-ote
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-release-5.1-e2e-gcp-operator-encryption-kms-ote
+    rerun_command: /test e2e-gcp-operator-encryption-kms-ote
+    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp-operator-encryption-kms-ote
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms-ote,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-perf-aescbc
     decorate: true
     labels:
@@ -978,7 +1059,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-perf-aesgcm
     decorate: true
     labels:
@@ -1060,7 +1141,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-perf-single-node
     decorate: true
     labels:
@@ -1142,7 +1223,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aescbc
     decorate: true
     labels:
@@ -1224,7 +1305,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aesgcm
     decorate: true
     labels:
@@ -1306,7 +1387,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-rotation-single-node
     decorate: true
     labels:
@@ -1388,7 +1469,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-encryption-single-node
     decorate: true
     labels:
@@ -1470,7 +1551,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-serial-ote
     decorate: true
     labels:
@@ -1550,7 +1631,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-gcp-operator-single-node
     decorate: true
     labels:
@@ -1631,7 +1712,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-180d
     decorate: true
     labels:
@@ -1712,7 +1793,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-1y
     decorate: true
     labels:
@@ -1793,7 +1874,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-90d
     decorate: true
     labels:
@@ -1874,7 +1955,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-180d
     decorate: true
     labels:
@@ -1955,7 +2036,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-1y
     decorate: true
     labels:
@@ -2036,7 +2117,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-90d
     decorate: true
     labels:
@@ -2117,7 +2198,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-180d
     decorate: true
     labels:
@@ -2198,7 +2279,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-1y
     decorate: true
     labels:
@@ -2279,7 +2360,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-90d
     decorate: true
     labels:
@@ -2360,7 +2441,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-180d
     decorate: true
     labels:
@@ -2441,7 +2522,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-1y
     decorate: true
     labels:
@@ -2522,7 +2603,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-2y
     decorate: true
     labels:
@@ -2603,7 +2684,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-3y
     decorate: true
     labels:
@@ -2684,7 +2765,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-90d
     decorate: true
     labels:
@@ -2765,7 +2846,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     labels:
@@ -2846,7 +2927,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-short-cert-rotation
     decorate: true
     labels:
@@ -2927,7 +3008,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/e2e-short-cert-rotation-azure
     decorate: true
     labels:
@@ -3008,7 +3089,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/images
     decorate: true
     labels:
@@ -3062,7 +3143,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/k8s-e2e-gcp
     decorate: true
     labels:
@@ -3142,7 +3223,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/k8s-e2e-gcp-serial
     decorate: true
     labels:
@@ -3223,7 +3304,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/unit
     decorate: true
     labels:
@@ -3284,7 +3365,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/verify
     decorate: true
     labels:
@@ -3345,7 +3426,7 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
-    cluster: build04
+    cluster: build08
     context: ci/prow/verify-deps
     decorate: true
     labels:

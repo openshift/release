@@ -19,13 +19,15 @@ export LOCATION; LOCATION="${LOCATION:=${LEASED_RESOURCE}}"
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
+
 export E2E_TYPE; E2E_TYPE="${E2E_TYPE:=csp}"
+if [[ "${E2E_TYPE}" == "miwi" ]]; then
+  export USE_WI="true"
+  export PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS; PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS=$(az rest --method GET --uri "/subscriptions/${AZURE_SUBSCRIPTION_ID}/providers/Microsoft.redhatopenshift/locations/${LOCATION}/platformworkloadidentityrolesets?api-version=2025-07-25" --query "value[*].properties")
+else
+  export USE_WI="false"
+fi
 export RESOURCEGROUP; RESOURCEGROUP="${NAMESPACE}-prow-${LOCATION}-${UNIQUE_HASH}-${E2E_TYPE}"
 export CLUSTER; CLUSTER="${RESOURCEGROUP}"
-
-
-echo "Location: ${LOCATION}"
-echo "Resource Group: ${RESOURCEGROUP}"
-echo "Cluster Name: ${CLUSTER}"
 
 e2e.test -test.v --ginkgo.v --ginkgo.timeout 180m --ginkgo.flake-attempts=2 --ginkgo.no-color --ginkgo.label-filter=!smoke

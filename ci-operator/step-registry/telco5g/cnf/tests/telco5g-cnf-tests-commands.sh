@@ -640,14 +640,14 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.22" ]] || [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
+if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.21"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
     export TARGET_RELEASE=$CNF_BRANCH
-    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}

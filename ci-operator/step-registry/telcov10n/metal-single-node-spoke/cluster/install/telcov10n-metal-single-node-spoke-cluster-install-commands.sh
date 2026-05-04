@@ -91,18 +91,31 @@ function generate_host_firmware_settings_manifest {
     set +x
     echo
 
-    oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
+    desired_settings_json=$(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+
+    # Skip patch when desired settings already match current BIOS state to prevent
+    # Metal3 generation/observedGeneration deadlock (BMH stuck in "preparing" forever).
+    current_bios_subset=$(oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" \
+      -ojson | jq -c --argjson desired "${desired_settings_json}" \
+      '[.status.settings | to_entries[] | select(.key as $k | $desired | has($k))] | sort_by(.key) | from_entries')
+    desired_sorted=$(echo "${desired_settings_json}" | jq -c 'to_entries | sort_by(.key) | from_entries')
+
+    if [ "${desired_sorted}" = "${current_bios_subset}" ]; then
+      echo "All BIOS settings already match current state. Skipping HFS patch."
+    else
+      oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
 spec:
-  settings: $(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+  settings: ${desired_settings_json}
 EO-hfs-patch
 
-    echo
-    echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
-    echo "-----------------------------------------------------------------"
-    set -x
-    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
-    set +x
-    echo
+      echo
+      echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
+      echo "-----------------------------------------------------------------"
+      set -x
+      oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+      set +x
+      echo
+    fi
   fi
 }
 

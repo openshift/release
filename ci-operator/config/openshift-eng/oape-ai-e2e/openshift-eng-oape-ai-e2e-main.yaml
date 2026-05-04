@@ -1,0 +1,30 @@
+binary_build_commands: cd go-server && go install .
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+  items:
+  - dockerfile_path: images/agent-worker.Dockerfile
+    to: agent-worker
+  - dockerfile_path: images/gh-token-minter.Dockerfile
+    to: gh-token-minter
+  - dockerfile_path: images/go-server.Dockerfile
+    to: go-server
+promotion:
+  to:
+  - name: ai-e2e-agent
+    namespace: oape
+    tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: oape-ai-e2e

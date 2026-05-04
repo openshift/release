@@ -68,6 +68,11 @@ if [[ "${RUN_UPGRADE_TEST:-}" == "true" ]] && check_e2e_flag "upgrade.run-tests"
   RUN_UPGRADE_PARAM="--upgrade.run-tests --e2e.private-platform=AWS --e2e.ho-enable-ci-debug-output=true --e2e.hypershift-operator-latest-image=${CI_HYPERSHIFT_OPERATOR}"
 fi
 
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
+fi
+
 OAUTH_EXTERNAL_OIDC_PARAM=""
 if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
@@ -117,5 +122,6 @@ hack/ci-test-e2e.sh -test.v \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  ${RUN_UPGRADE_PARAM} &
+  ${RUN_UPGRADE_PARAM} \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
 wait $!

@@ -15,6 +15,8 @@ promotion:
   to:
   - name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -34,13 +36,26 @@ resources:
       memory: 200Mi
 test_binary_build_commands: openshift/unit-tests.sh
 tests:
-- always_run: false
-  as: e2e-azure-ovn-techpreview
-  optional: true
+- as: e2e-azure-ovn-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: e2e-azure-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-e2e-azure
 - as: unit
   commands: openshift/unit-tests.sh

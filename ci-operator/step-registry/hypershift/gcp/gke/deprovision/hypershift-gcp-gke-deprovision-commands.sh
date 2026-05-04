@@ -18,8 +18,8 @@ else
     # If the provision step is aborted (SIGTERM), the Secret update may not complete,
     # leaving SHARED_DIR empty for post steps. Reconstruct from env vars.
     RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
-    INFRA_ID="${RESOURCE_NAME_PREFIX}"
-    CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
+    PROJECT_HASH="ci$(echo -n "${BUILD_ID}" | sha256sum | cut -c1-8)"
+    CP_PROJECT_ID="${PROJECT_HASH}-control-plane"
     CP_CLUSTER_NAME="${RESOURCE_NAME_PREFIX}-gke"
     GCP_REGION="${GKE_REGION}"
     echo "WARNING: SHARED_DIR files missing - reconstructed resource names from env vars"
@@ -41,8 +41,8 @@ fi
 if [[ -f "${SHARED_DIR}/hosted-cluster-project-id" ]]; then
     HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
 else
-    INFRA_ID="${INFRA_ID:-${NAMESPACE}-${UNIQUE_HASH}}"
-    HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
+    PROJECT_HASH="${PROJECT_HASH:-ci$(echo -n "${BUILD_ID}" | sha256sum | cut -c1-8)}"
+    HC_PROJECT_ID="${PROJECT_HASH}-hosted-cluster"
     echo "WARNING: Reconstructed HC_PROJECT_ID=${HC_PROJECT_ID}"
 fi
 
