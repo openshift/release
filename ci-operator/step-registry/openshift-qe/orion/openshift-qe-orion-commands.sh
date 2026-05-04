@@ -25,7 +25,15 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git switch ${PULL_NUMBER}
 fi
 
-pip install -r requirements.txt
+MAX_RETRIES=3
+set +e
+for attempt in $(seq 1 $MAX_RETRIES); do
+  pip install -r requirements.txt && break
+  echo "pip install -r requirements.txt failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..."
+  [[ $attempt -eq $MAX_RETRIES ]] && { echo "pip install -r requirements.txt failed after $MAX_RETRIES attempts, exiting..."; exit 1; }
+  sleep 10
+done
+set -e
 
 case "$ES_TYPE" in
   qe)
