@@ -250,8 +250,12 @@ function install_secured_cluster_with_helm() {
 
 echo '>>> Begin setup'
 
+# Check for explicit ACS_IMAGE_TAG override first
+if [[ -n "${ACS_IMAGE_TAG:-}" ]]; then
+  ACS_VERSION_TAG="${ACS_IMAGE_TAG}"
+  echo "Using explicitly set ACS_IMAGE_TAG: ${ACS_VERSION_TAG}"
 # Check if a PR image tag was exported by a previous step
-if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/acs_image_tag" ]]; then
+elif [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/acs_image_tag" ]]; then
   ACS_VERSION_TAG="$(cat "${SHARED_DIR}/acs_image_tag")"
   echo "Using PR image tag from previous step: ${ACS_VERSION_TAG}"
 else

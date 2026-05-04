@@ -27,10 +27,13 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-stackrox
     env:
+      ACS_IMAGE_TAG: 4.11.x-688-g405c8cf703
       BASE_DOMAIN: perfscale.rox.systems
-      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
-      COMPUTE_NODE_REPLICAS: "24"
-      PODS_PER_NODE: "240"
+      COMPUTE_NODE_REPLICAS: "5"
+      CONNECTION_LOAD_REPLICAS: "2"
+      ENDPOINT_LOAD_REPLICAS: "2"
+      JOB_ITERATIONS: "2"
+      PROCESS_LOAD_REPLICAS: "2"
       ROX_SCANNER_V4_ENABLED: "true"
       SCANNER_V4_MATCHER_READINESS: vulnerability
       SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
@@ -38,7 +41,7 @@ tests:
       USER_TAGS: |
         TicketId 382
         RoxProject PerfScale
-      ZONES_COUNT: "3"
+      ZONES_COUNT: "1"
     post:
     - chain: gather-core-dump
     - chain: ipi-aws-post
@@ -51,7 +54,7 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: stackrox-install-helm
     test:
-    - chain: stackrox-perfscale
+    - chain: stackrox-perfscale-berserker-test
   timeout: 14h0m0s
 zz_generated_metadata:
   branch: master
