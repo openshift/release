@@ -1,0 +1,1 @@
+../../rhdh-aks-lifecycle/scripts/check-k8s-lifecycle.sh

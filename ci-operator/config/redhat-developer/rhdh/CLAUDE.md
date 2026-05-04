@@ -2,7 +2,7 @@
 
 ## Available Skills
 
-Skills in `.claude/skills/` are loaded on demand by the agent. Use them when working with RHDH OCP version management in this repository.
+Skills in `.claude/skills/` are loaded on demand by the agent. Use them when working with RHDH version management in this repository.
 
 ### `rhdh-ocp-lifecycle` — Check RHDH & OCP version support
 
@@ -31,6 +31,36 @@ Cross-reference cluster pools, CI test configs, RHDH lifecycle, and OCP lifecycl
 ### `rhdh-decommission-release` — Decommission EOL release branch
 
 Remove all CI configuration for an end-of-life RHDH release branch: CI config file, generated Prow jobs, and branch protection entry.
+
+### `rhdh-aks-lifecycle` — Check AKS K8s version support
+
+Query the endoflife.date API to check which AKS Kubernetes versions are supported and compare against the version configured in the MAPT create script. Cross-verifies with vendor docs. The configured version lives in a shared step-registry script and affects all RHDH branches.
+
+**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]`
+
+### `rhdh-aks-tests` — Manage AKS test entries and K8s version
+
+List AKS test entries (`e2e-aks-*`) across RHDH release branches and update the K8s version in the shared MAPT create script. Unlike OCP tests, AKS uses a single shared version for all branches. `make update` is not required for version changes.
+
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex> [--mapt-script <path>]`
+
+### `rhdh-eks-lifecycle` — Check EKS K8s version support
+
+Query the endoflife.date API to check which EKS Kubernetes versions are supported and compare against the version configured in the MAPT create script. Cross-verifies with vendor docs. The configured version lives in a shared step-registry script and affects all RHDH branches.
+
+**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]`
+
+### `rhdh-eks-tests` — Manage EKS test entries and K8s version
+
+List EKS test entries (`e2e-eks-*`) across RHDH release branches and update the K8s version in the shared MAPT create script. Unlike OCP tests, EKS uses a single shared version for all branches. `make update` is not required for version changes.
+
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex> [--mapt-script <path>]`
+
+### `rhdh-gke-lifecycle` — Check GKE K8s version support
+
+Query the endoflife.date API to check which GKE Kubernetes versions are supported. Cross-verifies with vendor docs. GKE uses a long-running static cluster whose version is not managed in CI config — updates require manual intervention on the cluster itself.
+
+**Scripts**: `check-k8s-lifecycle.sh --api-url <url>`
 
 ## New Release Branch Checklist
 
