@@ -3,9 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
-  export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
-fi
+source ci-operator/step-registry/aro-hcp/lease/common/aro-hcp-lease-common-commands.sh
+aro_hcp_lease::source_env_exports
 
 export AZURE_TOKEN_CREDENTIALS=prod
 

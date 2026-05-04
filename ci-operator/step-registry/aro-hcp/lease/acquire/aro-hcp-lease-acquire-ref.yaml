@@ -1,0 +1,41 @@
+ref:
+  as: aro-hcp-lease-acquire
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-lease-acquire-commands.sh
+  grace_period: 15s
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-int
+      mount_path: /var/run/aro-hcp-int
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-stg
+      mount_path: /var/run/aro-hcp-stg
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-prod
+      mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: |-
+        Selects which environment's cluster secrets to use (dev, int, stg, prod).
+    - name: LOCATION
+      default: ""
+      documentation: |-
+        Preferred Azure region for slot selection (for example, "uksouth").
+    - name: MULTISTAGE_PARAM_OVERRIDE_LOCATION
+      default: ""
+      documentation: |-
+        Overrides LOCATION via Gangway API when selecting the runtime slot.
+    - name: ARO_HCP_DEPLOY_ENV
+      default: ""
+      documentation: Config environment name (prow, ci01, int, stg, prod).
+  documentation: |-
+    Acquire the runtime Boskos leases required by ARO HCP E2E workflows and
+    persist the runtime slot env contract into SHARED_DIR for later steps.
