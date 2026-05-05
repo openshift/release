@@ -77,10 +77,10 @@ main() {
     echo "Deploy OCP for compute-nto testing"
     ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
-        --extra-vars "release=${VERSION}" \
+        --extra-vars "release=quay.io/openshift-release-dev/ocp-release:4.22.0-rc.2-x86_64" \
         --extra-vars "cluster_name=${CLUSTER_NAME}" \
         --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" \
-        --extra-vars "ocp_version_facts_release_type=${OCP_VERSION_RELEASE_TYPE}" \
+        --extra-vars "ocp_version_facts_release_type=quay.io/openshift-release-dev/ocp-release:4.22.0-rc.2-x86_64" \
         --extra-vars "ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}"
 
     echo "Store inventory in SHARED_DIR"
