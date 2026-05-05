@@ -14,6 +14,7 @@ PARAMS=(
     --recursive
     --lenient
     --use-llm
+    --fail-on-severity high
     --format sarif
     --output-sarif "${ARTIFACT_DIR}/skill-scanner.sarif"
     --format json
