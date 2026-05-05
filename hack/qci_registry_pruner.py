@@ -256,7 +256,18 @@ def get_release_component_images(payload_pullspec: str) -> List[Dict[str, str]]:
         # For that, we would need to get image info for all architectures.
         # Here, we assume a single manifest.
         cmd = ["oc", "adm", "release", "info", "--output=json", payload_pullspec]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=300)
+        dockerconfig_json = os.getenv(QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME)
+        run_env = os.environ.copy()
+        if dockerconfig_json:
+            run_env["REGISTRY_AUTH_FILE"] = dockerconfig_json
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=300,
+            env=run_env,
+        )
 
         data = json.loads(result.stdout)
         tags = data.get("references", {}).get("spec", {}).get("tags", [])
