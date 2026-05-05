@@ -122,6 +122,75 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- as: e2e-gcp-operator-weekly
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependency_overrides:
+      OO_INDEX: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__4.22__ose-support-log-gather-rhel9-operator
+    env:
+      OO_CHANNEL: tech-preview
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_PACKAGE: support-log-gather-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: setup-konflux-image-access
+      cli: latest
+      commands: |
+        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-rhel9-operator
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-must-gather-rhel9
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      credentials:
+      - mount_path: /var/run/secrets/pull-secret
+        name: deploy-konflux-operator-art-image-share
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-subscribe
+    - as: verify-install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true

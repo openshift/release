@@ -7,119 +7,45 @@ images:
   items:
   - additional_architectures:
     - arm64
-    dockerfile_path: Dockerfile.gui
-    to: fleetshift-gui
-  - additional_architectures:
-    - arm64
-    dockerfile_path: Dockerfile.mock-servers
-    to: fleetshift-mock-servers
-  - additional_architectures:
-    - arm64
-    dockerfile_path: Dockerfile.mock-ui-plugins
-    to: fleetshift-mock-ui-plugins
+    dockerfile_path: Dockerfile.web
+    to: fleetshift-web
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror-gui
+- as: pr-image-mirror
   capabilities:
   - arm64
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-gui
+      SOURCE_IMAGE_REF: fleetshift-web
     env:
-      IMAGE_REPO: fleetshift-gui
+      IMAGE_REPO: fleetshift-web
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-latest-gui
+- as: pr-merge-image-mirror-latest
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-gui
+      SOURCE_IMAGE_REF: fleetshift-web
     env:
-      IMAGE_REPO: fleetshift-gui
+      IMAGE_REPO: fleetshift-web
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
-- as: pr-image-mirror-mock-servers
-  capabilities:
-  - arm64
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-servers
-    env:
-      IMAGE_REPO: fleetshift-mock-servers
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-latest-mock-servers
+- as: pr-merge-image-mirror-sha
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-servers
+      SOURCE_IMAGE_REF: fleetshift-web
     env:
-      IMAGE_REPO: fleetshift-mock-servers
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-image-mirror-mock-ui-plugins
-  capabilities:
-  - arm64
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-ui-plugins
-    env:
-      IMAGE_REPO: fleetshift-mock-ui-plugins
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-latest-mock-ui-plugins
-  capabilities:
-  - arm64
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-ui-plugins
-    env:
-      IMAGE_REPO: fleetshift-mock-ui-plugins
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-sha-gui
-  capabilities:
-  - arm64
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-gui
-    env:
-      IMAGE_REPO: fleetshift-gui
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-sha-mock-servers
-  capabilities:
-  - arm64
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-servers
-    env:
-      IMAGE_REPO: fleetshift-mock-servers
-      REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror-sha-mock-ui-plugins
-  capabilities:
-  - arm64
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: fleetshift-mock-ui-plugins
-    env:
-      IMAGE_REPO: fleetshift-mock-ui-plugins
+      IMAGE_REPO: fleetshift-web
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
 zz_generated_metadata:

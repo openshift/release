@@ -477,7 +477,7 @@ CONFIG = {
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
     'powervs-multi-1-quota-slice': {
-        'wdc06': 2,
+        'lon04': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 40,
@@ -495,7 +495,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'us-east': 3,
+        'lon04': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
