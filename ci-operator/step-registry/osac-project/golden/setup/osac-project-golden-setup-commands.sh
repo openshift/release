@@ -252,6 +252,18 @@ wait_keycloak &
 wait
 echo "$(date +%T) All parallel waits complete"
 
+echo "$(date +%T) Waiting for AAP API to serve requests..."
+AAP_URL="https://osac-aap-osac-e2e-ci.apps.test-infra-cluster-d55276d8.redhat.com/api/controller/v2/ping/"
+for i in $(seq 1 60); do
+  code=$(curl -sk --connect-timeout 5 -o /dev/null -w '%{http_code}' "${AAP_URL}" 2>/dev/null || echo "000")
+  if [[ "${code}" != "503" && "${code}" != "000" && "${code}" != "502" ]]; then
+    echo "$(date +%T) AAP API responding (HTTP ${code}, ${i}0s)"
+    break
+  fi
+  echo "$(date +%T) AAP API not ready (HTTP ${code})..."
+  sleep 10
+done
+
 echo "$(date +%T) Restarting Authorino for clean OIDC discovery..."
 oc --kubeconfig="${HUB_KC}" rollout restart deployment/authorino -n osac-e2e-ci 2>&1 || true
 oc --kubeconfig="${HUB_KC}" rollout status deployment/authorino -n osac-e2e-ci --timeout=120s 2>&1 || true
