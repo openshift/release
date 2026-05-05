@@ -45,7 +45,7 @@ echo "Updating networking section in install-config.yaml..."
 # Remove existing networking section and add our custom one
 # This is a more reliable approach than trying to merge YAML without dependencies
 awk '
-BEGIN { in_networking = 0; print_networking = 0 }
+BEGIN { in_networking = 0 }
 /^networking:/ { 
     in_networking = 1
     print "networking:"
@@ -57,16 +57,17 @@ BEGIN { in_networking = 0; print_networking = 0 }
     print "  machineNetwork:"
     print "  - cidr: '"${MACHINE_NETWORK_CIDR}"'"
     print "  networkType: '"${NETWORK_TYPE}"'"
-    print_networking = 1
     next
 }
 /^[a-zA-Z]/ && in_networking && !/^  / {
     in_networking = 0
+    print $0
+    next
 }
-!in_networking || /^  / && in_networking && print_networking {
-    if (!in_networking) print $0
+in_networking && /^  / {
+    next
 }
-!in_networking && !print_networking {
+!in_networking {
     print $0
 }
 ' "${CONFIG}.backup" > "${CONFIG}"

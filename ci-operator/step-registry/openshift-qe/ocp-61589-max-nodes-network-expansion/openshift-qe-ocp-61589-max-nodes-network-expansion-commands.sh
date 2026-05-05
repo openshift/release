@@ -9,8 +9,9 @@ set -o pipefail
 # approximately 512 nodes can become Ready before hitting subnet exhaustion.
 
 EXPECTED_READY_NODES=${EXPECTED_READY_NODES:-512}
-TOTAL_SCALE_NODES=${TOTAL_SCALE_NODES:-520}
+TOTAL_SCALE_NODES=${MAX_NODES_TARGET:-520}
 EXPANSION_TARGET_CIDR=${EXPANSION_TARGET_CIDR:-10.128.0.0/14}
+CLUSTER_NETWORK_ORIGINAL_CIDR="${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}"
 
 echo "=========================================="
 echo "OCP-61589: Maximum nodes network expansion test"
@@ -32,17 +33,55 @@ echo "Initial node count: ${INITIAL_NODES}"
 echo "Initial network configuration:"
 oc get network.config cluster -o yaml
 
-# Perform network expansion (this should already be done by ovn-clusternetwork-cidr-expansion step)
-echo "Checking if network expansion has occurred..."
+# Verify cluster starts with correct original CIDR
+echo "Verifying initial cluster network CIDR..."
 CURRENT_CIDR=$(oc get network.config cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
 echo "Current CIDR: ${CURRENT_CIDR}"
 
-if [[ "${CURRENT_CIDR}" == "${EXPANSION_TARGET_CIDR}" ]]; then
-  echo "✅ Network expansion already completed to ${EXPANSION_TARGET_CIDR}"
-else
-  echo "❌ Network expansion not detected. Expected ${EXPANSION_TARGET_CIDR}, got ${CURRENT_CIDR}"
+if [[ "${CURRENT_CIDR}" != "${CLUSTER_NETWORK_ORIGINAL_CIDR}" ]]; then
+  echo "❌ CRITICAL ERROR: Cluster started with CIDR ${CURRENT_CIDR} instead of expected ${CLUSTER_NETWORK_ORIGINAL_CIDR}"
+  echo "TEST CANNOT PROCEED: Expansion from ${CURRENT_CIDR} to ${EXPANSION_TARGET_CIDR} would not validate the intended functionality"
   exit 1
 fi
+
+echo "✅ Cluster network CIDR verified: ${CURRENT_CIDR}"
+
+# Perform network expansion from /20 to /14
+echo "🚀 Performing network CIDR expansion from ${CLUSTER_NETWORK_ORIGINAL_CIDR} to ${EXPANSION_TARGET_CIDR}..."
+expansion_start_time=$(date +%s)
+
+oc patch network.config cluster --type='merge' --patch="{\"spec\":{\"clusterNetwork\":[{\"cidr\":\"${EXPANSION_TARGET_CIDR}\",\"hostPrefix\":22}]}}"
+
+echo "⏳ Waiting for network expansion to complete..."
+timeout_seconds=600
+end_time=$(($(date +%s) + timeout_seconds))
+
+while [[ $(date +%s) -lt $end_time ]]; do
+    current_cidr=$(oc get network.config cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+    if [[ "$current_cidr" == "$EXPANSION_TARGET_CIDR" ]]; then
+        echo "✅ Network expansion completed successfully"
+        break
+    fi
+    echo "   Waiting for expansion... Current CIDR: ${current_cidr}"
+    sleep 30
+done
+
+expansion_end_time=$(date +%s)
+expansion_duration=$((expansion_end_time - expansion_start_time))
+expansion_minutes=$((expansion_duration / 60))
+expansion_seconds=$((expansion_duration % 60))
+
+# Verify expansion completed
+FINAL_CIDR=$(oc get network.config cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+if [[ "${FINAL_CIDR}" != "${EXPANSION_TARGET_CIDR}" ]]; then
+  echo "❌ TIMEOUT: Network expansion not completed within $timeout_seconds seconds"
+  echo "   Expected: ${EXPANSION_TARGET_CIDR}"
+  echo "   Actual: ${FINAL_CIDR}"
+  exit 1
+fi
+
+echo "⏱️  Network expansion completed in: ${expansion_minutes}m ${expansion_seconds}s"
+echo "✅ Network successfully expanded from ${CLUSTER_NETWORK_ORIGINAL_CIDR} to ${EXPANSION_TARGET_CIDR}"
 
 # Scale machinesets to test subnet exhaustion
 echo "Scaling machinesets to ${TOTAL_SCALE_NODES} total nodes..."
