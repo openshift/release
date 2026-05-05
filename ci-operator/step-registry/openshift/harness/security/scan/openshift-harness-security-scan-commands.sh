@@ -19,6 +19,8 @@ PARAMS=(
     --output-sarif "${ARTIFACT_DIR}/skill-scanner.sarif"
     --format json
     --output-json "${ARTIFACT_DIR}/skill-scanner.json"
+    --format html
+    --output-html "${ARTIFACT_DIR}/skill-scanner-summary.html"
 )
 
 if [ -n "${SCAN_ADDITIONAL_ARGS}" ]; then
