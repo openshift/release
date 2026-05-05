@@ -1,0 +1,60 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    to: fleetshift-server
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.local
+    from: fleetshift-server
+    to: fleetshift-server-local
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror-local
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-server-local
+    env:
+      IMAGE_REPO: fleetshift-server-local
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-local-latest
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-server-local
+    env:
+      IMAGE_REPO: fleetshift-server-local
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-local-sha
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-server-local
+    env:
+      IMAGE_REPO: fleetshift-server-local
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: fleetshift
+  repo: fleetshift-poc
+  variant: multiarch
