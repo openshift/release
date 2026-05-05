@@ -177,7 +177,10 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask 077
+    env -i bash --norc --noprofile << 'EOF' > "${podman_env_file}"
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
     export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
     export ENABLE_JIRA_REPORTING=true
@@ -191,12 +194,12 @@ tests:
     export JOB_LINK=${JOB_LINK}
     source /usr/local/cs-qe-credentials/ocm-tokens
     source /usr/local/cs-qe-credentials/jira-cred
-    env | grep -v '^_='
+    env | grep -E '^(AWS_|SHARED_VPC_|ENABLE_|JOB_|OCM_|JIRA_)'
     EOF
 
     podman run \
     --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-    --env-file /tmp/podman.env \
+    --env-file "${podman_env_file}" \
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
