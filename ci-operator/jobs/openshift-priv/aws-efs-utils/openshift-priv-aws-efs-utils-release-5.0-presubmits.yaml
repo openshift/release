@@ -5,30 +5,12 @@ presubmits:
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
-    cluster: build03
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     hidden: true
-=======
-=======
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-      sparse_checkout_files:
-      - Dockerfile
-    hidden: true
->>>>>>> 724cc7eed20 (workflow fix)
->>>>>>> fa1e2127285 (workflow fix)
-=======
-    hidden: true
->>>>>>> 76bfa17a7b2 ( - Add network expansion test (OCP-61589) for 520-node capacity validation)
-=======
->>>>>>> 1d9672b2b8c (make update fix)
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -40,6 +22,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -54,6 +37,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -65,6 +51,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
