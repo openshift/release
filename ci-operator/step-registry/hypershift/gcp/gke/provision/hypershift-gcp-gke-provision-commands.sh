@@ -76,6 +76,7 @@ gcloud services enable \
     iam.googleapis.com \
     iamcredentials.googleapis.com \
     cloudresourcemanager.googleapis.com \
+    storage.googleapis.com \
     --project="${HC_PROJECT_ID}"
 
 # GCP API enablement is eventually consistent: gcloud services enable returns
