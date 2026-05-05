@@ -101,11 +101,14 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
-      XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "CFamily", "value": "M4", "operator": "equals"}
+          ]
+        ]
+      TEST_OBJECT: Regions
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
 - as: installer-rehearse-gcp2
   cron: '@yearly'
   steps:
@@ -114,23 +117,26 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
-      XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns-private
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "CFamily", "value": "C4D", "operator": "equals"}
+          ]
+        ]
+      TEST_OBJECT: Regions
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       CLUSTER_PARAMETER_SELECT_CONDITIONS: |
         [
           [
-              {"column": "Region", "value": "europe-west4", "operator": "equals"}
+              {"column": "CFamily", "value": "Z3", "operator": "equals"}
           ]
         ]
       TEST_FILTERS: "57148"
