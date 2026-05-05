@@ -2,7 +2,7 @@
 name: rhdh-aks-lifecycle
 description: >-
   Check AKS Kubernetes version support status and compare against the
-  configured version in the MAPT create script
+  configured version in the CI config files
 allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
 ---
 # Check AKS Kubernetes Version Lifecycle
@@ -15,7 +15,7 @@ allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
 
 ## Prerequisites
 
-- `curl`, `jq`, internet connectivity
+- `curl`, `jq`, `yq` (v4+), internet connectivity
 
 ## Steps
 
@@ -24,8 +24,8 @@ allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/check-k8s-lifecycle.sh" \
   --api-url https://endoflife.date/api/azure-kubernetes-service.json \
-  --mapt-script ci-operator/step-registry/redhat-developer/rhdh/aks/mapt/create/redhat-developer-rhdh-aks-mapt-create-commands.sh \
-  --mapt-ref ci-operator/step-registry/redhat-developer/rhdh/aks/mapt/create/redhat-developer-rhdh-aks-mapt-create-ref.yaml
+  --mapt-ref ci-operator/step-registry/redhat-developer/rhdh/aks/mapt/create/redhat-developer-rhdh-aks-mapt-create-ref.yaml \
+  --test-pattern "^e2e-aks-"
 ```
 
 2. Cross-verify by fetching the vendor docs and comparing supported versions:

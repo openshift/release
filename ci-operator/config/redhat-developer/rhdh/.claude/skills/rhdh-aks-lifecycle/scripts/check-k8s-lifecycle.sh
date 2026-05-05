@@ -2,22 +2,24 @@
 # Check Kubernetes version lifecycle for a managed K8s platform using endoflife.date.
 #
 # Usage:
-#   check-k8s-lifecycle.sh --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]
+#   check-k8s-lifecycle.sh --api-url <url> [--mapt-ref <path>] [--test-pattern <regex>] [--config-dir <path>]
 #
-# Requires: curl, jq
+# Requires: curl, jq, yq (v4+)
 
 set -euo pipefail
 
 API_URL=""
-MAPT_SCRIPT=""
 MAPT_REF=""
+TEST_PATTERN=""
+CONFIG_DIR="ci-operator/config/redhat-developer/rhdh"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --api-url)       API_URL="$2"; shift 2 ;;
-    --mapt-script)   MAPT_SCRIPT="$2"; shift 2 ;;
-    --mapt-ref)      MAPT_REF="$2"; shift 2 ;;
-    *) echo "Usage: $0 --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]" >&2; exit 1 ;;
+    --api-url)        API_URL="$2"; shift 2 ;;
+    --mapt-ref)       MAPT_REF="$2"; shift 2 ;;
+    --test-pattern)   TEST_PATTERN="$2"; shift 2 ;;
+    --config-dir)     CONFIG_DIR="$2"; shift 2 ;;
+    *) echo "Usage: $0 --api-url <url> [--mapt-ref <path>] [--test-pattern <regex>] [--config-dir <path>]" >&2; exit 1 ;;
   esac
 done
 
@@ -25,16 +27,25 @@ done
 
 TODAY=$(date -u +%Y-%m-%d)
 
-# Extract configured version from MAPT script (if provided)
-CONFIGURED=""
-if [[ -n "$MAPT_SCRIPT" && -f "$MAPT_SCRIPT" ]]; then
-  CONFIGURED=$(grep -oE -- '--version [0-9]+\.[0-9]+' "$MAPT_SCRIPT" | awk '{print $2}' | head -1 || true)
-fi
-
 # Extract MAPT image tag (if provided)
 MAPT_TAG=""
 if [[ -n "$MAPT_REF" && -f "$MAPT_REF" ]]; then
   MAPT_TAG=$(grep 'tag:' "$MAPT_REF" | awk '{print $2}' | head -1 || true)
+fi
+
+# Extract configured versions from CI config files (per branch)
+if [[ -n "$TEST_PATTERN" && -d "$CONFIG_DIR" ]] && command -v yq &>/dev/null; then
+  PREFIX="redhat-developer-rhdh-"
+  echo "Configured MAPT_KUBERNETES_VERSION per branch:"
+  for f in "${CONFIG_DIR}/${PREFIX}"*.yaml; do
+    [[ -f "$f" ]] || continue
+    branch=$(basename "$f" | sed "s/^${PREFIX}//;s/\.yaml$//")
+    ver=$(yq -o=json "[.tests[] | select(.as | test(\"${TEST_PATTERN}\")) | .steps.env.MAPT_KUBERNETES_VERSION // \"N/A\"] | unique | .[]" "$f" 2>/dev/null | sort -u | paste -sd',' - || echo "N/A")
+    [[ -z "$ver" ]] && ver="N/A"
+    echo "  ${branch}: ${ver}"
+  done
+  [[ -n "$MAPT_TAG" ]] && echo "MAPT image: mapt:${MAPT_TAG}"
+  echo ""
 fi
 
 # Fetch lifecycle data
@@ -57,10 +68,5 @@ RESULT=$(echo "$DATA" | jq -r --arg t "$TODAY" '
 IFS='|' read -r NEWEST NEWEST_GA NEWEST_EOL OLDEST OLDEST_GA OLDEST_END <<< "$RESULT"
 
 # Print summary
-if [[ -n "$CONFIGURED" ]]; then
-  echo "Configured: ${CONFIGURED}"
-  [[ -n "$MAPT_TAG" ]] && echo "MAPT image: mapt:${MAPT_TAG}"
-  echo "Source:     ${MAPT_SCRIPT}"
-fi
 echo "Newest:  ${NEWEST} (GA: ${NEWEST_GA}, EOL: ${NEWEST_EOL})"
 echo "Oldest:  ${OLDEST} (GA: ${OLDEST_GA}, EOL: ${OLDEST_END})"

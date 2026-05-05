@@ -34,27 +34,27 @@ Remove all CI configuration for an end-of-life RHDH release branch: CI config fi
 
 ### `rhdh-aks-lifecycle` — Check AKS K8s version support
 
-Query the endoflife.date API to check which AKS Kubernetes versions are supported and compare against the version configured in the MAPT create script. Cross-verifies with vendor docs. The configured version lives in a shared step-registry script and affects all RHDH branches.
+Query the endoflife.date API to check which AKS Kubernetes versions are supported and compare against the versions configured per branch in CI config files. Cross-verifies with vendor docs.
 
-**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]`
+**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-ref <path>] [--test-pattern <regex>]`
 
 ### `rhdh-aks-tests` — Manage AKS test entries and K8s version
 
-List AKS test entries (`e2e-aks-*`) across RHDH release branches and update the K8s version in the shared MAPT create script. Unlike OCP tests, AKS uses a single shared version for all branches. `make update` is not required for version changes.
+List AKS test entries (`e2e-aks-*`) across RHDH release branches and update the K8s version. The version is set per branch via `MAPT_KUBERNETES_VERSION` in each CI config file's `steps.env`. `make update` is not required for version changes.
 
-**Scripts**: `list-k8s-test-configs.sh --pattern <regex> [--mapt-script <path>]`
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
 
 ### `rhdh-eks-lifecycle` — Check EKS K8s version support
 
-Query the endoflife.date API to check which EKS Kubernetes versions are supported and compare against the version configured in the MAPT create script. Cross-verifies with vendor docs. The configured version lives in a shared step-registry script and affects all RHDH branches.
+Query the endoflife.date API to check which EKS Kubernetes versions are supported and compare against the versions configured per branch in CI config files. Cross-verifies with vendor docs.
 
-**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-script <path>] [--mapt-ref <path>]`
+**Scripts**: `check-k8s-lifecycle.sh --api-url <url> [--mapt-ref <path>] [--test-pattern <regex>]`
 
 ### `rhdh-eks-tests` — Manage EKS test entries and K8s version
 
-List EKS test entries (`e2e-eks-*`) across RHDH release branches and update the K8s version in the shared MAPT create script. Unlike OCP tests, EKS uses a single shared version for all branches. `make update` is not required for version changes.
+List EKS test entries (`e2e-eks-*`) across RHDH release branches and update the K8s version. The version is set per branch via `MAPT_KUBERNETES_VERSION` in each CI config file's `steps.env`. `make update` is not required for version changes.
 
-**Scripts**: `list-k8s-test-configs.sh --pattern <regex> [--mapt-script <path>]`
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
 
 ### `rhdh-gke-lifecycle` — Check GKE K8s version support
 

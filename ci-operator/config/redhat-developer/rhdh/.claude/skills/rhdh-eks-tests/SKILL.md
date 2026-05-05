@@ -2,7 +2,7 @@
 name: rhdh-eks-tests
 description: >-
   List EKS test entries in RHDH ci-operator config files and update the EKS
-  Kubernetes version in the shared MAPT create script
+  Kubernetes version per branch
 allowed-tools: Read, Edit, Bash(bash *list-k8s-test-configs.sh*)
 ---
 # RHDH EKS Test Management
@@ -13,7 +13,7 @@ List EKS test entries and update the K8s version used by EKS MAPT clusters.
 
 - List which EKS test entries exist per RHDH release branch
 - Update the EKS K8s version after a lifecycle check
-- The version lives in a shared step-registry script — changes affect ALL branches
+- The version is set per branch via `MAPT_KUBERNETES_VERSION` in each CI config file
 
 ## Prerequisites
 
@@ -23,27 +23,34 @@ List EKS test entries and update the K8s version used by EKS MAPT clusters.
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/list-k8s-test-configs.sh" \
-  --pattern "^e2e-eks-" \
-  --mapt-script ci-operator/step-registry/redhat-developer/rhdh/eks/mapt/create/redhat-developer-rhdh-eks-mapt-create-commands.sh
+  --pattern "^e2e-eks-"
 ```
 
 Filter by branch: add `--branch main`.
 
 ## Updating the Version
 
-The K8s version is the `--version X.Y` flag in the MAPT create script:
+The K8s version is set per branch as the `MAPT_KUBERNETES_VERSION` env var in each CI config file:
 
 ```
-ci-operator/step-registry/redhat-developer/rhdh/eks/mapt/create/redhat-developer-rhdh-eks-mapt-create-commands.sh
+ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-<branch>.yaml
 ```
 
-To update, use the `Edit` tool to replace the `--version` value in that file. Verify the MAPT image tag in the corresponding ref YAML is compatible with the new K8s version:
+Each EKS test entry has `MAPT_KUBERNETES_VERSION` under `steps.env`. To update, use the `Edit` tool to change the value for the target branch. Example:
+
+```yaml
+  steps:
+    env:
+      MAPT_KUBERNETES_VERSION: "1.35"
+```
+
+Verify the MAPT image tag in the ref YAML is compatible with the new K8s version:
 
 ```
 ci-operator/step-registry/redhat-developer/rhdh/eks/mapt/create/redhat-developer-rhdh-eks-mapt-create-ref.yaml
 ```
 
-**WARNING**: This change affects ALL RHDH branches. `make update` is NOT required.
+**NOTE**: Each branch can use a different K8s version. `make update` is NOT required for version changes.
 
 ## Related Skills
 
