@@ -1,3 +1,40 @@
+base_images:
+  assisted-image-service:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
 build_root:
   image_stream_tag:
     name: release
@@ -7,10 +44,29 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: osac-operator
+  - dockerfile_path: Containerfile
+    to: osac-operator-pr
+  - dockerfile_literal: |
+      FROM osac-installer
+      COPY config/ /installer/base/osac-operator/config/
+    inputs:
+      osac-installer:
+        as:
+        - osac-installer
+    to: osac-installer-with-pr
 promotion:
   to:
-  - name: latest
+  - excluded_images:
+    - osac-operator-pr
+    - osac-installer-with-pr
+    name: latest
     namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -18,6 +74,175 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e-metal-vmaas-compute-instance-creation
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_creation.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-api-fields
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_api_fields.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-cli-fields
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_cli_fields.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-delete-during-provision
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_delete_during_provision.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-restart
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_restart.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-compute-instance-restart-negative
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_compute_instance_restart_negative.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-subnet-lifecycle
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_subnet_lifecycle.py
+    workflow: osac-project-ofcir-baremetal-component
+- as: e2e-metal-vmaas-virtual-network-lifecycle
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+      TEST: test_virtual_network_lifecycle.py
+    workflow: osac-project-ofcir-baremetal-component
 zz_generated_metadata:
   branch: main
   org: osac-project
