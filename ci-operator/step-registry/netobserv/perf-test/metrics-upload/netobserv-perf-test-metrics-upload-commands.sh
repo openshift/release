@@ -73,12 +73,14 @@ function install_requirements(){
 
 function upload_metrics(){
     install_requirements scripts/requirements.txt
-    python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
-    upload_metrics_rc=$?
+    python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION" --dump-only
     cp -r /tmp/data "$ARTIFACT_DIR"
+    output_file=$(ls /tmp/data/)
+    python scripts/nope.py upload --file "$output_file"
 }
 
 upload_metrics
+upload_metrics_rc=$?
 if [[ $upload_metrics_rc -gt 0 ]]; then
     echo "Metrics uploading to ES failed!!!"
 fi
