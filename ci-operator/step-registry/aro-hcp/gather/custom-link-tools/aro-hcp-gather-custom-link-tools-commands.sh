@@ -7,7 +7,16 @@ set -o xtrace
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_TOKEN_CREDENTIALS=prod
-SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
+INFRA_SUB_FILE="${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id"
+FALLBACK_SUB_FILE="${CLUSTER_PROFILE_DIR}/subscription-id"
+if [[ -s "${INFRA_SUB_FILE}" ]]; then
+  SUBSCRIPTION_ID=$(cat "${INFRA_SUB_FILE}")
+elif [[ -s "${FALLBACK_SUB_FILE}" ]]; then
+  SUBSCRIPTION_ID=$(cat "${FALLBACK_SUB_FILE}")
+else
+  echo "No subscription-id file found in ${CLUSTER_PROFILE_DIR}"
+  exit 1
+fi
 
 START_TIME_FALLBACK_ARGS=""
 if [[ -f "${SHARED_DIR}/write-config-timestamp-rfc3339" ]]; then
