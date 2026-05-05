@@ -55,17 +55,17 @@ tests:
     - chain: openshift-qe-build-farm
     workflow: rosa-aws-sts
   timeout: 8h0m0s
-- always_run: false
-  as: cluster-density-v2-249nodes
+- as: cluster-density-v2-249nodes
+  cron: 0 2,14 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
-      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=6h
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       ENABLE_AUTOSCALING: "false"
+      GC: "false"
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -73,10 +73,10 @@ tests:
       OPENSHIFT_VERSION: "4.22"
       REPLICAS: "249"
     test:
-    - chain: openshift-qe-control-plane
+    - ref: openshift-qe-node-density-cni
     workflow: rosa-aws-sts
-- always_run: false
-  as: control-plane-120nodes
+- as: control-plane-120nodes
+  cron: 0 2,14 * * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -101,10 +101,13 @@ tests:
       OPENSHIFT_VERSION: "4.22"
       REPLICAS: "120"
     test:
-    - chain: openshift-qe-control-plane
+    - ref: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-node-density
+    - ref: openshift-qe-node-density-cni
+    - ref: openshift-qe-crd-scale
     workflow: rosa-aws-sts
-- always_run: false
-  as: control-plane-24nodes
+- as: control-plane-24nodes
+  cron: 0 2,14 * * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -124,6 +127,7 @@ tests:
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       ENABLE_AUTOSCALING: "false"
+      GC: "false"
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -131,7 +135,7 @@ tests:
       READY_WAIT_TIMEOUT: 30m
     test:
     - ref: openshift-qe-workers-scale
-    - chain: openshift-qe-control-plane
+    - ref: openshift-qe-cluster-density-v2
     workflow: rosa-aws-sts
 - always_run: false
   as: data-path-9nodes
