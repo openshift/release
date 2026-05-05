@@ -1,0 +1,27 @@
+ref:
+  as: openshift-harness-security-scan
+  env:
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: /var/run/claude-code-service-account/token
+    documentation: "Path to the GCP service account key for Vertex AI access."
+  - name: SKILL_SCANNER_LLM_MODEL
+    default: "vertex_ai/claude-sonnet-4-6"
+    documentation: "LiteLLM model string for LLM-based semantic analysis."
+  - name: VERTEXAI_LOCATION
+    default: "global"
+    documentation: "Vertex AI region for model serving."
+  - name: SCAN_ADDITIONAL_ARGS
+    default: ""
+    documentation: "Additional arguments to pass to skill-scanner."
+  commands: openshift-harness-security-scan-commands.sh
+  from: src
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  credentials:
+  - mount_path: /var/run/claude-code-service-account
+    name: sa-claude-openshift-ci
+    namespace: test-credentials
