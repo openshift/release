@@ -10,10 +10,10 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 fi
 
-echo "Applying additional NetworkPolicies for Cilium compatibility"
+echo "Applying four additional NetworkPolicies for Cilium compatibility (OCPBUGS-84104)"
 echo "OCP 4.22+ adds deny-all NetworkPolicies in openshift-monitoring and openshift-ingress."
-echo "OVN handles these via the network.openshift.io/policy-group label, but Cilium does not."
-echo "These policies restore the required traffic paths for conformance tests."
+echo "Existing allow policies use named ports, which Cilium does not resolve (cilium/cilium#30003)."
+echo "These four additional policies restore the required traffic paths using numeric ports as a workaround."
 
 # Allow test access to Prometheus web API (ports 9090, 9091)
 oc apply -f - <<'EOF'
