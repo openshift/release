@@ -21,14 +21,36 @@ else
 fi
 echo "Using KServe deployment mode: ${KSERVE_MODE} (RHOAI channel: ${RHOAI_CHANNEL})"
 
+approve_install_plans() {
+    local ns="${1}"
+    local sub_name="${2}"
+    local csv_name
+    csv_name=$(oc get sub "${sub_name}" -n "${ns}" -o jsonpath='{.status.currentCSV}' 2>/dev/null)
+    if [[ -z "${csv_name}" ]]; then
+        return
+    fi
+    oc get installplan -n "${ns}" -o json 2>/dev/null \
+        | jq -r ".items[] | select(.spec.approved == false)
+                  | select(.spec.clusterServiceVersionNames[]? == \"${csv_name}\")
+                  | .metadata.name" \
+        | while read -r plan; do
+            echo "Auto-approving InstallPlan '${plan}' for ${csv_name} in ${ns}"
+            oc patch installplan "${plan}" -n "${ns}" --type=merge -p '{"spec":{"approved":true}}'
+        done
+}
+
 wait_for_csv() {
     local ns="${1}"
     local name_prefix="${2}"
     local timeout="${3:-600}"
+    local sub_name="${4:-}"
     local elapsed=0
 
     echo "Waiting for CSV starting with '${name_prefix}' in namespace '${ns}' to reach Succeeded..."
     while [[ ${elapsed} -lt ${timeout} ]]; do
+        if [[ -n "${sub_name}" ]]; then
+            approve_install_plans "${ns}" "${sub_name}"
+        fi
         local phase
         phase=$(oc get csv -n "${ns}" -o json 2>/dev/null \
             | jq -r ".items[] | select(.metadata.name | startswith(\"${name_prefix}\")) | .status.phase" \
@@ -145,13 +167,13 @@ fi
 # --- 4. Wait for all CSVs ---
 echo "=== Waiting for operator CSVs ==="
 if [[ "${KSERVE_MODE}" == "Serverless" ]]; then
-    wait_for_csv "openshift-operators" "servicemeshoperator" 600 || exit 1
-    wait_for_csv "openshift-serverless" "serverless-operator" 600 || exit 1
+    wait_for_csv "openshift-operators" "servicemeshoperator" 600 "servicemeshoperator" || exit 1
+    wait_for_csv "openshift-serverless" "serverless-operator" 600 "serverless-operator" || exit 1
 fi
-wait_for_csv "${RHOAI_NAMESPACE}" "rhods-operator" 600 || exit 1
+wait_for_csv "${RHOAI_NAMESPACE}" "rhods-operator" 600 "rhods-operator" || exit 1
 echo "All operator CSVs reached Succeeded"
 
-# --- 5. Configure DSCI for RawDeployment (disable Service Mesh) ---
+# --- 5. Configure DSCI for RawDeployment (disable Service Mesh on RHOAI 2.x) ---
 if [[ "${KSERVE_MODE}" == "RawDeployment" ]]; then
     echo "=== Configuring DSCI for RawDeployment mode ==="
     DSCI_TIMEOUT=300
@@ -159,12 +181,7 @@ if [[ "${KSERVE_MODE}" == "RawDeployment" ]]; then
     while [[ ${DSCI_ELAPSED} -lt ${DSCI_TIMEOUT} ]]; do
         DSCI_NAME=$(oc get dsci -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
         if [[ -n "${DSCI_NAME}" ]]; then
-            if oc patch dsci "${DSCI_NAME}" --type=merge \
-                -p '{"spec":{"serviceMesh":{"managementState":"Removed"}}}'; then
-                echo "DSCI '${DSCI_NAME}' patched: serviceMesh set to Removed"
-                break
-            fi
-            echo "WARNING: DSCI '${DSCI_NAME}' patch failed, retrying..."
+            break
         fi
         sleep 10
         DSCI_ELAPSED=$((DSCI_ELAPSED + 10))
@@ -172,6 +189,16 @@ if [[ "${KSERVE_MODE}" == "RawDeployment" ]]; then
     if [[ ${DSCI_ELAPSED} -ge ${DSCI_TIMEOUT} ]]; then
         echo "ERROR: DSCI not found within ${DSCI_TIMEOUT}s"
         exit 1
+    fi
+    # RHOAI 3.x (DSCI apiVersion v2) removed spec.serviceMesh entirely.
+    # Only patch on RHOAI 2.x where the field still exists.
+    DSCI_API=$(oc get dsci "${DSCI_NAME}" -o jsonpath='{.apiVersion}' 2>/dev/null)
+    if [[ "${DSCI_API}" != *"/v2" ]]; then
+        oc patch dsci "${DSCI_NAME}" --type=merge \
+            -p '{"spec":{"serviceMesh":{"managementState":"Removed"}}}'
+        echo "DSCI '${DSCI_NAME}' patched: serviceMesh set to Removed"
+    else
+        echo "DSCI '${DSCI_NAME}' uses ${DSCI_API} (RHOAI 3.x) -- serviceMesh field not present, skipping patch"
     fi
 fi
 
@@ -320,8 +347,8 @@ spec:
     - --max-num-seqs=${MAX_NUM_SEQS}
     - --max-model-len=${MAX_MODEL_LEN}
     - --disable-frontend-multiprocessing
-    - --enable-chunked-prefill=false
-    - --enable-prefix-caching=false
+    - --no-enable-chunked-prefill
+    - --no-enable-prefix-caching
     env:
     - name: NEURON_COMPILE_CACHE_URL
       value: /mnt/models/neuron-compiled-artifacts
