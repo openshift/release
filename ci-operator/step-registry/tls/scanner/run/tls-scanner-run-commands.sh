@@ -148,8 +148,8 @@ if [[ "$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 
     exit 1
 fi
 
-oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
-    echo "Scanner did not complete successfully"
+oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=10m || {
+    echo "Scanner did not complete successfully - timeout exceeded"
     oc describe pod/tls-scanner -n "${NAMESPACE}"
     exit 1
 }
