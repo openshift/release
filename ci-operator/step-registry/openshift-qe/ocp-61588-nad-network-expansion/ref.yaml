@@ -1,0 +1,41 @@
+ref:
+  as: openshift-qe-ocp-61588-nad-network-expansion
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: cli
+  commands: openshift-qe-ocp-61588-nad-network-expansion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+  documentation: |-
+    This step performs OCP-61588 Network Attachment Definition (NAD) network expansion testing.
+    
+    The test validates NAD functionality during cluster network CIDR expansion:
+    - Creates pods with and without NAD annotations
+    - Expands cluster network CIDR from /20 to /19  
+    - Verifies routing behavior and connectivity after expansion
+    - Tests NAD route override functionality
+    
+    Environment Variables:
+    - CLUSTER_NETWORK_CIDR: Original cluster CIDR (default: 10.128.0.0/20)
+    - CLUSTER_NETWORK_EXPANDED_CIDR: Target expanded CIDR (default: 10.128.0.0/19)
+    - NETWORK_TYPE: Network plugin type (default: OVNKubernetes)
+    - TEST_NAMESPACE: Namespace for test resources (default: openshift-qe-nad-test)
+  env:
+  - name: CLUSTER_NETWORK_CIDR
+    default: "10.128.0.0/20"
+    documentation: "Original cluster network CIDR for expansion test"
+  - name: CLUSTER_NETWORK_EXPANDED_CIDR  
+    default: "10.128.0.0/19"
+    documentation: "Target expanded cluster network CIDR"
+  - name: NETWORK_TYPE
+    default: "OVNKubernetes"
+    documentation: "Network plugin type for the cluster"
+  - name: TEST_NAMESPACE
+    default: "openshift-qe-nad-test"
+    documentation: "Namespace to create for test resources"
