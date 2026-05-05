@@ -13,10 +13,6 @@ base_images:
     tag: upi-installer
 build_root:
   from_repository: true
-images:
-  items:
-  - dockerfile_path: Dockerfile.rhel7
-    to: machine-config-operator
 releases:
   initial:
     candidate:
@@ -116,6 +112,44 @@ tests:
     - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
     - ref: openshift-e2e-test-longrun
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-vsphere-mco-disruptive-disc-proxy
+  cron: 0 0 1 1 *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: vsphere-dis-2
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_HTTPS_PROXY: "yes"
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- always_run: false
+  as: e2e-vsphere-mco-disruptive-https-proxy
+  cron: 0 0 1 1 *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: rhcos-conf-osstream
+    - ref: ipi-conf-vsphere-proxy-https
+    - chain: ipi-install-vsphere
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test-longrun
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv4-mco-disruptive
   capabilities:
@@ -450,6 +484,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-z4hcj7k/release:latest
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/longduration

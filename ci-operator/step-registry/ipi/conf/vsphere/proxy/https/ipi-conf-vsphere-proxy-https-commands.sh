@@ -14,7 +14,6 @@ cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 proxy:
   httpProxy: ${http_proxy_url}
   httpsProxy: ${https_proxy_url}
-  noProxy: test.no-proxy.com
 additionalTrustBundle: |
 $(sed 's/^/  &/g' ${additional_ca})
 EOF

@@ -665,6 +665,17 @@ fi
 upgrade
 check_upgrade_status
 
+
+echo "Adding tmp to path..."
+export PATH=/tmp/:$PATH
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
+
 if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
     check_history
 fi
