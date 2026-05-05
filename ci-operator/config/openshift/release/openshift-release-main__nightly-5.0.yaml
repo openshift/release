@@ -1000,11 +1000,6 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     workflow: openshift-e2e-vsphere
-- as: e2e-external-vsphere-ccm
-  cron: 5 0 * * 3
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: upi-vsphere-platform-external-ccm
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
@@ -2359,24 +2354,53 @@ tests:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
     workflow: ipi-aws
-- as: e2e-external-aws
-  cron: '@weekly'
+- as: e2e-external-vsphere-ccm
+  cron: 5 0 * * 3
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: upi-vsphere-platform-external-ccm
+- as: e2e-platform-external-aws
+  cron: '@monthly'
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-external-aws
-- as: e2e-external-aws-ccm
-  cron: '@weekly'
+  timeout: 6h0m0s
+- as: e2e-platform-external-aws-ccm
+  cron: '@yearly'
   steps:
     cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-external-aws-ccm
-  cron: '@weekly'
+  timeout: 6h0m0s
+- as: e2e-platform-none-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PLATFORM_NONE_ENFORCE: "yes"
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: opct-platform-external-aws-ccm
+  cron: '@yearly'
   steps:
     cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
+- as: opct-platform-external-aws
+  cron: '@monthly'
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
+- as: opct-platform-none-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PLATFORM_NONE_ENFORCE: "yes"
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
