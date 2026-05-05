@@ -1,9 +1,9 @@
 ---
 name: rhdh-eks-lifecycle
 description: >-
-  Check EKS Kubernetes version support status and compare against the
-  configured version in the CI config files
-allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
+  Check EKS Kubernetes version support status using the official AWS EKS docs
+  source and compare against the configured version in the CI config files
+allowed-tools: Bash(bash *check-eks-lifecycle.sh*), WebFetch
 ---
 # Check EKS Kubernetes Version Lifecycle
 
@@ -15,26 +15,27 @@ allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
 
 ## Prerequisites
 
-- `curl`, `jq`, `yq` (v4+), internet connectivity
+- `curl`, `jq`, `yq` (v4+), `awk`, internet connectivity
 
 ## Steps
 
 1. Run the lifecycle check script:
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/check-k8s-lifecycle.sh" \
-  --api-url https://endoflife.date/api/amazon-eks.json \
+bash "${CLAUDE_SKILL_DIR}/scripts/check-eks-lifecycle.sh" \
   --mapt-ref ci-operator/step-registry/redhat-developer/rhdh/eks/mapt/create/redhat-developer-rhdh-eks-mapt-create-ref.yaml \
   --test-pattern "^e2e-eks-"
 ```
 
-2. Cross-verify by fetching the vendor docs and comparing supported versions:
+The script queries two sources:
+- **Primary**: `awsdocs/amazon-eks-user-guide` raw AsciiDoc on GitHub — official AWS EKS docs source with standard/extended support status and release calendar
+- **Cross-verify**: `https://endoflife.date/api/amazon-eks.json` — community-maintained EOL dates
+
+2. If the API call fails, fall back to the vendor docs:
 
 ```
 WebFetch https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
 ```
-
-Report any discrepancies between endoflife.date and the vendor page.
 
 ## Related Skills
 

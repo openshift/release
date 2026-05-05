@@ -1,9 +1,9 @@
 ---
 name: rhdh-aks-lifecycle
 description: >-
-  Check AKS Kubernetes version support status and compare against the
-  configured version in the CI config files
-allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
+  Check AKS Kubernetes version support status using the official AKS release
+  status API and compare against the configured version in the CI config files
+allowed-tools: Bash(bash *check-aks-lifecycle.sh*), WebFetch
 ---
 # Check AKS Kubernetes Version Lifecycle
 
@@ -22,19 +22,20 @@ allowed-tools: Bash(bash *check-k8s-lifecycle.sh*), WebFetch
 1. Run the lifecycle check script:
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/check-k8s-lifecycle.sh" \
-  --api-url https://endoflife.date/api/azure-kubernetes-service.json \
+bash "${CLAUDE_SKILL_DIR}/scripts/check-aks-lifecycle.sh" \
   --mapt-ref ci-operator/step-registry/redhat-developer/rhdh/aks/mapt/create/redhat-developer-rhdh-aks-mapt-create-ref.yaml \
   --test-pattern "^e2e-aks-"
 ```
 
-2. Cross-verify by fetching the vendor docs and comparing supported versions:
+The script queries two sources:
+- **Primary**: `https://releases.aks.azure.com/parsed_data.json` — official AKS release status with per-region K8s version availability (major.minor only)
+- **Cross-verify**: `https://endoflife.date/api/azure-kubernetes-service.json` — community-maintained EOL dates
+
+2. If the API call fails, fall back to the vendor docs:
 
 ```
 WebFetch https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions
 ```
-
-Report any discrepancies between endoflife.date and the vendor page.
 
 ## Related Skills
 
