@@ -3,6 +3,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -102,17 +106,28 @@ tests:
   container:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
+- as: shellcheck
+  commands: make lint-shellcheck
+  container:
+    from: shellcheck
+  run_if_changed: .sh$
 - as: ocp-ci-monitor
   cron: 0 7 * * *
+  retry:
+    attempts: 2
+    interval: 30m
   steps:
     workflow: openshift-edge-tooling-ci-monitor
 - as: pr-notifier
   cron: 0 7 * * 0-5
   restrict_network_access: false
+  retry:
+    attempts: 2
+    interval: 30m
   steps:
     env:
       FORBIDDEN_LABELS: jira/invalid-bug
-      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling
+      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements
       REQUIRED_LABELS: lgtm,approved,verified
     workflow: openshift-edge-tooling-gh-notifier
 zz_generated_metadata:

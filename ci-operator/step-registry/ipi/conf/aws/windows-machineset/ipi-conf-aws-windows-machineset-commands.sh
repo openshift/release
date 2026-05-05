@@ -52,6 +52,7 @@ oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
       .spec.template.spec.providerSpec.value.ami.id = $ami_id |
       .spec.template.spec.providerSpec.value.instanceType = $instance_type |
       .spec.template.spec.providerSpec.value.userDataSecret.name = $user_data_secret |
+      .spec.template.spec.providerSpec.value.metadataServiceOptions.authentication = "Optional" |
       del(.status) |
       del(.metadata.selfLink) |
       del(.metadata.uid)

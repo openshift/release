@@ -59,12 +59,13 @@ collect_inspect || true
 retrieve_artifact || true
 show_results || true
 
-# Check if job is running in OPCT repo to skip upload results to
+# Check if job is running in OPCT workflow in allowed job ref to skip upload results to
 # OPCT storage.
 show_reader "Consolidating artifacts as Baseline Results"
 INVALID_OPCT_REPO="true"
 VALID_REPOS=("redhat-openshift-ecosystem-provider-certification-tool")
 VALID_REPOS+=("redhat-openshift-ecosystem-opct")
+VALID_REPOS+=("periodic-ci-openshift-release-main")
 show_msg "Checking if JOB name is allowed to upload results: ${JOB_NAME}"
 for VR in "${VALID_REPOS[@]}"; do
   if [[ $JOB_NAME == *"$VR"* ]]; then
@@ -72,7 +73,7 @@ for VR in "${VALID_REPOS[@]}"; do
   fi
 done
 
-# Ignore persisting data in non OPCT/repo jobs
+# Ignore persisting data from unexpected jobs
 if [[ "${INVALID_OPCT_REPO}" == "true" ]]; then
   show_msg "# WARNING: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
   exit 0
