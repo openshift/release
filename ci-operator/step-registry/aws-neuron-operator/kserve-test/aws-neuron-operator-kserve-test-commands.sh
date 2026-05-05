@@ -5,8 +5,39 @@ set -o pipefail
 
 echo "Starting KServe inference tests"
 
+TOOLS_DIR="/tmp/tools"
+mkdir -p "${TOOLS_DIR}"
+export PATH="${TOOLS_DIR}:${PATH}"
+
+if ! command -v oc &>/dev/null; then
+    echo "oc not found, downloading OpenShift client..."
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+        | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
+fi
+
+if ! command -v jq &>/dev/null; then
+    echo "jq not found, downloading..."
+    curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -o "${TOOLS_DIR}/jq" \
+        && chmod +x "${TOOLS_DIR}/jq" || true
+fi
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
+
+OCP_VERSION=""
+OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
+if [[ -z "${OCP_VERSION}" && -f "${SHARED_DIR}/ocp-version" ]]; then
+    OCP_VERSION=$(cat "${SHARED_DIR}/ocp-version")
+fi
+if [[ -z "${OCP_VERSION}" ]]; then
+    OCP_VERSION=$(oc version -o json 2>/dev/null | jq -r '.openshiftVersion // empty' || true)
+fi
+OCP_VERSION="${OCP_VERSION:-unknown}"
+echo "${OCP_VERSION}" > "${ARTIFACT_DIR}/ocp.version"
+echo "OCP Version: ${OCP_VERSION}"
+
+echo "${ECO_HWACCEL_NEURON_DRIVER_VERSION:-unknown}" > "${ARTIFACT_DIR}/driver.version"
+echo "Neuron Driver Version: ${ECO_HWACCEL_NEURON_DRIVER_VERSION:-unknown}"
 
 if [[ -f "${CLUSTER_PROFILE_DIR}/hf-token" ]]; then
     export ECO_HWACCEL_NEURON_HF_TOKEN
@@ -41,6 +72,15 @@ else
     echo "FAILURE" > "${ARTIFACT_DIR}/kserve_inference.status"
     echo "KServe inference tests failed with exit code ${TEST_EXIT_CODE}"
 fi
+
+NEURON_OPERATOR_VERSION=$(oc get csv -A -o json 2>/dev/null \
+    | jq -r '[.items[] | select(.metadata.name | test("neuron";"i"))] | .[0].spec.version // empty' || true)
+if [[ -z "${NEURON_OPERATOR_VERSION}" ]]; then
+    NEURON_OPERATOR_VERSION="${ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE##*:}"
+fi
+NEURON_OPERATOR_VERSION="${NEURON_OPERATOR_VERSION:-unknown}"
+echo "${NEURON_OPERATOR_VERSION}" > "${ARTIFACT_DIR}/operator.version"
+echo "Neuron Operator Version: ${NEURON_OPERATOR_VERSION}"
 
 echo "=== Collecting KServe debug info ==="
 debug_dir="${ARTIFACT_DIR}/debug-kserve"

@@ -9,15 +9,14 @@ if [ -z "${PULL_BASE_SHA:-}" ]; then
     exit 1
 fi
 
-export HOME=/tmp
-export GOPATH=/tmp/go
-export GOMODCACHE=/tmp/go-mod
-export GOCACHE=/tmp/go-build
-export PATH="$GOPATH/bin:$PATH"
-unset GOFLAGS
+HOOKS_VERSION="v0.1.2"
+HOOKS_URL="https://github.com/openshift-hyperfleet/hyperfleet-hooks/releases/download/${HOOKS_VERSION}/hyperfleet-hooks-linux-amd64"
+HOOKS_BIN="/tmp/hyperfleet-hooks"
 
-echo "Installing hyperfleet-hooks..."
-go install github.com/openshift-hyperfleet/hyperfleet-hooks/cmd/hyperfleet-hooks@v0.1.1
+echo "Downloading hyperfleet-hooks ${HOOKS_VERSION}..."
+curl -fsSL -o "${HOOKS_BIN}" "${HOOKS_URL}"
+chmod +x "${HOOKS_BIN}"
+export PATH="/tmp:$PATH"
 
 echo "Running commitlint validation..."
 hyperfleet-hooks commitlint --pr

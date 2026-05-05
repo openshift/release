@@ -1,0 +1,65 @@
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs20-linux
+canonical_go_repository: github.com/stolostron/console
+images:
+  items:
+  - dockerfile_path: Containerfile.acm
+    to: console
+  - dockerfile_path: Containerfile.mce
+    to: console-mce
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - console-mce
+    name: "5.1"
+    namespace: stolostron
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 2Gi
+tests:
+- as: check
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow check
+  container:
+    from: src
+- as: unit-tests-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console
+    env:
+      IMAGE_REPO: console
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-mce
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-mce
+    env:
+      IMAGE_REPO: console-mce
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: stolostron-console

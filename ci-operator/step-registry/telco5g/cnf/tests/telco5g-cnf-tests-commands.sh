@@ -534,7 +534,7 @@ function check_commit_message_for_prs {
     if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
         # Get the commit message from Github of current PR if exists
         API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
-        COMMIT_MESSAGE=$(curl -s "$API_PR_URL" | jq -r '.body')
+        COMMIT_MESSAGE=$(curl -s --retry 5 --retry-delay 10 "$API_PR_URL" | jq -r '.body')
         # Check if we have Depends-On: in commit message
         if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
             # Extract the pull request URL with org and repo from commit message
@@ -647,7 +647,7 @@ else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
     export TARGET_RELEASE=$CNF_BRANCH
-    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}

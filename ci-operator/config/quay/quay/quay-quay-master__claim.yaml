@@ -24,11 +24,23 @@ tests:
     test:
     - as: export-kubeconfig
       commands: |
-        cp "${KUBECONFIG}" "${ARTIFACT_DIR}/kubeconfig"
-        cp "${KUBEADMIN_PASSWORD_FILE}" "${ARTIFACT_DIR}/kubeadmin-password" 2>/dev/null || true
+        openssl enc -aes-256-cbc -pbkdf2 \
+          -pass file:/var/run/encryption-key/kubeconfig-encryption-key \
+          -in "${KUBECONFIG}" \
+          -out "${ARTIFACT_DIR}/kubeconfig.enc"
+        if [[ -f "${KUBEADMIN_PASSWORD_FILE}" ]]; then
+          openssl enc -aes-256-cbc -pbkdf2 \
+            -pass file:/var/run/encryption-key/kubeconfig-encryption-key \
+            -in "${KUBEADMIN_PASSWORD_FILE}" \
+            -out "${ARTIFACT_DIR}/kubeadmin-password.enc"
+        fi
         oc whoami --show-server
         oc get clusterversion
-        echo "Kubeconfig exported to artifacts."
+        echo "Encrypted kubeconfig exported to artifacts."
+      credentials:
+      - mount_path: /var/run/encryption-key
+        name: quay-ambient-ci-kubeconfig-encryption
+        namespace: test-credentials
       from: cli
       resources:
         requests:
