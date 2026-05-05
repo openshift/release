@@ -38,7 +38,7 @@ spec:
 EOF
 
 # Need to allow some time before checking if the StorageCluster is deployed
-sleep 60
+sleep 600
 
 echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
