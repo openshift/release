@@ -133,6 +133,53 @@ tests:
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
+- as: ocm-fvt-test-job-link-envar
+  capabilities:
+  - nested-podman
+  commands: |
+    echo "========================================="
+    echo "Testing JOB_LINK environment variable"
+    echo "========================================="
+    echo ""
+    echo "Step 1: Constructing JOB_LINK outside env -i"
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+    echo "JOB_LINK constructed: ${JOB_LINK}"
+    echo ""
+
+    echo "Step 2: Creating podman env file"
+    env -i bash --norc --noprofile << EOF > /tmp/podman.env
+    export TEST_VAR="hello from env file"
+    export JOB_LINK="${JOB_LINK}"
+    env | grep -v '^_='
+    EOF
+
+    echo ""
+    echo "Step 3: Contents of /tmp/podman.env:"
+    cat /tmp/podman.env
+    echo ""
+
+    echo "Step 4: Running podman container with env file"
+    podman run \
+    --env-file /tmp/podman.env \
+    --rm \
+    quay.io/openshift/origin-cli:latest \
+    bash -c 'echo ""; echo "=== Inside Podman Container ==="; echo "JOB_LINK value: ${JOB_LINK}"; echo "TEST_VAR value: ${TEST_VAR}"; echo "All env vars:"; env | sort; echo ""'
+
+    echo ""
+    echo "========================================="
+    echo "Test completed"
+    echo "========================================="
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  interval: 24h
+  nested_podman: true
 zz_generated_metadata:
   branch: main
   org: openshift-online
