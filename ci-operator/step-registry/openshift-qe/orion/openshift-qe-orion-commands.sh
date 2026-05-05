@@ -274,8 +274,8 @@ process_change_point() {
 
     echo "Owners loaded as JSON array: $OWNERS_JSON"
 
-    for f in junit*.json; do
-        [ -e "$f" ] || { echo "No junit*.json files found"; return; }
+    for f in output*.json; do
+        [ -e "$f" ] || { echo "No output*.json files found"; return; }
 
         echo "Processing file: $f"
 
