@@ -115,6 +115,11 @@ export CONTAINER_PLATFORM_VERSION
 CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 echo "Platform: ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION}"
 
+# Save platform info to SHARED_DIR for data-router step
+printf "%s" "${IS_OPENSHIFT}" > "${SHARED_DIR}/IS_OPENSHIFT.txt"
+printf "%s" "${CONTAINER_PLATFORM}" > "${SHARED_DIR}/CONTAINER_PLATFORM.txt"
+printf "%s" "${CONTAINER_PLATFORM_VERSION}" > "${SHARED_DIR}/CONTAINER_PLATFORM_VERSION.txt"
+
 # ── Clone & checkout ─────────────────────────────────────────────────────────
 
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -142,6 +147,9 @@ fi
 INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
+# Save RHDH version to SHARED_DIR for data-router step
+printf "%s" "${RHDH_VERSION}" > "${SHARED_DIR}/RHDH_VERSION.txt"
+
 # ── Artifact collection ──────────────────────────────────────────────────────
 
 collect_artifacts() {
@@ -149,6 +157,11 @@ collect_artifacts() {
         echo "[INFO] Copying artifacts to ${ARTIFACT_DIR}"
         cp -a playwright-report "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] playwright-report not found"
         cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] e2e-test-results not found"
+    fi
+    # Copy JUnit results to SHARED_DIR for data-router step
+    if [[ -f "playwright-report/junit-results.xml" ]]; then
+        cp playwright-report/junit-results.xml "${SHARED_DIR}/junit-results-overlay-e2e.xml"
+        echo "[INFO] JUnit results copied to ${SHARED_DIR}/junit-results-overlay-e2e.xml"
     fi
 }
 
