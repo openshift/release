@@ -340,9 +340,17 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
-  else
-    # 4.10 and above
+  elif version_le "${ocp_version}" "4.21"; then
+    # 4.10 to 4.21
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+  else
+    # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
+    coreos_file="coreos-rhel-9.json"
+    if [[ "${OS_IMAGE_STREAM:-}" == "rhel-10" ]]; then
+      coreos_file="coreos-rhel-10.json"
+    fi
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   fi
   COMPUTE_AMI="${CONTROL_PLANE_AMI}"
