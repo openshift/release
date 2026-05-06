@@ -8,7 +8,7 @@ set -x
 export SHARED_DIR=${SHARED_DIR:-/tmp/shared_dir}
 export ARTIFACT_DIR=${ARTIFACT_DIR:-/tmp/artifacts}
 export HOSTEDCLUSTER_PLATFORM=${HOSTEDCLUSTER_PLATFORM:-"aws"}
-export JOB_PARALLEL=${JOB_PARALLEL:-"5"}
+export JOB_PARALLEL=${JOB_PARALLEL:-"2"} # Limited to 2 due to VPC limitations.
 export CHECK_INTERVAL=${CHECK_INTERVAL:-300}
 export CHECK_TIMEOUT=${CHECK_TIMEOUT:-18000}
 
@@ -17,18 +17,20 @@ GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com
 
 # Each MCE supports the latest three HostedCluster versions
 declare -A mce_to_guest=(
-    [2.8]="4.16 4.17 4.18"
-    [2.9]="4.17 4.18 4.19"
-    [2.10]="4.18 4.19 4.20"
+    # Commented out to reduce the number of jobs but give information about the supported versions.
+    #[2.8]="4.16 4.17 4.18"
+    #[2.9]="4.17 4.18 4.19"
+    #[2.10]="4.18 4.19 4.20"
     [2.11]="4.19 4.20 4.21"
     [2.17]="4.20 4.21 4.22"
 )
 
 # Each MCE is available on the latest hub version and two versions back
 declare -A hub_to_mce=(
-    [4.18]="2.8 2.9 2.10"
-    [4.19]="2.9 2.10 2.11"
-    [4.20]="2.10 2.11 2.17"
+    # Commented out to reduce the number of jobs but give information about the supported versions.
+    #[4.18]="2.8 2.9 2.10"
+    #[4.19]="2.9 2.10 2.11"
+    #[4.20]="2.10 2.11 2.17"
     [4.21]="2.11 2.17"
     [4.22]="2.17"
 )
