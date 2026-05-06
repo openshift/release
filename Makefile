@@ -34,8 +34,8 @@ check-labels: python-help
 	@echo "Labels config check: PASS"
 
 check-cluster-profiles:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci:ci_check-cluster-profiles-config_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci:ci_check-cluster-profiles-config_latest --normalize --config-path=/release/ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_check-cluster-profiles-config_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_check-cluster-profiles-config_latest --normalize --config-path=/release/ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
 	@echo "Cluster profiles config check: PASS"
 
 check-yaml-indentation: python-help
