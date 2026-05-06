@@ -82,6 +82,24 @@ KUBECONFIG="" oc registry login
 
 run_command "which oc"
 run_command "oc version --client"
+
+# Download oc-mirror from mirror.openshift.com
+echo "Downloading oc-mirror from mirror.openshift.com"
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
+oc_mirror_download_dir=$(mktemp -d)
+pushd "${oc_mirror_download_dir}"
+curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+tar -xzf oc-mirror.tar.gz
+chmod +x oc-mirror
+oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+popd
+
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
@@ -90,7 +108,6 @@ new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
 
-oc_mirror_bin="oc-mirror"
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
 # set the imagesetconfigure
