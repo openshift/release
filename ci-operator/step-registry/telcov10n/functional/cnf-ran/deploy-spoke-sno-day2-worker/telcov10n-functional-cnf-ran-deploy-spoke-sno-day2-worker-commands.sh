@@ -84,7 +84,7 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconf
 SPOKE_CLUSTER_NAME=$(echo "${SPOKE_CLUSTER}" | tr -d "[]' ")
 
 echo "Running day 2 worker expansion for SNO spoke cluster: ${SPOKE_CLUSTER_NAME}"
-ansible-playbook ./playbooks/deploy-ocp-sno-day2-worker.yml \
+ansible-playbook ./playbooks/ran/deploy-ocp-sno-day2-worker.yml \
     -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
         spoke_cluster_name=${SPOKE_CLUSTER_NAME} \

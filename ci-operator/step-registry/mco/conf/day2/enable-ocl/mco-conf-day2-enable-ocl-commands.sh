@@ -160,11 +160,17 @@ for custom_mcp_name in "${mcp_arr[@]}"; do
 
     machine_os_build_name=$(oc get machineosconfig "$MOSC_NAME" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
     echo "Waiting for a $machine_os_build_name MOSB to exist"
-    if ! run_command "oc wait --for=create machineosbuild $machine_os_build_name --timeout=300s"
-    then
-        echo "ERROR. The $machine_os_build_name MOSB resource was not created"
-        debug_and_exit
-    fi
+    timeout=300
+    elapsed=0
+    while ! oc get machineosbuild "$machine_os_build_name" &>/dev/null; do
+        if [ $elapsed -ge $timeout ]; then
+            echo "ERROR. The $machine_os_build_name MOSB resource was not created after ${timeout}s"
+            debug_and_exit
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+    echo "MOSB $machine_os_build_name exists"
 
     echo "Waiting for $machine_os_build_name MOSB to start building"
     if ! run_command "oc wait --for=condition=Building  machineosbuild $machine_os_build_name --timeout=300s"

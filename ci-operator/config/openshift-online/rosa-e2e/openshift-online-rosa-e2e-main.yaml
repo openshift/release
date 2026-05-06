@@ -45,35 +45,6 @@ tests:
   container:
     from: src
   cron: 0 14 * * *
-- as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
-  capabilities:
-  - nested-podman
-  commands: |
-    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
-    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
-    export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
-    export ENABLE_JIRA_REPORTING=true
-    source /usr/local/cs-qe-credentials/ocm-tokens
-    source /usr/local/cs-qe-credentials/jira-cred
-    env | grep -v '^_='
-    EOF
-
-    podman run \
-    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-    --env-file /tmp/podman.env \
-    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
-    --rm \
-    quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main --reportJiraTicket
-  container:
-    from: nested-podman
-    memory_backed_volume:
-      size: 1Gi
-  cron: 0 8 * * *
-  nested_podman: true
-  secrets:
-  - mount_path: /usr/local/cs-qe-credentials
-    name: cs-qe-credentials
 zz_generated_metadata:
   branch: main
   org: openshift-online

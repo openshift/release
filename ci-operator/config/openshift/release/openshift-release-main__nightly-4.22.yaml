@@ -563,6 +563,19 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
     workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-agent-ovn-two-node-arbiter-workers
+  capabilities:
+  - intranet
+  cron: 41 10 */2 * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
+        NUM_WORKERS=3
+        WORKER_DISK=120
+        WORKER_MEMORY=9000
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   capabilities:
   - intranet
@@ -1057,12 +1070,10 @@ tests:
         PV (block volmode).*multiVolume.*should concurrently access the single volume
         from pods on different node'
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-ovn-host-groups-csi-techpreview
+- as: e2e-vsphere-ovn-host-groups-csi
   cron: 36 3 * * 0
   steps:
     cluster_profile: vsphere-elastic
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-host-groups-csi
 - as: e2e-vsphere-ovn-zones
   cron: 16 0 * * 5
@@ -1102,7 +1113,7 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
 - as: e2e-vsphere-ovn-hybrid-env-techpreview
-  cron: '@daily'
+  cron: 45 7 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1115,7 +1126,7 @@ tests:
         low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
 - as: e2e-vsphere-ovn-hybrid-env-serial-techpreview
-  cron: '@daily'
+  cron: 50 7 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1124,11 +1135,12 @@ tests:
       NETWORK_TYPE: multi-tenant
       PERSISTENT_MONITORING: "false"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
-      TEST_SKIPS: \[sig-arch\]\[Early\] Operators low level operators
+      TEST_SKIPS: \[FeatureGate:VSphereDriverConfiguration\]\|\[sig-arch\]\[Early\]
+        Operators low level operators
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-vsphere-hybrid-env
 - as: e2e-vsphere-ovn-upi-hybrid-env-techpreview
-  cron: '@daily'
+  cron: 55 7 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2205,12 +2217,18 @@ tests:
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-external-aws-ccm
+- as: opct-platform-external-aws-ccm
   cron: '@weekly'
   steps:
     cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
+- as: opct-platform-external-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-aws
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout

@@ -871,3 +871,36 @@ periodics:
         requests:
           cpu: 100m
           memory: 100Mi
+- agent: kubernetes
+  cluster: build11
+  cron: 0 * * * *
+  decorate: true
+  decoration_config:
+    timeout: 10m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-build-farm-canary-build12
+  reporter_config:
+    slack:
+      channel: '#alerts-testplatform-build-farms'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
+  spec:
+    containers:
+    - command:
+      - ./hack/build-farm-canary.sh
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
