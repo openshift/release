@@ -285,6 +285,24 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
+# Fail fast if any node is not Ready
+echo "************ Checking node readiness ************"
+oc get nodes -owide
+NOT_READY_NODES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -v "True$" || true)
+if [[ -n "${NOT_READY_NODES}" ]]; then
+  echo "[ERROR] The following nodes are not Ready:"
+  echo "${NOT_READY_NODES}"
+  echo "[ERROR] All nodes must be Ready before starting PTP tests. Aborting."
+  exit 1
+fi
+TOTAL_NODES=$(oc get nodes --no-headers | wc -l)
+if [[ "${TOTAL_NODES}" -eq 0 ]]; then
+  echo "[ERROR] No nodes found in the cluster. Aborting."
+  exit 1
+fi
+echo "[INFO] All ${TOTAL_NODES} nodes are Ready."
+echo "***************************************************"
+
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
   source "$HOME"/golang-1.20
