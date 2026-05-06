@@ -88,7 +88,11 @@ process_junit_files() {
     local artifacts_url
     artifacts_url=$(get_artifacts_url)
 
-    # Replace attachment placeholders with full URLs to OpenShift CI storage
+    # Replace attachment placeholders with full URLs to OpenShift CI storage.
+    # Playwright generates relative paths like ../node_modules/.cache/e2e-test-results/...
+    # which map to artifacts/e2e-test-results/... in GCS (collect_artifacts copies them there).
+    sed -i "s#\[\[ATTACHMENT|\.\./node_modules/\.cache/\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
+    # Catch any remaining attachment placeholders that don't match the pattern above
     sed -i "s#\[\[ATTACHMENT|\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
 
     # Fix XML property tags format for Data Router compatibility
