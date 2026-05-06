@@ -35,6 +35,22 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
+# Managment Kubeconfig for ROSA-HCP
+# Set this variable only for HCP clusters on AWS
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; then
+    if [[ -f "${SHARED_DIR}/hs-mc.kubeconfig" ]]; then
+        # Check if the cluster is accessible from prow environment, 
+        # Set this variable only if accessible
+        MC_CLUSTER_INFRA=$(oc --kubeconfig="${SHARED_DIR}/hs-mc.kubeconfig" get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+        if [[ $MC_CLUSTER_INFRA == "AWS" ]]; then
+            export MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+            export ES_INDEX=ripsaw-kube-burner
+        fi
+    fi
+fi
+
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
@@ -62,7 +78,10 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
 METRICS_FOLDER="collected-metrics-${UUID}"
 if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
@@ -82,3 +101,5 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+exit ${RUN_EXIT_CODE}

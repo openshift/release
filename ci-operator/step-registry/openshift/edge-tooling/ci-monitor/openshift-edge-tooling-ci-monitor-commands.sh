@@ -190,6 +190,9 @@ fi
 if [[ "${WITH_TIMING}" == "true" ]]; then
     SKILL_ARGS+="--with-timing "
 fi
+if [[ -n "${PAYLOAD_COUNT}" ]]; then
+    SKILL_ARGS+="--payloads ${PAYLOAD_COUNT} "
+fi
 
 # ===========================================================================
 # Invoke Claude with the generate-dashboard skill
@@ -197,7 +200,7 @@ fi
 echo ""
 echo "=== Invoking Claude with edge-ocp-ci:generate-dashboard ==="
 
-ALLOWED_TOOLS="Agent Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+ALLOWED_TOOLS="Agent SendMessage Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 PHASE_START=$(date +%s)
 CLAUDE_EXIT=0
@@ -205,7 +208,7 @@ timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
-    --max-turns 80 \
+    --max-turns 150 \
     -p "/edge-ocp-ci:generate-dashboard ${SKILL_ARGS}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-analysis.log" || CLAUDE_EXIT=$?
 
@@ -222,7 +225,7 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --continue \
         --allowedTools "${ALLOWED_TOOLS}" \
         --output-format stream-json \
-        --max-turns 10 \
+        --max-turns 15 \
         -p "Time is up. Write whatever analysis you have to the JSON file now (Step 5), then merge into the dashboard (Step 6)." \
         --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-analysis.log" || NUDGE_EXIT=$?
 fi

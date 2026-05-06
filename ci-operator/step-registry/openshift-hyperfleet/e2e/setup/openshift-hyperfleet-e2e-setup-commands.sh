@@ -84,14 +84,36 @@ export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
 echo "${MAESTRO_URL}" > "${SHARED_DIR}/maestro_url"
 
 
-log "=== Checking Hyperfleet API accessibility ==="
-if ! curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/; then
-  log "ERROR: Hyperfleet API is not accessible at ${HYPERFLEET_API_URL}"
+wait_for_api() {
+  local url="$1"
+  local name="$2"
+  local max_attempts="${API_RETRY_ATTEMPTS:-30}"
+  local wait_seconds="${API_RETRY_INTERVAL:-10}"
+
+  log "=== Waiting for ${name} to become accessible at ${url} ==="
+  for attempt in $(seq 1 "$max_attempts"); do
+    if curl -sf --connect-timeout 5 --max-time 10 -X GET "${url}" > /dev/null 2>&1; then
+      log "SUCCESS: ${name} is accessible (attempt ${attempt}/${max_attempts})"
+      return 0
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, retrying in ${wait_seconds}s..."
+      sleep "$wait_seconds"
+    else
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, no retries remaining"
+    fi
+  done
+
+  log "ERROR: ${name} is not accessible at ${url} after ${max_attempts} attempts"
+  log "Final attempt output for diagnostics:"
+  curl --connect-timeout 5 --max-time 10 -X GET "${url}" 2>&1 || true
+  return 1
+}
+
+if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
   exit 1
 fi
 
-log "=== Checking Maestro API accessibility ==="
-if ! curl -f -X GET ${MAESTRO_URL}/api/maestro/v1/consumers; then
-  log "ERROR: Maestro API is not accessible at ${MAESTRO_URL}"
+if ! wait_for_api "${MAESTRO_URL}/api/maestro/v1/consumers" "Maestro API"; then
   exit 1
 fi

@@ -21,7 +21,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # Install terraform
 TERRAFORM_VERSION="1.5.5"
-curl -sL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+curl -sL --retry 5 --retry-delay 10 "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
 unzip -o /tmp/terraform.zip -d /tmp/
 chmod +x /tmp/terraform
 export PATH="/tmp:${PATH}"

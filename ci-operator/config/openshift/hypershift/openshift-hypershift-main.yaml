@@ -233,6 +233,7 @@ tests:
       OCP_IMAGE_N2: release:n2minor
     env:
       CI_TESTS_RUN: ^(TestCreateCluster$|TestAutoscaling|TestNodePool|TestUpgradeControlPlane|TestHAEtcdChaos|TestAzureOAuthLoadBalancer|TestAzurePrivateTopology)$
+      E2E_RESOURCE_REQUEST_OVERRIDES: "1"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     post:
@@ -490,49 +491,6 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- as: verify-workflows
-  commands: |
-    set -euo pipefail
-    git fetch --unshallow 2>/dev/null || true
-    if ! git fetch https://github.com/openshift/hypershift.git main; then
-      echo "ERROR: Could not fetch main from GitHub."
-      exit 1
-    fi
-    MAIN_REF="FETCH_HEAD"
-    # ci-operator runs on a merge commit (PR merged into base). HEAD is the
-    # merge result, so workflow files from main are already present. We need
-    # the actual PR head commit (second parent of the merge) to detect
-    # outdated files on the PR branch itself.
-    PR_HEAD=$(git rev-parse HEAD^2 2>/dev/null) || PR_HEAD="HEAD"
-    BASE=$(git merge-base "$PR_HEAD" "$MAIN_REF")
-    echo "PR_HEAD: $(git rev-parse "$PR_HEAD")"
-    echo "MAIN:    $(git rev-parse "$MAIN_REF")"
-    echo "BASE:    $BASE"
-    echo ""
-    FAILED=0
-    while IFS= read -r file; do
-      [ -z "$file" ] && continue
-      main_hash=$(git rev-parse "${MAIN_REF}:${file}" 2>/dev/null) || continue
-      head_hash=$(git rev-parse "${PR_HEAD}:${file}" 2>/dev/null) || head_hash=""
-      if [ -z "$head_hash" ]; then
-        echo "MISSING: $file exists on main but not on this branch."
-        FAILED=1
-      elif [ "$main_hash" != "$head_hash" ]; then
-        base_hash=$(git rev-parse "${BASE}:${file}" 2>/dev/null) || base_hash=""
-        if [ "$head_hash" = "$base_hash" ]; then
-          echo "OUTDATED: $file has been updated on main since this branch diverged."
-          FAILED=1
-        fi
-      fi
-    done < <(git ls-tree --name-only "${MAIN_REF}" -- .github/workflows/)
-    if [ "$FAILED" -eq 1 ]; then
-      echo ""
-      echo "Rebase your branch on main: git fetch upstream main && git rebase upstream/main"
-      exit 1
-    fi
-    echo "Workflow files are up to date."
-  container:
-    from: src
 - always_run: false
   as: reqserving-e2e-aws
   capabilities:

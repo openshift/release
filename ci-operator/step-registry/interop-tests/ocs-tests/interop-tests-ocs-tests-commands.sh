@@ -8,7 +8,19 @@ CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.v
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
 OCP_VERSION="${OCP_MAJOR_MINOR}"
 
-OCS_VERSION=$(oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | startswith("ocs-operator")).spec.version' | cut -d. -f1,2)
+OCS_VERSION=$(
+  oc get csv -n openshift-storage -o json 2>/dev/null |
+    jq -r '
+      [ .items[] | select(.metadata.name | test("^(ocs-(client-)?|odf-)operator")) ] |
+      first | .spec.version // empty
+    ' | cut -d. -f1,2
+) || true
+if [[ -z "${OCS_VERSION}" ]]; then
+    echo "ERROR: OCS_VERSION not set or CSV lookup failed."
+    echo "Available CSVs in openshift-storage:"
+    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || echo "  (namespace may not exist)"
+    exit 1
+fi
 
 CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"

@@ -52,7 +52,7 @@ spec:
   serviceAccountName: builder
   containers:
     - name: priv
-      image: quay.io/podman/stable
+      image: quay.io/podman/stable:v4.9.4
       command:
         - /bin/bash
         - -c
@@ -170,8 +170,22 @@ spec:
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
-  dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
+  dockercgf=""
+  for i in $(seq 1 80); do
+    dockercgf=$(oc --request-timeout=10s -n openshift-ptp get secret \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+      | grep '^builder-dockercfg-' | head -1 || true)
+    if [[ -n "${dockercgf}" ]]; then
+      break
+    fi
+    echo "Waiting for builder-dockercfg secret (attempt ${i}/80)..."
+    sleep 5
+  done
+  if [[ -z "${dockercgf}" ]]; then
+    echo "[ERROR] builder-dockercfg secret not found after 400s"
+    exit 1
+  fi
+  jobdefinition=${jobdefinition//BUILDER_DOCKERCFG/${dockercgf}}
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
