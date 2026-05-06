@@ -60,26 +60,24 @@ function trigger_prow_job() {
     local max_retries=30
     local retry_interval=10
 
-    set +x
     for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
+        set +x
         response=$(curl -s -X POST -d "${_http_post_data}" \
             -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
             "${GANGWAY_API}/v1/executions/${_job_name}" \
             -w "%{http_code}")
-
+        set -x
         json_body=$(echo "$response" | sed '$d')    # Extract JSON response body
         http_status=$(echo "$response" | tail -n 1) # Extract HTTP status code
 
         if [ "$http_status" -eq 200 ]; then
             echo "JOB_ID###$(jq -r '.id' <<< "$json_body")###"
-            set -x
             return 0
         else
-            (set -x; echo "[$retry_count/$max_retries] Gangway API not available (HTTP $response). Retrying in $retry_interval sec...")
+            (echo "[$retry_count/$max_retries] Gangway API not available (HTTP $response). Retrying in $retry_interval sec...")
             sleep "$retry_interval"
         fi
     done
-    set -x
     echo "Gangway API is still not available after $max_retries retries. Aborting." && return 0
 }
 
