@@ -26,18 +26,18 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
-    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
-    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
-    export ENABLE_JIRA_REPORTING=true
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
       JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     else
       JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
     fi
-    echo "JOB_LINK=${JOB_LINK}"
-    export JOB_LINK=${JOB_LINK}
+
+    env -i bash --norc --noprofile << EOF > /tmp/podman.env
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export ENABLE_JIRA_REPORTING=true
+    export JOB_LINK="${JOB_LINK}"
     source /usr/local/cs-qe-credentials/ocm-tokens
     source /usr/local/cs-qe-credentials/jira-cred
     env | grep -v '^_='
