@@ -265,22 +265,31 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
-#if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
+#if OVERRIDE_OC_MIRROR then download oc-mirror from mirror.openshift.com
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "OCP Version: ${ocpVersion}"
     if [[ "$ocpVersion" == *arm* ]] || [[ "${OCP_ARCH:-}" != "amd64" ]]; then
-        echo "[WARN]OCP_ARCH is not amd64, or OCP is not for amd64, currently do not support to overwrite the oc-mirror from the OCP release image"
+        echo "[WARN]OCP_ARCH is not amd64, or OCP is not for amd64, currently do not support arm64 oc-mirror download"
     fi
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
         cd ${tmpDir}
-        echo "Extracting oc-mirror from ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
+        echo "Downloading oc-mirror from mirror.openshift.com for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
         set -x
-        filter="linux/amd64"      
-        tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
-        which oc
-        uname -m
-        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" --confirm
+
+        # Determine architecture
+        ARCH=$(uname -m)
+        case ${ARCH} in
+            x86_64) ARCH="amd64" ;;
+            aarch64) ARCH="arm64" ;;
+        esac
+
+        # Download oc-mirror from mirror.openshift.com
+        echo "Downloading oc-mirror for architecture: ${ARCH}"
+        curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+
+        tar -xzf oc-mirror.tar.gz
         ls -la ./oc-mirror
         md5sum ./oc-mirror
         chmod +x ./oc-mirror
