@@ -160,8 +160,8 @@ collect_artifacts() {
     fi
     # Copy JUnit results to SHARED_DIR for data-router step
     if [[ -f "playwright-report/junit-results.xml" ]]; then
-        cp playwright-report/junit-results.xml "${SHARED_DIR}/junit-results-overlay-e2e.xml"
-        echo "[INFO] JUnit results copied to ${SHARED_DIR}/junit-results-overlay-e2e.xml"
+        cp playwright-report/junit-results.xml "${SHARED_DIR}/junit-results-ocp-helm.xml"
+        echo "[INFO] JUnit results copied to ${SHARED_DIR}/junit-results-ocp-helm.xml"
     fi
 }
 
