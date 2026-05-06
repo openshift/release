@@ -1,11 +1,8 @@
 ---
 paths:
-  - "ci-operator/step-registry/hypershift/azure/e2e/**"
+  - "ci-operator/step-registry/hypershift/azure/e2e/self-managed/**"
   - "ci-operator/step-registry/hypershift/azure/run-e2e-self-managed/**"
-  - "ci-operator/step-registry/hypershift/azure/create/**"
-  - "ci-operator/step-registry/hypershift/azure/destroy/**"
   - "ci-operator/step-registry/hypershift/azure/setup-private-link/**"
-  - "ci-operator/step-registry/hypershift/azure/kas-dns-update/**"
 ---
 
 # HyperShift Azure Self-Managed
@@ -18,16 +15,17 @@ Uses **OpenShift management clusters** — the same nested management cluster pa
 
 This is different from managed Azure (ARO-HCP), which uses AKS as the management cluster.
 
-Key distinction: self-managed sets `AZURE_SELF_MANAGED=true`, which skips the `--managed-service=ARO-HCP` flag during hypershift install.
+Key distinction: self-managed sets `AZURE_SELF_MANAGED=true`, which skips the `--managed-service=ARO-HCP` flag during hypershift install. When Private Link credentials are available, it also adds `--private-platform=Azure`, `--azure-private-creds`, and `--azure-pls-resource-group` flags.
 
 ## Workflow
 
 `hypershift-azure-e2e-self-managed`:
-1. Set up nested OpenShift management cluster via `hypershift-setup-nested-management-cluster` (with `CLOUD_PROVIDER=Azure`)
-2. Configure Azure Private Link via `hypershift-azure-setup-private-link`
-3. Install HyperShift operator via `hypershift-install` (with `AZURE_SELF_MANAGED=true`)
-4. Run e2e tests via `hypershift-azure-run-e2e-self-managed`
-5. Destroy management cluster via `hypershift-destroy-nested-management-cluster`
+1. RBAC setup via `ipi-install-rbac`
+2. Set up nested OpenShift management cluster via `hypershift-setup-nested-management-cluster` (with `CLOUD_PROVIDER=Azure`)
+3. Configure Azure Private Link via `hypershift-azure-setup-private-link`
+4. Install HyperShift operator via `hypershift-install` (with `AZURE_SELF_MANAGED=true`)
+5. Run e2e tests via `hypershift-azure-run-e2e-self-managed`
+6. Destroy management cluster via `hypershift-destroy-nested-management-cluster`
 
 ## Cluster Profile
 
@@ -53,10 +51,6 @@ Private Link artifacts in SHARED_DIR:
 - `azure_private_link_creds_file` — Private Link credentials
 - `azure_private_nat_subnet_id` — NAT subnet for private endpoints
 
-## KAS DNS Update
-
-Step `hypershift-azure-kas-dns-update` updates Azure DNS CNAME records for custom KAS (Kubernetes API Server) DNS names. Used when `HYPERSHIFT_DYNAMIC_DNS` is set.
-
 ## Self-Managed-Specific Credentials
 
 In addition to the shared credentials in `hypershift-azure-common.md`:
@@ -66,6 +60,7 @@ In addition to the shared credentials in `hypershift-azure-common.md`:
 | `/etc/hypershift-ci-jobs-self-managed-azure/credentials.json` | Self-managed Azure service principal |
 | `/etc/hypershift-ci-jobs-self-managed-azure-e2e/` | Self-managed e2e-specific creds |
 | `/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig` | Root management cluster kubeconfig |
+| `/etc/hypershift-additional-pull-secret/.dockerconfigjson` | Additional pull secret for e2e tests |
 
 ## Self-Managed-Specific Environment Variables
 
@@ -79,6 +74,11 @@ In addition to the shared env vars in `hypershift-azure-common.md`:
 | `HYPERSHIFT_NODE_COUNT` | 2 | Worker node count |
 | `AZURE_PRIVATE_CREDS_FILE` | | Path to Private Link credentials |
 | `AZURE_PLS_RESOURCE_GROUP` | | Resource group for Private Link Services |
+| `AZURE_PRIVATE_NAT_SUBNET_ID` | (empty) | NAT subnet for private endpoints (alternative to SHARED_DIR file) |
+| `CI_TESTS_RUN` | (empty) | Regex filter for e2e test selection |
+| `HYPERSHIFT_EXTERNAL_DNS_DOMAIN` | aks-e2e.hypershift.azure.devcluster.openshift.com | External DNS domain (workflow default) |
+| `HYPERSHIFT_AZURE_ZONES` | (empty) | Availability zones for hosted cluster |
+| `E2E_RESOURCE_REQUEST_OVERRIDES` | (empty) | Resource request overrides for e2e tests |
 
 ## Self-Managed-Specific SHARED_DIR Artifacts
 
@@ -86,9 +86,7 @@ In addition to the shared artifacts in `hypershift-azure-common.md`:
 
 | File | Purpose |
 |---|---|
-| `management_cluster_kubeconfig` | Nested management cluster kubeconfig |
-| `management_cluster_name` | Management cluster name |
-| `management_cluster_namespace` | Management cluster namespace |
+| `kubeconfig` | Copy of management cluster kubeconfig |
 | `azure_pls_resource_group` | Private Link Services resource group |
 | `azure_private_link_creds_file` | Private Link credentials |
 | `azure_private_nat_subnet_id` | NAT subnet for private endpoints |
@@ -97,7 +95,4 @@ In addition to the shared artifacts in `hypershift-azure-common.md`:
 
 - `e2e/self-managed/` — self-managed e2e workflow definition
 - `run-e2e-self-managed/` — e2e test execution (ref + commands script)
-- `create/` — HostedCluster creation chain
-- `destroy/` — cleanup operations
 - `setup-private-link/` — Azure Private Link/Private Endpoint setup
-- `kas-dns-update/` — Azure DNS CNAME updates for custom KAS DNS

@@ -22,8 +22,9 @@ This is different from self-managed Azure, which uses OpenShift management clust
 1. Provision AKS cluster via `cucushift-installer-rehearse-azure-aks-provision`
 2. Attach Azure Key Vault via `hypershift-azure-aks-attach-kv`
 3. Install HyperShift operator via `hypershift-install` (with `AKS=true`)
-4. Run e2e tests via `hypershift-azure-run-e2e`
-5. Deprovision AKS cluster
+4. Get guest annotations via `cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations`
+5. Run e2e tests via `hypershift-azure-run-e2e`
+6. Deprovision AKS cluster
 
 ## Cluster Profile
 
@@ -45,6 +46,8 @@ In addition to the shared credentials in `hypershift-azure-common.md`:
 | `/etc/hypershift-ci-jobs-azurecreds/managed-identities.json` | Managed identity mappings |
 | `/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json` | Data plane identity mappings |
 | `/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json` | AKS KMS configuration |
+| `/etc/hypershift-additional-pull-secret/.dockerconfigjson` | Additional pull secret for e2e tests |
+| `/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig` | Root management cluster kubeconfig (MGMT_PARENT_KUBECONFIG default) |
 
 ## Managed-Specific Environment Variables
 
@@ -52,11 +55,15 @@ In addition to the shared env vars in `hypershift-azure-common.md`:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AKS` | true | Indicates management cluster is AKS |
-| `USE_HYPERSHIFT_AZURE_CREDS` | true | Use HyperShift OSD account |
-| `HYPERSHIFT_AZURE_CP_MI` | | Use managed identities for control plane |
+| `AKS` | false (overridden to `true` at workflow level) | Indicates management cluster is AKS |
+| `USE_HYPERSHIFT_AZURE_CREDS` | false (overridden to `true` at workflow level) | Use HyperShift OSD account |
 | `AUTH_THROUGH_CERTS` | false | Azure Key Vault certificate auth |
-| `HYPERSHIFT_AZURE_MARKETPLACE_ENABLED` | | Use Azure Marketplace images |
+| `HYPERSHIFT_MANAGED_SERVICE` | ARO-HCP | Managed service identifier passed to hypershift install |
+| `TECH_PREVIEW_NO_UPGRADE` | false | Skip upgrades for tech preview |
+| `HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER` | aro4 | Azure Marketplace image offer |
+| `HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER` | azureopenshift | Marketplace publisher |
+| `HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION` | 419.6.20250523 | Marketplace image version (pinned, updated periodically) |
+| `HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU` | aro_419 | Marketplace image SKU (pinned, updated periodically) |
 
 ## Managed-Specific SHARED_DIR Artifacts
 
@@ -64,9 +71,8 @@ In addition to the shared artifacts in `hypershift-azure-common.md`:
 
 | File | Purpose |
 |---|---|
-| `azure-marketplace-image-sku` | Marketplace image SKU |
-| `azure-marketplace-image-version` | Marketplace image version |
 | `hypershift_hc_annotations` | HostedCluster annotations (one per line) |
+| `resourcegroup_aks` | AKS resource group name (used by attach-kv) |
 
 ## AKS Subdirectories
 

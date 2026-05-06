@@ -19,21 +19,27 @@ HyperShift separates the hosted cluster control plane from the data plane:
 - Setup: `hypershift-setup-nested-management-cluster` chain
 - Destroy: `hypershift-destroy-nested-management-cluster` chain
 - Outputs to SHARED_DIR: `management_cluster_kubeconfig`, `management_cluster_name`, `management_cluster_namespace`
+- **Root management cluster (alternative)**: `hypershift-setup-root-management-cluster` chain copies the root kubeconfig to `${SHARED_DIR}/kubeconfig` (not `management_cluster_kubeconfig`) without creating a nested cluster. Used by `hypershift-aws-e2e-external` and `hypershift-aws-conformance` for a simpler 2-tier model (root cluster → HostedCluster)
 
 Azure managed (ARO-HCP) is the exception — it uses AKS as management cluster instead of nested OpenShift.
 
 ## Workflow Composition (pre/test/post)
 
-Standard workflow pattern:
-- **PRE**: `ipi-install-rbac` → management cluster setup → platform-specific setup → `hypershift-install` (operator deployment)
+Most common workflow pattern (3-tier nested):
+- **PRE**: `ipi-install-rbac` → management cluster setup → `hypershift-install` (operator deployment) → platform-specific create (e.g., `hypershift-aws-create`)
 - **TEST**: `run-e2e` or `conformance` chain
-- **POST**: `hypershift-dump` (diagnostics) → destroy hosted cluster → destroy management cluster
-- `allow_best_effort_post_steps: true` ensures cleanup runs even on test failure
+- **POST**: destroy management cluster (dump is embedded in the destroy chain for 3-tier nested workflows; 2-tier workflows use separate `hypershift-dump` + platform-specific destroy)
+- Some workflows set `allow_best_effort_post_steps: true` to ensure cleanup runs even on test failure (e.g., `hypershift-agent-conformance`, `hypershift-aws-reqserving-e2e`); most workflows rely on default post-step behavior
+
+Alternative PRE patterns:
+- **Root management cluster (no nested, 2-tier)**: `hypershift-setup-root-management-cluster` copies root kubeconfig directly, skips `hypershift-install` (operator already on root cluster) (e.g., `hypershift-aws-conformance`, `hypershift-aws-e2e-external`)
+- **Hostedcluster workflow**: `openshift-cluster-bot-rbac` → `hypershift-hostedcluster-create`
+- **Agent conformance**: `assisted-baremetal-operator` → `enable-qe-catalogsource` → `hypershift-install` → `hypershift-agent-create`
 
 ## HyperShift Install Step
 
 Deploys the HyperShift operator to the management cluster. Key controls:
-- `CLOUD_PROVIDER`: AWS or Azure
+- `CLOUD_PROVIDER`: AWS, Azure, or GCP
 - `AKS`: whether management cluster is AKS (managed Azure)
 - `AZURE_SELF_MANAGED`: skip `--managed-service=ARO-HCP` for self-managed Azure
 - `TECH_PREVIEW_NO_UPGRADE`, `ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE`
@@ -55,7 +61,7 @@ Deploys the HyperShift operator to the management cluster. Key controls:
 
 ## Step Registry File Conventions
 
-- `*-ref.yaml` + `*-commands.sh` = steps (atomic tasks)
+- `*-ref.yaml` + `*-commands.sh` = steps (atomic tasks with metadata and executable script)
 - `*-chain.yaml` = chains (ordered step sequences)
 - `*-workflow.yaml` = workflows (complete pre/test/post scenarios)
 - Security: disable `set -x` around credential handling (see root CLAUDE.md for pattern)
@@ -90,17 +96,19 @@ Deploys the HyperShift operator to the management cluster. Key controls:
 
 ## Directory Overview
 
-**Platforms**: aws/, azure/, gcp/, ibmcloud/, kubevirt/, openstack/, powervs/
+**Platforms**: aws/, azure/, gcp/, ibmcloud/, kubevirt/, openstack/, powervs/, agent/
 **MCE**: mce/ (Multicluster Engine with agent, kubevirt, power, ibmz support)
-**Operations**: install/, hostedcluster/, conformance/, e2e-v2/, e2e-backuprestore/
+**Operations**: install/, hostedcluster/, conformance/, e2e-v2/, e2e-backuprestore/, operatorhub/, optional-operators/, performanceprofile/
 **Infrastructure**: setup-nested-management-cluster/, setup-root-management-cluster/, destroy-nested-management-cluster/
 **Diagnostics**: dump/, debug/, analyze-e2e-failure/, k8sgpt/
-**AI/Automation**: agent/, agentic-qe/, review-agent/, jira-agent/, dependabot-triage/
+**AI/Automation**: agentic-qe/, review-agent/, jira-agent/, dependabot-triage/
 
 ## Timeouts
 
 - Management cluster setup: 45m
-- HostedCluster create: 60m
-- E2E tests: 30m
+- HostedCluster create: 35m (AWS), 45m (Azure), 60m (GCP, hostedcluster)
+- E2E tests (V2): 30m
+- E2E tests (V1 run-e2e): 2h
+- Conformance tests: 4h (14400s)
 - Dump operations: 15m
-- Destroy: 45m (management), 1h (hosted)
+- Destroy: 25m (Azure hosted), 45m (AWS hosted), 1h (hostedcluster generic)
