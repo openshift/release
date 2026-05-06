@@ -15,6 +15,7 @@ echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_ZONES '${COMPUTE_ZONES}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_NODE_TYPE '${COMPUTE_NODE_TYPE}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_ZONES '${CONTROL_PLANE_ZONES}'"
 echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_NODE_TYPE '${CONTROL_PLANE_NODE_TYPE}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE '${ADDITIONAL_WORKER_VM_TYPE}'"
 
 function get_zones_from_region() {
   # shellcheck disable=SC2178
@@ -177,6 +178,43 @@ if [[ -z "${CONTROL_PLANE_ZONES}" ]]; then
   fi
   echo "$(date -u --rfc-3339=seconds) - INFO: As a temporary workaround of https://redhat.atlassian.net/browse/OCPBUGS-78431, ensure the zones of compute & controlPlane machines are the same"
   array_intersection_or_fallback CANDIDATE_ZONES_ARRAY ZONES_ARRAY2
+fi
+
+# For heterogeneous clusters, also constrain zones based on additional worker machine type
+# Only apply this logic for OCP 4.17+ to avoid changing behavior of older releases
+is_version_gte_4_17() {
+  if command -v oc &> /dev/null && command -v openshift-install &> /dev/null; then
+    local release_image ocp_version
+    release_image="$(openshift-install version | sed -n 's/^release image\s\+\(.*\)$/\1/p' | tr -d '\n')"
+    ocp_version="$(oc adm release info "$release_image" -o json | jq -r '.metadata.version' | tr -d '\n')"
+    echo "$(date -u --rfc-3339=seconds) - INFO: Detected OCP version: ${ocp_version}"
+    printf '%s\n%s' "4.17" "$ocp_version" | sort -C -V
+  else
+    # If we can't detect version, assume it's new enough
+    echo "$(date -u --rfc-3339=seconds) - WARNING: Cannot detect OCP version, assuming >= 4.17"
+    return 0
+  fi
+}
+
+if [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]] && is_version_gte_4_17; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE specified, getting zones supporting '${ADDITIONAL_WORKER_VM_TYPE}'"
+  ZONES_ARRAY3=()
+  get_zones_by_machine_type "${ADDITIONAL_WORKER_VM_TYPE}" ZONES_ARRAY3
+
+  if [[ ${#ZONES_ARRAY3[@]} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: No zones found supporting additional worker machine type '${ADDITIONAL_WORKER_VM_TYPE}' in region ${GCP_REGION}"
+    exit 1
+  fi
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: For heterogeneous clusters, restrict zones to those supporting all machine types"
+  array_intersection_or_fallback CANDIDATE_ZONES_ARRAY ZONES_ARRAY3
+
+  if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: No common zones support all machine types (compute: ${MACHINE_TYPE1}, control-plane: ${MACHINE_TYPE2}, additional: ${ADDITIONAL_WORKER_VM_TYPE})"
+    exit 1
+  fi
+elif [[ -n "${ADDITIONAL_WORKER_VM_TYPE}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: ADDITIONAL_WORKER_VM_TYPE specified but OCP version < 4.17, skipping zone intersection logic"
 fi
 
 if [[ ${#CANDIDATE_ZONES_ARRAY[@]} -gt 0 ]]; then
