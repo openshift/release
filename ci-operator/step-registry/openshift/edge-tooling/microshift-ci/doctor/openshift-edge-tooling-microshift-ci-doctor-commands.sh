@@ -230,9 +230,9 @@ EOF
 #
 echo "Starting MicroShift Claude CI Doctor"
 
-# CI Doctor should only run from the main branch
-if [[ "${JOB_NAME}" != *-main-ci-doctor ]]; then
-    echo "ERROR: CI Doctor should only run from the main branch job (JOB_NAME=${JOB_NAME})"
+# This job should only run from the main branch
+if [[ "${JOB_NAME}" != *-main-microshift-ci-doctor ]]; then
+    echo "ERROR: This job should only run from the main branch (JOB_NAME=${JOB_NAME})"
     exit 1
 fi
 

@@ -10,7 +10,7 @@ fi
 
 download_report() {
     local -r report_name="microshift-ci-doctor-report.html"
-    local -r report_url="${PROW_JOB_URL}/artifacts/ci-doctor/openshift-microshift-claude-ci-doctor/artifacts/${report_name}"
+    local -r report_url="${PROW_JOB_URL}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/${report_name}"
     local -r output_file="${ARTIFACT_DIR}/0-${report_name%.html}-summary.html"
 
     echo "Downloading report from artifacts..."
