@@ -5,20 +5,6 @@ set -euo pipefail
 mkdir -p /tmp/home
 export HOME=/tmp/home
 
-# Clone the source code under test
-SCAN_DIR="/tmp/source"
-git clone --depth=1 "https://github.com/${REPO_OWNER}/${REPO_NAME}.git" "${SCAN_DIR}"
-if [ -n "${PULL_NUMBER:-}" ]; then
-    cd "${SCAN_DIR}"
-    git fetch origin "pull/${PULL_NUMBER}/head:pr" --depth=1
-    git checkout pr
-fi
-cd "${SCAN_DIR}"
-
-export PATH="$HOME/.local/bin:$PATH"
-# TODO: should we have deeper pins? requirements.txt, with pip freeze for supply chain protection?
-pip3 install "cisco-ai-skill-scanner[vertex]>=2,<3"
-
 PARAMS=(
     --recursive
     --lenient
@@ -51,4 +37,6 @@ INJECT
 fi
 
 echo "Running cisco-ai-skill-scanner..."
-skill-scanner scan-all "${PARAMS[@]}" .
+# TODO: should we have deeper pins for supply chain protection?
+uvx --from "cisco-ai-skill-scanner[vertex]>=2,<3" --python 3.11 \
+    skill-scanner scan-all "${PARAMS[@]}" .
