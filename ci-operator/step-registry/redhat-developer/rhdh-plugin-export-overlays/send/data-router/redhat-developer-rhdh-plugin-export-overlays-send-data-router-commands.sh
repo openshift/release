@@ -12,7 +12,7 @@ set +o nounset
 # Prerequisites (written by the test step to SHARED_DIR):
 #   - IS_OPENSHIFT.txt, CONTAINER_PLATFORM.txt, CONTAINER_PLATFORM_VERSION.txt
 #   - RHDH_VERSION.txt
-#   - junit-results-*.xml
+#   - junit-*.xml
 # =============================================================================
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
@@ -130,7 +130,7 @@ validate_required_vars() {
   for var in "${required_vars[@]}"; do
     if [[ -z "${!var}" ]]; then
       echo "ERROR: Required variable ${var} is not set"
-      exit 1
+      return 1
     fi
   done
 }

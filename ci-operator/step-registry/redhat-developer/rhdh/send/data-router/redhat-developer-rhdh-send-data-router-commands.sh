@@ -158,7 +158,7 @@ validate_required_vars() {
   for var in "${required_vars[@]}"; do
     if [[ -z "${!var}" ]]; then
       echo "ERROR: Required variable ${var} is not set"
-      exit 1
+      return 1
     fi
   done
 }
