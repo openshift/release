@@ -22,8 +22,6 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-#IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
-#export IC_API_KEY
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
 
