@@ -141,7 +141,23 @@ oc registry login --to "${new_pull_secret}"
 #    fi
 #done
 
-oc_mirror_bin="oc-mirror"
+# Download oc-mirror from mirror.openshift.com
+echo "Downloading oc-mirror from mirror.openshift.com"
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
+oc_mirror_download_dir=$(mktemp -d)
+pushd "${oc_mirror_download_dir}"
+curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+tar -xzf oc-mirror.tar.gz
+chmod +x oc-mirror
+oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+popd
+
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
 
