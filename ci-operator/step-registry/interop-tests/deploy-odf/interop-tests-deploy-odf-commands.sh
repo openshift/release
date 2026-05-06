@@ -1,40 +1,11 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-ODF_INSTALL_NAMESPACE=openshift-storage
-DEFAULT_ODF_OPERATOR_CHANNEL="stable-${ODF_VERSION_MAJOR_MINOR}"
-ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
-ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
-ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
-ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
-ODF_DEFAULT_STORAGE_CLASS="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd"
-# ODF_DEFAULT_STORAGE_CLASS=ocs-storagecluster-ceph-rbd-virtualization
-DEFAULT_STORAGE_CLASS=${DEFAULT_STORAGE_CLASS:-${ODF_DEFAULT_STORAGE_CLASS}}
-
-readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
-readonly ODF_CATALOG_NAME=odf-catalogsource
-
-readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
-readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
-readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
-
-
-if [[ ! -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
-  echo "ERROR: ODF Quay credentials file not found"
-  sleep 7200
-fi
-
-echo "🐶 Get pull secret from cluster"
-oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
-
-echo "🍯 Merge pull secret with ODF Quay credentials"
-jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
-
-echo "🌊 Update pull secret in cluster"
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
+#
+# Deploy ODF/OCS on the target cluster (hub or managed spoke when managed-cluster-kubeconfig exists).
+# Merges cluster pull secret with ODF Quay credentials, applies catalog/subscription/StorageCluster, sets default SC.
+# Shell: xtrace on from start; off only while reading/merging cluster pull secret; on again after (MPEX Section0).
+#
+set -euxo pipefail
+shopt -s inherit_errexit
 
 function monitor_progress() {
   local status=''
@@ -55,7 +26,7 @@ function run_must_gather_and_abort_on_fail() {
   local odf_must_gather_image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
   # Wait for StorageCluster to be deployed, and on fail run must gather
   oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m' || \
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='30m' || \
   oc adm must-gather --image="${odf_must_gather_image}" --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
   # exit 1
 }
@@ -87,6 +58,45 @@ wait_mcp_for_updated() {
     exit 1
   fi
 }
+
+if [[ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
+fi
+
+ODF_INSTALL_NAMESPACE=openshift-storage
+DEFAULT_ODF_OPERATOR_CHANNEL="stable-${ODF_VERSION_MAJOR_MINOR}"
+ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
+ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
+ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
+ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
+ODF_DEFAULT_STORAGE_CLASS="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd"
+# ODF_DEFAULT_STORAGE_CLASS=ocs-storagecluster-ceph-rbd-virtualization
+DEFAULT_STORAGE_CLASS=${DEFAULT_STORAGE_CLASS:-${ODF_DEFAULT_STORAGE_CLASS}}
+
+readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
+readonly ODF_CATALOG_NAME=odf-catalogsource
+
+readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
+readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
+readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
+
+if [[ ! -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+  echo "[ERROR] ODF Quay credentials file not found: ${ODF_QUAY_CREDENTIALS_FILE}" >&2
+  exit 1
+fi
+
+# xtrace off while handling pull secrets (merge/update cluster pull secret; credential material).
+set +x
+echo "[INFO] Get pull secret from cluster"
+oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
+
+echo "[INFO] Merge pull secret with ODF Quay credentials"
+jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
+
+echo "[INFO] Update pull secret in cluster"
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
+# xtrace on again for ODF install and waits.
+set -x
 
 # Move into a tmp folder with write access
 pushd /tmp
@@ -124,7 +134,7 @@ if [ -e "icsp.yaml" ] ; then
 fi
 
 echo "Add ODF CatalogSource"
-echo "📷 image: ${ODF_CATALOG_IMAGE}"
+echo "[INFO] Catalog image: ${ODF_CATALOG_IMAGE}"
 oc apply -f - <<__EOF__
 kind: CatalogSource
 apiVersion: operators.coreos.com/v1alpha1
@@ -141,16 +151,16 @@ spec:
   sourceType: grpc
 __EOF__
 
-echo "⏳ Wait for CatalogSource to be ready"
+echo "[INFO] Wait for CatalogSource to be ready"
 sleep 30
 oc wait catalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace \
   --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout='5m'
 
-echo "🏷 Set label on ODF CatalogSource (required for ocs-ci tests)"
+echo "[INFO] Set label on ODF CatalogSource (required for ocs-ci tests)"
 oc label CatalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace ocs-operator-internal=true
 
 echo "Subscribe to the operator"
-SUB=$(
+subscriptionName=$(
     cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -166,19 +176,19 @@ spec:
 EOF
 )
 
-echo "⏳ Wait for CSV to be ready"
+echo "[INFO] Wait for CSV to be ready"
 for _ in {1..60}; do
-    CSV=$(oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
+    csvName=$(oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$subscriptionName" -o jsonpath='{.status.installedCSV}' || true)
+    if [[ -n "$csvName" ]]; then
+        if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get csv "$csvName" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+            echo "ClusterServiceVersion \"${csvName}\" ready"
             break
         fi
     fi
     sleep 10
 done
 
-echo "⏳ Wait for OCS Operator deployment to be ready"
+echo "[INFO] Wait for OCS Operator deployment to be ready"
 sleep 90
 
 oc wait deployment ocs-operator \
@@ -186,11 +196,11 @@ oc wait deployment ocs-operator \
   --for=condition='Available' \
   --timeout='5m'
 
-echo "🏷️ Preparing Nodes"
+echo "[INFO] Preparing nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
   --selector='node-role.kubernetes.io/worker'
 
-echo "💽 Create StorageCluster"
+echo "[INFO] Create StorageCluster"
 cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
@@ -221,14 +231,14 @@ sleep 30
 monitor_progress &
 run_must_gather_and_abort_on_fail &
 
-echo "⏳ Wait for StorageCluster to be deployed"
+echo "[INFO] Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='180m'
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='180m'
 
-echo " 🚮 Remove is-default-class annotation from all the storage classes"
+echo "[INFO] Remove is-default-class annotation from all storage classes"
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
 
-echo " ⭐ Make ${DEFAULT_STORAGE_CLASS} the default storage class"
+echo "[INFO] Make ${DEFAULT_STORAGE_CLASS} the default storage class"
 oc annotate storageclass ${DEFAULT_STORAGE_CLASS} storageclass.kubernetes.io/is-default-class=true
 
 

@@ -1,8 +1,11 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
+#
+# OpenShift Virtualization interop tests: prepare cluster storage/CNV state, run pytest (smoke or OCP upgrade),
+# optional junit mapping, copy results to SHARED_DIR. See ref env (e.g. CNV_TESTS_UPGRADE_ONLY).
+# Shell: xtrace on from start; off only while reading Bitwarden files and exporting tokens; on again after (MPEX Section0).
+#
+set -euxo pipefail
+shopt -s inherit_errexit
 
 start_time=$SECONDS
 
@@ -34,7 +37,7 @@ debug_on_exit() {
     oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
 
     runMustGather
-    echo "    😴 😴 😴"
+    echo "[INFO] Entering debug sleep loop (remove /tmp/debug_marker to continue)."
 
     # Use file flag so loop can be interrupted by removing the file
     touch /tmp/debug_marker
@@ -86,16 +89,17 @@ function retry() {
     local max_retries=$1; shift
     local delay=$1; shift
     local count=0
+    local last_exit_code=0
 
     until "$@"; do
-        exit_code=$?
+        last_exit_code=$?
         count=$((count + 1))
         if [ $count -lt $max_retries ]; then
             echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
             sleep $delay
         else
             echo "Command failed after $max_retries attempts."
-            return $exit_code
+            return "${last_exit_code}"
         fi
     done
     return 0
@@ -201,12 +205,45 @@ function mapTestsForComponentReadiness() {
 
     [[ ${MAP_TESTS:-false} != "true" ]] && return
 
-    results_file="${1}"
+    local results_file="${1:-}"
     echo "Patching Tests Result File: ${results_file}"
     if [ -f "${results_file}" ]; then
         install_yq_if_not_exists
         echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${results_file}"
+    fi
+}
+
+# Install and verify virtctl (same approach as redhat-lp-chaos)
+function InstallAndVerifyVirtctl () {
+
+    [[ ${CNV_TESTS_UPGRADE_ONLY:-false} != "true" ]] && return
+    
+    local baseURL
+    if ! baseURL=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' | tr -d '\n\r'); then
+        echo "FATAL ERROR: Failed to get OpenShift cluster base domain."
+        exit 1
+    fi
+
+    local dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
+    # No tar -v: keep CI logs smaller (MPEX Section0).
+    if ! curl -kfsSL "${dlURL}" | tar -xzf - -C "${BIN_FOLDER}"; then
+        echo "FATAL ERROR: Failed to download and extract virtctl."
+        exit 1
+    fi
+
+    # Handle virtctl in subdirectory (archive may have virtctl-4.x.x/virtctl)
+    if [[ ! -x "${BIN_FOLDER}/virtctl" ]]; then
+        local virtctl_path
+        virtctl_path=$(find "${BIN_FOLDER}" -name virtctl -type f -executable | head -1)
+        if [[ -n "${virtctl_path}" ]]; then
+            mv "${virtctl_path}" "${BIN_FOLDER}/virtctl"
+        fi
+    fi
+
+    if ! virtctl version --client; then
+        echo "FATAL ERROR: virtctl installed but failed to execute after setup."
+        exit 1
     fi
 }
 
@@ -218,14 +255,16 @@ export PATH="${BIN_FOLDER}:${PATH}"
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
 export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
-set +x # We don't want to see it in the logs
+# xtrace off while reading Bitwarden files and exporting credentials (MPEX Section0).
+set +x
 ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
 ARTIFACTORY_SERVER=$(head -1 "${BW_PATH}"/artifactory-server)
 ACCESS_TOKEN=$(head -1 "${BW_PATH}"/bitwarden-client-secret)
 ORGANIZATION_ID=$(head -1 "${BW_PATH}"/bitwarden-org-id)
-set -x
 export ORGANIZATION_ID ACCESS_TOKEN ARTIFACTORY_USER ARTIFACTORY_TOKEN ARTIFACTORY_SERVER
+# xtrace on again for oc, tests, etc.
+set -x
 
 # Unset the following environment variables to avoid issues with oc command
 unset KUBERNETES_SERVICE_PORT_HTTPS
@@ -239,7 +278,15 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 ###########################################################################
 # Get oc binary
-curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
+curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzf - oc
+
+if [[ "${CNV_TESTS_UPGRADE_ONLY:-false}" == "true" ]]; then
+  if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+    echo "[ERROR] CNV_TESTS_UPGRADE_ONLY=true but ${SHARED_DIR}/managed-cluster-kubeconfig not found" >&2
+    exit 1
+  fi
+  export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
+fi
 
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
@@ -249,8 +296,27 @@ setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
 oc get sc # After
 cnv::reimport_datavolumes
 
-rc=0
-uv --verbose --cache-dir /tmp/uv-cache \
+InstallAndVerifyVirtctl
+
+exitCode=0
+
+if [[ "${CNV_TESTS_UPGRADE_ONLY:-false}" == "true" ]]; then
+  uv --verbose --cache-dir /tmp/uv-cache \
+    run pytest -o cache_dir=/tmp/pytest-cache\
+    -s \
+    -o log_cli=true \
+    --upgrade=ocp \
+    --ocp-image "${ORIGINAL_RELEASE_IMAGE_LATEST}" \
+    --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization\
+    --junitxml="${JUNIT_RESULTS_FILE}" \
+    --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
+    --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
+    --tc "hco_subscription:${HCO_SUBSCRIPTION}" \
+    --ignore=tests/network/ \
+    --tb=native \
+    || exitCode=$?
+else
+  uv --verbose --cache-dir /tmp/uv-cache \
     run pytest -o cache_dir=/tmp/pytest-cache \
     -s \
     -o log_cli=true \
@@ -266,7 +332,9 @@ uv --verbose --cache-dir /tmp/uv-cache \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
-    -m smoke || rc=$?
+    -m smoke \
+    || exitCode=$?
+fi
 
 # TODO: Fix junit, spyglass still show "nil" for failed jobs.
 #       (This attempt didn't work)
@@ -277,10 +345,10 @@ uv --verbose --cache-dir /tmp/uv-cache \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
 
-# Map tests if needed for related use cases
 mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
+
 
 # Send junit file to shared dir for Data Router Reporter step
 cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
 
-exit ${rc}
+exit "${exitCode}"

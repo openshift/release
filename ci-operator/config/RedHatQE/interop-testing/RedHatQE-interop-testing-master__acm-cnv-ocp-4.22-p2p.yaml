@@ -1,14 +1,14 @@
 base_images:
   acmqe-grc-test:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: acmqe-grc-test
   application-ui-test:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: application-ui-test
   cli:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: cli
   fetch-managed-clusters:
@@ -16,7 +16,7 @@ base_images:
     namespace: acm-qe
     tag: fetch-managed-clusters
   multicluster-observability-operator-opp:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
   openshift-virtualization-tests:
@@ -27,32 +27,18 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.20
-images:
-  items:
-  - dockerfile_literal: |
-      FROM this-is-ignored
-      RUN dnf install -y git python39
-    from: cli
-    to: cli-with-git
-  - dockerfile_literal: |
-      FROM this-is-ignored
-      USER root
-      RUN dnf install -y sshpass openssh-clients
-      RUN dnf clean all
-    from: openshift-virtualization-tests
-    to: openshift-virtualization-tests-sshpass
+    tag: rhel-9-release-golang-1.20-openshift-4.17
 releases:
   initial:
-    release:
-      channel: stable
-      version: "4.20"
-  latest:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.21.0-rc.0
-        upper: 4.21.0-rc.20
+      stream: nightly
+      version: "4.21"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -67,7 +53,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
-      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.20"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.21"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CLOUD_PROVIDER: ipi-aws
@@ -93,20 +79,20 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      OCP_VERSION: "4.20"
-      ODF_OPERATOR_CHANNEL: stable-4.20
-      ODF_VERSION_MAJOR_MINOR: "4.20"
+      OCP_VERSION: "4.21"
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      ODF_VERSION_MAJOR_MINOR: "4.21"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      TARGET_CHANNEL: candidate-4.21
+      TARGET_CHANNEL: candidate-4.22
       USER_TAGS: |
         scenario acm-cnv-p2p
     leases:
@@ -144,8 +130,9 @@ tests:
     - ref: acm-tests-observability
     - ref: acm-tests-grc
     - ref: acm-tests-alc
+  timeout: 10h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
   repo: interop-testing
-  variant: acm-cnv-ocp-4.21-p2p
+  variant: acm-cnv-ocp-4.22-p2p
