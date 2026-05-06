@@ -45,33 +45,28 @@ export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
 export AWS_REGION="${LEASED_RESOURCE}"
 
-# Set CLUSTER_TOPOLOGY so the test binary knows the cluster type without an extra OCM API call
-if [[ "${HOSTED_CP:-false}" == "true" ]]; then
-  export CLUSTER_TOPOLOGY="hcp"
-else
-  export CLUSTER_TOPOLOGY="classic"
-fi
-log "Cluster topology: ${CLUSTER_TOPOLOGY}"
-
-# Try to get MC access via backplane (HCP only)
-if [[ "${CLUSTER_TOPOLOGY}" == "hcp" ]]; then
-  log "Attempting MC access via backplane..."
-  if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
-    export MC_KUBECONFIG="${HOME}/.kube/config"
-    MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
-    if [[ "${MC_SERVER}" == *"backplane"* ]]; then
-      MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
-      export MANAGEMENT_CLUSTER_ID
-      log "MC access established: ${MANAGEMENT_CLUSTER_ID}"
-    fi
+# Try to get manager cluster access via backplane
+# HCP: --manager accesses the Management Cluster (HyperShift operator, HCP namespaces)
+# Classic: --manager accesses the Hive cluster (ClusterDeployment)
+log "Attempting manager cluster access via backplane..."
+if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
+  export MC_KUBECONFIG="${HOME}/.kube/config"
+  MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
+  if [[ "${MC_SERVER}" == *"backplane"* ]]; then
+    MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
+    export MANAGEMENT_CLUSTER_ID
+    log "Manager cluster access established: ${MANAGEMENT_CLUSTER_ID}"
   fi
 fi
 
 # Run tests
-GINKGO_ARGS=(--ginkgo.junit-report="${ARTIFACT_DIR}/junit-rosa-e2e.xml" --ginkgo.v)
+GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
 if [[ -n "${LABEL_FILTER}" ]]; then
-  log "Label filter: ${LABEL_FILTER}"
-  GINKGO_ARGS+=(--ginkgo.label-filter="${LABEL_FILTER}")
+  GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${LABEL_FILTER}"
+fi
+
+if [[ -n "${CLUSTER_TOPOLOGY:-}" ]]; then
+  export CLUSTER_TOPOLOGY
 fi
 
 if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
@@ -79,6 +74,6 @@ if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
 fi
 
 log "Running rosa-e2e tests..."
-/usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"
+/usr/local/bin/e2e.test ${GINKGO_FLAGS}
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"
