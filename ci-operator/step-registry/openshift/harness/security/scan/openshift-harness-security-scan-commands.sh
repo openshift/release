@@ -5,9 +5,18 @@ set -euo pipefail
 mkdir -p /tmp/home
 export HOME=/tmp/home
 
-python3 -m ensurepip
+# Clone the source code under test
+SCAN_DIR="/tmp/source"
+git clone --depth=1 "https://github.com/${REPO_OWNER}/${REPO_NAME}.git" "${SCAN_DIR}"
+if [ -n "${PULL_NUMBER:-}" ]; then
+    cd "${SCAN_DIR}"
+    git fetch origin "pull/${PULL_NUMBER}/head:pr" --depth=1
+    git checkout pr
+fi
+cd "${SCAN_DIR}"
+
 export PATH="$HOME/.local/bin:$PATH"
-# TODO:should we have deeper pins? requirements.txt, with pip freeze for supply chain protection?
+# TODO: should we have deeper pins? requirements.txt, with pip freeze for supply chain protection?
 pip3 install "cisco-ai-skill-scanner[vertex]>=2,<3"
 
 PARAMS=(
