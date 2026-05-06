@@ -17,3 +17,5 @@ The additional step(s) used in this workflow are as follows:
   - [`firewatch-report-issues`](../../report-issues/firewatch-report-issues-ref.yaml)
 
 Please see the [`ipi-aws`](https://steps.ci.openshift.org/workflow/ipi-aws) documentation for more information regarding the steps that are not either of the steps explained above as they are not maintained by the CSPI QE team.
+
+Jobs that use this workflow can be exercised with `/pj-rehearse <prow-job-name>` on an `openshift/release` pull request when validating CI wiring.
