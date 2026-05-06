@@ -71,7 +71,7 @@ get_artifacts_url() {
 process_junit_files() {
   echo "Processing JUnit files for Data Router compatibility..."
 
-  for junit_file in "${SHARED_DIR}"/junit-results-*.xml; do
+  for junit_file in "${SHARED_DIR}"/junit-*.xml; do
     if [[ ! -f "$junit_file" ]]; then
       continue
     fi
