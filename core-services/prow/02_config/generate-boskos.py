@@ -66,9 +66,6 @@ CONFIG = {
     'aws-sd-qe-quota-slice': {
         'us-west-2': 10,
     },
-    'aws-outpost-quota-slice': {
-        'us-east-1': 10,
-    },
     'aws-outpost-qe-quota-slice': {
         'us-east-1': 5,
     },
@@ -489,9 +486,6 @@ CONFIG = {
         'jp-tok': 20,
     },
     'ibmcloud-qe-2-quota-slice': {
-        'us-east': 10,
-    },
-    'ibmcloud-gpu-quota-slice': {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
