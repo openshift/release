@@ -29,7 +29,11 @@ tests:
     podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
     trap 'rm -f "${podman_env_file}"' EXIT
     umask 077
-    env -i bash --norc --noprofile << 'EOF' > "${podman_env_file}"
+    env -i \
+      PULL_NUMBER="${PULL_NUMBER:-}" \
+      JOB_NAME="${JOB_NAME}" \
+      BUILD_ID="${BUILD_ID}" \
+      bash --norc --noprofile << 'EOF' > "${podman_env_file}"
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
     export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
     export ENABLE_JIRA_REPORTING=true
