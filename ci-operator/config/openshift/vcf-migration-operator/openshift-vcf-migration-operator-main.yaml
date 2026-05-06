@@ -1,8 +1,10 @@
+binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.25
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: vcf-migration-operator
 promotion:
   to:
   - name: "5.0"
@@ -24,6 +26,11 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift
