@@ -28,9 +28,18 @@ set -o errexit
 set -o pipefail
 
 # Determine container runtime (podman or docker)
-CLI="sudo podman"
-if ! command -v podman &>/dev/null; then
-    CLI="sudo docker"
+SUDO=
+if [ "$EUID" -ne 0 ]; then
+  SUDO="sudo"
+fi
+
+CLI="$SUDO podman"
+if ! command -v podman; then
+    CLI="$SUDO docker"
+    if ! command -v docker; then
+        echo "ERROR: Neither podman nor docker found on this host"
+        exit 1
+    fi
 fi
 echo "Container CLI is: $CLI"
 

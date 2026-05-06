@@ -272,8 +272,8 @@ fi
 deploy_frr_external_container vrf_neighbors
 
 # For no-overlay clusters, FRR-K8s is not used — skip its setup.
-# Detect no-overlay by checking the ovn-kubernetes config for transport="no-overlay".
-if ! oc get cm ovnkube-config -n openshift-ovn-kubernetes -o yaml 2>/dev/null | grep -q 'transport="no-overlay"'; then
+# Detect no-overlay by checking the Network operator CR for NoOverlay transport.
+if [ "$(oc get networks.operator.openshift.io cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.transport}' 2>/dev/null)" != "NoOverlay" ]; then
   # apply FRR-K8s overrides to enable debug logging
   oc create namespace openshift-frr-k8s
   oc apply -f - <<EOF
