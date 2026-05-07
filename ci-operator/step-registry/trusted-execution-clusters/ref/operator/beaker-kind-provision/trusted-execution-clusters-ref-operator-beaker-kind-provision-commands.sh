@@ -524,21 +524,6 @@ mkdir -p /tmp/kind-deployment-logs
 exec > >(tee -a /tmp/kind-deployment-logs/deployment.log)
 exec 2>&1
 
-# Install Dependencies
-echo "[INFO] Installing dependencies..."
-
-if command -v dnf &> /dev/null; then
-  PKG_MGR="dnf"
-elif command -v yum &> /dev/null; then
-  PKG_MGR="yum"
-else
-  echo "[ERROR] Neither dnf nor yum package manager found"
-  exit 1
-fi
-
-echo "[INFO] Installing basic prerequisites..."
-${SUDO} ${PKG_MGR} install -y curl gcc make dnf-plugins-core wget tar git jq file
-
 # Install Rust
 echo "[INFO] Installing Rust via rustup..."
 if ! command -v rustc &> /dev/null; then
@@ -558,34 +543,6 @@ rustc --version
 cargo --version
 
 echo "[SUCCESS] Rust installed successfully"
-
-# Install Docker CE
-echo "[INFO] Installing Docker CE..."
-
-if command -v docker &> /dev/null && systemctl is-active --quiet docker; then
-    DOCKER_VERSION=$(docker --version | awk '{print $3}' | sed 's/,//')
-    echo "[INFO] Docker is already installed and running: ${DOCKER_VERSION}"
-    echo "[INFO] Skipping Docker installation"
-else
-    echo "[INFO] Docker not found or not running, installing..."
-
-    ${SUDO} tee /etc/yum.repos.d/docker-ce.repo > /dev/null <<'DOCKERREPO'
-[docker-ce-stable]
-name=Docker CE Stable - $basearch
-baseurl=https://download.docker.com/linux/fedora/$releasever/$basearch/stable
-enabled=1
-gpgcheck=1
-gpgkey=https://download.docker.com/linux/fedora/gpg
-DOCKERREPO
-
-    ${SUDO} ${PKG_MGR} install -y docker-ce docker-ce-cli containerd.io
-    echo "[SUCCESS] Docker CE installed"
-fi
-
-echo "[INFO] Installing additional dependencies..."
-${SUDO} ${PKG_MGR} install -y conntrack golang || echo "[WARN] Some packages may already be installed"
-
-echo "[SUCCESS] Additional dependencies installed"
 
 # Start Container Runtime Service
 echo "[INFO] Starting Docker service..."
