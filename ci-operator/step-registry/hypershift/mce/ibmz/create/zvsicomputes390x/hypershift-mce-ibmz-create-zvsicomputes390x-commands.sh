@@ -280,7 +280,7 @@ create_sg_rule $sg_name inbound tcp 30000 33000
 create_sg_rule $sg_name inbound tcp 3128 3128
 
 # Create Bastion Node
-create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ibm-redhat-9-6-minimal-amd64-3" "hcp-prow-ci-dnd-key" "$sg_name"
+create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ubuntu-s390x-image" "hcp-prow-ci-dnd-key" "$sg_name"
 
 # Create Compute Nodes
 
