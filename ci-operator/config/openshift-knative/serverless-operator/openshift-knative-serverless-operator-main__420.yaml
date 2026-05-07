@@ -119,7 +119,7 @@ images:
         as:
         - $GO_BUILDER
     to: serverless-metadata-webhook
-  run_if_changed: ^non-existing$
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
 releases:
   latest:
     release:
@@ -133,9 +133,9 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: kitchensink-upgrade
+- as: kitchensink-upgrade
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -219,8 +219,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-- always_run: false
-  as: kitchensink-upgrade-c
+- as: kitchensink-upgrade-c
   cron: 1 3 * * 1,5
   steps:
     allow_best_effort_post_steps: true
