@@ -34,7 +34,7 @@ if version_lt "${ocp_version}" "4.16"; then
 fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_REGION="${LEASED_RESOURCE}"
+export AWS_REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
