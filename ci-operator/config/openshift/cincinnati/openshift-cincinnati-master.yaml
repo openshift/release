@@ -81,6 +81,12 @@ promotion:
     - downstream-deploy
     name: cincinnati-build-root
     namespace: cincinnati-ci
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -184,16 +190,11 @@ tests:
     workflow: generic-claim
 - always_run: false
   as: olm-e2e-tls-scan
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
   optional: true
   steps:
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: openshift-update-service
     test:
     - as: openshift-e2e-test
@@ -207,7 +208,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - ref: tls-scanner-run
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: osus-e2e
   cluster_claim:
     architecture: amd64
