@@ -51,17 +51,21 @@ function openshift-install () {
             --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
             "$@" 2>&1 || es=$?
         echo "$(printf '%.0s=' {1..80})"
-        ((! es))
+        exit ${es}
     } | tee -a "${ARTIFACT_DIR}/ocp--installer--cluster.log"
-    ((! PIPESTATUS[0]))
+    return ${PIPESTATUS[0]}
 }
 
 function HandleSIGCHLD () {
+    typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
+    trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
+    set -euxo pipefail; shopt -s inherit_errexit
     typeset -i i=0
     for i in "${!taskPIDs[@]}"; do
         kill -0 "${taskPIDs[i]}" 2>/dev/null ||
         unset "taskPIDs[i]"
     done
+    true
 }
 
 function RedfishAPIcall () {
@@ -69,6 +73,7 @@ function RedfishAPIcall () {
     typeset bmcURL="${1:?}"; (($#)) && shift
     typeset apiMethod="${1:?}"; (($#)) && shift
     typeset apiEP="${1?}"; (($#)) && shift
+    typeset -i es=0
     curl -sSLk -X "${apiMethod}" \
         --fail-with-body \
         -K <(
@@ -85,8 +90,9 @@ function RedfishAPIcall () {
         -H 'Content-Type: application/json' \
         -H 'Accept: application/json' \
         "$@" \
-        "${bmcURL}/redfish/v1/${apiEP#/}"
-    true
+        "${bmcURL}/redfish/v1/${apiEP#/}" ||
+        es=$?
+    return ${es}
 }
 
 function VCD-Eject () {
@@ -104,10 +110,11 @@ function Host-PowerControl () {
     typeset bmcURL="${1:?}"; (($#)) && shift
     typeset bmcSysId="${1:?}"; (($#)) && shift
     typeset resetType="${1:?}"; (($#)) && shift
+    typeset -i es=0
     RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
         "Systems/${bmcSysId}/Actions/ComputerSystem.Reset" \
-        -d "{\"ResetType\": \"${resetType}\"}"
-    true
+        -d "{\"ResetType\": \"${resetType}\"}" || es=$?
+    return ${es}
 }
 
 function WipeDisks () {
@@ -117,8 +124,9 @@ function WipeDisks () {
     typeset bmcSysId="${1:?}"; (($#)) && shift
     typeset bmcMgrId="${1:?}"; (($#)) && shift
     typeset wipeMethod="${1?}"; (($#)) && shift
+    typeset -i es=0
     case ${wipeMethod} in
-      (OS) (
+      (OS)  (
         typeset hostIPv4
         hostIPv4="$(jq -r \
             --arg url "${bmcURL}" \
@@ -157,7 +165,7 @@ sshEOF
               (193) exit ${es} ;;
             esac
         done
-      ) ;;
+      ) || es=$?;;
       (BMC) (
         typeset ctrlId='' volEP='' driveEP='' jobId=''
         typeset -a jobIds=()
@@ -219,11 +227,11 @@ sshEOF
             done
             break
         done
-      ) ;;
+      ) || es=$?;;
       ('')  ;;
-      (*)   : "Unknown method: ${wipeMethod}"; false;;
+      (*)   : "Unknown method: ${wipeMethod}"; es=1;;
     esac
-    true
+    return ${es}
 }
 
 

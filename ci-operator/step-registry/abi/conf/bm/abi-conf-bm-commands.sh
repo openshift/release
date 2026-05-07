@@ -43,9 +43,9 @@ function openshift-install () {
             --log-level "${OCP__ABI__INSTLR_LOG_LEVEL}" \
             "$@" 2>&1 || es=$?
         echo "$(printf '%.0s=' {1..80})"
-        ((! es))
+        exit ${es}
     } | tee -a "${ARTIFACT_DIR}/ocp--installer--cluster.log"
-    ((! PIPESTATUS[0]))
+    return ${PIPESTATUS[0]}
 }
 
 function UpdateCfg () {
