@@ -57,8 +57,9 @@ LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastruc
 }
 
 function prepare_next_steps() {
-  #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  local exit_code="${1:-0}"
+  # Save exit code for must-gather to generate junit
+  echo "${exit_code}" > "${SHARED_DIR}/install-status.txt"
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -109,22 +110,183 @@ function prepare_next_steps() {
   fi
 }
 
-function wait_router_lb_provision() {
-    local try=0 retries=20
-    local SERVICE
-    SERVICE="$(oc -n openshift-ingress get service router-default -o json)"
+function write_ingress_cfn_template() {
+    local cfn_template="${1}"
 
-    while test -z "$(echo "${SERVICE}" | jq -r '.status.loadBalancer.ingress[][]')" && test "${try}" -lt "${retries}"; do
-      echo "waiting on router-default service load balancer ingress..."
-      sleep 30
-      SERVICE="$(oc -n openshift-ingress get service router-default -o json)"
-      let try+=1
-    done
-    if [ "$try" -eq "$retries" ]; then
-      echo "${SERVICE}"
-      echo "ERROR: router-default service failed to provision load balancer ingress"
-      return 1
+    if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
+        cat > "${cfn_template}" << 'CFNEOF'
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
+
+Parameters:
+  PrivateHostedZoneId:
+    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
+    Type: String
+  PrivateHostedZoneName:
+    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
+    Type: String
+  RouterLbDns:
+    Description: The loadbalancer DNS
+    Type: String
+  RouterLbHostedZoneId:
+    Description: The Route53 zone ID where loadbalancer reside
+    Type: String
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterLabels:
+      PrivateHostedZoneId:
+        default: "Private Hosted Zone ID"
+      PrivateHostedZoneName:
+        default: "Private Hosted Zone Name"
+      RouterLbDns:
+        default: "router loadbalancer dns"
+      RouterLbHostedZoneId:
+        default: "Private Hosted Zone ID of router lb"
+
+Resources:
+  InternalAppsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !Ref RouterLbDns
+        HostedZoneId: !Ref RouterLbHostedZoneId
+        EvaluateTargetHealth: false
+      HostedZoneId: !Ref PrivateHostedZoneId
+      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
+      Type: A
+CFNEOF
+    elif [ "${CLUSTER_TYPE}" == "aws-usgov" ]; then
+        cat > "${cfn_template}" << 'CFNEOF'
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
+
+Parameters:
+  PrivateHostedZoneId:
+    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
+    Type: String
+  PrivateHostedZoneName:
+    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
+    Type: String
+  RouterLbDns:
+    Description: The loadbalancer DNS
+    Type: String
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterLabels:
+      PrivateHostedZoneId:
+        default: "Private Hosted Zone ID"
+      PrivateHostedZoneName:
+        default: "Private Hosted Zone Name"
+      RouterLbDns:
+        default: "router loadbalancer dns"
+
+Resources:
+  InternalAppsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref PrivateHostedZoneId
+      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
+      Type: CNAME
+      TTL: 10
+      ResourceRecords:
+      - !Ref RouterLbDns
+CFNEOF
+    else
+        echo "Unsupported CLUSTER_TYPE for ingress CloudFormation template: ${CLUSTER_TYPE}"
+        return 1
     fi
+}
+
+function create_ingress_dns_record() {
+    # Background watcher: creates *.apps DNS record during 'create cluster'
+    # instead of after it times out. Saves a lot of time when
+    # ADD_INGRESS_RECORDS_MANUALLY=yes.
+    set +e
+
+    # Wait for kubeconfig to become available (created early in create cluster)
+    local kubeconfig="${dir}/auth/kubeconfig"
+    local kube_try=0
+    while [ ! -f "${kubeconfig}" ] && [ "${kube_try}" -lt 60 ]; do
+        sleep 10
+        kube_try=$((kube_try + 1))
+    done
+    if [ ! -f "${kubeconfig}" ]; then
+        echo "DNS watcher: ERROR - kubeconfig not found after 10 minutes"
+        return 1
+    fi
+    echo "DNS watcher: kubeconfig available"
+    export KUBECONFIG="${kubeconfig}"
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+    # Wait for the router-default service to get a load balancer hostname
+    local try=0 retries=40
+    local router_lb=""
+    while [ "${try}" -lt "${retries}" ]; do
+        router_lb=$(oc -n openshift-ingress get service router-default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null) || true
+        if [ -n "${router_lb}" ]; then
+            break
+        fi
+        echo "DNS watcher: waiting for router-default LB (attempt $((try + 1))/${retries})..."
+        sleep 30
+        try=$((try + 1))
+    done
+    if [ -z "${router_lb}" ]; then
+        echo "DNS watcher: ERROR - router-default LB not found after ${retries} attempts"
+        return 1
+    fi
+    echo "DNS watcher: router LB found: ${router_lb}"
+
+    # Look up the private hosted zone
+    local private_route53_hostzone_name="${CLUSTER_NAME}.${BASE_DOMAIN}"
+    local private_route53_hostzone_id
+    private_route53_hostzone_id=$(aws route53 list-hosted-zones-by-name --dns-name "${private_route53_hostzone_name}" --max-items 1 | jq -r '.HostedZones[].Id' | awk -F '/' '{print $3}')
+    if [ -z "${private_route53_hostzone_id}" ]; then
+        echo "DNS watcher: ERROR - private hosted zone not found for ${private_route53_hostzone_name}"
+        return 1
+    fi
+    echo "DNS watcher: private hosted zone: ${private_route53_hostzone_id}"
+
+    # Write CloudFormation template
+    local cfn_template="/tmp/ingress_app_bg.yml"
+    write_ingress_cfn_template "${cfn_template}" || return 1
+
+    # Create CloudFormation stack
+    local APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
+    echo "${APPS_DNS_STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+    local REGION="${LEASED_RESOURCE}"
+
+    if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
+        local router_lb_hostzone_id
+        if is_dualstack; then
+            router_lb_hostzone_id=$(aws --region "${REGION}" elbv2 describe-load-balancers | jq -r ".LoadBalancers[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneId")
+        else
+            router_lb_hostzone_id=$(aws --region "${REGION}" elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
+        fi
+
+        aws --region "${REGION}" cloudformation create-stack --stack-name "${APPS_DNS_STACK_NAME}" \
+            --template-body "file://${cfn_template}" \
+            --parameters \
+            ParameterKey=PrivateHostedZoneId,ParameterValue="${private_route53_hostzone_id}" \
+            ParameterKey=PrivateHostedZoneName,ParameterValue="${private_route53_hostzone_name}" \
+            ParameterKey=RouterLbDns,ParameterValue="${router_lb}" \
+            ParameterKey=RouterLbHostedZoneId,ParameterValue="${router_lb_hostzone_id}" \
+            --capabilities CAPABILITY_NAMED_IAM || return 1
+    elif [ "${CLUSTER_TYPE}" == "aws-usgov" ]; then
+        aws --region "${REGION}" cloudformation create-stack --stack-name "${APPS_DNS_STACK_NAME}" \
+            --template-body "file://${cfn_template}" \
+            --parameters \
+            ParameterKey=PrivateHostedZoneId,ParameterValue="${private_route53_hostzone_id}" \
+            ParameterKey=PrivateHostedZoneName,ParameterValue="${private_route53_hostzone_name}" \
+            ParameterKey=RouterLbDns,ParameterValue="${router_lb}" \
+            --capabilities CAPABILITY_NAMED_IAM || return 1
+    fi
+
+    aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${APPS_DNS_STACK_NAME}" || return 1
+
+    echo "DNS watcher: *.apps DNS record created successfully via stack ${APPS_DNS_STACK_NAME}"
     return 0
 }
 
@@ -194,8 +356,24 @@ function is_dualstack() {
   fi
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
+# shellcheck disable=SC2329  # invoked from EXIT/TERM trap
+function cleanup() {
+  local exit_code=$?
+
+  # Kill any background jobs
+  local pid
+  while read -r pid; do
+    [ -n "${pid}" ] && kill "${pid}" 2>/dev/null || true
+  done < <(jobs -p)
+  wait 2>/dev/null || true
+
+  prepare_next_steps "${exit_code}"
+
+  # Remove the EXIT trap so we aren't called again
+  trap - EXIT
+  exit "${exit_code}"
+}
+trap cleanup EXIT TERM
 
 export INSTALLER_BINARY="openshift-install"
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -353,9 +531,16 @@ TF_LOG_PATH="${dir}/terraform.txt"
 export TF_LOG_PATH
 
 ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+INSTALL_PID=$!
+
+if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
+    echo "Starting background DNS watcher for manual ingress record creation..."
+    create_ingress_dns_record &
+    DNS_WATCHER_PID=$!
+fi
 
 set +e
-wait "$!"
+wait "${INSTALL_PID}"
 ret="$?"
 set -e
 
@@ -365,149 +550,25 @@ fi
 
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
 
-  export KUBECONFIG="${dir}/auth/kubeconfig"
-  export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-  wait_router_lb_provision || exit 1
+  # Wait for background DNS watcher to finish
+  echo "Checking background DNS watcher status..."
+  set +e
+  wait "${DNS_WATCHER_PID}"
+  dns_ret=$?
+  set -e
 
-  if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
-    # creating app record
-    cat >> "/tmp/ingress_app.yml" << EOF
-AWSTemplateFormatVersion: 2010-09-09
-Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
-
-Parameters:
-  PrivateHostedZoneId:
-    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
-    Type: String
-  PrivateHostedZoneName:
-    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
-    Type: String
-  RouterLbDns:
-    Description: The loadbalancer DNS
-    Type: String
-  RouterLbHostedZoneId:
-    Description: The Route53 zone ID where loadbalancer reside
-    Type: String
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterLabels:
-      PrivateHostedZoneId:
-        default: "Private Hosted Zone ID"
-      PrivateHostedZoneName:
-        default: "Private Hosted Zone Name"
-      RouterLbDns:
-        default: "router loadbalancer dns"
-      RouterLbHostedZoneId:
-        default: "Private Hosted Zone ID of router lb"
-
-Resources:
-  InternalAppsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      AliasTarget:
-        DNSName: !Ref RouterLbDns
-        HostedZoneId: !Ref RouterLbHostedZoneId
-        EvaluateTargetHealth: false
-      HostedZoneId: !Ref PrivateHostedZoneId
-      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
-      Type: A
-EOF
+  if [ "${dns_ret}" -eq 0 ]; then
+    echo "Background DNS watcher completed successfully"
+  else
+    echo "ERROR: Background DNS watcher failed (exit code: ${dns_ret})"
+    exit 1
   fi
-
-  if [ "${CLUSTER_TYPE}" == "aws-usgov" ]; then
-    # creating app record
-    cat >> "/tmp/ingress_app.yml" << EOF
-AWSTemplateFormatVersion: 2010-09-09
-Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
-
-Parameters:
-  PrivateHostedZoneId:
-    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
-    Type: String
-  PrivateHostedZoneName:
-    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
-    Type: String
-  RouterLbDns:
-    Description: The loadbalancer DNS
-    Type: String
-
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterLabels:
-      PrivateHostedZoneId:
-        default: "Private Hosted Zone ID"
-      PrivateHostedZoneName:
-        default: "Private Hosted Zone Name"
-      RouterLbDns:
-        default: "router loadbalancer dns"
-
-Resources:
-  InternalAppsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref PrivateHostedZoneId
-      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
-      Type: CNAME
-      TTL: 10
-      ResourceRecords:
-      - !Ref RouterLbDns
-EOF
-  fi
-
-  APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
-  echo ${APPS_DNS_STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
-  REGION="${LEASED_RESOURCE}"
-
-  private_route53_hostzone_name="${CLUSTER_NAME}.${BASE_DOMAIN}"
-  private_route53_hostzone_id=$(aws route53 list-hosted-zones-by-name --dns-name "${private_route53_hostzone_name}" --max-items 1 | jq -r '.HostedZones[].Id' | awk -F '/' '{print $3}')
-  router_lb=$(oc -n openshift-ingress get service router-default -o json | jq -r '.status.loadBalancer.ingress[].hostname')
-
-  if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
-    if is_dualstack; then
-      router_lb_hostzone_id=$(aws --region ${REGION} elbv2 describe-load-balancers | jq -r ".LoadBalancers[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneId")
-    else
-      router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
-    fi
-
-    aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
-      --template-body 'file:///tmp/ingress_app.yml' \
-      --parameters \
-      ParameterKey=PrivateHostedZoneId,ParameterValue=${private_route53_hostzone_id} \
-      ParameterKey=PrivateHostedZoneName,ParameterValue=${private_route53_hostzone_name} \
-      ParameterKey=RouterLbDns,ParameterValue=${router_lb} \
-      ParameterKey=RouterLbHostedZoneId,ParameterValue=${router_lb_hostzone_id} \
-      --capabilities CAPABILITY_NAMED_IAM &
-    wait "$!"
-    ret=$?
-  fi
-
-  if [ "${CLUSTER_TYPE}" == "aws-usgov" ]; then
-    aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
-      --template-body 'file:///tmp/ingress_app.yml' \
-      --parameters \
-      ParameterKey=PrivateHostedZoneId,ParameterValue=${private_route53_hostzone_id} \
-      ParameterKey=PrivateHostedZoneName,ParameterValue=${private_route53_hostzone_name} \
-      ParameterKey=RouterLbDns,ParameterValue=${router_lb} \
-      --capabilities CAPABILITY_NAMED_IAM &
-    wait "$!"
-    ret=$?
-  fi
-    
-  echo "Created stack $APPS_DNS_STACK_NAME"
-
-  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${APPS_DNS_STACK_NAME}" &
-  wait "$!"
-  ret=$?
-  echo "Waited for stack $APPS_DNS_STACK_NAME"
 
   # completing installation
+  export KUBECONFIG="${dir}/auth/kubeconfig"
   ${INSTALLER_BINARY} --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
-
-  echo "Waited for stack $APPS_DNS_STACK_NAME"
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
