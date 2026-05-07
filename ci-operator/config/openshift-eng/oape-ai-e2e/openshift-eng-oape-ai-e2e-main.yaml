@@ -12,9 +12,13 @@ images:
     to: gh-token-minter
   - dockerfile_path: images/go-server.Dockerfile
     to: go-server
+  - dockerfile_path: prow-workflow/input.Dockerfile
+    to: workflow-input
 promotion:
   to:
-  - name: ai-e2e-agent
+  - excluded_images:
+    - workflow-input
+    name: ai-e2e-agent
     namespace: oape
     tag_by_commit: true
 resources:
@@ -24,6 +28,200 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: run-workflow
+  run_if_changed: ^prow-workflow/
+  steps:
+    env:
+      BONFIRE_NAMESPACE_DURATION: 3h
+    test:
+    - as: extract-params
+      commands: |
+        cp /params.env "${SHARED_DIR}/params.env"
+        cat "${SHARED_DIR}/params.env"
+      from: workflow-input
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - as: deploy-and-run
+      commands: |
+        set -euo pipefail
+
+        # --- Ephemeral namespace access ---
+        export KUBECONFIG="${SHARED_DIR}/ephemeral-kubeconfig"
+        NAMESPACE=$(cat "${SHARED_DIR}/ephemeral-namespace")
+        oc project "${NAMESPACE}"
+
+        # Load workflow params
+        source "${SHARED_DIR}/params.env"
+
+        # --- Create secrets from mounted CI credentials ---
+        oc create secret generic gcloud-adc \
+          --from-file=application_default_credentials.json=/var/run/gcloud-adc/application_default_credentials.json
+        oc create secret generic github-app \
+          --from-file=private-key.pem=/var/run/github-app/private-key.pem
+
+        # --- Create worker ConfigMap (env vars) ---
+        oc create configmap shift-worker-config \
+          --from-literal=CLAUDE_CODE_USE_VERTEX=1 \
+          --from-literal=CLOUD_ML_REGION=global \
+          --from-literal=ANTHROPIC_VERTEX_PROJECT_ID=itpc-gcp-hcm-pe-eng-claude \
+          --from-literal=ANTHROPIC_MODEL=claude-opus-4-6
+
+        # --- Deploy gh-token-minter ---
+        cat <<DEPLOYEOF | oc apply -f -
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: gh-token-minter
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: gh-token-minter
+          template:
+            metadata:
+              labels:
+                app: gh-token-minter
+            spec:
+              containers:
+              - name: minter
+                image: ${GH_TOKEN_MINTER_IMAGE}
+                ports:
+                - containerPort: 8081
+                env:
+                - name: GH_APP_ID
+                  value: "3065249"
+                - name: GH_APP_PEM_FILE_PATH
+                  value: /etc/github-app/private-key.pem
+                - name: LISTEN_PORT
+                  value: "8081"
+                volumeMounts:
+                - name: gh-app-key
+                  mountPath: /etc/github-app
+                  readOnly: true
+              volumes:
+              - name: gh-app-key
+                secret:
+                  secretName: github-app
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: gh-token-minter
+        spec:
+          selector:
+            app: gh-token-minter
+          ports:
+          - port: 8081
+            targetPort: 8081
+        DEPLOYEOF
+
+        oc wait --for=condition=Available deployment/gh-token-minter --timeout=120s
+
+        # --- Mint GH token via port-forward ---
+        oc port-forward svc/gh-token-minter 8081:8081 &
+        PF_PID=$!
+        sleep 3
+
+        # Disable tracing due to token handling
+        set +x
+        TOKEN_RESP=$(curl -sf http://localhost:8081/token)
+        kill $PF_PID || true
+        GH_TOKEN=$(echo "$TOKEN_RESP" | jq -r '.token')
+
+        oc create secret generic gh-token-secret \
+          --from-literal=GH_TOKEN="${GH_TOKEN}"
+
+        # --- Create agent-worker Job ---
+        JOB_ID="ci-$(date +%s)"
+        cat <<JOBEOF | oc apply -f -
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: shift-workflow-${JOB_ID}
+          labels:
+            app: shift-worker
+        spec:
+          backoffLimit: 0
+          template:
+            spec:
+              restartPolicy: Never
+              containers:
+              - name: worker
+                image: ${AGENT_WORKER_IMAGE}
+                command: ["sh", "-c", "python3.11 /app/main.py"]
+                env:
+                - name: EP_URL
+                  value: "${EP_URL}"
+                - name: REPO_URL
+                  value: "${REPO_URL}"
+                - name: BASE_BRANCH
+                  value: "${BASE_BRANCH}"
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /secrets/gcloud/application_default_credentials.json
+                envFrom:
+                - configMapRef:
+                    name: shift-worker-config
+                - secretRef:
+                    name: gh-token-secret
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 512Mi
+                  limits:
+                    cpu: "2"
+                    memory: 4Gi
+                volumeMounts:
+                - name: gcloud-adc
+                  mountPath: /secrets/gcloud
+                  readOnly: true
+              volumes:
+              - name: gcloud-adc
+                secret:
+                  secretName: gcloud-adc
+        JOBEOF
+
+        echo "Agent-worker Job shift-workflow-${JOB_ID} created."
+
+        # --- Wait for pod, stream logs, check result ---
+        oc wait --for=condition=Ready pod -l job-name=shift-workflow-${JOB_ID} --timeout=300s || true
+        POD=$(oc get pods -l job-name=shift-workflow-${JOB_ID} -o jsonpath='{.items[0].metadata.name}')
+        oc logs -f "${POD}" || true
+
+        # Check final status
+        if oc wait --for=condition=complete --timeout=30s job/shift-workflow-${JOB_ID} 2>/dev/null; then
+          echo "Workflow completed successfully."
+        else
+          echo "Workflow failed."
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/gcloud-adc
+        name: oap-lts-claude-gcp-vertex-sa
+        namespace: test-credentials
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      dependencies:
+      - env: AGENT_WORKER_IMAGE
+        name: agent-worker
+      - env: GH_TOKEN_MINTER_IMAGE
+        name: gh-token-minter
+      from_image:
+        name: cli-jq
+        namespace: ocp
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 2h0m0s
+    workflow: ephemeral-namespace
 zz_generated_metadata:
   branch: main
   org: openshift-eng
