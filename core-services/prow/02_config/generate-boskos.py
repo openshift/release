@@ -264,6 +264,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'azure-perfscale-qe-quota-slice': {
+        'centralus': 6,
+   },
     'aro-classic-int-quota-slice': {
         'default': 1,
     },
