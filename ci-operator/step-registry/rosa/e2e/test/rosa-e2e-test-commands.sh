@@ -45,15 +45,25 @@ export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
 export AWS_REGION="${LEASED_RESOURCE}"
 
-# Try to get MC access via backplane
-log "Attempting MC access via backplane..."
-if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
-  export MC_KUBECONFIG="${HOME}/.kube/config"
-  MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
-  if [[ "${MC_SERVER}" == *"backplane"* ]]; then
-    MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
-    export MANAGEMENT_CLUSTER_ID
-    log "MC access established: ${MANAGEMENT_CLUSTER_ID}"
+# Set CLUSTER_TOPOLOGY so the test binary knows the cluster type without an extra OCM API call
+if [[ "${HOSTED_CP:-false}" == "true" ]]; then
+  export CLUSTER_TOPOLOGY="hcp"
+else
+  export CLUSTER_TOPOLOGY="classic"
+fi
+log "Cluster topology: ${CLUSTER_TOPOLOGY}"
+
+# Try to get MC access via backplane (HCP only)
+if [[ "${CLUSTER_TOPOLOGY}" == "hcp" ]]; then
+  log "Attempting MC access via backplane..."
+  if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
+    export MC_KUBECONFIG="${HOME}/.kube/config"
+    MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
+    if [[ "${MC_SERVER}" == *"backplane"* ]]; then
+      MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
+      export MANAGEMENT_CLUSTER_ID
+      log "MC access established: ${MANAGEMENT_CLUSTER_ID}"
+    fi
   fi
 fi
 
