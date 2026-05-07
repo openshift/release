@@ -1,0 +1,35 @@
+ref:
+  as: openshift-harness-security-scan
+  from: skill-tools
+  commands: openshift-harness-security-scan-commands.sh
+  credentials:
+  - mount_path: /var/run/claude-code-service-account
+    name: sa-claude-openshift-ci
+    namespace: test-credentials
+  env:
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: /var/run/claude-code-service-account/token
+    documentation: Path to the GCP service account key for Vertex AI access.
+  - name: SKILL_SCANNER_LLM_MODEL
+    default: vertex_ai/claude-sonnet-4-6
+    documentation: LiteLLM model string for LLM-based semantic analysis.
+  - name: VERTEXAI_LOCATION
+    default: global
+    documentation: Vertex AI region for model serving.
+  - name: USE_LLM
+    default: "true"
+    documentation: Set to "false" to disable LLM-based semantic analysis and use only static YARA rules.
+  - name: SCAN_ADDITIONAL_ARGS
+    default: ""
+    documentation: Additional arguments to pass to skill-scanner.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs cisco-ai-skill-scanner with LLM-based semantic analysis
+    (via Vertex AI / Claude Sonnet) to detect prompt injection,
+    data exfiltration, command injection, and other agent security
+    issues. Fails on medium severity findings by default.
