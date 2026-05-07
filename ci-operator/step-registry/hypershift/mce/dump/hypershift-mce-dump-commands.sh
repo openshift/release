@@ -7,6 +7,14 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+# Check if any hostedclusters exist before attempting to dump
+HOSTED_CLUSTER_COUNT=$(oc get hostedcluster -A -ojsonpath='{.items}' | jq 'length')
+if [[ "${HOSTED_CLUSTER_COUNT}" -eq 0 ]]; then
+  echo "No hostedcluster resources found. Skipping dump."
+  exit 0
+fi
+
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
 EXTRA_ARGS=""
 PLATFORM_TYPE=$(oc get hostedclusters -n ${HOSTED_CLUSTER_NS} ${CLUSTER_NAME} -ojsonpath="{.spec.platform.type}")
