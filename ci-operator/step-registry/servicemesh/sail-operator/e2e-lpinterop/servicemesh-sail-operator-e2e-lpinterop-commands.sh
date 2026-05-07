@@ -228,6 +228,15 @@ export ARTIFACTS
 # workaround for node instability, for now, ztunnel image only
 prepull_image_on_nodes "ztunnel"
 
+FIPS_CLUSTER=false
+# If fips cluster, patch network config to be able to run ambient tests
+if [[ $(oc get machineconfigs | grep fips) ]]; then
+    echo "Patching network config to be able to run ambient tests on fips cluster"
+    oc patch networks.operator.openshift.io cluster --type=merge -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost": true}}}}}'
+    FIPS_CLUSTER=true
+fi
+export FIPS_CLUSTER
+
 #execute test, do not terminate when there is some failure since we want to archive junit files
 make test.e2e.ocp || ret_code=$?
 
