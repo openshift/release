@@ -146,32 +146,7 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
         echo "Time duration: $time"
         [[ ${#plugins_args[@]} -gt 0 ]] && echo "Plugins: ${plugins_args[*]}"
 
-        if [[ "$action" == "redeploy" ]]; then
-            echo "Running teardown before redeployment..."
-
-            # Teardown must use the plugins from the PREVIOUS deploy, not the current redeploy.
-            # Passing the new plugin list would leave any previously-deployed-but-now-removed
-            # plugins (e.g. lighthouse) still running in the cluster.
-            prev_deploy_comment=$(gh pr view "$GIT_PR_NUMBER" --repo "$REPO" --json comments |
-                jq -r '.comments | reverse | map(select(.body | test("^(/pj-rehearse|/test) deploy "))) | .[0].body')
-            echo "Previous deploy comment: $prev_deploy_comment"
-
-            teardown_plugins_args=()
-            if [[ -n "$prev_deploy_comment" && "$prev_deploy_comment" != "null" ]]; then
-                read -r -a prev_parts <<< "$prev_deploy_comment"
-                for (( i=4; i<${#prev_parts[@]}; i++ )); do
-                    if [[ "${prev_parts[$i]}" == "--plugins" ]] && [[ $(( i + 1 )) -lt ${#prev_parts[@]} ]]; then
-                        teardown_plugins_args=("--plugins" "${prev_parts[$((i+1))]}")
-                        break
-                    fi
-                done
-            fi
-
-            echo "Tearing down previously deployed plugins: ${teardown_plugins_args[*]:-none}"
-            source ./teardown.sh "$install_type" "${teardown_plugins_args[@]}"
-        fi
-
-        # deploy.sh mirrors the deploy.sh script from the rhdh-test-instance repo
+        # deploy.sh mirrors the rhdh-test-instance repo; redeploy uses the same path (fresh CI cluster each run).
         source ./deploy.sh "$install_type" "$rhdh_version" "${plugins_args[@]}"
     else
         echo "❌ Error: Unable to trigger deployment - command format is incorrect."
@@ -192,7 +167,7 @@ if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
 - \`/test deploy operator 1.6 2h\`
 - \`/test deploy helm 1.7-98-CI\` (defaults to 3h)
 - \`/test deploy helm 1.7 3h --plugins keycloak,lighthouse\`
-- \`/test redeploy helm 1.7 3h --plugins keycloak\` (tears down first, then redeploys)
+- \`/test redeploy helm 1.7 3h --plugins keycloak\`
 
 Please correct the command format and try again! 🚀"
         exit 1
