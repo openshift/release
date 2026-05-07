@@ -15,6 +15,10 @@ base_images:
     name: cincinnati-graph-data
     namespace: cincinnati-ci-public
     tag: stable
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
   ubi:
     name: ubi
     namespace: ocp
@@ -98,6 +102,36 @@ tests:
         requests:
           cpu: 500m
           memory: 1000Mi
+    workflow: generic-claim
+- always_run: false
+  as: install-bundle-tls-scan
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    env:
+      SCAN_NAMESPACE: install-osus-here
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE" --security-context-config restricted
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    - ref: tls-scanner-run
     workflow: generic-claim
 - as: scorecard
   steps:
