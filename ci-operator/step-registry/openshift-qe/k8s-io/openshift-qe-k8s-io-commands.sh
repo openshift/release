@@ -14,6 +14,10 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# The k8s-io binary tries rest.InClusterConfig() before KUBECONFIG.
+# Unset these so it falls back to the KUBECONFIG set by proxy-conf.sh.
+unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+
 pushd /tmp
 
 ES_PASSWORD="$(< /secret/password)"
