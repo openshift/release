@@ -262,8 +262,15 @@ echo -e "Available cluster versions:\n${versionList}"
 # If account-roles-create fell back to a different version, use it. This overrides
 # release:latest resolution so the cluster version matches the account roles.
 if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
-  OPENSHIFT_VERSION=$(cat "${SHARED_DIR}/openshift_version")
-  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step (fallback)"
+  FALLBACK_VERSION=$(cat "${SHARED_DIR}/openshift_version")
+  REQUESTED_MAJOR_MINOR=$(echo "${OPENSHIFT_VERSION}" | cut -d'.' -f1,2)
+  FALLBACK_MAJOR_MINOR=$(echo "${FALLBACK_VERSION}" | cut -d'.' -f1,2)
+  if [[ "${REQUESTED_MAJOR_MINOR}" =~ ^[0-9]+\.[0-9]+$ && "${REQUESTED_MAJOR_MINOR}" != "${FALLBACK_MAJOR_MINOR}" ]]; then
+    log "ERROR: Requested version ${OPENSHIFT_VERSION} but account-roles fell back to ${FALLBACK_VERSION}. Version ${OPENSHIFT_VERSION} may not be available for this cluster type."
+    exit 1
+  fi
+  OPENSHIFT_VERSION="${FALLBACK_VERSION}"
+  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
 fi
 
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
