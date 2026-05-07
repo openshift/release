@@ -21,15 +21,8 @@ export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 
-START_TIME_FALLBACK_ARGS=""
-if [[ -f "${SHARED_DIR}/write-config-timestamp-rfc3339" ]]; then
-  START_TIME_FALLBACK_ARGS="--start-time-fallback $(cat "${SHARED_DIR}/write-config-timestamp-rfc3339")"
-fi
-
 export AZURE_TOKEN_CREDENTIALS=prod
 test/aro-hcp-tests gather-snapshot \
   --timing-input "${SHARED_DIR}" \
   --output "${ARTIFACT_DIR}/" \
-  --rendered-config "${SHARED_DIR}/config.yaml" \
-  --subscription-id "${INFRA_SUBSCRIPTION_ID}" \
-  ${START_TIME_FALLBACK_ARGS}
+  --rendered-config "${SHARED_DIR}/config.yaml"
