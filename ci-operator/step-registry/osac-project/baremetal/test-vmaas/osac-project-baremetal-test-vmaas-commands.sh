@@ -6,14 +6,14 @@ set -o pipefail
 
 echo "Running OSAC VMaaS e2e test suite"
 
-timeout -s 9 120m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s "${E2E_NAMESPACE}" "${E2E_VM_TEMPLATE}" "${OSAC_TEST_IMAGE}" <<'REMOTE_EOF'
+timeout 170m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s "${E2E_NAMESPACE}" "${E2E_VM_TEMPLATE}" "${OSAC_TEST_IMAGE}" <<'REMOTE_EOF'
 set -euo pipefail
 
 E2E_NAMESPACE="$1"
 E2E_VM_TEMPLATE="$2"
 OSAC_TEST_IMAGE="$3"
 
-KUBECONFIG=$(find ${KUBECONFIG} -type f -print -quit 2>/dev/null)
+KUBECONFIG=$(find "${KUBECONFIG}" -type f -print -quit 2>/dev/null)
 [[ -z "${KUBECONFIG}" ]] && echo "ERROR: No kubeconfig found" && exit 1
 
 PULL_SECRET_PATH="/root/pull-secret"

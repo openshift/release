@@ -17,7 +17,7 @@ Host ci_machine
   User ${EDGE04_USER}
   IdentityFile ${SSH_KEY_FILE}
   ConnectTimeout 10
-  StrictHostKeyChecking no
+  StrictHostKeyChecking accept-new
   UserKnownHostsFile /dev/null
   ServerAliveInterval 90
   LogLevel ERROR
