@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 if [ ${RUN_ORION} == false ]; then
   exit 0
