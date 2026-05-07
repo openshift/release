@@ -1,0 +1,21 @@
+workflow:
+  as: rosa-e2e-classic
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "false"
+      MULTI_AZ: "true"
+      REPLICAS: "3"
+    pre:
+      - chain: rosa-aws-sts-provision
+      - ref: rosa-cluster-wait-ready-nodes
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - ref: rosa-sts-account-roles-delete
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA STS (Classic) cluster and runs the rosa-e2e
+    managed service validation suite, then tears down the cluster.
