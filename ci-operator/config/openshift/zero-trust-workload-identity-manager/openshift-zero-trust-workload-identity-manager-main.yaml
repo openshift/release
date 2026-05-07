@@ -14,6 +14,26 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: zero-trust-workload-identity-manager
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21 AS builder
+      ARG TARGETOS
+      ARG TARGETARCH
+      WORKDIR /workspace
+      COPY . .
+      RUN go mod download
+      RUN CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+          go build -mod=mod -a \
+          -cover -covermode=count -coverpkg=./... \
+          -o zero-trust-workload-identity-manager \
+          ./cmd/zero-trust-workload-identity-manager/main.go
+      FROM registry.access.redhat.com/ubi9-minimal:9.4
+      WORKDIR /
+      COPY --from=builder /workspace/zero-trust-workload-identity-manager /usr/bin
+      RUN mkdir -p /tmp/e2e-cover && chmod 777 /tmp/e2e-cover
+      USER 65532:65532
+      ENV GOCOVERDIR=/tmp/e2e-cover
+      ENTRYPOINT ["/usr/bin/zero-trust-workload-identity-manager"]
+    to: zero-trust-workload-identity-manager-coverage
 operator:
   bundles:
   - as: zero-trust-workload-identity-manager-bundle
@@ -57,6 +77,104 @@ tests:
     version: "4.20"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NAMESPACE="zero-trust-workload-identity-manager"
+        DEPLOYMENT="zero-trust-workload-identity-manager-controller-manager"
+        PVC_NAME="e2e-coverage-pvc"
+        GOCOVERDIR_PATH="/tmp/e2e-cover"
+        EXTRACTOR_IMAGE="golang:1.25"
+        CODECOV_SECRET="/var/run/secrets/codecov/CODECOV_TOKEN"
+
+        artifact_dir="${ARTIFACT_DIR:-.}"
+        coverage_dir="${artifact_dir}/e2e-cover-data"
+        coverage_profile="${artifact_dir}/coverage-e2e.out"
+
+        if [ -z "${CODECOV_TOKEN:-}" ] && [ -f "${CODECOV_SECRET}" ]; then
+          CODECOV_TOKEN=$(cat "${CODECOV_SECRET}")
+          export CODECOV_TOKEN
+        fi
+
+        echo "Scaling down operator to flush coverage data via SIGTERM..."
+        oc scale "deployment/${DEPLOYMENT}" --replicas=0 -n "${NAMESPACE}" || true
+        oc wait --for=delete pod -l name=zero-trust-workload-identity-manager \
+          -n "${NAMESPACE}" --timeout=60s 2>/dev/null || true
+
+        oc delete pod coverage-extractor -n "${NAMESPACE}" --ignore-not-found --wait=false 2>/dev/null || true
+
+        echo "Creating extractor pod..."
+        oc run coverage-extractor \
+          --image="${EXTRACTOR_IMAGE}" \
+          --restart=Never \
+          --overrides="{
+            \"spec\": {
+              \"volumes\": [{\"name\": \"cov\", \"persistentVolumeClaim\": {\"claimName\": \"${PVC_NAME}\"}}],
+              \"containers\": [{\"name\": \"coverage-extractor\", \"image\": \"${EXTRACTOR_IMAGE}\",
+                \"command\": [\"sleep\", \"600\"],
+                \"volumeMounts\": [{\"name\": \"cov\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}]
+              }]
+            }
+          }" \
+          -n "${NAMESPACE}"
+
+        oc wait pod/coverage-extractor --for=condition=Ready -n "${NAMESPACE}" --timeout=120s
+
+        mkdir -p "${coverage_dir}"
+        oc cp "${NAMESPACE}/coverage-extractor:${GOCOVERDIR_PATH}/." "${coverage_dir}"
+
+        echo "Coverage files:"
+        ls -la "${coverage_dir}/" 2>/dev/null || true
+
+        if ls "${coverage_dir}"/covmeta.* >/dev/null 2>&1; then
+          echo "Converting coverage data..."
+          go tool covdata textfmt -i="${coverage_dir}" -o="${coverage_profile}"
+          echo "=== E2E Coverage Summary ==="
+          go tool covdata percent -i="${coverage_dir}"
+          echo "============================="
+
+          if [ -n "${CODECOV_TOKEN:-}" ]; then
+            echo "Uploading to Codecov..."
+            codecov_bin="${artifact_dir}/codecov"
+            curl -sS -o "${codecov_bin}" https://uploader.codecov.io/latest/linux/codecov
+            curl -sS -o "${codecov_bin}.SHA256SUM" https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+            cd "$(dirname "${codecov_bin}")" && sha256sum -c "$(basename "${codecov_bin}").SHA256SUM" && cd - >/dev/null
+            chmod +x "${codecov_bin}"
+
+            codecov_flags="--file=${coverage_profile} --flags=e2e --name=E2E-Coverage --verbose"
+            job_type="${JOB_TYPE:-local}"
+            if [ "${job_type}" = "presubmit" ]; then
+              [ -n "${PULL_NUMBER:-}" ] && codecov_flags="${codecov_flags} --pr ${PULL_NUMBER}"
+              [ -n "${PULL_PULL_SHA:-}" ] && codecov_flags="${codecov_flags} --sha ${PULL_PULL_SHA}"
+              [ -n "${PULL_BASE_REF:-}" ] && codecov_flags="${codecov_flags} --branch ${PULL_BASE_REF}"
+              [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ] && codecov_flags="${codecov_flags} --slug ${REPO_OWNER}/${REPO_NAME}"
+            elif [ "${job_type}" = "postsubmit" ]; then
+              [ -n "${PULL_BASE_SHA:-}" ] && codecov_flags="${codecov_flags} --sha ${PULL_BASE_SHA}"
+              [ -n "${PULL_BASE_REF:-}" ] && codecov_flags="${codecov_flags} --branch ${PULL_BASE_REF}"
+              [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ] && codecov_flags="${codecov_flags} --slug ${REPO_OWNER}/${REPO_NAME}"
+            fi
+
+            ${codecov_bin} ${codecov_flags} || echo "Warning: Codecov upload failed (non-fatal)"
+            rm -f "${codecov_bin}" "${codecov_bin}.SHA256SUM"
+          else
+            echo "CODECOV_TOKEN not set -- skipping upload. Profile saved: ${coverage_profile}"
+          fi
+        else
+          echo "Warning: No coverage data found"
+        fi
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: ztwim-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
     test:
     - as: install
       cli: latest
@@ -68,6 +186,63 @@ tests:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
       from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NAMESPACE="zero-trust-workload-identity-manager"
+        DEPLOYMENT="zero-trust-workload-identity-manager-controller-manager"
+        PVC_NAME="e2e-coverage-pvc"
+        GOCOVERDIR_PATH="/tmp/e2e-cover"
+
+        echo "--- E2E Coverage Setup ---"
+        echo "Coverage image: ${COVERAGE_IMAGE}"
+
+        echo "Creating PVC..."
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: ${PVC_NAME}
+          namespace: ${NAMESPACE}
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+        EOF
+
+        echo "Discovering CSV from deployment ownerReference..."
+        csv=$(oc get deployment "${DEPLOYMENT}" -n "${NAMESPACE}" \
+          -o jsonpath='{.metadata.ownerReferences[?(@.kind=="ClusterServiceVersion")].name}')
+        if [ -z "${csv}" ]; then
+          echo "Error: no CSV found"; exit 1
+        fi
+        echo "Found CSV: ${csv}"
+
+        echo "Patching CSV..."
+        oc patch csv "${csv}" -n "${NAMESPACE}" --type=json -p "[
+          {\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"${COVERAGE_IMAGE}\"},
+          {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-\", \"value\": {\"name\": \"GOCOVERDIR\", \"value\": \"${GOCOVERDIR_PATH}\"}},
+          {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/volumeMounts/-\", \"value\": {\"name\": \"coverage-data\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}},
+          {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/volumes/-\", \"value\": {\"name\": \"coverage-data\", \"persistentVolumeClaim\": {\"claimName\": \"${PVC_NAME}\"}}}
+        ]"
+
+        echo "Waiting for rollout..."
+        sleep 5
+        oc rollout status "deployment/${DEPLOYMENT}" -n "${NAMESPACE}" --timeout=180s
+
+        oc exec -n "${NAMESPACE}" "deploy/${DEPLOYMENT}" -- env | grep GOCOVERDIR || \
+          echo "Warning: GOCOVERDIR not found (non-fatal)"
+        echo "--- Coverage setup complete ---"
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: zero-trust-workload-identity-manager-coverage
+      from: src
       resources:
         requests:
           cpu: 100m
