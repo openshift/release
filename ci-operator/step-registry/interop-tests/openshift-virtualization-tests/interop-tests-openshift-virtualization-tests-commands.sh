@@ -16,31 +16,43 @@ debug_on_exit() {
   local execution_time=$((end_time - start_time))
   local debug_threshold=720 # 12 minutes in seconds
   local hco_namespace=openshift-cnv
+  local lockfile=/tmp/debug_marker
+  set +e
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
     echo
-    echo "--------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo " SCRIPT EXITED PREMATURELY (runtime: ${execution_time}s) "
-    echo "--------------------------------------------------------"
-    echo "Entering 2-hour debug sleep. Press Ctrl+C to terminate."
-    echo "You can now inspect the system state."
+    echo "--------------------------------------------------------------------------------"
+    echo "Entering debug sleep. You can now inspect the system state."
+    echo "Remove the file: ${lockfile}, to continue script execution."
     echo "PID: $$"
     echo "Exit Code: ${exit_code}"
-    echo "--------------------------------------------------------"
-    # The 'sleep' command will be interrupted by Ctrl+C.
-    # To make the sleep uninterruptible by Ctrl+C, you could add:
-    # trap '' SIGINT SIGTERM
-    oc get -n "${hco_namespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
+    echo "--------------------------------------------------------------------------------"
+    echo "Dump HCO CR and logs for debugging."
+    oc get -n "${hco_namespace}" "${HCO_KIND}" kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
     oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
-
+    echo "--------------------------------------------------------------------------------"
+    echo "Run must-gather for additional debugging information."
     runMustGather
+    echo "--------------------------------------------------------------------------------"
     echo "    😴 😴 😴"
 
     # Use file flag so loop can be interrupted by removing the file
-    touch /tmp/debug_marker
-    while [[ -f /tmp/debug_marker ]]; do
-        sleep 120
+    touch "${lockfile}"
+    attempts=120
+    attempt_count=0
+    sleep_time=120
+    set +x
+    while [[ -f "${lockfile}" ]]; do
+        sleep "${sleep_time}"
+        ((attempt_count++))
+        if [[ ${attempt_count} -ge ${attempts} ]]; then
+            echo "Timed out waiting for lockfile to be removed."
+            break
+        fi
     done
+    set -x
   fi
 
   # exit with the original exit code.
@@ -90,8 +102,10 @@ function retry() {
     until "$@"; do
         exit_code=$?
         count=$((count + 1))
+        # shellcheck disable=SC2086
         if [ $count -lt $max_retries ]; then
             echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
+            # shellcheck disable=SC2086
             sleep $delay
         else
             echo "Command failed after $max_retries attempts."
@@ -108,14 +122,14 @@ function retry() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
     local status="${1}"
-    retry 5 5 oc patch hco kubevirt-hyperconverged -n openshift-cnv \
+    retry 5 5 oc patch "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv \
         --type=merge \
         -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
 
-    oc wait hco kubevirt-hyperconverged -n openshift-cnv  \
+    oc wait "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv  \
     --for=condition='Available' \
     --timeout='5m'
 }
@@ -206,7 +220,7 @@ function mapTestsForComponentReadiness() {
     if [ -f "${results_file}" ]; then
         install_yq_if_not_exists
         echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${results_file}"
     fi
 }
 
@@ -214,6 +228,7 @@ BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
 # Exports
+export HCO_KIND='hyperconvergeds.v1beta1.hco.kubevirt.io'
 export PATH="${BIN_FOLDER}:${PATH}"
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
