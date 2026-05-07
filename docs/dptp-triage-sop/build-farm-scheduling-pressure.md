@@ -1,6 +1,6 @@
 # Build Farm Scheduling Pressure
 
-Alerts: **BuildFarmHighPendingPods**, **BuildFarmNodePressure** (Slack: **#ops-testplatform**).
+**Alerts:** `BuildFarmHighPendingPods`, `BuildFarmNodePressure` — **Slack:** `#ops-testplatform`. **Rules:** [`build-farm-scheduling-pressure_prometheusrule.yaml`](../../clusters/build-clusters/common_except_app.ci/openshift-monitoring/build-farm-scheduling-pressure_prometheusrule.yaml) (per build cluster). **Severity:** `warning`.
 
 ## What the alerts mean
 

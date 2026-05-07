@@ -1,5 +1,14 @@
 # OpenShift Mirroring Failures
 
+## Alert binding
+
+| Field | Value |
+|-------|-------|
+| **Alert** | `openshift-mirroring-failures` |
+| **Cluster** | `app.ci` |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `openshift-mirroring-failures` |
+| **Severity** | `critical` |
+
 This SOP covers the `openshift-mirroring-failures` alert on `app.ci`.
 
 ## What this alert means
@@ -24,6 +33,58 @@ The exact fix depends on the failure type, but the path to recovery is usually f
    - Destination push/auth problem (permission denied, auth/credentials)
    - Registry/network/transient problem (timeouts, temporary API failures)
 5. Apply the minimal fix needed to get a successful run.
+
+## Diagnose with `oc` on `app.ci`
+
+### 1) List recent ProwJobs for the periodic
+
+Job name in Deck/Prow: **`periodic-image-mirroring-openshift`**.
+
+```bash
+CTX=app.ci
+
+oc --context "$CTX" get prowjobs.prow.k8s.io -n ci \
+  --sort-by=.metadata.creationTimestamp \
+  | { grep periodic-image-mirroring-openshift || true; } | tail -10
+```
+
+Pick the newest **`STATE=failure`** row’s **`NAME`**.
+
+### 2) Inspect ProwJob status (URLs, finish time)
+
+```bash
+PJ=<name-from-previous-command>
+
+oc --context "$CTX" get prowjob.prow.k8s.io -n ci "$PJ" -o yaml | sed -n '1,120p'
+```
+
+Note **`status.url`** (artifact browser) and **`status.build_id`**.
+
+### 3) Find runner pods (while still retained)
+
+```bash
+BUILD_ID=<status.build_id>
+
+oc --context "$CTX" get pods --all-namespaces \
+  -l prow.k8s.io/build-id="$BUILD_ID" \
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase'
+```
+
+Typical mirror workload namespaces begin with **`ci-op-`** or stay in **`ci`** depending on agent—use **`NS`** from the row whose **`NAME`** references **`image-mirroring`** / **`ci-operator`**.
+
+### 4) Stream ci-operator / test logs locally
+
+```bash
+TEST_NS=<namespace-from-above>
+OPERATOR_POD=$(oc --context "$CTX" get pods -n "$TEST_NS" -o name | grep ci-operator | head -1 | sed 's|pod/||')
+
+oc --context "$CTX" logs -n "$TEST_NS" "$OPERATOR_POD" -c test --tail=400 \
+  | grep -iE 'image mirror|manifest unknown|unauthorized|FORBIDDEN|error:|level=error' || true
+```
+
+### 5) If pods already GC’d
+
+Fall back to **GCS artifact path** from **`status.url`** (same content as CI Search would index).
 
 ## Common recovery actions
 

@@ -1,5 +1,14 @@
-QCI Pruner Job Timeout
-======================
+# QCI Pruner Job Timeout
+
+## Job binding
+
+| Field | Value |
+|-------|-------|
+| **ProwJob** | `periodic-openshift-release-qci-pruner` |
+| **Signal** | Job failure / 12h timeout; Slack **`#ops-testplatform`** via reporter template ([`infra-periodics.yaml`](../../ci-operator/jobs/infra-periodics.yaml)) |
+| **Script** | [`hack/qci_registry_pruner.py`](../../hack/qci_registry_pruner.py) |
+
+---
 
 The `periodic-openshift-release-qci-pruner` job is responsible for pruning old tags from the `quay.io/openshift/ci` repository. The job runs daily and has a 12-hour timeout. When the job fails with a timeout error, it indicates that the pruner script is taking longer than expected to process all tags.
 

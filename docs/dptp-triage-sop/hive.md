@@ -2,6 +2,8 @@
 
 ### hosted-mgmt-blocked-deprovision
 
+**Alert:** `hosted-mgmt-blocked-deprovision` — **cluster:** `hosted-mgmt`. **Rule:** [`hosted-mgmt-alerts_prometheusrule.yaml`](../../clusters/hosted-mgmt/hosted-mgmt-alerts_prometheusrule.yaml). **Severity:** `critical`.
+
 #### Runbook
 
 * Find out the name of the cluster pool that the `clusterdeployment` is from. The namespace and the name are usually the same and displayed in the alert's message

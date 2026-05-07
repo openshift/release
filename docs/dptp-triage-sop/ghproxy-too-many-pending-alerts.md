@@ -1,5 +1,14 @@
 # ghproxy Too Many Pending Alerts
 
+## Alert binding
+
+| Field | Value |
+|-------|-------|
+| **Alert** | `ghproxy-too-many-pending-alerts` |
+| **Cluster** | `app.ci` |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml); source [`ghproxy_alerts.libsonnet`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/_prometheus/ghproxy_alerts.libsonnet) |
+| **Severity** | `critical` |
+
 This SOP covers `ghproxy-too-many-pending-alerts` on `app.ci`.
 
 ## What this alert means
@@ -13,6 +22,47 @@ The dangerous case is a trend: repeated firings or sustained queue growth over t
 
 - One isolated firing: monitor, but do not treat as an outage by default.
 - Multiple firings or sustained backlog: investigate immediately.
+
+## Diagnose on-cluster (`app.ci`)
+
+Deployment **`ghproxy`** lives in namespace **`ci`** ([`ghproxy.yaml`](../../clusters/app.ci/prow/03_deployment/ghproxy.yaml), labels **`app=prow`**, **`component=ghproxy`**).
+
+### 1) Pod health
+
+```bash
+CTX=app.ci
+
+oc --context "$CTX" get pods -n ci -l app=prow,component=ghproxy -o wide
+oc --context "$CTX" describe pod -n ci -l app=prow,component=ghproxy | grep -A12 '^Conditions:'
+```
+
+### 2) Recent ghproxy logs (errors, cache, upstream GitHub)
+
+```bash
+oc --context "$CTX" logs -n ci deploy/ghproxy --tail=300 \
+  | grep -iE 'error|429|403|timeout|backoff' || true
+```
+
+Interpret:
+
+- **429 / 403 spikes**: GitHub rate limit / token permission—correlate with token metrics below.
+- **Dial / TLS errors**: egress or GitHub incident.
+
+### 3) Metrics port (inline sanity)
+
+Service **`ghproxy`** exposes **`9090`** named **`metrics`**—scrape targets should be **`UP`** in monitoring; if local pod healthy but alert persists, verify Service endpoints:
+
+```bash
+oc --context "$CTX" get endpoints -n ci ghproxy -o yaml
+```
+
+### 4) In-flight ConfigMap / deployment drift
+
+```bash
+oc --context "$CTX" get deploy/ghproxy -n ci -o yaml | grep -A3 ' image:'
+```
+
+Compare with Git [`ghproxy.yaml`](../../clusters/app.ci/prow/03_deployment/ghproxy.yaml) if image unexpectedly old.
 
 ## Investigation queries (Prometheus on app.ci)
 
