@@ -113,21 +113,19 @@ tests:
   run_if_changed: .sh$
 - as: ocp-ci-monitor
   cron: 0 7 * * *
-  retry:
-    attempts: 2
-    interval: 30m
   steps:
     workflow: openshift-edge-tooling-ci-monitor
+- as: microshift-ci-doctor
+  cron: 0 8,14 * * 1-5
+  steps:
+    workflow: openshift-edge-tooling-microshift-ci-doctor
 - as: pr-notifier
   cron: 0 7 * * 0-5
   restrict_network_access: false
-  retry:
-    attempts: 2
-    interval: 30m
   steps:
     env:
       FORBIDDEN_LABELS: jira/invalid-bug
-      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements
+      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements,openshift/lvm-operator
       REQUIRED_LABELS: lgtm,approved,verified
     workflow: openshift-edge-tooling-gh-notifier
 zz_generated_metadata:

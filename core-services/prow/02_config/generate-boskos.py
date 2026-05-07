@@ -66,9 +66,6 @@ CONFIG = {
     'aws-sd-qe-quota-slice': {
         'us-west-2': 10,
     },
-    'aws-outpost-quota-slice': {
-        'us-east-1': 10,
-    },
     'aws-outpost-qe-quota-slice': {
         'us-east-1': 5,
     },
@@ -267,6 +264,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'azure-perfscale-qe-quota-slice': {
+        'centralus': 6,
+   },
     'aro-classic-int-quota-slice': {
         'default': 1,
     },
@@ -489,9 +489,6 @@ CONFIG = {
         'jp-tok': 20,
     },
     'ibmcloud-qe-2-quota-slice': {
-        'us-east': 10,
-    },
-    'ibmcloud-gpu-quota-slice': {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
