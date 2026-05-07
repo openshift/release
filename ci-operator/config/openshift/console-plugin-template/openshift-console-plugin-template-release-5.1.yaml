@@ -26,16 +26,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: lint-aws-plugin-template
-  steps:
-    test:
-    - as: lint
-      commands: yarn install && yarn run lint
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+- as: frontend
+  commands: |
+    git config --global --add safe.directory /go/src/github.com/openshift/console-plugin-template
+    ./test-frontend.sh
+  container:
+    from: src
 - as: e2e-aws-plugin-template
   steps:
     cluster_profile: openshift-org-aws
@@ -44,7 +40,7 @@ tests:
       cli: latest
       commands: ./test-prow-e2e.sh
       dependencies:
-      - env: CYPRESS_PLUGIN_TEMPLATE_PULL_SPEC
+      - env: PLUGIN_TEMPLATE_PULL_SPEC
         name: console-plugin-template
       from: src
       grace_period: 30m0s
