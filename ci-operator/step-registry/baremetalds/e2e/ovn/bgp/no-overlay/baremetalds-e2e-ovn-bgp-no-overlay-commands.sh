@@ -27,6 +27,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Install podman if not already present. This step runs before
+# baremetalds-devscripts-setup which normally installs it.
+if ! command -v podman &>/dev/null; then
+    dnf install -y podman
+fi
+
 # Determine container runtime (podman or docker)
 SUDO=
 if [ "$EUID" -ne 0 ]; then
