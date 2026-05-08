@@ -307,6 +307,28 @@ process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
+# Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
+(
+    EXP_DIR="${ARTIFACT_DIR}/orion-original-edivisive"
+    mkdir -p "$EXP_DIR"
+    EXP_BINARY="/tmp/orion-original-edivisive"
+
+    echo "Downloading experimental orion binary..."
+    if ! curl -fsSL "https://github.com/cloud-bulldozer/orion/releases/download/orig-edivisive-exp/orion-amd64" -o "$EXP_BINARY"; then
+        echo "Failed to download experimental orion binary, skipping."
+        exit 0
+    fi
+    chmod +x "$EXP_BINARY"
+
+    echo "Running experimental orion (original e-divisive)..."
+    "$EXP_BINARY" --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee "$EXP_DIR/${FILENAME}.txt" || true
+
+    # Copy all results except .xml files into the experimental artifacts subdirectory
+    cp *.csv *.json *.txt *.html "$EXP_DIR/" 2>/dev/null || true
+
+    echo "Experimental orion run complete."
+) || echo "Experimental orion block failed, continuing."
+
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
