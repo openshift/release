@@ -527,12 +527,33 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
+- as: e2e-metal-ovn-two-node-arbiter-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-agent-ovn-two-node-arbiter
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-agent-ovn-two-node-arbiter-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=TNA_IPV4
+        FEATURE_SET="TechPreviewNoUpgrade"
+      OSSTREAM: rhel-10
     workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   capabilities:
@@ -846,6 +867,23 @@ tests:
     test:
     - chain: agent-test
     workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-metal-ovn-two-node-arbiter-private-tests-rhcos10-tp
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=32768
+        MASTER_DISK=100
+        FEATURE_SET="TechPreviewNoUpgrade"
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended
   capabilities:
   - intranet
