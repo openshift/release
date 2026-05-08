@@ -12,8 +12,16 @@ REPO="${REPO_NAME:-hypershift}"
 
 echo "Parsing trigger comment for PR #${PR_NUMBER} in ${REPO_ORG}/${REPO}"
 
-TRIGGER_COMMENT=$(curl -s "https://api.github.com/repos/${REPO_ORG}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&direction=desc" \
-  | jq -r '[.[] | select(.body | test("/test\\s+agentic-qe"))] | first | .body // empty')
+COMMENTS_JSON=$(curl -s "https://api.github.com/repos/${REPO_ORG}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&direction=desc")
+
+TRIGGER_COMMENT=$(echo "$COMMENTS_JSON" | python3 -c "
+import json, sys, re
+comments = json.load(sys.stdin)
+for c in comments:
+    if re.search(r'/test\s+agentic-qe', c.get('body', '')):
+        print(c['body'])
+        break
+" 2>/dev/null || true)
 
 if [[ -z "$TRIGGER_COMMENT" ]]; then
   echo "No trigger comment found, using defaults"
@@ -22,7 +30,7 @@ fi
 
 echo "Found trigger comment"
 
-RELEASE_IMAGE=$(echo "$TRIGGER_COMMENT" | grep -oP 'RELEASE_IMAGE=\S+' | head -1 | cut -d= -f2- || true)
+RELEASE_IMAGE=$(echo "$TRIGGER_COMMENT" | grep -o 'RELEASE_IMAGE=[^ ]*' | head -1 | cut -d= -f2- || true)
 if [[ -n "$RELEASE_IMAGE" ]]; then
   echo "Release image override: ${RELEASE_IMAGE}"
   echo "${RELEASE_IMAGE}" > "${SHARED_DIR}/release_image_override"
