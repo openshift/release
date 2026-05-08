@@ -19,21 +19,27 @@ ref:
       name: mpiit-dr-creds
       mount_path: /datarouter/secrets
   env:
-  - name: REPORT_TO_DR
-    default: "false"
-  - name: APPLY_TFA
+  - name: REPORTPORTAL_APPLY_TFA
     default: "true"
-    documentation: Whether to apply TFA (Test Failure Analysis)
+    documentation: Instructs the Report Portal whether to perform Test Failure Analysis (TFA).
   - name: REPORTPORTAL_HOSTNAME
     default: "reportportal-lp-interop.apps.dno.ocp-hub.prod.psi.redhat.com"
-  - name: OCP_VERSION
-    default: ""
-    documentation: If exists, will be injected as an attribute
+    documentation: Hostname of the Report Portal instance that the Data Router client uses when publishing results.
+  - name: REPORTPORTAL_PROJECT
+    default: "lp-interop-dr_personal"
+    documentation: Report Portal project that receives the uploads produced by this step.
   - name: REPORTPORTAL_CMP
     default: ""
-    documentation: Component (Layered Product) mention for metadata attributes
+    documentation: Deprecated component or launch identifier. See DR__RP__CR_COMP_NAME instead.
+  - name: DR__RP__CR_COMP_NAME
+    default: ""
+    documentation: Layered Product name for Component Readiness (CR), injected into Report Portal launch attributes, and sets launch name.
   - name: FIPS_ENABLED
     default: "false"
-    documentation: Whether FIPS is enabled (true/false); will be injected as an attribute
+    documentation: This information is set as a metadata attribute of the report.
+  - name: OCP_VERSION
+    default: ""
+    documentation: If this is set to an empty string, the Step will attempt to determine the OCP version by parsing the job name (`ocp-*.*`). This information is set as a metadata attribute of the report.
   documentation: |-
-    The step analysis the tests and upload the results to ReportPortal
+    This step uploads the results to [Data Router Report Portal](https://redhat.atlassian.net/wiki/display/CentralCI/D%26O+Data+Router).
+    It supplies Report Portal launch metadata, including the launch name and attributes derived from the job context and from the environment variables documented above.
