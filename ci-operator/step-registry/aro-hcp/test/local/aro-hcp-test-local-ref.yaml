@@ -1,0 +1,41 @@
+ref:
+  as: aro-hcp-test-local
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-test-local-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: aro-hcp-qe-pull-secret
+      mount_path: /var/run/aro-hcp-qe-pull-secret
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  grace_period: 30s
+  timeout: 4h0m0s
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: |-
+        Selects which environment's cluster secrets to use (dev, int, stg, prod).
+    - name: AROHCP_ENV
+      default: "development"
+    - name: LOCATION
+      default: "westus3"
+      documentation: Azure region to create resources in.  For example, "uksouth"
+    - name: POOLED_IDENTITIES
+      default: "true"
+      documentation: Whether to use pooled identities for the test.
+    - name: ARO_HCP_DEPLOY_ENV
+      default: "prow"
+      documentation: |-
+        Config environment name. Also used to select the infrastructure
+        subscription from Vault (infra-{ARO_HCP_DEPLOY_ENV}-subscription-id).
+    - name: COMPRESS_TIMING_METADATA
+      default: "true"
+      documentation: Whether to compress timing metadata files with gzip.
+  documentation: |-
+    Run the ARO HCP local e2e test suite. Fetches svc cluster kubeconfig, discovers
+    service addresses, grants frontend ingress, registers subscription, then runs tests.

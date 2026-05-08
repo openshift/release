@@ -1,3 +1,8 @@
+base_images:
+  python-311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/agentic-skills
@@ -5,10 +10,24 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: agentic-skills
+  - dockerfile_literal: |
+      FROM python-311
+      COPY . /src
+      WORKDIR /src
+      RUN pip install cisco-ai-skill-scanner
+    from: python-311
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/agentic-skills/.
+    to: skill-scanner
 promotion:
   to:
   - name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   latest:
     integration:
@@ -24,9 +43,12 @@ resources:
       memory: 200Mi
 tests:
 - as: eval
-  commands: echo FIXME actual tests
+  commands: |
+    skill-scanner scan-all . --recursive --check-overlap --format json \
+      --fail-on-severity medium \
+      --output "${ARTIFACT_DIR}/skill-scanner-report.json"
   container:
-    from: src
+    from: skill-scanner
   skip_if_only_changed: ^(README\.md|OWNERS|LICENSE|AGENTS\.md|CLAUDE\.md|\.gitignore)$
 zz_generated_metadata:
   branch: main

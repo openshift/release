@@ -461,13 +461,12 @@ tests:
     workflow: aro-hcp-local-e2e
   timeout: 10h0m0s
 - always_run: false
-  as: e2e-parallel-infra-shard1
+  as: e2e-parallel-infra-ci01
   optional: true
   steps:
     env:
       ARO_HCP_CLOUD: dev
-      ARO_HCP_DEPLOY_ENV: prow
-      INFRA_SHARD: shard1
+      ARO_HCP_DEPLOY_ENV: ci01
       LOCATION: westus3
     leases:
     - count: 1
@@ -476,6 +475,7 @@ tests:
     workflow: aro-hcp-local-e2e
   timeout: 10h0m0s
 - as: global-pipeline-postsubmit
+  max_concurrency: 4
   postsubmit: true
   run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
   steps:
@@ -488,11 +488,13 @@ tests:
     test:
     - ref: aro-hcp-provision-global-pipeline
 - as: images-push-postsubmit
+  max_concurrency: 4
   postsubmit: true
   steps:
     test:
     - ref: aro-hcp-images-push
 - as: cspr-pipeline-postsubmit
+  max_concurrency: 4
   postsubmit: true
   steps:
     env:

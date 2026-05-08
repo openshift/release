@@ -27,7 +27,7 @@
             expr: |||
               sum by (job_name) (
                 rate(
-                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m]
+                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="failure"}[5m]
                 )
               )
               * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"}) > 0
@@ -115,7 +115,8 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md',
             },
           }
         ],

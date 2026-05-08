@@ -1,0 +1,59 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+canonical_go_repository: github.com/stolostron/cluster-permission
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-permission
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile test
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export HOME="/tmp"
+    export XDG_CACHE_HOME="/tmp/.cache"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-permission
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-5.0
+  org: openshift-priv
+  repo: stolostron-cluster-permission

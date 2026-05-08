@@ -40,14 +40,47 @@ IMAGE_NAME="${OPENSTACK_RHCOS_IMAGE_NAME}-${OCP_VERSION}"
 echo "RHCOS version from installer: ${IMAGE_VERSION}"
 echo "Image URL: ${IMAGE_URL}"
 
-# Check if the image already exists and is up-to-date
+# Use `openstack image list` instead of `openstack image show` for all
+# name-based lookups and always operate by image ID. This avoids failures
+# when multiple images share the same name (e.g. after a concurrent upload
+# race) and makes the script self-healing: duplicate images are cleaned up
+# on the next run.
+
+# List all images with the target name
+EXISTING_IMAGES="$(openstack image list --name "$IMAGE_NAME" -f json)"
+EXISTING_COUNT="$(echo "$EXISTING_IMAGES" | jq 'length')"
+
+# If there are duplicates, clean them up (keep the newest one)
+if [[ "$EXISTING_COUNT" -gt 1 ]]; then
+	echo "WARNING: Found ${EXISTING_COUNT} images named '${IMAGE_NAME}'. Cleaning up duplicates..."
+	DUPLICATE_IDS="$(echo "$EXISTING_IMAGES" | jq -r 'sort_by(.["Created At"]) | reverse | .[1:] | .[].ID')"
+	for id in $DUPLICATE_IDS; do
+		echo "  Deleting duplicate image ${id}..."
+		openstack image delete "$id" 2>/dev/null || true
+	done
+
+	# Re-list after cleanup and abort if duplicates persist, to prevent
+	# creating yet another image and making the problem worse.
+	EXISTING_IMAGES="$(openstack image list --name "$IMAGE_NAME" -f json)"
+	EXISTING_COUNT="$(echo "$EXISTING_IMAGES" | jq 'length')"
+	if [[ "$EXISTING_COUNT" -gt 1 ]]; then
+		echo "ERROR: Failed to clean up duplicate images named '${IMAGE_NAME}' (${EXISTING_COUNT} remaining). Aborting to prevent further accumulation."
+		exit 1
+	fi
+fi
+
+# Check if the (single remaining) image is up-to-date
 CURRENT_SHA256=""
-if IMAGE_PROPS="$(openstack image show -c properties -f json "$IMAGE_NAME" 2>/dev/null)"; then
-	CURRENT_SHA256="$(echo "$IMAGE_PROPS" | jq --raw-output '
-		.properties["owner_specified.openstack.sha256"] //
-		.properties["sha256"] //
-		empty
-	')"
+CURRENT_ID=""
+if [[ "$EXISTING_COUNT" -ge 1 ]]; then
+	CURRENT_ID="$(echo "$EXISTING_IMAGES" | jq -r 'sort_by(.["Created At"]) | reverse | .[0].ID')"
+	if IMAGE_PROPS="$(openstack image show -c properties -f json "$CURRENT_ID" 2>/dev/null)"; then
+		CURRENT_SHA256="$(echo "$IMAGE_PROPS" | jq --raw-output '
+			.properties["owner_specified.openstack.sha256"] //
+			.properties["sha256"] //
+			empty
+		')"
+	fi
 fi
 
 if [[ "$CURRENT_SHA256" == "$UNCOMPRESSED_SHA256" ]]; then
@@ -72,8 +105,10 @@ else
 	echo "Verifying uncompressed image checksum..."
 	echo "${UNCOMPRESSED_SHA256}  ${UNCOMPRESSED_FILE}" | sha256sum --check --quiet
 
-	# Clean up leftover from any previous failed run
-	openstack image delete "${IMAGE_NAME}-new" 2>/dev/null || true
+	# Clean up leftover from any previous failed run (by ID to handle duplicates)
+	for id in $(openstack image list --name "${IMAGE_NAME}-new" -f value -c ID 2>/dev/null); do
+		openstack image delete "$id" 2>/dev/null || true
+	done
 
 	echo "Uploading image to '${OS_CLOUD}' as '${IMAGE_NAME}-new'..."
 	NEW_IMAGE_ID="$(openstack image create "${IMAGE_NAME}-new" \
@@ -86,8 +121,15 @@ else
 		--format value --column id)"
 
 	echo "Replacing old '${IMAGE_NAME}' image with new one..."
-	openstack image delete "${IMAGE_NAME}-old" 2>/dev/null || true
-	openstack image set --name "${IMAGE_NAME}-old" "$IMAGE_NAME" 2>/dev/null || true
+	# Delete old images by ID
+	for id in $(openstack image list --name "${IMAGE_NAME}-old" -f value -c ID 2>/dev/null); do
+		openstack image delete "$id" 2>/dev/null || true
+	done
+	# Rename current image to -old (by ID, not name)
+	if [[ -n "$CURRENT_ID" ]]; then
+		openstack image set --name "${IMAGE_NAME}-old" "$CURRENT_ID" 2>/dev/null || true
+	fi
+	# Promote the new image (already using ID)
 	openstack image set --name "$IMAGE_NAME" "$NEW_IMAGE_ID"
 
 	rm -rf "$WORK_DIR"

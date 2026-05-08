@@ -28,10 +28,6 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/kmm-pull-secret" ]]; then
     export ECO_HWACCEL_KMM_PULL_SECRET
     ECO_HWACCEL_KMM_PULL_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/kmm-pull-secret")
     echo "KMM pull secret loaded from cluster profile"
-elif [[ -f "/var/run/vault/kmm-pull-secret/pull-secret" ]]; then
-    export ECO_HWACCEL_KMM_PULL_SECRET
-    ECO_HWACCEL_KMM_PULL_SECRET=$(cat "/var/run/vault/kmm-pull-secret/pull-secret")
-    echo "KMM pull secret loaded from vault credentials"
 else
     echo "WARNING: No KMM pull secret found, tests requiring external registry may be skipped"
 fi
@@ -41,7 +37,6 @@ cd /home/testuser || exit 1
 export ECO_TEST_FEATURES="${KMM_TEST_FEATURES:-modules}"
 export ECO_TEST_LABELS="${KMM_TEST_LABELS:-kmm-sanity && !bmc}"
 export ECO_TEST_VERBOSE="true"
-export ECO_VERBOSE_LEVEL="100"
 export ECO_DUMP_FAILED_TESTS="${ECO_DUMP_FAILED_TESTS:-true}"
 export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
 
