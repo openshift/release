@@ -56,10 +56,10 @@ else
     LATEST_TAG=$TAG
 fi
 git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1
-cd orion
+pushd orion
 pip install -q -r requirements.txt
 pip install -q .
-cd /tmp
+popd && popd
 
 # Build comma-separated file list for orion --report
 json_file_list=""
