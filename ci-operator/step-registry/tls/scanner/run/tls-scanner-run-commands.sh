@@ -22,6 +22,11 @@ if [[ "${PQC_CHECK:-false}" == "true" ]]; then
     echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
 fi
 
+if [[ -n "${SCAN_LIMIT_IPS:-}" && "${SCAN_LIMIT_IPS}" != "0" ]]; then
+    SCANNER_ARGS="${SCANNER_ARGS} --limit-ips ${SCAN_LIMIT_IPS}"
+    echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
+fi
+
 mkdir -p "${SCANNER_ARTIFACT_DIR}"
 
 echo "=== TLS Scanner ==="
@@ -78,11 +83,11 @@ spec:
       sleep 120
     resources:
       requests:
-        cpu: "4"
-        memory: 4Gi
+        cpu: "${SCANNER_CPU}"
+        memory: ${SCANNER_MEMORY}
       limits:
-        cpu: "4"
-        memory: 4Gi
+        cpu: "${SCANNER_CPU}"
+        memory: ${SCANNER_MEMORY}
     securityContext:
       privileged: true
       runAsUser: 0
