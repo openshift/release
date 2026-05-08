@@ -34,7 +34,7 @@ tests:
 - as: insights-operator-e2e-tests-periodic
   cron: 40 4 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -42,7 +42,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not techpreview and periodic_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic
+        pytest.sh -k "not techpreview and periodic_only" --junitxml=$(pwd)/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -62,9 +62,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -74,8 +71,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -86,7 +81,7 @@ tests:
 - as: e2e-gcp-ovn-techpreview
   cron: 40 4 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     pre:
@@ -96,7 +91,6 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "techpreview and not periodic_only" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -122,9 +116,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -138,8 +129,6 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       resources:
         requests:
@@ -149,7 +138,7 @@ tests:
 - as: e2e-gcp-techpreview
   cron: 2 10 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     pre:
@@ -159,7 +148,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -179,9 +168,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -191,8 +177,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -213,7 +197,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -233,9 +217,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -245,8 +226,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -267,7 +246,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -287,9 +266,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -299,8 +275,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -321,7 +295,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -341,9 +315,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -353,8 +324,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -380,7 +349,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -400,9 +369,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -412,8 +378,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -432,7 +396,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -452,9 +416,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -464,8 +425,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -476,7 +435,7 @@ tests:
 - as: gcp-insights-runtime-extractor-tests
   cron: 15 17 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -484,7 +443,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -504,9 +463,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -516,8 +472,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -536,7 +490,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -556,9 +510,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -568,8 +519,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -588,7 +537,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -608,9 +557,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -620,8 +566,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -640,7 +584,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -660,9 +604,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -672,8 +613,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -690,7 +629,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -710,9 +649,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -722,8 +658,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -751,7 +685,6 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -k "not tp_only and not slow and not UI" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -771,9 +704,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -783,8 +713,6 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:

@@ -443,7 +443,6 @@ platform:
     network: "${vsphere_portgroup}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
-    folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 else
 ${platform_required} && cat >>"${install_config}" <<EOF

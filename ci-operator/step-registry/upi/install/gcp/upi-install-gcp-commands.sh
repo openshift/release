@@ -15,6 +15,13 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
+if test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found, so infra-manager is preferred."
+  exit 0
+
+fi
+
 export HOME=/tmp
 
 export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
@@ -127,14 +134,15 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
 if version_ge "${ocp_version}" "4.11"; then
-  GCLOUD_SDK_VERSION="447"
+  GCLOUD_SDK_VERSION="563"
 else
   GCLOUD_SDK_VERSION="256"
 fi
-if ! gcloud --version; then
+gcloud version
+if ! gcloud version | grep -q "Google Cloud SDK ${GCLOUD_SDK_VERSION}"; then
   GCLOUD_TAR="google-cloud-sdk-${GCLOUD_SDK_VERSION}.0.0-linux-x86_64.tar.gz"
   GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
-  echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
+  echo "$(date -u --rfc-3339=seconds) - gcloud expected version not installed: installing from $GCLOUD_URL"
   pushd ${HOME}
   curl -O "$GCLOUD_URL"
   tar -xzf "$GCLOUD_TAR"
@@ -142,6 +150,8 @@ if ! gcloud --version; then
   popd
 fi
 gcloud version
+echo "$(date -u --rfc-3339=seconds) - Unset env var 'CLOUDSDK_PYTHON', use gcloud bundled-python3-unix instead"
+unset CLOUDSDK_PYTHON
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
   echo "Activating XPN service-account..."
@@ -164,8 +174,6 @@ cp -t "${dir}" \
 cp -t "${dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
-cp -t "${dir}" \
-    "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"/*
 tar -xzf "${SHARED_DIR}/.openshift_install_state.json.tgz"
 
 function backoff() {

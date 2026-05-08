@@ -3,6 +3,8 @@
 set -eoux pipefail
 
 declare -r REGISTRY_PROXY_PORT="${KONFLUX_REGISTRY_PROXY_PORT:-6004}"
+declare -r DISCONNECTED="${DISCONNECTED:-false}"
+declare -r KONFLUX_DEPLOY_CATALOG_SOURCE="${KONFLUX_DEPLOY_CATALOG_SOURCE:-false}"
 
 function create_marketplace_namespace () {
     # Since OCP 4.11, the marketplace is optional. If it is not installed, we need to create the namespace manually.

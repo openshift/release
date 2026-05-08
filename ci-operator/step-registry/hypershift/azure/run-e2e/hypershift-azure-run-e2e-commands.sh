@@ -40,6 +40,11 @@ trap cleanup EXIT
 
 export EVENTUALLY_VERBOSE="false"
 
+check_e2e_flag() {
+  grep -q "$1" <<<"$( bin/test-e2e -h 2>&1 )"
+  return $?
+}
+
 EXTERNAL_DNS_ARGS=""
 if [[ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" != "" ]]; then
   EXTERNAL_DNS_ARGS="--e2e.external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
@@ -103,6 +108,11 @@ if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT
   MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
 fi
 
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
+fi
+
 OAUTH_EXTERNAL_OIDC_PARAM=""
 if [ -f ${SHARED_DIR}/external-oidc-provider ] ; then
     source ${SHARED_DIR}/external-oidc-provider
@@ -155,5 +165,6 @@ hack/ci-test-e2e.sh -test.v \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
 wait $!

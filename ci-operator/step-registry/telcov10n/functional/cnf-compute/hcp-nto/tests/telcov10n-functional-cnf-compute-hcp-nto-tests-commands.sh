@@ -102,7 +102,16 @@ echo "Ginkgo command failed with exit code: ${run_tests_status}"
 
 python3 -m venv "${SHARED_DIR}"/myenv
 source "${SHARED_DIR}"/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed, retrying in 10s..."
+  rm -rf "${SHARED_DIR}"/telco5gci
+  sleep 10
+done
+if [[ ! -d "${SHARED_DIR}"/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
 for junit_file in "${ARTIFACT_DIR}"/*.xml; do

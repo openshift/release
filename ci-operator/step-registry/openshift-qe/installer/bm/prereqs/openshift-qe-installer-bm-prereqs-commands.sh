@@ -56,7 +56,7 @@ if [[ "$PRE_BOOT_ORDER" == "true" ]]; then
   echo "Cheking boot order ..."
   for i in $HOSTS; do
     # Until https://github.com/redhat-performance/badfish/issues/411 gets sorted
-    command_output=$(podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD -i config/idrac_interfaces.yml -t foreman 2>&1)
+    command_output=$(podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure -i config/idrac_interfaces.yml -t foreman 2>&1)
     desired_output="- WARNING  - No changes were made since the boot order already matches the requested."
     echo "Cheking boot order of server $i ..."
     echo $command_output
@@ -74,8 +74,8 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   echo "Cheking UEFI setup ..."
   for i in $HOSTS; do
     echo "Cheking UEFI setup of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --set-bios-attribute --attribute BootMode --value Uefi
-    if [[ $(podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
+    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --insecure --set-bios-attribute --attribute BootMode --value Uefi
+    if [[ $(podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --insecure --get-bios-attribute --attribute BootMode --value Uefi -o json 2>&1 | jq -r .CurrentValue) != "Uefi" ]]; then
       echo "$i not in Uefi mode"
       sleep 10s
       continue

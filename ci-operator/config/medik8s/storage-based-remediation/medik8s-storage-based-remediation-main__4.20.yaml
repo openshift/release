@@ -11,15 +11,15 @@ images:
   - dockerfile_path: Dockerfile
     from: os
     to: storage-based-remediation
-  - dockerfile_path: cmd/sbd-agent/Dockerfile
-    to: sbd-agent
+  - dockerfile_path: cmd/sbr-agent/Dockerfile
+    to: sbr-agent
 operator:
   bundles:
   - as: my-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/sbd-operator:.*
+  - pullspec: quay.io/medik8s/storage-based-remediation-operator:.*
     with: pipeline:storage-based-remediation
 releases:
   latest:
@@ -40,8 +40,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
-      OPERATOR_NAMESPACE: sbd-operator-system
-      OPERATOR_RELEASED_VERSION: 0.2.0
+      OPERATOR_NAMESPACE: sbr-operator-system
     test:
     - as: install-last-operator-version
       cli: latest
@@ -52,11 +51,38 @@ tests:
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
-        BUNDLE_IMG=quay.io/medik8s/sbd-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+        # OPERATOR_NAMESPACE variable is used by bundle-run
+        BUNDLE_IMG="$OO_BUNDLE" make bundle-run
+
+        # Inject CI-built agent image into the CSV so OLM propagates it to the deployment
+        CSV_NAME=""
+        for _ in {1..30}; do
+          CSV_NAME=$(oc get csv -n "$OPERATOR_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | tail -n1)
+          [[ -n "$CSV_NAME" ]] && break
+          sleep 5
+        done
+        [[ -n "$CSV_NAME" ]] || { echo "CSV not found in namespace ${OPERATOR_NAMESPACE}"; exit 1; }
+
+        # Ensure env array exists before appending
+        if ! oc get csv "$CSV_NAME" -n "$OPERATOR_NAMESPACE" -o jsonpath='{.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[0].name}' >/dev/null 2>&1; then
+          oc -n "$OPERATOR_NAMESPACE" patch csv "$CSV_NAME" --type=json -p='[
+            {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env","value":[]}
+          ]'
+        fi
+        oc -n "$OPERATOR_NAMESPACE" patch csv "$CSV_NAME" --type=json -p='[
+          {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_SBR_AGENT","value":"'"${SBR_AGENT_IMAGE}"'"}}
+        ]'
+        echo "CSV patched, waiting for OLM to process and trigger rollout..."
+        sleep 30
+        oc rollout status deployment/sbr-operator-controller-manager \
+          -n "$OPERATOR_NAMESPACE" --timeout=120s
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      - env: SBR_AGENT_IMAGE
+        name: sbr-agent
       env:
       - name: OPERATOR_NAMESPACE
-      - name: OPERATOR_RELEASED_VERSION
       from: src
       resources:
         requests:
@@ -71,33 +97,7 @@ tests:
         unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
 
         make setup-odf-storage
-        make run-setup-odf-storage-retry
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: upgrade-operator-latest
-      cli: latest
-      commands: |
-        BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
-
-        # Inject CI-built agent image into the CSV so OLM propagates it to the deployment
-        CSV_NAME=$(oc get csv -n "$OPERATOR_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
-        oc -n "$OPERATOR_NAMESPACE" patch csv "$CSV_NAME" --type=json -p '[
-          {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_SBR_AGENT","value":"'"${SBR_AGENT_IMAGE}"'"}}
-        ]'
-        echo "CSV patched, waiting for OLM to process and trigger rollout..."
-        sleep 30
-        oc rollout status deployment/sbd-operator-controller-manager \
-          -n "$OPERATOR_NAMESPACE" --timeout=120s
-      dependencies:
-      - env: OO_BUNDLE
-        name: my-bundle
-      - env: SBR_AGENT_IMAGE
-        name: sbd-agent
-      env:
-      - name: OPERATOR_NAMESPACE
+        ODF_SUBSCRIPTION_CHANNEL="stable-4.20" make run-setup-odf-storage-retry
       from: src
       resources:
         requests:

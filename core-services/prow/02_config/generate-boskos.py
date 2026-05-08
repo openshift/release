@@ -66,9 +66,6 @@ CONFIG = {
     'aws-sd-qe-quota-slice': {
         'us-west-2': 10,
     },
-    'aws-outpost-quota-slice': {
-        'us-east-1': 10,
-    },
     'aws-outpost-qe-quota-slice': {
         'us-east-1': 5,
     },
@@ -267,6 +264,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'azure-perfscale-qe-quota-slice': {
+        'centralus': 6,
+   },
     'aro-classic-int-quota-slice': {
         'default': 1,
     },
@@ -289,6 +289,12 @@ CONFIG = {
         'default': 15,
     },
     'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-cspr-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
@@ -471,7 +477,7 @@ CONFIG = {
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
     'powervs-multi-1-quota-slice': {
-        'wdc06': 2,
+        'lon04': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 40,
@@ -485,11 +491,8 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
-    'ibmcloud-gpu-quota-slice': {
-        'us-east': 10,
-    },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'us-east': 3,
+        'lon04': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -880,7 +883,7 @@ def generate_config():
 def print_cluster_profile_set_details():
     # Do not dump the following cps. Useful when a new profile is about to be introduced
     # and it is not fully defined yet.
-    ignore_list = ["openshift-org-gcp"]
+    ignore_list = []
     cps = {}
     for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
         if not cps_name in ignore_list:

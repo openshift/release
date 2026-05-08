@@ -23,6 +23,8 @@ promotion:
       console-tests: src
     name: 4.23-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -82,11 +84,17 @@ tests:
 - as: e2e-gcp-console
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
       dependencies:
       - env: CYPRESS_PLUGIN_PULL_SPEC
         name: console-plugin-demo

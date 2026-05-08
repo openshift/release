@@ -16,6 +16,12 @@ else
     SCANNER_ARGS="--all-pods"
 fi
 
+# Enable post-quantum cryptography checks when requested by the step ref.
+if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+    SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
+    echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
+fi
+
 mkdir -p "${SCANNER_ARTIFACT_DIR}"
 
 echo "=== TLS Scanner ==="
@@ -67,7 +73,7 @@ spec:
         --csv-file /results/results.csv \
         --junit-file /results/junit_tls_scan.xml \
         --log-file /results/scan.log 2>&1 | tee /results/output.log
-      echo "Scan complete. Exit code: \$?"
+      echo "Scan complete. Exit code: \$?" | tee -a /results/output.log
       # Keep pod alive for artifact collection
       sleep 120
     resources:
@@ -96,30 +102,43 @@ oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m || 
     exit 1
 }
 
-echo "Waiting for scan to complete..."
-# Poll logs until scan completes (don't use -f which waits for container exit)
+echo "Streaming scanner logs (live)..."
+oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
+LOGS_PID=$!
+
+echo "Waiting for scan to finish (pod stays alive 120s after scan for artifact collection)..."
 while true; do
-    if oc logs pod/tls-scanner -n "${NAMESPACE}" 2>/dev/null | grep -q "Scan complete"; then
+    phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    echo "Poll: phase=${phase}"
+    # Sentinel check first — must copy artifacts while pod is still running.
+    if oc exec pod/tls-scanner -n "${NAMESPACE}" -- grep -q "Scan complete" /results/output.log 2>/dev/null; then
+        echo "Sentinel found in /results/output.log — proceeding to copy artifacts"
         break
     fi
-    # Show progress
-    echo "  Scan still running..."
-    sleep 30
+    # Fallback: pod already exited (sleep window expired or crash).
+    if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+        echo "Warning: pod ${phase} before artifact collection — oc cp will likely fail"
+        break
+    fi
+    sleep 15
 done
 
-echo "Scan completed. Fetching full logs..."
-oc logs pod/tls-scanner -n "${NAMESPACE}" || true
-
-echo "Copying artifacts (container still alive in sleep phase)..."
+echo "Copying artifacts..."
 oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
 
-# Copy JUnit XML to root artifact dir for Spyglass (pattern: artifacts/junit*.xml)
 if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
     cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
     echo "JUnit results copied to ${ARTIFACT_DIR}/junit_tls_scan.xml for Spyglass"
 fi
 
-# Wait for pod to complete
+wait $LOGS_PID 2>/dev/null || true
+
+if [[ "$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null)" == "Failed" ]]; then
+    echo "Scanner pod failed"
+    oc describe pod/tls-scanner -n "${NAMESPACE}"
+    exit 1
+fi
+
 oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
     echo "Scanner did not complete successfully"
     oc describe pod/tls-scanner -n "${NAMESPACE}"

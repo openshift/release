@@ -47,6 +47,11 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+CLUSTER_SWITCH="--classic"
+if [[ "$HOSTED_CP" == "true" ]]; then
+   CLUSTER_SWITCH="--hosted-cp"
+fi
+
 # Support to create the account-roles with the higher version
 VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
@@ -67,24 +72,13 @@ if [[ "$CHANNEL_GROUP" != "stable" ]]; then
 
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
 
-  # Verify the version has published policies. If not, fall back to the latest
-  # available version. This handles cases where nightly builds for unreleased
-  # versions (e.g., 4.23, 5.0) don't have IAM policies published yet.
-  if ! rosa list account-roles --output json 2>/dev/null | jq -e --arg v "${OPENSHIFT_VERSION}" '.[] | select(.Version // "" | startswith($v))' > /dev/null 2>&1; then
-    echo "Version ${OPENSHIFT_VERSION} may not have published policies, checking available versions..."
-    available_version=$(rosa list versions --channel-group ${CHANNEL_GROUP} ${CLUSTER_SWITCH} -o json 2>/dev/null | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1)
-    if [[ -n "${available_version}" ]]; then
-      echo "Falling back from ${OPENSHIFT_VERSION} to ${available_version}"
-      OPENSHIFT_VERSION="${available_version}"
-    fi
+  # Determine cluster type switch early so the version fallback can use it
+  CLUSTER_SWITCH="--classic"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    CLUSTER_SWITCH="--hosted-cp"
   fi
 
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-fi
-
-CLUSTER_SWITCH="--classic"
-if [[ "$HOSTED_CP" == "true" ]]; then
-   CLUSTER_SWITCH="--hosted-cp"
 fi
 
 ARN_PATH_SWITCH=""
@@ -97,16 +91,54 @@ if [[ ! -z "$PERMISSIONS_BOUNDARY" ]]; then
    PERMISSIONS_BOUNDARY_SWITCH="--permissions-boundary ${PERMISSIONS_BOUNDARY}"
 fi
 
-# Whatever the account roles with the prefix exist or not, do creation.
+# Create account roles, falling back to latest available version if target lacks published policies
 echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
 echo "rosa create account-roles -y --mode auto --prefix ${ACCOUNT_ROLES_PREFIX} ${CLUSTER_SWITCH} ${VERSION_SWITCH} ${ARN_PATH_SWITCH}"
+
+create_ret=0
 rosa create account-roles -y --mode auto \
                           --prefix ${ACCOUNT_ROLES_PREFIX} \
                           ${CLUSTER_SWITCH} \
                           ${VERSION_SWITCH} \
                           ${ARN_PATH_SWITCH} \
                           ${PERMISSIONS_BOUNDARY_SWITCH} \
-                          | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+                          | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" \
+  || create_ret=$?
+
+if [[ "${create_ret}" -ne 0 && "${CHANNEL_GROUP}" == "stable" ]]; then
+  echo "ERROR: Account role creation failed (exit ${create_ret}) on stable channel-group"
+  exit "${create_ret}"
+elif [[ "${create_ret}" -ne 0 ]]; then
+  echo "Account role creation failed (exit ${create_ret}). Falling back to latest available version in channel-group ${CHANNEL_GROUP}..."
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" ${CLUSTER_SWITCH} -o json 2>/dev/null \
+      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  else
+    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json 2>/dev/null \
+      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  fi
+  if [[ -n "${fallback_version}" && "${fallback_version}" != "${OPENSHIFT_VERSION}" ]]; then
+    echo "Retrying with version ${fallback_version} (was ${OPENSHIFT_VERSION})"
+    OPENSHIFT_VERSION="${fallback_version}"
+    VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
+    rosa create account-roles -y --mode auto \
+                              --prefix ${ACCOUNT_ROLES_PREFIX} \
+                              ${CLUSTER_SWITCH} \
+                              ${VERSION_SWITCH} \
+                              ${ARN_PATH_SWITCH} \
+                              ${PERMISSIONS_BOUNDARY_SWITCH} \
+                              | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+  else
+    echo "ERROR: No fallback version available in channel-group ${CHANNEL_GROUP}"
+    exit 1
+  fi
+fi
+
+# Share the resolved version (includes fallback if one was used)
+if [[ "${CHANNEL_GROUP}" != "stable" && -n "${OPENSHIFT_VERSION:-}" ]]; then
+  echo -n "${OPENSHIFT_VERSION}" > "${SHARED_DIR}/openshift_version"
+  echo "Stored resolved version ${OPENSHIFT_VERSION} to SHARED_DIR"
+fi
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"

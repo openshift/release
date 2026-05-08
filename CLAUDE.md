@@ -37,6 +37,15 @@ Search the step-registry (4,400+ reusable CI components) to find existing steps,
 
 **Always use `/step-finder` before creating new step-registry components to avoid duplication.**
 
+### `/test-repo-files` - Repo File URL Validation
+Validate that `core-services/release-controller/_repos/ocp-*.repo` files have correct mirror2 and CDN URLs after editing:
+
+```bash
+/test-repo-files 4.22              # Test all 4.22 repo files
+/test-repo-files ocp-4.22-rhel9    # Test a specific repo file
+/test-repo-files                   # Test all modified repo files vs main
+```
+
 See `.claude/SLASH_COMMANDS.md` for detailed documentation.
 
 ## Common Development Commands

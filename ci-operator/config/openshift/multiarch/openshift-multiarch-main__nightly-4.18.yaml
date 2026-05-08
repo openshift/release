@@ -463,36 +463,6 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi-heterogeneous
-- as: ocp-heavy-build-ovn-remote-libvirt-multi-s390x
-  capabilities:
-  - intranet
-  cron: 0 19 * * 1,3
-  steps:
-    cluster_profile: libvirt-s390x-vpn
-    dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
-    env:
-      ARCH: s390x
-      BRANCH: "4.18"
-      ETCD_DISK_SPEED: slow
-      NODE_TUNING: "true"
-      TEST_TYPE: heavy-build
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-vpn
-- as: ocp-heavy-build-ovn-remote-libvirt-multi-z-z
-  capabilities:
-  - intranet
-  cron: 0 19 * * 2,4
-  steps:
-    cluster_profile: libvirt-s390x-vpn
-    env:
-      ARCH: s390x
-      BRANCH: "4.18"
-      ETCD_DISK_SPEED: slow
-      NODE_TUNING: "true"
-      TEST_TYPE: heavy-build
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
@@ -635,7 +605,7 @@ tests:
   - sshd-bastion
   cron: 0 7 * * *
   steps:
-    cluster_profile: powervs-7
+    cluster_profile: powervs-6
     env:
       ARCH: ppc64le
       BRANCH: "4.18"
@@ -681,7 +651,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-a-a
   cron: 49 14 17 4 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
@@ -689,7 +659,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   cron: 55 8 15 5 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
@@ -698,10 +668,11 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-x-ax
   cron: 9 23 19 11 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2
+      COMPUTE_NODE_REPLICAS: "2"
       OCP_ARCH: amd64
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
@@ -721,7 +692,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-day-0-a-x
   cron: 39 9 23 2 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -741,10 +712,11 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   cron: 7 19 11 11 *
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2
+      COMPUTE_NODE_REPLICAS: "2"
       OCP_ARCH: amd64
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-gcp-heterogeneous

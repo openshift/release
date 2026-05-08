@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.5.5
+    tag: stackrox-ui-test-stable
 resources:
   '*':
     requests:
@@ -101,7 +101,18 @@ tests:
       OCP_VERSION: ocp/candidate-4.21
       TEST_SUITE: ocp-nongroovy-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
+- always_run: false
+  as: vm-scanning-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate-4.21
+      TEST_SUITE: ocp-vm-scanning-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 7h0m0s
 - as: merge-qa-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -110,6 +121,7 @@ tests:
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-operator-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -117,6 +129,7 @@ tests:
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-scanner-v4-install-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -125,6 +138,7 @@ tests:
       TEST_SUITE: ocp-scanner-v4-install-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-ui-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -133,6 +147,7 @@ tests:
       TEST_SUITE: ocp-ui-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-nongroovy-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -141,6 +156,7 @@ tests:
       TEST_SUITE: ocp-nongroovy-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-compliance-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
