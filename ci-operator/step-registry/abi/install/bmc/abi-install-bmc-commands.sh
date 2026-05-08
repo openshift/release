@@ -185,7 +185,8 @@ sshEOF
                         -d '{
                             "InitializeType": "Slow",
                             "@Redfish.OperationApplyTime": "OnReset"
-                        }' -o /dev/null -w '%header{location}'
+                        }' -o /dev/null -D - |
+                    sed -nE 's/^[Ll]ocation: ([^\r]*)\r?$/\1/p;T;q'
                 )" || true
                 jobId="${jobId##*/}"
                 [ -n "${jobId}" ] && jobIds+=("${jobId}") && continue
@@ -194,7 +195,8 @@ sshEOF
                     jobId="$(
                         RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
                             "${driveEP#/redfish/v1/}/Actions/Drive.SecureErase" \
-                            -d '{}' -o /dev/null -w '%header{location}'
+                            -d '{}' -o /dev/null -D - |
+                        sed -nE 's/^[Ll]ocation: ([^\r]*)\r?$/\1/p;T;q'
                     )" || true
                     jobId="${jobId##*/}"
                     [ -n "${jobId}" ] && jobIds+=("${jobId}")
