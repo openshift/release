@@ -3,8 +3,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source ci-operator/step-registry/aro-hcp/lease/common/aro-hcp-lease-common-commands.sh
-aro_hcp_lease::source_env_exports
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
+    export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
+fi
+
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ -f "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
+fi
+
+: "${LOCATION:?LOCATION must be set directly, via Gangway override, or by runtime slot export file}"
 
 export AZURE_TOKEN_CREDENTIALS=prod
 

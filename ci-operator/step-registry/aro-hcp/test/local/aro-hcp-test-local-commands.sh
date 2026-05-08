@@ -3,8 +3,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source ci-operator/step-registry/aro-hcp/lease/common/aro-hcp-lease-common-commands.sh
-aro_hcp_lease::source_env_exports
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ ! -f "${env_file}" ]]; then
+    printf 'Missing runtime lease export file: %s\n' "${env_file}" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${env_file}"
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 

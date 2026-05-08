@@ -36,6 +36,27 @@ ref:
     - name: ARO_HCP_DEPLOY_ENV
       default: ""
       documentation: Config environment name (prow, ci01, int, stg, prod).
+    - name: ARO_HCP_SLOT_MANAGER_GIT_REF
+      default: ""
+      documentation: |-
+        Temporary opt-in override for release-side rehearsals. When set,
+        the lease step fetches this ref from github.com/Azure/ARO-HCP and
+        runs `slot-manager` via `go run` instead of the built binary.
+        Normal ARO-HCP PR jobs should leave this unset because the
+        `aro-hcp-e2e-tests` image is already built from the PR source.
+    - name: ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE
+      default: ""
+      documentation: |-
+        Optional override for `slot-manager acquire --max-wait-for-lease`.
+        Leave unset to use the binary default (currently 30m). Set to `0s`
+        to wait forever after a full exhausted pass across all candidate pools.
+    - name: ARO_HCP_SLOT_MANAGER_LEASE_WAIT_INTERVAL
+      default: ""
+      documentation: |-
+        Optional override for `slot-manager acquire --lease-wait-interval`.
+        Leave unset to use the binary default (currently 1m). This controls
+        the delay between retries after a full exhausted pass across all
+        candidate pools.
   documentation: |-
     Acquire the runtime Boskos leases required by ARO HCP E2E workflows and
     persist the runtime slot env contract into SHARED_DIR for later steps.
