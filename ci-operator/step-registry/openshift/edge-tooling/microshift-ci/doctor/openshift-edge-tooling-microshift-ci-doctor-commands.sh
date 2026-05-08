@@ -76,20 +76,7 @@ load_secrets() {
 
     echo "Loading secrets..."
     if [ -f "${GITHUB_APP_ID_PATH}" ] && [ -f "${GITHUB_KEY_PATH}" ]; then
-        local -r app_ver="2.0.8"
-        local -r app_sha="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
-        local -r app_exe="/tmp/gh-token-${app_ver}"
-
-        curl -sSL \
-            "https://github.com/Link-/gh-token/releases/download/v${app_ver}/linux-amd64" \
-            -o "${app_exe}"
-        if ! echo "${app_sha}  ${app_exe}" | sha256sum -c -; then
-            echo "ERROR: Failed to verify GitHub CLI extension checksum"
-            return 1
-        fi
-        chmod +x "${app_exe}"
-
-        GITHUB_APP_JWT="$("${app_exe}" generate \
+        GITHUB_APP_JWT="$(gh-token generate \
             --app-id "$(< "${GITHUB_APP_ID_PATH}")" \
             --key "${GITHUB_KEY_PATH}" \
             --jwt \
@@ -98,17 +85,10 @@ load_secrets() {
             echo "ERROR: Failed to generate GitHub App JWT"
             return 1
         fi
-        rm -f "${app_exe}"
 
         GITHUB_TOKEN_USHIFT="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
         if [ -z "${GITHUB_TOKEN_USHIFT}" ] || [ "${GITHUB_TOKEN_USHIFT}" = "null" ]; then
             echo "ERROR: Failed to generate installation access token for openshift/microshift"
-            return 1
-        fi
-
-        GITHUB_TOKEN_EDGE="$(github_app_token "${GITHUB_APP_JWT}" openshift-eng/edge-tooling)"
-        if [ -z "${GITHUB_TOKEN_EDGE}" ] || [ "${GITHUB_TOKEN_EDGE}" = "null" ]; then
-            echo "ERROR: Failed to generate installation access token for openshift-eng/edge-tooling"
             return 1
         fi
 
@@ -191,9 +171,7 @@ configure_claude() {
       "Read(//tmp/**)",
       "Write(//tmp/**)",
       "Bash(bash plugins/microshift-ci/scripts/*)",
-      "Bash(bash /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
-      "Bash(python3 /tmp/edge-tooling/plugins/microshift-ci/scripts/*)",
       "Skill(microshift-ci:create-bugs)",
       "Skill(microshift-ci:doctor)",
       "Skill(microshift-ci:prow-job)",
@@ -243,15 +221,12 @@ load_secrets
 install_prerequisites
 configure_claude
 
-# Clone the edge-tooling repository from the main branch to get the latest
-# microshift-ci skills and run analysis on all releases and open pull requests
-SRC_DIR="/tmp/edge-tooling"
+# Use the edge-tooling source pre-installed in the image
+SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
-{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_EDGE}"; set -x; }
-gh repo clone openshift-eng/edge-tooling "${SRC_DIR}" -- --branch main
 cd "${SRC_DIR}"
 
-# The rest of the script runs with the MicroShift GitHub token
+# Configure the GitHub token for MicroShift repo operations
 { set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
 
 # Run analysis on all releases and open rebase PRs.
