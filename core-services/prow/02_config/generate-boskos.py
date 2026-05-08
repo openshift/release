@@ -465,9 +465,7 @@ CONFIG = {
         'syd04': 1,
         'syd05': 1,
     },
-    'powervs-3-quota-slice': {
-        'dal10': 1,
-    },
+    'powervs-3-quota-slice': {},
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
@@ -730,6 +728,9 @@ for i in range(0,2):
 
 for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-3-quota-slice']['dal10-powervs-3-quota-slice-{}'.format(i)] = 1
 
 for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
