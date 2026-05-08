@@ -166,7 +166,7 @@ sshEOF
               (0)   break ;;
               (193) exit ${es} ;;
               (255)
-                rgx='\bPermission denied (.*\bpublickey\b.*)'
+                rgx='\bPermission denied \(.*\bpublickey\b.*\)'
                 [[ "${stdErr}" =~ ${rgx} ]] && exit 255
                 ;;
             esac
