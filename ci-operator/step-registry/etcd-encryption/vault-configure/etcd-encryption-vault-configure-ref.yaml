@@ -1,0 +1,45 @@
+ref:
+  as: etcd-encryption-vault-configure
+  from: cli
+  commands: etcd-encryption-vault-configure-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_NAMESPACE
+    default: "vault-kms"
+    documentation: |-
+      Namespace where Vault Enterprise is installed.
+  - name: VAULT_KMS_KEY_NAME
+    default: "kms-key"
+    documentation: |-
+      Name of the transit encryption key to create in Vault for KMS encryption.
+      This key will be used by the Kubernetes API server for encrypting secrets.
+  documentation: |-
+    Configures an already-installed Vault instance for Kubernetes KMS encryption.
+
+    This step should run after etcd-encryption-vault-install.
+
+    Configuration steps:
+    - Checks if Vault is already initialized
+    - Initializes Vault (if needed)
+    - Unseals Vault
+    - Enables transit secret engine
+    - Creates transit encryption key (name: ${VAULT_KMS_KEY_NAME})
+    - Enables AppRole authentication
+    - Creates KMS policy with encrypt/decrypt permissions
+    - Creates AppRole role (kms-plugin)
+    - Retrieves AppRole credentials
+    - Stores credentials in vault-credentials secret
+
+    Prerequisites:
+    - Vault must be installed and pods Ready (run etcd-encryption-vault-install first)
+    - OpenShift cluster with vault-0 pod running in ${VAULT_NAMESPACE}
+
+    Outputs:
+    - Credentials stored in: vault-credentials secret (namespace: ${VAULT_NAMESPACE})
+      * role-id: AppRole role ID
+      * secret-id: AppRole secret ID
+      * root-token: Vault root token
+      * unseal-key: Vault unseal key

@@ -1,0 +1,53 @@
+ref:
+  as: etcd-encryption-vault-install
+  from: cli
+  commands: etcd-encryption-vault-install-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: tests-private-account
+    mount_path: /var/run/vault/tests-private-account
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_VERSION
+    default: "2.0.0-ent"
+    documentation: |-
+      Version of Vault Enterprise to install via Helm.
+      Check https://hub.docker.com/r/hashicorp/vault-enterprise/tags for available versions.
+  - name: VAULT_CHART_VERSION
+    default: "0.28.1"
+    documentation: |-
+      Version of the Vault Helm chart to use.
+      Check https://github.com/hashicorp/vault-helm/releases for available versions.
+  - name: VAULT_NAMESPACE
+    default: "vault-kms"
+    documentation: |-
+      Namespace where Vault Enterprise will be installed.
+  - name: VAULT_IMAGE_REPOSITORY
+    default: "docker.io/hashicorp/vault-enterprise"
+    documentation: |-
+      Container image repository for Vault Enterprise.
+  documentation: |-
+    Installs HashiCorp Vault Enterprise via Helm.
+
+    This step:
+    - Installs Helm if not present
+    - Adds HashiCorp Helm repository
+    - Creates vault namespace with appropriate SCC (restricted)
+    - Creates vault-license secret from mounted credential (if available)
+    - Installs Vault Enterprise using Helm chart
+    - Waits for Vault pod to be ready
+
+    Prerequisites:
+    - OpenShift cluster with adequate resources
+    - Vault Enterprise license secret named 'tests-private-account' in test-credentials namespace
+      (automatically mounted at /var/run/vault/tests-private-account/)
+
+    Outputs:
+    - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
+    - Vault pod: vault-0 (Ready state)
+
+    Next step:
+    - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS
