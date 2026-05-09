@@ -9,6 +9,9 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
+CLAUDE_ANALYSIS_LOG="${WORKDIR}/claude-analysis.log"
+CLAUDE_BUG_CREATION_LOG="${WORKDIR}/claude-bug-creation.log"
+
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
@@ -16,6 +19,7 @@ atexit_handler() {
         find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -maxdepth 1 -name "*.log"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
@@ -27,7 +31,7 @@ atexit_handler() {
         fi
     fi
 
-    # Check if the report was produced
+    # Check if the HTML report was produced
     if ls "${WORKDIR}"/*.html &>/dev/null; then
         touch "${SHARED_DIR}/claude-report-available"
         echo "Analysis complete"
@@ -36,14 +40,28 @@ atexit_handler() {
         return 1
     fi
 
-    # Check if the Claude session completed successfully
-    local result_line
-    result_line=$(grep '"type":"result"' "${WORKDIR}/claude-output.log" | tail -1)
-    if ! echo "$result_line" | grep -q '"subtype":"success"' ||
-       ! echo "$result_line" | grep -q '"is_error":false'; then
-        echo "ERROR: Claude session did not complete successfully"
-        return 1
-    fi
+    # Check if the Claude sessions were completed successfully
+    for log_file in "${CLAUDE_ANALYSIS_LOG}" "${CLAUDE_BUG_CREATION_LOG}"; do
+        # If a session was terminated due to a timeout, report lack of
+        # subsequent session log files as a warning and continue not
+        # to mask the actual error
+        if [ ! -f "${log_file}" ]; then
+            echo "WARNING: Log file '${log_file}' not found"
+            continue
+        fi
+
+        local result_line
+        result_line="$(grep '"type":"result"' "${log_file}" | tail -1 || true)"
+        if [[ -z "${result_line}" ]]; then
+            echo "ERROR: No Claude result event found in '${log_file}'"
+            return 1
+        fi
+        if ! echo "$result_line" | grep -q '"subtype":"success"' ||
+           ! echo "$result_line" | grep -q '"is_error":false'; then
+            echo "ERROR: Claude session in '${log_file}' did not complete successfully"
+            return 1
+        fi
+    done
 }
 
 github_app_token() {
@@ -232,13 +250,26 @@ cd "${SRC_DIR}"
 # Run analysis on all releases and open rebase PRs.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-timeout 3600 claude \
+timeout 3000 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${WORKDIR}/claude-output.log"
+    --verbose 2>&1 | tee "${CLAUDE_ANALYSIS_LOG}"
+echo "Analysis for MicroShift CI jobs and pull requests completed"
+
+# Run bug creation for failed jobs (dry-run mode).
+# Time-box bug creation and limit turns to avoid uncontrolled billable minutes.
+echo "Running Claude to create bugs for failed jobs..."
+timeout 600 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 50 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS}" \
+    --verbose 2>&1 | tee "${CLAUDE_BUG_CREATION_LOG}"
+echo "Bug creation for failed jobs completed"
 
 # After the analysis, attempt to restart failed rebase PRs tests. If the
 # restarted tests complete successfully, the PR will be automatically
