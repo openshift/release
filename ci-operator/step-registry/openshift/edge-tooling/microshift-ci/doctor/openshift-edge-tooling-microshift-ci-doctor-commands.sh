@@ -51,7 +51,11 @@ atexit_handler() {
         fi
 
         local result_line
-        result_line=$(grep '"type":"result"' "${log_file}" | tail -1)
+        result_line="$(grep '"type":"result"' "${log_file}" | tail -1 || true)"
+        if [[ -z "${result_line}" ]]; then
+            echo "ERROR: No Claude result event found in '${log_file}'"
+            return 1
+        fi
         if ! echo "$result_line" | grep -q '"subtype":"success"' ||
            ! echo "$result_line" | grep -q '"is_error":false'; then
             echo "ERROR: Claude session in '${log_file}' did not complete successfully"
