@@ -14,25 +14,16 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_path: images/Containerfile.tooling
-    from: root
-    to: gh-token
   - dockerfile_path: images/Containerfile.markdownlint
     from: root
     to: markdownlint-cli2
   - dockerfile_path: images/Containerfile.ci
     from: claude-ai-helpers
-    inputs:
-      gh-token:
-        paths:
-        - destination_dir: ghtoken
-          source_path: /usr/local/bin/gh-token
     to: edge-tooling-ai-helpers
 promotion:
   to:
   - additional_images:
       edge-tooling-ai-helpers: edge-tooling-ai-helpers
-      gh-token: gh-token
       markdownlint-cli2: markdownlint-cli2
     excluded_images:
     - '*'
@@ -48,11 +39,13 @@ tests:
   as: markdownlint
   commands: make lint-markdown
   container:
+    clone: true
     from: markdownlint-cli2
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
 - as: shellcheck
   commands: make lint-shellcheck
   container:
+    clone: true
     from: shellcheck
   run_if_changed: .sh$
 - as: ocp-ci-monitor
