@@ -1,0 +1,36 @@
+ref:
+  as: osac-project-edge04-test
+  from: dev-scripts
+  dependencies:
+  - name: osac-test-infra
+    env: OSAC_TEST_IMAGE
+  grace_period: 10m
+  timeout: 3h0m0s
+  commands: osac-project-edge04-test-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: edge04key
+    mount_path: /tmp/secrets/edge04
+  env:
+  - name: EDGE04_HOST
+    default: "edge-04.edge.lab.eng.rdu2.redhat.com"
+    documentation: The edge-04 baremetal host to run tests on
+  - name: EDGE04_USER
+    default: "root"
+    documentation: SSH user for edge-04
+  - name: E2E_NAMESPACE
+    default: "osac-e2e-ci"
+    documentation: The namespace to use for the e2e tests
+  - name: E2E_VM_TEMPLATE
+    default: "osac.templates.ocp_virt_vm"
+    documentation: The VM template to use for the e2e tests
+  - name: E2E_CLUSTER_TEMPLATE
+    default: "osac.templates.ocp_4_17_small"
+    documentation: The cluster template to use for CaaS e2e tests
+  documentation: |-
+    Runs the full vmaas test suite on a persistent edge-04 baremetal host via SSH,
+    without provisioning a new cluster. All tests run sequentially in a single environment.
