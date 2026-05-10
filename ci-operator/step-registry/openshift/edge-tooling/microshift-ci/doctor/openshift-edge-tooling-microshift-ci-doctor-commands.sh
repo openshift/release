@@ -132,23 +132,6 @@ load_secrets() {
     fi
 }
 
-install_prerequisites() {
-    # Export the PATH to include the local bin directory
-    export PATH="${HOME}/.local/bin:${PATH}"
-
-    echo "Installing gcloud CLI..."
-    curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
-    /tmp/google-cloud-sdk/install.sh --quiet --path-update true
-    export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
-    echo "gcloud CLI installed."
-
-    echo "Installing Python package dependencies..."
-    pip install --user \
-        'uv==0.11.6' \
-        'matplotlib==3.9.4'
-    echo "Python package dependencies installed."
-}
-
 wait_for_mcp_status() {
     local -r service="$1"
     local -r status="$2"
@@ -236,7 +219,6 @@ fi
 trap atexit_handler EXIT TERM INT
 
 load_secrets
-install_prerequisites
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image

@@ -14,65 +14,17 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_literal: |
-      FROM root
-      ARG GH_TOKEN_VER=2.0.8
-      ARG GH_TOKEN_SHA=867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f
-      RUN set -eu; \
-            f=/tmp/gh-token.download; rm -f "$f"; \
-            n=1; max=5; delay=1; \
-            until curl -sSL --fail --connect-timeout 10 --max-time 120 \
-              --retry 3 --retry-delay 2 \
-              "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" \
-              -o "$f"; do \
-              rm -f "$f"; \
-              [ "$n" -ge "$max" ] && exit 1; \
-              sleep "$delay"; \
-              delay=$((delay * 2)); \
-              n=$((n+1)); \
-            done; \
-            echo "${GH_TOKEN_SHA}  $f" | sha256sum -c -; \
-            install -m 0755 "$f" /usr/local/bin/gh-token; \
-            rm -f "$f"
+  - dockerfile_path: images/Containerfile.markdownlint
     from: root
-    to: gh-token
-  - dockerfile_literal: |
-      FROM src
-      USER 0:0
-      COPY ghtoken/gh-token /usr/local/bin/gh-token
-      RUN chmod +x /usr/local/bin/gh-token
-      COPY . /opt/app-root/src/
-      WORKDIR /opt/app-root/src/
-    from: src
-    inputs:
-      gh-token:
-        paths:
-        - destination_dir: ghtoken
-          source_path: /usr/local/bin/gh-token
-    to: edge-tooling
-  - dockerfile_literal: |
-      FROM pipeline:claude-ai-helpers
-      USER 0:0
-      COPY ghtoken/gh-token /usr/local/bin/gh-token
-      RUN chmod +x /usr/local/bin/gh-token
-      COPY repo/ /opt/app-root/src/edge-tooling
-      ENV EDGE_TOOLING_DIR=/opt/app-root/src/edge-tooling
-      WORKDIR /opt/app-root/src/edge-tooling
+    to: markdownlint-cli2
+  - dockerfile_path: images/Containerfile.ci
     from: claude-ai-helpers
-    inputs:
-      gh-token:
-        paths:
-        - destination_dir: ghtoken
-          source_path: /usr/local/bin/gh-token
-      src:
-        paths:
-        - destination_dir: repo
-          source_path: /go/src/github.com/openshift-eng/edge-tooling/.
     to: edge-tooling-ai-helpers
 promotion:
   to:
   - additional_images:
-      gh-token: gh-token
+      edge-tooling-ai-helpers: edge-tooling-ai-helpers
+      markdownlint-cli2: markdownlint-cli2
     excluded_images:
     - '*'
     namespace: ci
@@ -82,34 +34,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |-
-  dnf -y module reset nodejs || true
-  dnf -y module enable nodejs:20
-  dnf -y install nodejs
-
-  npm install -g \
-  markdownlint@v0.40.0 \
-  markdownlint-cli2@v0.22.1 \
-  markdownlint-cli2-formatter-json \
-  markdownlint-cli2-formatter-pretty \
-  markdownlint-cli2-formatter-junit
 tests:
 - always_run: false
   as: markdownlint
-  commands: |
-    set +e
-    make lint-markdown
-    rc=$?
-    if [[ -n "${ARTIFACT_DIR:-}" && -f markdownlint-cli2-junit.xml ]]; then
-      cp -f markdownlint-cli2-junit.xml "${ARTIFACT_DIR}/"
-    fi
-    exit "${rc}"
+  commands: make lint-markdown
   container:
-    from: test-bin
+    clone: true
+    from: markdownlint-cli2
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
 - as: shellcheck
   commands: make lint-shellcheck
   container:
+    clone: true
     from: shellcheck
   run_if_changed: .sh$
 - as: ocp-ci-monitor
