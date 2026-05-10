@@ -1,0 +1,50 @@
+ref:
+  as: baremetalds-two-node-fencing-assisted-setup
+  from: two-node-toolbox
+  grace_period: 10m
+  timeout: 120m
+  commands: baremetalds-two-node-fencing-assisted-setup-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: SPOKE_CLUSTER_NAME
+    default: "spoke-tnf"
+    documentation: |-
+      Name of the spoke TNF cluster to deploy via assisted installer.
+  - name: SPOKE_BASE_DOMAIN
+    default: "metalkube.org"
+    documentation: |-
+      Base domain for the spoke cluster. Must match a domain in the squid
+      proxy ACL (e.g., metalkube.org) for test steps to access the spoke API.
+  - name: HUB_OPERATOR
+    default: "acm"
+    documentation: |-
+      Hub operator to install: "acm" (Advanced Cluster Management) or "mce"
+      (MultiCluster Engine).
+  - name: SPOKE_VM_MEMORY
+    default: "32768"
+    documentation: |-
+      Memory in MB for each spoke VM.
+  - name: SPOKE_VM_VCPUS
+    default: "4"
+    documentation: |-
+      Number of vCPUs for each spoke VM.
+  - name: SPOKE_VM_DISK_SIZE
+    default: "120"
+    documentation: |-
+      Disk size in GB for each spoke VM.
+  - name: FORCE_CLEANUP
+    default: "false"
+    documentation: |-
+      When "true", force cleanup of existing spoke resources before deployment.
+  documentation: |-
+    Deploys a spoke TNF cluster on an existing hub using two-node-toolbox's
+    assisted-install.yml playbook. Requires a hub cluster already deployed via
+    baremetalds-devscripts-setup (from baremetalds-ofcir-pre chain).
+    SSHs into the OFCIR host, generates CI config, then runs the playbook
+    remotely. The playbook installs ACM on the hub, creates spoke VMs via
+    libvirt, and deploys a 2-node spoke cluster via assisted installer.
+    Spoke kubeconfig replaces SHARED_DIR/kubeconfig so downstream test steps
+    target the spoke cluster.
