@@ -1,8 +1,7 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euxo pipefail
+shopt -s inherit_errexit
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
@@ -16,9 +15,8 @@ OCS_VERSION=$(
     ' | cut -d. -f1,2
 ) || true
 if [[ -z "${OCS_VERSION}" ]]; then
-    echo "ERROR: OCS_VERSION not set or CSV lookup failed."
-    echo "Available CSVs in openshift-storage:"
-    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || echo "  (namespace may not exist)"
+    # ERROR: OCS_VERSION not set or CSV lookup failed; list openshift-storage CSVs after failure (namespace may be missing).
+    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || true
     exit 1
 fi
 
@@ -32,17 +30,17 @@ export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
 # Function to clean up folders
 cleanup() {
-    echo "Cleaning up..."
-    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -fvr "${CLUSTER_PATH}/auth"
+    # Tear down local auth copy created for run-ci.
+    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
 
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        curl -fsSL \
-https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"; trap '
+        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    trap '
         cleanup
-        LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
     ' EXIT
 else
@@ -68,8 +66,13 @@ mkdir -p "${BIN_FOLDER}"
 
 export PATH="${BIN_FOLDER}:${PATH}"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+if [ -s "${KUBECONFIG}" ]; then
+    oc whoami
+    cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
+    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+else #login for ROSA & Hypershift platforms
+    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+fi
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
@@ -108,7 +111,6 @@ if [[ "${DISABLE_ENVIRONMENT_CHECKER}" == "true" ]]; then
     EXTRA_ARGS="--disable-environment-checker"
 fi
 
-set -x
 START_TIME=$(date "+%s")
 
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
@@ -123,19 +125,12 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   ${EXTRA_ARGS} \
   || /bin/true
 
-
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
-set +x
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
-    echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
-    sleep 7200
+    # ERROR: tests finished too quickly (DIFF_TIME sec <= 1800)
     exit 1
-else
-    echo "Finished in: ${DIFF_TIME} sec"
 fi
 
 #
@@ -144,3 +139,5 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
+
+true
