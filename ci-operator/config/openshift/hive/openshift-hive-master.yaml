@@ -303,7 +303,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-openstack
-- as: e2e-ote
+- as: e2e-ote-a
   cluster_claim:
     architecture: amd64
     as: unused
@@ -324,8 +324,56 @@ tests:
         export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
-        export SKIP_LONG_RUNNING_TESTS=true
         export PLATFORM=aws
+        export TEST_SHARD_INDEX=0
+        export TEST_TOTAL_SHARDS=2
+        export TEST_LIMIT=1
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+      credentials:
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
+        namespace: test-credentials
+      - mount_path: /tmp/secret/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h30m0s
+    workflow: generic-claim
+  timeout: 4h0m0s
+- as: e2e-ote-b
+  cluster_claim:
+    architecture: amd64
+    as: unused
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
+        export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
+        export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
+        export PLATFORM=aws
+        export TEST_SHARD_INDEX=1
+        export TEST_TOTAL_SHARDS=2
+        export TEST_LIMIT=1
         /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
