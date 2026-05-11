@@ -100,13 +100,22 @@ echo "Overlay: ${INSTALLER_KUSTOMIZE_OVERLAY}"
 echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo ""
 
+echo "[0/9] Waiting for AAP operator initial reconciliation (background)..."
+(retry_until 300 10 '[[ "$(oc get ansibleautomationplatform osac-aap -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Successful")].status}'"'"' 2>/dev/null)" == "True" ]]') &
+AAP_WAIT_PID=$!
+
 echo "[1/9] Deleting stale routes..."
 oc delete routes -n "${INSTALLER_NAMESPACE}" --all
 
 echo "[2/9] Applying kustomize overlay..."
 oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 
-echo "[3/9] Triggering AAP reconciliation..."
+echo "[3/9] Waiting for AAP operator to be ready, then triggering reconciliation..."
+wait ${AAP_WAIT_PID} || {
+    echo "Timed out waiting for AAP operator initial reconciliation"
+    exit 1
+}
+echo "AAP operator ready. Triggering reconciliation..."
 RECONCILE_TS=$(date +%s)
 oc annotate ansibleautomationplatform osac-aap -n "${INSTALLER_NAMESPACE}" \
     force-reconcile="${RECONCILE_TS}" --overwrite
