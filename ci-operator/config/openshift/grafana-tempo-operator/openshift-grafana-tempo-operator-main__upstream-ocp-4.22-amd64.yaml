@@ -7,6 +7,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
   upi-installer:
     name: "4.12"
     namespace: ocp
@@ -66,7 +70,7 @@ tests:
             {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      SKIP_TESTS: tests/e2e-openshift-object-stores/*
+      SLEEP_DURATION: 6h
     test:
     - as: install
       cli: latest
@@ -83,8 +87,7 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: install-operators
-    - ref: distributed-tracing-tests-tempo-upstream
-    - ref: distributed-tracing-tests-tracing-ui-integration
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
