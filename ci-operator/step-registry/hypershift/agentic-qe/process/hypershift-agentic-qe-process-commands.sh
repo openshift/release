@@ -5,10 +5,20 @@ echo "=== HyperShift Agent QE Process ==="
 
 # Management cluster kubeconfig (from pre phase)
 MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-# Guest cluster kubeconfig (from hypershift-aws-create)
+
+# Cluster name: v2 chains write cluster-name-public, v1 chains write cluster-name
+if [[ -f "${SHARED_DIR}/cluster-name-public" ]]; then
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name-public")
+else
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+fi
+
+# Guest cluster kubeconfig: generate if not present (v2 chains don't write it)
 GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-# Cluster name (from hypershift-aws-create)
-CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+if [[ ! -f "$GUEST_KUBECONFIG" ]]; then
+  echo "Generating guest cluster kubeconfig..."
+  KUBECONFIG="$MGMT_KUBECONFIG" bin/hypershift create kubeconfig --namespace=clusters --name="${CLUSTER_NAME}" > "$GUEST_KUBECONFIG"
+fi
 
 echo "Management cluster: $(KUBECONFIG=$MGMT_KUBECONFIG oc whoami --show-server)"
 echo "HostedCluster name: $CLUSTER_NAME"
