@@ -1,6 +1,9 @@
 ref:
   as: openshift-edge-tooling-gh-notifier
-  from: edge-tooling
+  from_image:
+    namespace: ci
+    name: edge-tooling-ai-helpers
+    tag: latest
   commands: openshift-edge-tooling-gh-notifier-commands.sh
   credentials:
   - namespace: test-credentials
@@ -48,10 +51,4 @@ ref:
   timeout: 30m0s
   grace_period: 5m0s
   documentation: |-
-    Runs the gh-notifier image built from openshift-eng/edge-tooling (pipeline image gh-notifier via
-    dockerfile_literal in ci-operator config), exports GitHub App and Slack credentials, and executes
-    GH_NOTIFIER_INVOKE. No runtime git clone—the src checkout is in the image; optional pip install of ./gh-notifier
-    runs at image build when pyproject.toml or setup.py exists. gh-token is installed in the image at build time.
-    After the notifier succeeds, ./gh-notifier/pr-dashboard.html is copied to
-    "${ARTIFACT_DIR}/edge-tooling-pr-summary.html" so Spyglass can show it (html lens *-summary*.html) and GCS/deck
-    can link the same path as in slack reporter templates (see ocp-ci-monitor / microshift ci-doctor patterns).
+    Runs gh-notifier a tool to notify about pull requests that need attention, see more in https://github.com/openshift-eng/edge-tooling/blob/main/gh-notifier/README.md.
