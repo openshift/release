@@ -66,7 +66,7 @@ Query the endoflife.date API (auto-scraped from Google's GKE release schedule pa
 
 List GKE test entries (`e2e-gke-*`) across RHDH release branches and inspect the long-running GKE cluster K8s version. Auto-discovers cluster name and project from `gcloud`. When upgrades are available, prints a direct GCP Console link. Unlike AKS/EKS, GKE uses a pre-existing static cluster — version upgrades are performed via the GCP Console. `make update` is not required.
 
-**Scripts**: `inspect-gke-cluster.sh [--project <id>] [--cluster <name>] [--zone <zone>]`
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`, `inspect-gke-cluster.sh [--project <id>] [--cluster <name>] [--zone <zone>]`
 
 ## New Release Branch Checklist
 

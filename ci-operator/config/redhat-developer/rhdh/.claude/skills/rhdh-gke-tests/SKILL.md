@@ -27,7 +27,7 @@ a pre-existing static cluster. Version upgrades are performed via the GCP Consol
 ## Listing Tests
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../rhdh-aks-tests/scripts/list-k8s-test-configs.sh" \
+bash "${CLAUDE_SKILL_DIR}/scripts/list-k8s-test-configs.sh" \
   --pattern "^e2e-gke-"
 ```
 
