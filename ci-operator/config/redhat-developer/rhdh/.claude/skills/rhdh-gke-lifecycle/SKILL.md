@@ -3,11 +3,11 @@ name: rhdh-gke-lifecycle
 description: >-
   Check GKE Kubernetes version support status. GKE uses a long-running static
   cluster whose version is not managed in CI config
-allowed-tools: Bash(bash *check-gke-lifecycle.sh*), Bash(gcloud *), WebFetch
+allowed-tools: Bash(bash *check-gke-lifecycle.sh*), WebFetch
 ---
 # Check GKE Kubernetes Version Lifecycle
 
-GKE uses a pre-existing long-running cluster. The K8s version is NOT in CI config — updates require running `gcloud` against the live cluster.
+GKE uses a pre-existing long-running cluster. The K8s version is NOT in CI config — updates are performed via the GCP Console.
 
 ## Prerequisites
 
@@ -24,20 +24,12 @@ bash "${CLAUDE_SKILL_DIR}/scripts/check-gke-lifecycle.sh"
 The script queries:
 - **Primary**: `https://endoflife.date/api/google-kubernetes-engine.json` — auto-scraped from Google's GKE release schedule page, shows standard/maintenance support status and EOL dates
 
-2. Cross-verify by checking the actual cluster version via the `rhdh-gke-tests` inspect script (auto-discovers cluster and project from `gcloud`):
-
-```bash
-bash "${CLAUDE_SKILL_DIR}/../rhdh-gke-tests/scripts/inspect-gke-cluster.sh"
-```
-
-3. If both fail, fall back to the vendor docs:
+2. If the API call fails, fall back to the vendor docs:
 
 ```
 WebFetch https://cloud.google.com/kubernetes-engine/docs/release-schedule
 ```
 
-Report any discrepancies between endoflife.date and the actual cluster version.
-
 ## Related Skills
 
-- **`rhdh-gke-tests`**: Inspect the GKE cluster version and list test entries
+- **`rhdh-gke-tests`**: List GKE test entries and manage the cluster version

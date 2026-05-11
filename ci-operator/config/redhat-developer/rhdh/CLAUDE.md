@@ -58,15 +58,15 @@ List EKS test entries (`e2e-eks-*`) across RHDH release branches and update the 
 
 ### `rhdh-gke-lifecycle` — Check GKE K8s version support
 
-Query the endoflife.date API (auto-scraped from Google's GKE release schedule page) for supported K8s versions with standard/maintenance status and EOL dates. Can cross-verify against the actual cluster version via `gcloud`. GKE uses a long-running static cluster whose version is not managed in CI config.
+Query the endoflife.date API (auto-scraped from Google's GKE release schedule page) for supported K8s versions with standard/maintenance status and EOL dates. GKE uses a long-running static cluster whose version is not managed in CI config.
 
 **Scripts**: `check-gke-lifecycle.sh`
 
-### `rhdh-gke-tests` — Manage GKE test entries and check the cluster version
+### `rhdh-gke-tests` — Manage GKE test entries
 
-List GKE test entries (`e2e-gke-*`) across RHDH release branches and inspect the long-running GKE cluster K8s version. Auto-discovers cluster name and project from `gcloud`. When upgrades are available, prints a direct GCP Console link. Unlike AKS/EKS, GKE uses a pre-existing static cluster — version upgrades are performed via the GCP Console. `make update` is not required.
+List GKE test entries (`e2e-gke-*`) across RHDH release branches. Unlike AKS/EKS, GKE uses a pre-existing static cluster — version upgrades are performed via the GCP Console. `make update` is not required.
 
-**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`, `inspect-gke-cluster.sh [--project <id>] [--cluster <name>] [--zone <zone>]`
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
 
 ## New Release Branch Checklist
 
