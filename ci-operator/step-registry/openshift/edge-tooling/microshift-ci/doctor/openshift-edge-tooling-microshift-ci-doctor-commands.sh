@@ -11,6 +11,7 @@ mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_ANALYSIS_LOG="${WORKDIR}/claude-analysis.log"
 CLAUDE_BUG_CREATION_LOG="${WORKDIR}/claude-bug-creation.log"
+JIRA_MCP_LOG="${WORKDIR}/jira-mcp.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
@@ -185,16 +186,18 @@ EOF
     echo "Claude permissions configured."
     cat "${CLAUDE_HOME}/settings.json"
 
-    # Configure JIRA MCP
+    # Configure JIRA MCP, redirecting stderr to the JIRA MCP log file.
+    # Set MCP_VERBOSE=true to enable verbose logging.
     if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
         echo "Configuring JIRA MCP..."
         claude mcp add \
             -e JIRA_URL="${JIRA_URL}" \
             -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
             -e JIRA_USERNAME="${JIRA_USERNAME}" \
+            -e MCP_VERBOSE=true \
             --scope user \
             --transport stdio \
-            jira -- uvx mcp-atlassian@0.21.0
+            jira -- bash -c "uvx mcp-atlassian@0.21.0 2>>${JIRA_MCP_LOG}"
 
         echo "Waiting for JIRA MCP to become available..."
         wait_for_mcp_status "jira" "Connected"
