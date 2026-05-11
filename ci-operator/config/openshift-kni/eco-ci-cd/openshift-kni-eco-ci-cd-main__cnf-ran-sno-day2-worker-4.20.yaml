@@ -39,7 +39,14 @@ tests:
           {"name":"topology-aware-lifecycle-manager","catalog":"topology-aware-lifecycle-manager-fbc","og_name":"global-operators","nsname":"openshift-operators","fbc_iib_repo":"latest","channel":"stable","deploy_default_config":false,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/telco-5g-tenant/topology-aware-lifecycle-manager-fbc-4-20"},
           {"name":"cluster-logging","catalog":"redhat-operators","nsname":"openshift-logging","channel":"stable-6.2","default_channel":"stable-6.5","og_name":"cluster-logging","subscription_name":"cluster-logging","og_spec":{"targetNamespaces":[]}}
         ]
+      JOB_NAME: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-ran-sno-day2-worker-4.20-cnf-ran-ztp-tests
+      JOB_TYPE: "1"
       MIRROR_REGISTRY: disconnected.registry.local:5000
+      RAN_METRICS_LIST: spoke_general_ocp,hub_general_ocp,sriov,sriov_fec,ptp,acm,talm,gitops,local_storage,logging
+      REPORTER_TEMPLATE_NAME: Telco 5G RAN Regression 4_20 - Telco 5G RAN Regression
+        - <build> - 4.20
+      REPORTPORTAL_FILES: .reportportal_url_Sno_Day2_Worker
+      REPORTS_PORTAL_ATTRIBUTES_ENV: ci-lane:telco-ft-ran-sno-day2-worker;spoke_ocp_version:4.20
       SPOKE_CLUSTER: '[''kni-qe-107'']'
       SPOKE_OPERATORS: |
         [
@@ -53,6 +60,11 @@ tests:
       ZTP_GIT_BRANCH: sno_day2_worker
       ZTP_GIT_BRANCH_DAY2_WORKER: sno_day2_worker_add_worker
       ZTP_GIT_REPO: https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git
+    post:
+    - ref: telcov10n-functional-cnf-ran-report-compact
+    - ref: telcov10n-functional-cnf-ran-send-slack-notification
+    - ref: telcov10n-functional-cnf-network-trigger-job
+    - ref: telcov10n-verify-junit-reports
     pre:
     - ref: telcov10n-functional-cnf-ran-hub-deploy
     - ref: telcov10n-functional-cnf-ran-hub-config
