@@ -16,8 +16,13 @@ mkdir -p "${HOME}"/.ssh
 mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
+PRIVATE_KEY_PATH="${HOME}"/.ssh/google_compute_engine
+cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${PRIVATE_KEY_PATH}"
+chmod 0600 "${PRIVATE_KEY_PATH}"
+lastchar=$(tail -c1 "${PRIVATE_KEY_PATH}")
+if [ -n "$lastchar" ]; then
+    echo >> "${PRIVATE_KEY_PATH}"
+fi
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
 
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
