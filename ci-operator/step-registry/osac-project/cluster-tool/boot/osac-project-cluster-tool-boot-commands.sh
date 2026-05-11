@@ -315,15 +315,15 @@ REMOTE_SCRIPT
 
 echo "Executing boot script on machine..."
 timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
-    bash /root/boot.sh \
-    "${CLUSTER_TOOL_COMMIT}" \
-    "${CLUSTER_TOOL_FLAVOR_IMAGE}" \
-    "${CLONE_NAME}" \
-    "${OSAC_INSTALLER_IMAGE}" \
-    "${E2E_KUSTOMIZE_OVERLAY}" \
-    "${E2E_VM_TEMPLATE}" \
-    "${COMPONENT_IMAGE:-}" \
-    "${COMPONENT_IMAGE_NAME:-}" \
-    "${E2E_NAMESPACE}"
+    "bash /root/boot.sh \
+    '${CLUSTER_TOOL_COMMIT}' \
+    '${CLUSTER_TOOL_FLAVOR_IMAGE}' \
+    '${CLONE_NAME}' \
+    '${OSAC_INSTALLER_IMAGE}' \
+    '${E2E_KUSTOMIZE_OVERLAY}' \
+    '${E2E_VM_TEMPLATE}' \
+    '${COMPONENT_IMAGE:-}' \
+    '${COMPONENT_IMAGE_NAME:-}' \
+    '${E2E_NAMESPACE}'"
 
 echo "Boot step finished successfully."
