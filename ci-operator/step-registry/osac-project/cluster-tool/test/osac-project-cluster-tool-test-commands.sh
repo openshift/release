@@ -44,7 +44,7 @@ RESULTS_DIR="$6"
 mkdir -p "${RESULTS_DIR}"
 
 echo "Running vmaas tests..."
-podman run --pull=never --rm --network=host \
+podman run --authfile /root/pull-secret --rm --network=host \
     -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
     -v /root/pull-secret:/root/pull-secret:z \
     -v "${RESULTS_DIR}":/tmp/test-results:z \

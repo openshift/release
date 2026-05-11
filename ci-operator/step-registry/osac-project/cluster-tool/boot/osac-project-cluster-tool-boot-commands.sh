@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Installing podman in CI pod..."
-dnf install -y podman 2>&1 | tail -1
-
 echo "************ cluster-tool boot ************"
 echo "CLUSTER_TOOL_COMMIT: ${CLUSTER_TOOL_COMMIT}"
 echo "CLUSTER_TOOL_FLAVOR_IMAGE: ${CLUSTER_TOOL_FLAVOR_IMAGE}"
@@ -14,7 +11,6 @@ echo "E2E_NAMESPACE: ${E2E_NAMESPACE}"
 echo "E2E_KUSTOMIZE_OVERLAY: ${E2E_KUSTOMIZE_OVERLAY}"
 echo "E2E_VM_TEMPLATE: ${E2E_VM_TEMPLATE}"
 echo "OSAC_INSTALLER_IMAGE: ${OSAC_INSTALLER_IMAGE}"
-echo "OSAC_TEST_IMAGE: ${OSAC_TEST_IMAGE}"
 echo "COMPONENT_IMAGE: ${COMPONENT_IMAGE:-<none>}"
 echo "COMPONENT_IMAGE_NAME: ${COMPONENT_IMAGE_NAME:-<none>}"
 echo "-------------------------------------------"
@@ -50,24 +46,27 @@ for i in $(seq 30); do
     sleep 10
 done
 
-# === Extract installer files in CI pod (where we have registry auth) ===
-# This avoids ALL CI registry pulls on the OFCIR machine.
-echo "Extracting installer files from ${OSAC_INSTALLER_IMAGE}..."
-podman create --name installer-extract "${OSAC_INSTALLER_IMAGE}"
-mkdir -p /tmp/installer-files
-podman cp installer-extract:/installer /tmp/installer-files/installer
-podman cp installer-extract:/usr/local/bin/oc /tmp/installer-files/oc
-podman cp installer-extract:/usr/local/bin/osac /tmp/installer-files/osac
-podman rm installer-extract
+# === Build merged pull-secret with CI registry credentials ===
+# /etc/pull-secret/.dockerconfigjson is auto-mounted in every CI pod
+# and contains credentials for registry.buildXX.ci.openshift.org
+echo "Building pull secret..."
+echo "  Cluster profile registries: $(jq -r '.auths | keys | join(", ")' ${CLUSTER_PROFILE_DIR}/pull-secret 2>/dev/null || echo 'PARSE ERROR')"
+echo "  CI pod pull-secret exists: $(test -f /etc/pull-secret/.dockerconfigjson && echo YES || echo NO)"
+if [[ -f /etc/pull-secret/.dockerconfigjson ]]; then
+    echo "  CI pull-secret registries: $(jq -r '.auths | keys | join(", ")' /etc/pull-secret/.dockerconfigjson 2>/dev/null || echo 'PARSE ERROR')"
+    jq -s 'reduce .[] as $x ({}; . * $x)' \
+        "${CLUSTER_PROFILE_DIR}/pull-secret" \
+        /etc/pull-secret/.dockerconfigjson \
+        > /tmp/merged-pull-secret.json
+    echo "  Merged registries: $(jq -r '.auths | keys | join(", ")' /tmp/merged-pull-secret.json 2>/dev/null || echo 'PARSE ERROR')"
+else
+    echo "  WARNING: /etc/pull-secret/.dockerconfigjson not found, using cluster profile only"
+    cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/merged-pull-secret.json
+fi
 
-# Pre-pull the test image too so we can save+load it
-echo "Saving test image ${OSAC_TEST_IMAGE}..."
-podman save "${OSAC_TEST_IMAGE}" -o /tmp/test-image.tar
-
-# === Copy everything to the OFCIR machine ===
 echo "Copying pull secret to machine..."
 timeout -s 9 2m scp -F "${SHARED_DIR}/ssh_config" \
-    "${CLUSTER_PROFILE_DIR}/pull-secret" \
+    /tmp/merged-pull-secret.json \
     ci_machine:/root/pull-secret
 
 echo "Copying AAP license to machine..."
@@ -76,24 +75,9 @@ timeout -s 9 2m scp -F "${SHARED_DIR}/ssh_config" \
     /tmp/license.zip \
     ci_machine:/tmp/license.zip
 
-echo "Copying installer files to machine..."
-timeout -s 9 5m scp -F "${SHARED_DIR}/ssh_config" \
-    /tmp/installer-files/oc \
-    /tmp/installer-files/osac \
-    ci_machine:/usr/local/bin/
-
-timeout -s 9 5m scp -r -F "${SHARED_DIR}/ssh_config" \
-    /tmp/installer-files/installer \
-    ci_machine:/root/installer
-
-echo "Copying test image to machine..."
-timeout -s 9 10m scp -F "${SHARED_DIR}/ssh_config" \
-    /tmp/test-image.tar \
-    ci_machine:/tmp/test-image.tar
-
 # === Create refresh script on machine (PR #95 not yet merged) ===
 echo "Creating refresh script on machine..."
-timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/installer/scripts/refresh-after-snapshot.sh' <<'REFRESH_SCRIPT'
+timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/refresh-after-snapshot.sh' <<'REFRESH_SCRIPT'
 #!/bin/bash
 
 set -o nounset
@@ -184,7 +168,7 @@ REFRESH_SCRIPT
 
 # === Create patched prepare-fulfillment-service.sh (PR #95 adds osac delete hub) ===
 echo "Creating patched prepare-fulfillment-service.sh on machine..."
-timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/installer/scripts/prepare-fulfillment-service.sh' <<'PREPARE_FS_SCRIPT'
+timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/prepare-fulfillment-service.sh' <<'PREPARE_FS_SCRIPT'
 #!/bin/bash
 
 set -o nounset
@@ -238,11 +222,12 @@ set -euo pipefail
 COMMIT="$1"
 FLAVOR_IMAGE="$2"
 CLONE="$3"
-KUSTOMIZE_OVERLAY="$4"
-VM_TEMPLATE="$5"
-COMPONENT_IMAGE="${6:-}"
-COMPONENT_IMAGE_NAME="${7:-}"
-NAMESPACE="${8:-osac-e2e-ci}"
+INSTALLER_IMAGE="$4"
+KUSTOMIZE_OVERLAY="$5"
+VM_TEMPLATE="$6"
+COMPONENT_IMAGE="${7:-}"
+COMPONENT_IMAGE_NAME="${8:-}"
+NAMESPACE="${9:-osac-e2e-ci}"
 
 # --- Phase 1: cluster-tool setup ---
 echo "=== Downloading cluster-tool ==="
@@ -295,29 +280,41 @@ KUBECONFIG_PATH="/root/.kube/${CLONE}.kubeconfig"
 echo "export KUBECONFIG=${KUBECONFIG_PATH}" >> /root/.bashrc
 export KUBECONFIG="${KUBECONFIG_PATH}"
 
-echo "=== Loading test image ==="
-podman load -i /tmp/test-image.tar
-rm -f /tmp/test-image.tar
+echo "=== Installing oc ==="
+curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    | tar xzf - -C /usr/local/bin oc kubectl
+
+echo "=== Installing osac from installer image ==="
+podman run --authfile /root/pull-secret --rm \
+    -v /usr/local/bin:/target \
+    "${INSTALLER_IMAGE}" \
+    cp /usr/local/bin/osac /target/osac
 
 echo "=== Updating cluster pull secret ==="
 oc set data secret/pull-secret -n openshift-config \
     --from-file=.dockerconfigjson=/root/pull-secret
 
 # --- Phase 4: component override (conditional) ---
+COMPONENT_OVERRIDE_CMD=""
 if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     echo "=== Component override: ${COMPONENT_IMAGE_NAME} ==="
-    cd /root/installer && kustomize edit set image "${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE}"
+    COMPONENT_OVERRIDE_CMD="cd /installer && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && "
 fi
 
 # --- Phase 5: refresh ---
 echo "=== Running refresh ==="
-cp /root/pull-secret /root/installer/overlays/${KUSTOMIZE_OVERLAY}/files/quay-pull-secret.json
-cp /tmp/license.zip /root/installer/overlays/${KUSTOMIZE_OVERLAY}/files/license.zip
-cd /root/installer && \
-    INSTALLER_KUSTOMIZE_OVERLAY="${KUSTOMIZE_OVERLAY}" \
-    INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
-    INSTALLER_NAMESPACE="${NAMESPACE}" \
-    bash scripts/refresh-after-snapshot.sh
+podman run --authfile /root/pull-secret --rm --network=host \
+    -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
+    -v /root/pull-secret:/installer/overlays/${KUSTOMIZE_OVERLAY}/files/quay-pull-secret.json:z \
+    -v /tmp/license.zip:/installer/overlays/${KUSTOMIZE_OVERLAY}/files/license.zip:z \
+    -v /root/refresh-after-snapshot.sh:/installer/scripts/refresh-after-snapshot.sh:z \
+    -v /root/prepare-fulfillment-service.sh:/installer/scripts/prepare-fulfillment-service.sh:z \
+    -e KUBECONFIG=/root/.kube/config \
+    -e INSTALLER_KUSTOMIZE_OVERLAY="${KUSTOMIZE_OVERLAY}" \
+    -e INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
+    -e INSTALLER_NAMESPACE="${NAMESPACE}" \
+    "${INSTALLER_IMAGE}" \
+    bash -c "${COMPONENT_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
 
 echo "=== Boot + refresh complete ==="
 REMOTE_SCRIPT
@@ -328,6 +325,7 @@ timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     "${CLUSTER_TOOL_COMMIT}" \
     "${CLUSTER_TOOL_FLAVOR_IMAGE}" \
     "${CLONE_NAME}" \
+    "${OSAC_INSTALLER_IMAGE}" \
     "${E2E_KUSTOMIZE_OVERLAY}" \
     "${E2E_VM_TEMPLATE}" \
     "${COMPONENT_IMAGE:-}" \
