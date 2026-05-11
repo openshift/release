@@ -191,6 +191,10 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n 
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsal in PR against openshift/release repo
     job_type="(periodic OR rehearse)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${REPO_OWNER:-}" == "openshift" && "${REPO_NAME:-}" == "ovn-kubernetes" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    pull_number="${PULL_NUMBER}"
+    job_type="pull"
+    EXTRA_FLAGS+=" --pr-analysis"
 fi
 
 set +e
