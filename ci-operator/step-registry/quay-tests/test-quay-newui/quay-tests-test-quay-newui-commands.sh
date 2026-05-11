@@ -136,5 +136,7 @@ NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --r
 
 yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 
-reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true 
+reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true
+
+sleep 8h
 
