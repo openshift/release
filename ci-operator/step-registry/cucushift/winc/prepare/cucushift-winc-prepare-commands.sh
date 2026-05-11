@@ -323,17 +323,13 @@ echo ""
 echo "All Windows nodes are Ready:"
 oc get nodes -l kubernetes.io/os=windows -o wide
 
-# Choose the Windows container version depending on the Windows version
-# installed on the Windows workers
-# Supported: Server 2019 (1809), Server 2022 (ltsc2022)
-# TODO: Remove Server 2019 support after AMI/image upgrades to Server 2022
-# TODO: Add Server 2025 (ltsc2025) when Microsoft publishes the image
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
-windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
-if [[ "$os_version" == *"2019"* ]]
-then
-    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
+if [[ "$os_version" == *"2025"* ]]; then
+    # TODO: Update to lts-nanoserver-ltsc2025 when Microsoft publishes the image
+    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
+else
+    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
 fi
 
 # Setup image mirroring for Prow CI (if mirror registry is available)
