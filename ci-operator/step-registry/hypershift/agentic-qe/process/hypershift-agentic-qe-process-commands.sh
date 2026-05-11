@@ -17,7 +17,7 @@ fi
 GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 if [[ ! -f "$GUEST_KUBECONFIG" ]]; then
   echo "Generating guest cluster kubeconfig..."
-  KUBECONFIG="$MGMT_KUBECONFIG" bin/hypershift create kubeconfig --namespace=clusters --name="${CLUSTER_NAME}" > "$GUEST_KUBECONFIG"
+  KUBECONFIG="$MGMT_KUBECONFIG" oc get secret -n clusters "${CLUSTER_NAME}-admin-kubeconfig" -o jsonpath='{.data.kubeconfig}' | base64 -d > "$GUEST_KUBECONFIG"
 fi
 
 echo "Management cluster: $(KUBECONFIG=$MGMT_KUBECONFIG oc whoami --show-server)"
