@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+sleep 8h
+
 #Get the credentials and Email of new Quay User
 #QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 #QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
@@ -137,6 +139,4 @@ NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --r
 yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 
 reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true
-
-sleep 8h
 
