@@ -26,26 +26,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Extract MAPT image tag (if provided)
-MAPT_TAG=""
-if [[ -n "$MAPT_REF" && -f "$MAPT_REF" ]]; then
-  MAPT_TAG=$(grep 'tag:' "$MAPT_REF" | awk '{print $2}' | head -1 || true)
-fi
-
-# Extract configured versions from CI config files (per branch)
-if [[ -n "$TEST_PATTERN" && -d "$CONFIG_DIR" ]] && command -v yq &>/dev/null; then
-  PREFIX="redhat-developer-rhdh-"
-  echo "Configured MAPT_KUBERNETES_VERSION per branch:"
-  for f in "${CONFIG_DIR}/${PREFIX}"*.yaml; do
-    [[ -f "$f" ]] || continue
-    branch=$(basename "$f" | sed "s/^${PREFIX}//;s/\.yaml$//")
-    ver=$(yq -o=json "[.tests[] | select(.as | test(\"${TEST_PATTERN}\")) | .steps.env.MAPT_KUBERNETES_VERSION // \"N/A\"] | unique | .[]" "$f" 2>/dev/null | sort -u | paste -sd',' - || echo "N/A")
-    [[ -z "$ver" ]] && ver="N/A"
-    echo "  ${branch}: ${ver}"
-  done
-  [[ -n "$MAPT_TAG" ]] && echo "MAPT image: mapt:${MAPT_TAG}"
-  echo ""
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/print-configured-versions.sh"
 
 # Fetch EKS docs source (primary)
 echo "=== EKS Version Support (awsdocs/amazon-eks-user-guide) ==="
