@@ -19,18 +19,24 @@ E2E_VM_TEMPLATE="$2"
 E2E_CLUSTER_TEMPLATE="$3"
 OSAC_TEST_IMAGE="$4"
 
-KUBECONFIG=$(find /root -name "kubeconfig" -type f -print -quit 2>/dev/null || echo "")
-[[ -z "${KUBECONFIG}" ]] && KUBECONFIG="/root/.kube/config"
+KUBECONFIG="${KUBECONFIG:-/root/.kube/config}"
 [[ ! -f "${KUBECONFIG}" ]] && echo "ERROR: No kubeconfig found at ${KUBECONFIG}" && exit 1
 
 PULL_SECRET_PATH="/root/pull-secret"
 WORK_DIR=$(mktemp -d /tmp/osac-test-XXXXXX)
 
+cleanup() {
+  if compgen -G "${WORK_DIR}/*" > /dev/null; then
+    cp -r "${WORK_DIR}"/* /tmp/
+  fi
+  rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
+
 echo "Using kubeconfig: ${KUBECONFIG}"
 echo "Work dir: ${WORK_DIR}"
 echo "Test image: ${OSAC_TEST_IMAGE}"
 
-set +x
 podman run --authfile "${PULL_SECRET_PATH}" --rm --network=host \
   -v "${KUBECONFIG}:/root/.kube/config:z" \
   -v "${PULL_SECRET_PATH}:/root/pull-secret:z" \
@@ -43,9 +49,6 @@ podman run --authfile "${PULL_SECRET_PATH}" --rm --network=host \
   -e OSAC_PULL_SECRET_PATH=/root/pull-secret \
   "${OSAC_TEST_IMAGE}" \
   make test-vmaas
-
-echo "Copying reports"
-cp -r "${WORK_DIR}"/* /tmp/ 2>/dev/null || true
 REMOTE_EOF
 
 echo "Test suite completed"
