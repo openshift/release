@@ -301,7 +301,7 @@ oc set data secret/pull-secret -n openshift-config \
 COMPONENT_OVERRIDE_CMD=""
 if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     echo "=== Component override: ${COMPONENT_IMAGE_NAME} ==="
-    COMPONENT_OVERRIDE_CMD="curl -sL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xzf - -C /usr/local/bin && cd /installer && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && "
+    COMPONENT_OVERRIDE_CMD="curl -sL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xzf - -C /usr/local/bin && cd /installer/base && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && cd /installer && "
 fi
 
 # --- Phase 5: refresh ---
