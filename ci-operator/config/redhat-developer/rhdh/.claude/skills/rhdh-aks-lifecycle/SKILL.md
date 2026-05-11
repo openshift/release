@@ -2,7 +2,10 @@
 name: rhdh-aks-lifecycle
 description: >-
   Check AKS Kubernetes version support status using the official AKS release
-  status API and compare against the configured version in the CI config files
+  status API and compare against versions configured in CI config files. Use
+  whenever someone asks about AKS K8s version support, EOL dates, deprecation,
+  or whether the configured AKS version is still GA. Also use when planning AKS
+  K8s version upgrades — run this before using rhdh-aks-tests to make changes.
 allowed-tools: Bash(bash *check-aks-lifecycle.sh*), WebFetch
 ---
 # Check AKS Kubernetes Version Lifecycle
@@ -11,6 +14,7 @@ allowed-tools: Bash(bash *check-aks-lifecycle.sh*), WebFetch
 
 - Check if the configured AKS K8s version is still supported
 - Find the newest GA version available on AKS
+- See which K8s version each RHDH release branch is using for AKS tests
 - Before updating the AKS K8s version (use `rhdh-aks-tests` to make changes)
 
 ## Prerequisites
@@ -36,6 +40,22 @@ The script queries two sources:
 ```
 WebFetch https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions
 ```
+
+## Interpreting Results
+
+The script outputs three sections:
+
+1. **Configured MAPT_KUBERNETES_VERSION per branch** — shows what each RHDH release branch is currently using. If a version shows "N/A", the test entry may be missing the env var.
+
+2. **AKS Release Status** — supported minor versions from the official API, marked as GA, LTS, or Preview. The "Recently deprecated" line shows a version that was just removed from support.
+
+3. **Cross-verify (endoflife.date)** — independent EOL dates. If these disagree with the primary source, investigate further before making changes.
+
+Compare the configured version against the supported list. If the configured version is deprecated or missing from the supported list, it needs updating.
+
+## Next Steps
+
+If a version update is needed, use `rhdh-aks-tests` to change `MAPT_KUBERNETES_VERSION` in the CI config files.
 
 ## Related Skills
 

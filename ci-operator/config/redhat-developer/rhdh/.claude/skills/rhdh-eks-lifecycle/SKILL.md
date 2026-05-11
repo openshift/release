@@ -2,7 +2,11 @@
 name: rhdh-eks-lifecycle
 description: >-
   Check EKS Kubernetes version support status using the official AWS EKS docs
-  source and compare against the configured version in the CI config files
+  source and compare against versions configured in CI config files. Use
+  whenever someone asks about EKS K8s version support, EOL dates, or whether
+  the configured EKS version is still in standard support. Also use when
+  planning EKS K8s version upgrades — run this before using rhdh-eks-tests to
+  make changes.
 allowed-tools: Bash(bash *check-eks-lifecycle.sh*), WebFetch
 ---
 # Check EKS Kubernetes Version Lifecycle
@@ -11,6 +15,7 @@ allowed-tools: Bash(bash *check-eks-lifecycle.sh*), WebFetch
 
 - Check if the configured EKS K8s version is still supported
 - Find the newest GA version available on EKS
+- See which K8s version each RHDH release branch is using for EKS tests
 - Before updating the EKS K8s version (use `rhdh-eks-tests` to make changes)
 
 ## Prerequisites
@@ -36,6 +41,27 @@ The script queries two sources:
 ```
 WebFetch https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
 ```
+
+## Interpreting Results
+
+The script outputs four sections:
+
+1. **Configured MAPT_KUBERNETES_VERSION per branch** — shows what each RHDH release branch is currently using. If a version shows "N/A", the test entry may be missing the env var.
+
+2. **Supported minor versions** — lists versions with their support tier:
+   - **Standard**: actively supported, receives patches and security updates
+   - **Extended**: past standard support end date but still receives critical patches (at additional cost on AWS)
+   - Prefer Standard-tier versions for CI tests to avoid extended support costs and align with upstream
+
+3. **Release calendar** — shows upstream release date, EKS release date, and end dates for both standard and extended support. Use this to plan ahead for upcoming EOL dates.
+
+4. **Cross-verify (endoflife.date)** — independent EOL and extended support dates. If these disagree with the primary source, investigate further before making changes.
+
+Compare the configured version against the supported list. If the configured version is in Extended support or missing, it needs updating.
+
+## Next Steps
+
+If a version update is needed, use `rhdh-eks-tests` to change `MAPT_KUBERNETES_VERSION` in the CI config files.
 
 ## Related Skills
 
