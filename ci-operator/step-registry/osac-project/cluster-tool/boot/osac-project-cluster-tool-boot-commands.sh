@@ -94,7 +94,7 @@ echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo ""
 
 echo "[0/9] Waiting for AAP operator initial reconciliation (background)..."
-(retry_until 300 10 '[[ "$(oc get ansibleautomationplatform osac-aap -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Successful")].status}'"'"' 2>/dev/null)" == "True" ]]') &
+(retry_until 300 10 '[[ "$(oc get ansibleautomationplatform osac-aap -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Running")].message}'"'"' 2>/dev/null)" == "Awaiting next reconciliation" ]]') &
 AAP_WAIT_PID=$!
 
 echo "[1/9] Deleting stale routes..."
