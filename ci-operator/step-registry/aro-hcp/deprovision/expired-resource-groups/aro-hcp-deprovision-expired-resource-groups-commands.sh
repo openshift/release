@@ -16,6 +16,30 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 echo "Using subscription name='${CUSTOMER_SUBSCRIPTION}'"
 
+echo "DEBUG: VAULT_SECRET_PROFILE=${VAULT_SECRET_PROFILE}"
+echo "DEBUG: CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR}"
+echo "DEBUG: AZURE_CLIENT_ID=${AZURE_CLIENT_ID}"
+echo "DEBUG: AZURE_TENANT_ID=${AZURE_TENANT_ID}"
+
+echo "DEBUG: Azure account context:"
+az account show \
+  --query "{user:user.name, tenantId:tenantId, subscriptionId:id, subscriptionName:name}" \
+  -o table
+
+echo "DEBUG: Checking Key Vault access to aro-hcp-dev-svc-kv/firstPartyCert2"
+if az keyvault secret show \
+  --vault-name aro-hcp-dev-svc-kv \
+  --name firstPartyCert2 \
+  --query id \
+  -o tsv; then
+  echo "DEBUG: SUCCESS: Prow identity can access aro-hcp-dev-svc-kv/firstPartyCert2"
+else
+  echo "DEBUG: FAILURE: Prow identity cannot access aro-hcp-dev-svc-kv/firstPartyCert2"
+fi
+
+echo "DEBUG: stopping before cleanup for rehearsal"
+exit 0
+
 cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
 
 if [ -n "${CLEANUP_MODE}" ]; then
