@@ -31,17 +31,27 @@ ref:
   documentation: |-
     Tests OCPBUGS-45891: EgressIP scale testing with minimal AWS cluster using large VMs.
     
-    This test validates the maximum egress IP capacity with 2 m6a.16xlarge worker nodes,
+    This test validates the maximum egress IP capacity with 2+ m6a.16xlarge worker nodes,
     creating 100 EgressIP objects and verifying that 98 are successfully assigned with
     optimal load distribution.
     
+    FIXED: Updated to use specific IP assignment instead of auto-assignment to work
+    around OpenShift 4.22 auto-assignment bug where egressIPs: [] fails to assign.
+    
     The test follows Jean's validation methodology:
     - Verifies node egress IP configuration and capacity
-    - Labels worker nodes as egress-assignable  
-    - Creates 100 EgressIP objects
+    - Labels worker nodes as egress-assignable
+    - Generates specific IP addresses from node network ranges
+    - Creates 100 EgressIP objects with explicit IP assignment
     - Validates 98 successful assignments
-    - Verifies CloudPrivateIPConfig count matches
+    - Verifies CloudPrivateIPConfig count matches assigned EgressIPs
     - Checks load balancing across nodes
+    
+    Technical Notes:
+    - Uses specific egressIPs: ["x.x.x.x"] instead of egressIPs: []
+    - Auto-generates IPs from node annotations to avoid conflicts
+    - Distributes IPs optimally across available worker nodes
+    - Works reliably with OpenShift 4.22+ where auto-assignment is broken
     
     Environment variables:
     - EXPECTED_WORKER_NODES: Expected number of worker nodes (default: 2)

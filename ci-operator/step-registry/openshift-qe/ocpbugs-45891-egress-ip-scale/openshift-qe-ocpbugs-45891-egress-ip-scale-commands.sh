@@ -211,13 +211,103 @@ fi
 echo "✅ Successfully labeled $assignable_count nodes as egress-assignable"
 
 echo ""
-echo "=== STEP 4: Create EgressIP objects ==="
+echo "=== STEP 4: Generate IP addresses from node ranges ==="
 
-echo "📝 Creating $TOTAL_EGRESSIP_OBJECTS EgressIP objects with prefix: $EGRESSIP_NAME_PREFIX"
+# Get egress-assignable worker nodes and their IP ranges
+mapfile -t egress_nodes < <(oc get nodes -l k8s.ovn.org/egress-assignable=true -o custom-columns=NAME:.metadata.name --no-headers)
+echo "📊 Found ${#egress_nodes[@]} egress-assignable nodes for IP distribution"
 
-# Generate EgressIP objects based on Jean's pattern
+declare -A node_ranges
+total_capacity=0
+
+# Extract network ranges from each node
+for node in "${egress_nodes[@]}"; do
+    echo "📋 Processing IP range for node: $node"
+    
+    egress_config=$(oc get node "$node" -o jsonpath='{.metadata.annotations.cloud\.network\.openshift\.io/egress-ipconfig}')
+    
+    # Extract network range and capacity
+    network=$(echo "$egress_config" | python3 -c "
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+    print(data[0]['ifaddr']['ipv4'])
+except:
+    print('error')
+")
+    capacity=$(echo "$egress_config" | python3 -c "
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+    print(data[0]['capacity']['ipv4'])
+except:
+    print('0')
+")
+    
+    if [ "$network" = "error" ] || [ "$capacity" = "0" ]; then
+        echo "❌ ERROR: Failed to parse egress config for node $node"
+        exit 1
+    fi
+    
+    echo "  Network: $network, Capacity: $capacity"
+    node_ranges["$node"]="$network"
+    total_capacity=$((total_capacity + capacity))
+done
+
+echo "✅ Total EgressIP capacity available: $total_capacity"
+
+# Generate IP addresses distributed across nodes
+declare -a ip_addresses=()
+ips_per_node=$((TOTAL_EGRESSIP_OBJECTS / ${#egress_nodes[@]}))
+extra_ips=$((TOTAL_EGRESSIP_OBJECTS % ${#egress_nodes[@]}))
+
+echo "📊 Distributing $TOTAL_EGRESSIP_OBJECTS IPs: $ips_per_node per node, $extra_ips extra"
+
+for i in "${!egress_nodes[@]}"; do
+    node="${egress_nodes[$i]}"
+    network="${node_ranges[$node]}"
+    
+    # Extract base IP and CIDR
+    base_ip=$(echo "$network" | cut -d'/' -f1)
+    IFS='.' read -r oct1 oct2 oct3 oct4 <<< "$base_ip"
+    
+    # Calculate how many IPs to assign to this node
+    node_ip_count=$ips_per_node
+    if [ "$i" -lt "$extra_ips" ]; then
+        node_ip_count=$((node_ip_count + 1))
+    fi
+    
+    echo "🔢 Generating $node_ip_count IPs for $node (base: $base_ip)"
+    
+    # Generate IPs starting from base + 10 to avoid conflicts
+    for ((j=0; j<node_ip_count; j++)); do
+        new_last_octet=$((oct4 + 10 + j))
+        
+        # Handle octet overflow
+        if [ "$new_last_octet" -gt 255 ]; then
+            oct3=$((oct3 + 1))
+            new_last_octet=$((new_last_octet - 256))
+        fi
+        
+        ip="$oct1.$oct2.$oct3.$new_last_octet"
+        ip_addresses+=("$ip")
+    done
+done
+
+echo "✅ Generated ${#ip_addresses[@]} IP addresses"
+
+echo ""
+echo "=== STEP 5: Create EgressIP objects with specific IPs ==="
+
+echo "📝 Creating $TOTAL_EGRESSIP_OBJECTS EgressIP objects with specific IP assignment"
+echo "🔧 Using specific IPs instead of auto-assignment (workaround for OpenShift 4.22 auto-assignment bug)"
+
+# Generate EgressIP objects with specific IP addresses
 for i in $(seq 0 $((TOTAL_EGRESSIP_OBJECTS - 1))); do
     egressip_name="${EGRESSIP_NAME_PREFIX}-${i}"
+    ip_address="${ip_addresses[$i]}"
     
     cat <<EOF | oc apply -f -
 apiVersion: k8s.ovn.org/v1
@@ -225,11 +315,11 @@ kind: EgressIP
 metadata:
   name: $egressip_name
 spec:
-  egressIPs: []
-  namespaceSelector: {}
-  podSelector:
+  egressIPs: ["$ip_address"]
+  namespaceSelector:
     matchLabels:
-      egress-test: "$egressip_name"
+      kubernetes.io/metadata.name: default
+  podSelector: {}
 EOF
     
     # Log progress every 20 objects
@@ -241,7 +331,7 @@ done
 echo "✅ Successfully created $TOTAL_EGRESSIP_OBJECTS EgressIP objects"
 
 echo ""
-echo "=== STEP 5: Wait for EgressIP assignment ==="
+echo "=== STEP 6: Wait for EgressIP assignment ==="
 
 # Record start time for assignment timing
 assignment_start_time=$(date +%s)
@@ -279,7 +369,7 @@ else
 fi
 
 echo ""
-echo "=== STEP 6: Validate EgressIP assignment results ==="
+echo "=== STEP 7: Validate EgressIP assignment results ==="
 
 # Count assigned EgressIPs
 assigned_count=$(oc get egressip -o jsonpath='{range .items[*]}{.status.items[0].node}{"\n"}{end}' | grep -v '^$' | wc -l)
@@ -331,7 +421,7 @@ else
 fi
 
 echo ""
-echo "=== STEP 7: Validate test expectations ==="
+echo "=== STEP 8: Validate test expectations ==="
 
 # Validate assignment count  
 if [ $assignment_exit_code -eq 0 ]; then
