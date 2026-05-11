@@ -166,6 +166,7 @@ echo "=== Refresh complete ==="
 echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo "Namespace: ${INSTALLER_NAMESPACE}"
 REFRESH_SCRIPT
+ssh -F "${SHARED_DIR}/ssh_config" ci_machine chmod +x /root/refresh-after-snapshot.sh
 
 # === Create patched prepare-fulfillment-service.sh (PR #95 adds osac delete hub) ===
 echo "Creating patched prepare-fulfillment-service.sh on machine..."
@@ -214,6 +215,7 @@ if [[ -n "${INSTALLER_VM_TEMPLATE}" ]]; then
     }
 fi
 PREPARE_FS_SCRIPT
+ssh -F "${SHARED_DIR}/ssh_config" ci_machine chmod +x /root/prepare-fulfillment-service.sh
 
 # === Write boot script to machine and execute ===
 echo "Creating boot script on machine..."
@@ -299,7 +301,7 @@ oc set data secret/pull-secret -n openshift-config \
 COMPONENT_OVERRIDE_CMD=""
 if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     echo "=== Component override: ${COMPONENT_IMAGE_NAME} ==="
-    COMPONENT_OVERRIDE_CMD="cd /installer && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && "
+    COMPONENT_OVERRIDE_CMD="curl -sL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xzf - -C /usr/local/bin && cd /installer && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && "
 fi
 
 # --- Phase 5: refresh ---
