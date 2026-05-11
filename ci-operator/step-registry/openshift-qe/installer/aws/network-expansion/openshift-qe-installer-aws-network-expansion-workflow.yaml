@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-qe-installer-aws-network-expansion
+  steps: 
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws
+    - ref: ipi-install-config-network-custom
+    - ref: ipi-install-install
+    - chain: create-infra-move-ingress-monitoring-registry
+  documentation: |-
+    This workflow configures AWS clusters for network expansion testing with 
+    a custom initial network CIDR (10.128.0.0/20) that can be expanded to 
+    accommodate maximum node capacity testing.
+    
+    The workflow ensures the network configuration step runs BEFORE cluster 
+    installation by placing ipi-install-config-network-custom between the 
+    config steps (ipi-conf, ipi-conf-aws) and the installation step 
+    (ipi-install-install). This guarantees the cluster starts with /20 CIDR
+    instead of the default /14.

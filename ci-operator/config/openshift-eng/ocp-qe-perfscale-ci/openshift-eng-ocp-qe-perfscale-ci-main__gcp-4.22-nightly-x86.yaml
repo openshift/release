@@ -65,8 +65,9 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_REPLICAS: "9"
+      ADDITIONAL_WORKER_NODES: "6"
     test:
+    - ref: openshift-qe-workers-scale
     - ref: openshift-qe-perfscale-gcp-data-path-fw
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-gcp
@@ -116,6 +117,22 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+- always_run: false
+  as: ovn-service-sync-perf-5nodes
+  cron: 0 12 * * 0
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      BACKEND_PODS: "1000"
+      COMPUTE_NODE_REPLICAS: "5"
+      EXPECTED_WORKER_NODES: "5"
+      LOADBALANCER_SERVICES: "500"
+      SYNC_TIME_THRESHOLD: "10"
+      TEST_TIMEOUT: 45m
+    test:
+    - ref: openshift-qe-ovn-service-sync-perf
+    workflow: openshift-qe-installer-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-eng
