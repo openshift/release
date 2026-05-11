@@ -280,7 +280,7 @@ create_sg_rule $sg_name inbound tcp 30000 33000
 create_sg_rule $sg_name inbound tcp 3128 3128
 
 # Create Bastion Node
-create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ibm-redhat-9-6-minimal-amd64-7" "hcp-prow-ci-dnd-key" "$sg_name"
+create_vsi "$infra_name-bastion" "$IC_REGION-2" "bx2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ubuntu-s390x-image" "hcp-prow-ci-dnd-key" "$sg_name"
 
 # Create Compute Nodes
 
@@ -314,28 +314,29 @@ done
 
 
 ssh "${ssh_options[@]}" root@$BASTION_FIP '
-  yum install -y httpd &&
-  systemctl enable httpd &&
-  systemctl start httpd &&
+  apt-get update &&
+  apt-get install -y apache2 &&
+  systemctl enable apache2 &&
+  systemctl start apache2 &&
   echo "Configuring Web server with custom listeners on bastion" &&
-  if ! grep -q "8080" "/etc/httpd/conf/httpd.conf"; then
-     sed -i "s/80/8080/g" /etc/httpd/conf/httpd.conf
+  if ! grep -q "8080" "/etc/apache2/ports.conf"; then
+     echo "Listen 8080" >> /etc/apache2/ports.conf
   fi &&
-  if ! grep -q "8443" "/etc/httpd/conf/httpd.conf"; then
-     sed -i "s/443/8443/g" /etc/httpd/conf/httpd.conf
+  if ! grep -q "8443" "/etc/apache2/ports.conf"; then
+     echo "Listen 8443" >> /etc/apache2/ports.conf
   fi &&
-  systemctl restart httpd &&
-  systemctl status httpd --no-pager
+  systemctl restart apache2 &&
+  systemctl status apache2 --no-pager
 '
-ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl is-active --quiet httpd"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl is-active --quiet apache2"
 if [ $? -ne 0 ]; then
-  echo 'HTTPD server configuration failed, httpd serivce not running'
+  echo 'Apache server configuration failed, apache2 service not running'
   exit 1
 else
-  echo 'HTTPD server configuration succeeded'
+  echo 'Apache server configuration succeeded'
 fi
 
-ssh "${ssh_options[@]}" root@$BASTION_FIP "yum install -y haproxy ; systemctl enable haproxy ; systemctl start haproxy"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "apt-get install -y haproxy ; systemctl enable haproxy ; systemctl start haproxy"
 
 
 
