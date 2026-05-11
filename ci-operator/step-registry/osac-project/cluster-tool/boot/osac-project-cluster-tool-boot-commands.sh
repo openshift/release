@@ -47,14 +47,17 @@ for i in $(seq 30); do
 done
 
 # === Build merged pull-secret with CI registry credentials ===
-# Use oc registry login to get build-cluster registry credentials from the SA token.
-# KUBECONFIG="" ensures we talk to the build cluster, not any target cluster.
+# The CI build-farm registry (registry.buildXX.ci.openshift.org) requires auth
+# from the pod's service account token. The old workflow got this via dev-scripts
+# setup; cluster-tool skips that, so we inject the creds from the SA token directly.
 echo "Building pull secret..."
 echo "  Cluster profile registries: $(jq -r '.auths | keys | join(", ")' ${CLUSTER_PROFILE_DIR}/pull-secret 2>/dev/null || echo 'PARSE ERROR')"
 
-echo "  Getting CI registry credentials via oc registry login..."
-KUBECONFIG="" oc registry login --to=/tmp/ci-pull-creds.json
-echo "  CI registry creds: $(jq -r '.auths | keys | join(", ")' /tmp/ci-pull-creds.json 2>/dev/null || echo 'PARSE ERROR')"
+CI_REGISTRY=$(echo "${OSAC_INSTALLER_IMAGE}" | cut -d/ -f1)
+SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+CI_AUTH=$(echo -n "serviceaccount:${SA_TOKEN}" | base64 -w0)
+echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"${CI_AUTH}\"}}}" > /tmp/ci-pull-creds.json
+echo "  CI registry: ${CI_REGISTRY}"
 
 jq -s 'reduce .[] as $x ({}; . * $x)' \
     "${CLUSTER_PROFILE_DIR}/pull-secret" \
