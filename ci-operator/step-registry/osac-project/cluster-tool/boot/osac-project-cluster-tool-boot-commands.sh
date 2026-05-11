@@ -280,7 +280,7 @@ curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/opensh
 
 echo "=== Installing osac from installer image ==="
 podman run --authfile /root/pull-secret --rm \
-    -v /usr/local/bin:/target \
+    -v /usr/local/bin:/target:z \
     "${INSTALLER_IMAGE}" \
     cp /usr/local/bin/osac /target/osac
 
