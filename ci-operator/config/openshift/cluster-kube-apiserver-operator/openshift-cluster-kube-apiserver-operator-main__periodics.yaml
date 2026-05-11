@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -8,9 +8,13 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
+  vault_kube_kms:
+    name: vault-kube-kms
+    namespace: control-plane_vault
+    tag: 0.0.1
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -21,13 +25,13 @@ images:
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -77,6 +81,115 @@ tests:
         FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/event-ttl
     workflow: baremetalds-e2e
+- as: e2e-aws-encryption-kms
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- as: e2e-azure-encryption-kms
+  cron: 12 7 * * 1,4
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-azure
+- as: e2e-gcp-encryption-kms
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- as: e2e-vsphere-encryption-kms
+  cron: 30 16 * * 2,5
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal-encryption-kms
+  capabilities:
+  - intranet
+  cron: 12 0 * * 1,4
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: baremetal-lab-ipi-virtual-media
+- as: e2e-metal-encryption-kms-ipv6
+  capabilities:
+  - intranet
+  cron: 12 8 * * 2,5
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: baremetal-lab-ipi-virtual-media-ipv6-static
+- as: e2e-metal-encryption-kms-dual
+  capabilities:
+  - intranet
+  cron: 12 16 * * 3,6
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: baremetal-lab-upi-dual-stack
+- as: e2e-aws-encryption-kms-single-node
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: main
   org: openshift

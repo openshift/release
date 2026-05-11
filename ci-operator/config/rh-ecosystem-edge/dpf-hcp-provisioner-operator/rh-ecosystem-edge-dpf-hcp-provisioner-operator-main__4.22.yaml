@@ -1,0 +1,38 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.23
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: dpf-hcp-provisioner-operator
+  - dockerfile_path: e2e-tests.Containerfile
+    to: dpf-hcp-provisioner-operator-ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: dpf-hcp-provisioner-operator-e2e-aws-single-replica
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      MACHINE_OS_URL: quay.io/eelgaev/rhcos-bfb:4.22.0-ec.2
+    workflow: rh-ecosystem-edge-dpf-hcp-provisioner-operator
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: dpf-hcp-provisioner-operator
+  variant: "4.22"

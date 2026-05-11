@@ -534,7 +534,7 @@ function check_commit_message_for_prs {
     if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
         # Get the commit message from Github of current PR if exists
         API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
-        COMMIT_MESSAGE=$(curl -s "$API_PR_URL" | jq -r '.body')
+        COMMIT_MESSAGE=$(curl -s --retry 5 --retry-delay 10 "$API_PR_URL" | jq -r '.body')
         # Check if we have Depends-On: in commit message
         if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
             # Extract the pull request URL with org and repo from commit message

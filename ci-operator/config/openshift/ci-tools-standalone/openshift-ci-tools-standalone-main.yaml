@@ -7,6 +7,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  ubi-python:
+    name: ubi-python-312
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -35,6 +39,16 @@ images:
         - destination_dir: .
           source_path: /go/bin/ci-scheduling-webhook
     to: ci-scheduling-webhook
+  - additional_architectures:
+    - arm64
+    context_dir: images/commenter/
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/commenter
+    to: commenter
   - additional_architectures:
     - arm64
     context_dir: images/determinize-peribolos/
@@ -105,6 +119,21 @@ images:
         - destination_dir: .
           source_path: /go/bin/retester
     to: retester
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |-
+      FROM ubi-python
+      COPY . /workspace/
+      WORKDIR /workspace/ci-tools-standalone/cmd/secret-manager
+      RUN pip install --no-cache-dir -r requirements.txt
+      ENTRYPOINT ["python3", "main.py"]
+    from: ubi-python
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/ci-tools-standalone
+    to: secret-manager
 promotion:
   to:
   - namespace: ci
@@ -136,7 +165,7 @@ tests:
   container:
     from: golangci-lint
 - as: validate-vendor
-  commands: make validate-vendor
+  commands: make validate-modules
   container:
     from: src
   node_architecture: arm64

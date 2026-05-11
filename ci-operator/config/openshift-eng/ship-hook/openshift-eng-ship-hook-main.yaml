@@ -1,0 +1,41 @@
+binary_build_commands: make
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+  items:
+  - dockerfile_path: images/ship-hook/Dockerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: _output
+          source_path: /go/src/github.com/openshift-eng/ship-hook/_output/ship-hook
+    to: ship-hook
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: integration
+  commands: make integration-test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ship-hook

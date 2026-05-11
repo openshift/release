@@ -10,7 +10,7 @@ echo "************ telco5g add-interface command ************"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # Install AWS CLI
-curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscli.zip
+curl -sL --retry 5 --retry-delay 10 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscli.zip
 echo "Extracting aws cli"
 unzip -o /tmp/awscli.zip -d /tmp/ 1>/dev/null
 echo "Insalling aws cli"
@@ -20,7 +20,7 @@ aws --version
 
 # Install terraform
 TERRAFORM_VERSION="1.5.5"
-curl -sL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+curl -sL --retry 5 --retry-delay 10 "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
 echo "Extracting terraform"
 unzip -o /tmp/terraform.zip -d /tmp/ 1>/dev/null
 chmod +x /tmp/terraform
