@@ -47,22 +47,16 @@ for i in $(seq 30); do
 done
 
 # === Build merged pull-secret with CI registry credentials ===
-# /etc/pull-secret/.dockerconfigjson is auto-mounted in every CI pod
-# and contains credentials for registry.buildXX.ci.openshift.org
+# The old workflow gets CI registry auth via dev-scripts setup; cluster-tool
+# skips that. Inject the CI build-farm registry auth from the pod SA token.
 echo "Building pull secret..."
-echo "  Cluster profile registries: $(jq -r '.auths | keys | join(", ")' ${CLUSTER_PROFILE_DIR}/pull-secret 2>/dev/null || echo 'PARSE ERROR')"
-echo "  CI pod pull-secret exists: $(test -f /etc/pull-secret/.dockerconfigjson && echo YES || echo NO)"
-if [[ -f /etc/pull-secret/.dockerconfigjson ]]; then
-    echo "  CI pull-secret registries: $(jq -r '.auths | keys | join(", ")' /etc/pull-secret/.dockerconfigjson 2>/dev/null || echo 'PARSE ERROR')"
-    jq -s 'reduce .[] as $x ({}; . * $x)' \
-        "${CLUSTER_PROFILE_DIR}/pull-secret" \
-        /etc/pull-secret/.dockerconfigjson \
-        > /tmp/merged-pull-secret.json
-    echo "  Merged registries: $(jq -r '.auths | keys | join(", ")' /tmp/merged-pull-secret.json 2>/dev/null || echo 'PARSE ERROR')"
-else
-    echo "  WARNING: /etc/pull-secret/.dockerconfigjson not found, using cluster profile only"
-    cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/merged-pull-secret.json
-fi
+CI_REGISTRY=$(echo "${OSAC_INSTALLER_IMAGE}" | cut -d/ -f1)
+CI_AUTH=$(printf "serviceaccount:%s" "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" | base64 -w0)
+jq --arg registry "${CI_REGISTRY}" --arg auth "${CI_AUTH}" \
+    '.auths[$registry] = {"auth": $auth}' \
+    "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/merged-pull-secret.json
+echo "  CI registry: ${CI_REGISTRY}"
+echo "  Merged registries: $(jq -r '.auths | keys | join(", ")' /tmp/merged-pull-secret.json)"
 
 echo "Copying pull secret to machine..."
 timeout -s 9 2m scp -F "${SHARED_DIR}/ssh_config" \
