@@ -5,9 +5,6 @@ set -o errexit
 set -o pipefail
 
 
-echo "DEBUG: sleeping 1h for interactive debugging via oc rsh"
-sleep 3600
-
 SSH_KEY="/tmp/secrets/edge04/ssh-privatekey"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_KEY}"
 
