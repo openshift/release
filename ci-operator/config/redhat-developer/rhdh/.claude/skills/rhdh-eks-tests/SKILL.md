@@ -35,7 +35,7 @@ Filter by branch: add `--branch main`.
 
 The K8s version is set per branch as the `MAPT_KUBERNETES_VERSION` env var in each CI config file:
 
-```
+```text
 ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-<branch>.yaml
 ```
 
@@ -49,7 +49,7 @@ Each EKS test entry has `MAPT_KUBERNETES_VERSION` under `steps.env`. Update all 
 
 Verify the MAPT image tag in the ref YAML is compatible with the new K8s version:
 
-```
+```text
 ci-operator/step-registry/redhat-developer/rhdh/eks/mapt/create/redhat-developer-rhdh-eks-mapt-create-ref.yaml
 ```
 

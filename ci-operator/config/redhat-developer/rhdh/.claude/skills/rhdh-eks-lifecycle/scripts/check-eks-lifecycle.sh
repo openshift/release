@@ -5,7 +5,7 @@
 # Cross-verify:   https://endoflife.date/api/amazon-eks.json
 #
 # Usage:
-#   check-k8s-lifecycle.sh [--mapt-ref <path>] [--test-pattern <regex>] [--config-dir <path>]
+#   check-eks-lifecycle.sh [--mapt-ref <path>] [--test-pattern <regex>] [--config-dir <path>]
 #
 # Requires: curl, jq, yq (v4+), awk
 

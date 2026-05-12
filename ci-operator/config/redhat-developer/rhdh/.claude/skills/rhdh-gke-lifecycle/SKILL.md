@@ -35,7 +35,7 @@ The script queries:
 
 2. If the API call fails, fall back to the vendor docs:
 
-```
+```text
 WebFetch https://cloud.google.com/kubernetes-engine/docs/release-schedule
 ```
 

@@ -37,7 +37,7 @@ The script queries two sources:
 
 2. If the API call fails, fall back to the vendor docs:
 
-```
+```text
 WebFetch https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions
 ```
 

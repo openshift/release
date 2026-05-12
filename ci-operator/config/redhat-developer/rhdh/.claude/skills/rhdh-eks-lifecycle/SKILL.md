@@ -38,7 +38,7 @@ The script queries two sources:
 
 2. If the API call fails, fall back to the vendor docs:
 
-```
+```text
 WebFetch https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
 ```
 
