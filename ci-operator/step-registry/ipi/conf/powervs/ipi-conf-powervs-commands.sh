@@ -540,23 +540,6 @@ spec:
 EOF
 fi
 
-
-# This configures the network operator with routingViaHost and ipForwarding
-# before the cluster is created, avoiding pod restarts during installation
-echo "Saving Network patch to shared dir..."
-cat >> "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
-apiVersion: operator.openshift.io/v1
-kind: Network
-metadata:
-  name: cluster
-spec:
-  defaultNetwork:
-    ovnKubernetesConfig:
-      gatewayConfig:
-        routingViaHost: true
-        ipForwarding: Global
-EOF
-
 echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
 read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
 echo "count = ${#PARAMETERS[*]}"

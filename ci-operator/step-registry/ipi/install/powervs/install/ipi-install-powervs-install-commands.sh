@@ -814,6 +814,12 @@ fi
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${dir}" create manifests
 
+
+# This adds routingViaHost and ipForwarding to the existing network config
+# without overwriting the critical CIDR configurations
+echo "Patching network operator config for PowerVS..."
+yq-v4 eval '.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost = true | .spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding = "Global"' -i "${dir}/manifests/cluster-network-03-config.yml"
+
 # copy ccoctl files
 cat > "${dir}/manifests/openshift-cloud-controller-manager-ibm-cloud-credentials-credentials.yaml" << EOF
 apiVersion: v1
