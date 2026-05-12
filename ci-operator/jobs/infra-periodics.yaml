@@ -71,9 +71,16 @@ periodics:
         --slack-token-path=/etc/slack/oauth_token \
         --github-endpoint=http://ghproxy \
         --github-endpoint=https://api.github.com \
-        --github-token-path=/etc/oauth/oauth
+        --github-app-id=$(GITHUB_APP_ID) \
+        --github-app-private-key-path=/etc/github/cert
       command:
       - /bin/bash
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_pr-reminder_latest
       imagePullPolicy: Always
       name: ""
@@ -90,8 +97,9 @@ periodics:
       - mountPath: /etc/github-users
         name: github-users
         readOnly: true
-      - mountPath: /etc/oauth
-        name: github-token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
     - name: slack
       secret:
@@ -102,93 +110,9 @@ periodics:
     - configMap:
         name: sync-rover-groups
       name: github-users
-    - name: github-token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-ci-robot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-bugzilla-refresh-main
-  spec:
-    containers:
-    - args:
-      - |-
-        --query=is:pr
-        comments:<2500
-        state:open
-        base:main
-        label:bugzilla/valid-bug
-        label:lgtm
-        label:approved
-        -label:needs-rebase
-      - --token=/etc/oauth/oauth
-      - --updated=0
-      - |-
-        --comment=/bugzilla refresh
-
-        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target different OCP), recalculating validity.
-      - --ceiling=0
-      - --confirm
-      command:
-      - /ko-app/commenter
-      image: quay.io/openshift/ci:ci_commenter_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-bugzilla-refresh-master
-  spec:
-    containers:
-    - args:
-      - |-
-        --query=is:pr
-        comments:<2500
-        state:open
-        base:master
-        label:bugzilla/valid-bug
-        label:lgtm
-        label:approved
-        -label:needs-rebase
-      - --token=/etc/oauth/oauth
-      - --updated=0
-      - |-
-        --comment=/bugzilla refresh
-
-        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target different OCP), recalculating validity.
-      - --ceiling=0
-      - --confirm
-      command:
-      - /ko-app/commenter
-      image: quay.io/openshift/ci:ci_commenter_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
@@ -208,7 +132,10 @@ periodics:
         label:lgtm
         label:approved
         -label:needs-rebase
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - --updated=0
       - |-
         --comment=/jira refresh
@@ -217,7 +144,13 @@ periodics:
       - --ceiling=0
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -225,12 +158,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
@@ -250,7 +184,10 @@ periodics:
         label:lgtm
         label:approved
         -label:needs-rebase
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - --updated=0
       - |-
         --comment=/jira refresh
@@ -259,7 +196,13 @@ periodics:
       - --ceiling=0
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -267,12 +210,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
@@ -305,53 +249,6 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
-  cron: 0 1 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-daily-bugzilla-refresh
-  prowjob_defaults:
-    tenant_id: gangway-api
-  spec:
-    containers:
-    - args:
-      - |-
-        --query=is:pr
-        state:open
-        label:bugzilla/invalid-bug
-        comments:<2500
-        label:lgtm
-        -label:bugzilla/valid-bug
-        -label:do-not-merge
-        -label:do-not-merge/work-in-progress
-        -label:do-not-merge/hold
-        -label:needs-rebase
-        -label:needs-ok-to-test
-      - --token=/etc/oauth/oauth
-      - --updated=0
-      - |-
-        --comment=/bugzilla refresh
-
-        Recalculating validity in case the underlying Bugzilla bug has changed.
-      - --ceiling=0
-      - --confirm
-      command:
-      - /ko-app/commenter
-      image: quay.io/openshift/ci:ci_commenter_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
   cron: 0 0,8 * * *
   decorate: true
   labels:
@@ -362,6 +259,7 @@ periodics:
     - args:
       - |-
         --query=org:openshift
+        is:issue
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
@@ -370,7 +268,10 @@ periodics:
         -label:tide/merge-blocker
         label:lifecycle/rotten
       - --updated=720h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Rotten issues close after 30d of inactivity.
 
@@ -383,7 +284,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -391,12 +298,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 15 0,8 * * *
@@ -409,12 +317,16 @@ periodics:
     - args:
       - |-
         --query=repo:openshift/enhancements
+        is:issue
         comments:<2500
         -label:lifecycle/frozen
         -label:tide/merge-blocker
         label:lifecycle/rotten
       - --updated=168h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Rotten enhancement proposals close after 7d of inactivity.
 
@@ -429,7 +341,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -437,12 +355,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 30 0,8 * * *
@@ -455,6 +374,7 @@ periodics:
     - args:
       - |-
         --query=org:openshift
+        is:issue
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
@@ -464,7 +384,10 @@ periodics:
         label:lifecycle/stale
         -label:lifecycle/rotten
       - --updated=720h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Stale issues rot after 30d of inactivity.
 
@@ -480,7 +403,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -488,12 +417,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 45 0,8 * * *
@@ -506,13 +436,17 @@ periodics:
     - args:
       - |-
         --query=repo:openshift/enhancements
+        is:issue
         comments:<2500
         -label:tide/merge-blocker
         -label:lifecycle/frozen
         label:lifecycle/stale
         -label:lifecycle/rotten
       - --updated=168h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Stale enhancement proposals rot after 7d of inactivity.
 
@@ -530,7 +464,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -538,12 +478,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1,9 * * *
@@ -557,6 +498,7 @@ periodics:
       - |-
         --query=org:openshift
         org:terraform-redhat
+        is:issue
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
@@ -566,7 +508,10 @@ periodics:
         -label:lifecycle/rotten
         -label:tide/merge-blocker
       - --updated=2160h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Issues go stale after 90d of inactivity.
 
@@ -581,7 +526,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -589,12 +540,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 15 1,9 * * *
@@ -607,13 +559,17 @@ periodics:
     - args:
       - |-
         --query=repo:openshift/enhancements
+        is:issue
         comments:<2500
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
         -label:tide/merge-blocker
       - --updated=672h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Inactive enhancement proposals go stale after 28d of inactivity.
 
@@ -630,7 +586,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -638,12 +600,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 30 1,9 * * *
@@ -666,7 +629,10 @@ periodics:
         -label:tide/merge-blocker
         -label:do-not-merge/hold
       - --updated=720h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Stale PRs are closed after 21d of inactivity.
 
@@ -680,7 +646,13 @@ periodics:
       - --ceiling=30
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -688,12 +660,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 0 2,10 * * *
@@ -716,7 +689,10 @@ periodics:
         -label:lifecycle/rotten
         -label:do-not-merge/hold
       - --updated=336h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Stale PRs rot after 14d of inactivity.
 
@@ -731,7 +707,13 @@ periodics:
       - --ceiling=30
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -739,12 +721,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 30 2,10 * * *
@@ -766,7 +749,10 @@ periodics:
         label:lifecycle/rotten
         -label:do-not-merge/hold
       - --updated=168h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Rotten PRs close after 7d of inactivity.
 
@@ -778,7 +764,13 @@ periodics:
       - --ceiling=30
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -786,12 +778,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 0 0 * * 3
@@ -869,7 +862,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260508-77c4e0541
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -904,7 +897,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260508-77c4e0541
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -982,60 +975,6 @@ periodics:
         - key: sa.ci-monitoring.app.ci.token.txt
           path: token
         secretName: app-ci-openshift-user-workload-monitoring-credentials
-- agent: kubernetes
-  cluster: app.ci
-  cron: 0 0 1 6 *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-auto-prow-job-dispatcher
-  spec:
-    containers:
-    - args:
-      - --upstream-branch=main
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --github-login=openshift-bot
-      - --git-name=openshift-bot
-      - --git-email=openshift-bot@redhat.com
-      - --target-dir=.
-      - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
-      - --prow-jobs-dir=./ci-operator/jobs
-      - --self-approve=true
-      - --prometheus-bearer-token-path=/etc/prometheus/token
-      - --create-pr=true
-      - --pr-body=@coderabbitai ignore
-      command:
-      - /usr/bin/prow-job-dispatcher
-      image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
-      imagePullPolicy: Always
-      name: auto-prow-job-dispatcher
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/prometheus
-        name: prometheus
-        readOnly: true
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: prometheus
-      secret:
-        items:
-        - key: sa.ci-monitoring.app.ci.token.txt
-          path: token
-        secretName: app-ci-openshift-user-workload-monitoring-credentials
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: 0 0 * * *
@@ -1244,7 +1183,8 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --job-config-path=./ci-operator/jobs
       - --confirm=true
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
@@ -1252,7 +1192,13 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260504-92d6574a4
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1260,12 +1206,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-merge-robot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This job runs Prow branchprotector to reconcile the
@@ -1309,7 +1255,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1399,8 +1345,9 @@ periodics:
           --fix-repos \
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
-          --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260504-92d6574a4
+          --allow-repo-archival \
+          --ignore-enterprise-teams
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1432,7 +1379,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1912,47 +1859,6 @@ periodics:
       name: config-volume
 - agent: kubernetes
   cluster: app.ci
-  cron: '@yearly'
-  decorate: true
-  extra_refs:
-  - base_ref: openshift-4.22
-    org: openshift
-    repo: ocp-build-data
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-ocp-build-data-enforcer
-  spec:
-    containers:
-    - args:
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --ocp-build-data-repo-dir=./
-      - --create-prs=true
-      - --minor=22
-      - --pr-creation-ceiling=1000
-      command:
-      - /usr/bin/ocp-build-data-enforcer
-      env:
-      - name: CLICOLOR_FORCE
-        value: "1"
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ocp-build-data-enforcer_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
   cron: '@daily'
   decorate: true
   extra_refs:
@@ -2018,7 +1924,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2050,7 +1956,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2082,7 +1988,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260504-92d6574a4
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2558,6 +2464,13 @@ periodics:
   labels:
     ci.openshift.io/role: infra
   name: periodic-prow-auto-sippy-config-generator
+  reporter_config:
+    slack:
+      channel: '#trt-alert'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed. See https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-prow-auto-sippy-config-generator/{{.Status.BuildID}}
+        for details.
   spec:
     containers:
     - args:
@@ -2583,12 +2496,21 @@ periodics:
 
         # Initiate prcreator to open a PR against sippy
         /usr/bin/prcreator \
-        -github-token-path=/etc/github/oauth \
+        -pr-source-mode=branch \
+        -github-app-id=$(GITHUB_APP_ID) \
+        -github-app-private-key-path=/etc/github/cert \
+        -github-endpoint=http://ghproxy \
+        -github-endpoint=https://api.github.com \
         -organization=openshift -repo=sippy -branch=main \
         -pr-title="Automated - Update config ./config/openshift.yaml"
       command:
       - /bin/bash
       env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       - name: GOOGLE_APPLICATION_CREDENTIALS
         value: /etc/bigquery/token
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-sippy-config-generator_latest
@@ -2599,15 +2521,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/bigquery
         name: bigquery-token
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
     - name: bigquery-token
       secret:
         secretName: ci-data-bigquery-readonly
@@ -2797,7 +2719,7 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: build03
+  cluster: build07
   cron: '@yearly'
   decorate: true
   labels:
