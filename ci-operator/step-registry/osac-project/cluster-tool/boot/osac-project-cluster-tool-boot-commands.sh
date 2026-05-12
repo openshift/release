@@ -111,6 +111,7 @@ for route in $(oc get routes -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.items[*]
 done
 
 echo "[2/8] Applying kustomize overlay..."
+oc delete job -n "${INSTALLER_NAMESPACE}" --all --ignore-not-found
 oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 
 echo "[3/8] Applying AAP configuration..."
