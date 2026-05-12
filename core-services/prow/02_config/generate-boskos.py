@@ -90,10 +90,6 @@ CONFIG = {
         'us-east-1': 10,
         'us-west-2': 10,
     },
-    'aws-splat-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
