@@ -62,6 +62,33 @@ for ns in keycloak ansible-aap; do
     fi
 done
 
+echo "=== Collecting CNV/virtualization diagnostics ==="
+mkdir -p "${ARTIFACT_DIR}/cnv"
+oc get hyperconverged -A -o yaml > "${ARTIFACT_DIR}/cnv/hyperconverged.yaml" 2>&1 || true
+oc get vms -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/vms.txt" 2>&1 || true
+oc get vmis -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/vmis.txt" 2>&1 || true
+oc get datavolumes -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/datavolumes.txt" 2>&1 || true
+oc get pvc -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/pvcs.txt" 2>&1 || true
+oc get events -n openshift-cnv --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/cnv/events-openshift-cnv.txt" 2>&1 || true
+
+echo "=== Collecting compute instance status ==="
+oc get computeinstances -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/computeinstances.txt" 2>&1 || true
+oc get computeinstances -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/computeinstances.yaml" 2>&1 || true
+
+echo "=== Collecting node resource usage ==="
+oc adm top node > "${ARTIFACT_DIR}/node-resources.txt" 2>&1 || true
+oc adm top pod -n "${E2E_NAMESPACE}" --sort-by=memory > "${ARTIFACT_DIR}/pod-resources.txt" 2>&1 || true
+oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+oc describe node > "${ARTIFACT_DIR}/node-describe.txt" 2>&1 || true
+
+echo "=== Collecting cluster operator status ==="
+oc get co > "${ARTIFACT_DIR}/clusteroperators.txt" 2>&1 || true
+oc get csv -n openshift-cnv -o wide > "${ARTIFACT_DIR}/cnv/csv.txt" 2>&1 || true
+
+echo "=== Collecting AAP operator status ==="
+oc get ansibleautomationplatform -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-status.yaml" 2>&1 || true
+oc get automationcontroller -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/automationcontroller-status.yaml" 2>&1 || true
+
 echo "Log collection complete"
 REMOTE_EOF
 
