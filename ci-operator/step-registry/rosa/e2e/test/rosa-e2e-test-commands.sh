@@ -68,9 +68,10 @@ if [[ "${CLUSTER_TOPOLOGY}" == "hcp" ]]; then
 fi
 
 # Run tests
-GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
+GINKGO_ARGS=(--ginkgo.junit-report="${ARTIFACT_DIR}/junit-rosa-e2e.xml" --ginkgo.v)
 if [[ -n "${LABEL_FILTER}" ]]; then
-  GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${LABEL_FILTER}"
+  log "Label filter: ${LABEL_FILTER}"
+  GINKGO_ARGS+=(--ginkgo.label-filter="${LABEL_FILTER}")
 fi
 
 if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
@@ -78,6 +79,6 @@ if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
 fi
 
 log "Running rosa-e2e tests..."
-/usr/local/bin/e2e.test ${GINKGO_FLAGS}
+/usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"

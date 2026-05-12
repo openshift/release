@@ -40,6 +40,33 @@ tests:
     make lint
   container:
     from: src
+- as: e2e-rosa-hcp-smoke
+  run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Importance:Critical && Platform:HCP && (Area:ClusterLifecycle
+        || Area:DataPlane || Area:ManagementPlane || Area:Upgrade)
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: e2e-rosa-classic-smoke
+  run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "false"
+      LABEL_FILTER: Importance:Critical && Platform:Classic && (Area:ClusterLifecycle
+        || Area:DataPlane || Area:ManagementPlane || Area:Upgrade)
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REPLICAS: "3"
+    workflow: rosa-e2e-classic
 - as: rosa-ci-daily-status
   commands: scripts/ci-status-report.sh
   container:
