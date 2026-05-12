@@ -27,6 +27,20 @@ echo "HostedCluster name: $CLUSTER_NAME"
 export KUBECONFIG="$GUEST_KUBECONFIG"
 echo "Guest cluster: $(oc whoami --show-server)"
 
+# Authenticate Azure CLI if credentials are available
+AZURE_CREDS="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+if [[ -f "$AZURE_CREDS" ]]; then
+  echo "Authenticating Azure CLI..."
+  # Disable tracing due to credential handling
+  AZURE_CLIENT_ID="$(<"${AZURE_CREDS}" jq -r .clientId)"
+  AZURE_CLIENT_SECRET="$(<"${AZURE_CREDS}" jq -r .clientSecret)"
+  AZURE_TENANT_ID="$(<"${AZURE_CREDS}" jq -r .tenantId)"
+  AZURE_SUBSCRIPTION_ID="$(<"${AZURE_CREDS}" jq -r .subscriptionId)"
+  az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+  az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+  echo "Azure CLI authenticated (subscription: $(az account show --query name -o tsv))"
+fi
+
 # TEMPORARY: hardcode to test against hypershift PR 8454 — revert before merging
 PR_NUMBER="8454"
 REPO_ORG="openshift"
@@ -120,6 +134,7 @@ ENVIRONMENT:
 - Guest cluster kubeconfig (default): ${GUEST_KUBECONFIG}
 - HostedCluster name: ${CLUSTER_NAME}
 - HostedCluster namespace: clusters
+- Azure CLI: pre-authenticated (use 'az' commands for Azure resource verification)
 
 The default KUBECONFIG points to the guest (hosted) cluster.
 To run commands against the management cluster, use: KUBECONFIG=${MGMT_KUBECONFIG} oc <command>
