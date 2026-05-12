@@ -43,6 +43,10 @@ if [[ -n "${ROSA_REGIONAL_HELM_OVERRIDE_YAML:-}" ]] && [[ -n "${ROSA_REGIONAL_HE
   OVERRIDE_ARGS+=(--provision-override-file "${ROSA_REGIONAL_HELM_VALUES_FILE}:${OVERRIDE_YAML}")
 fi
 
+# Generate AWS profiles from mounted credentials (idempotent, no-op if already set).
+# Backwards-compatible: older refs of rosa-regional-platform don't have this script.
+[[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+
 echo "Starting ephemeral provisioning..."
 uv run --no-cache ci/ephemeral-provider/main.py \
   --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json" \
