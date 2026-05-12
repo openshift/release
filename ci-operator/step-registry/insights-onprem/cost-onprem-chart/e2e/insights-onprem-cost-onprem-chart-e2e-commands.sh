@@ -338,6 +338,11 @@ if [[ -n "${CHART_REF:-}" ]]; then
             elif git rev-parse "${CHART_REF}" &>/dev/null; then
                 git checkout "${CHART_REF}"
                 echo "Checked out: $(git describe --tags --always)"
+            else
+                echo "ERROR: Could not find tag cost-onprem-${CHART_REF} or ${CHART_REF}"
+                echo "Available tags:" >&2
+                git tag -l "cost-onprem-*" | tail -10 >&2
+                exit 1
             fi
             USE_LOCAL_CHART="true"
             CHART_REF_RESOLVED="${CHART_REF}"
