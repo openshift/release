@@ -7,8 +7,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: export GOTOOLCHAIN=auto && unset GOFLAGS && make manager &&
-  make targetallocator && make operator-opamp-bridge
+binary_build_commands: unset GOFLAGS && mkdir -p bin cmd/operator-opamp-bridge/bin
+  && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/manager_amd64 -trimpath
+  main.go && make targetallocator && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+  -o cmd/operator-opamp-bridge/bin/opampbridge_amd64 -trimpath ./cmd/operator-opamp-bridge
 build_root:
   image_stream_tag:
     name: builder
