@@ -43,7 +43,9 @@ tests:
   steps:
     post:
     - as: teardown-ephemeral
-      commands: ./ci/nightly.sh --teardown
+      commands: |-
+        source ci/setup-aws-profiles.sh
+        uv run --no-cache ci/ephemeral-provider/main.py --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -55,7 +57,10 @@ tests:
           memory: 200Mi
     pre:
     - as: provision-ephemeral
-      commands: ./ci/nightly.sh
+      commands: |-
+        source ci/setup-aws-profiles.sh
+        uv run --no-cache ci/ephemeral-provider/main.py \
+          --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json"
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -100,7 +105,8 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh --teardown-fire-and-forget
+        source ci/setup-aws-profiles.sh
+        uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -115,7 +121,9 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh
+        source ci/setup-aws-profiles.sh
+        uv run --no-cache ci/ephemeral-provider/main.py \
+          --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json"
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds

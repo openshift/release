@@ -18,9 +18,7 @@ git clone https://github.com/openshift-online/rosa-regional-platform.git "${WORK
 cd "${WORK_DIR}/platform"
 git checkout "${CLONE_REF}"
 
-# Generate AWS profiles from mounted credentials (idempotent, no-op if already set).
-# Backwards-compatible: older refs of rosa-regional-platform don't have this script.
-[[ -f ci/setup-aws-profiles.sh ]] && source ci/setup-aws-profiles.sh
+source ci/setup-aws-profiles.sh
 
 echo "Starting ephemeral teardown (fire-and-forget)..."
 uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
