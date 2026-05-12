@@ -42,6 +42,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
 -e INSTALLER_NAMESPACE=${E2E_NAMESPACE} \
 -e INSTALLER_KUSTOMIZE_OVERLAY=${E2E_KUSTOMIZE_OVERLAY} \
 -e INSTALLER_VM_TEMPLATE=${E2E_VM_TEMPLATE} \
+-e STORAGE_SERVICE=true \
 ${OSAC_INSTALLER_IMAGE} sh /installer/scripts/setup.sh
 
 EOF
