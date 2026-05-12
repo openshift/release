@@ -38,6 +38,15 @@ images:
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
     to: hypershift-cli
+  - dockerfile_literal: |
+      FROM claude-ai-helpers
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          dnf install -y https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm && \
+          mv /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ && \
+          dnf install -y azure-cli && \
+          dnf clean all
+    from: claude-ai-helpers
+    to: claude-ai-helpers-azure
 promotion:
   to:
   - excluded_images:
