@@ -6,7 +6,8 @@ set -o pipefail
 
 SCRIPTS_DIR="/opt/ai-helpers/plugins/marketplace-ops/scripts"
 REPO="${UPSTREAM_REPO}"
-FORK="${FORK_ORG}/ai-helpers"
+FORK="${FORK_REPO}"
+FORK_OWNER="${FORK_REPO%%/*}"
 
 echo "=== Marketplace Prune Agent ==="
 echo "Upstream: ${REPO}"
@@ -80,7 +81,7 @@ git remote rename origin upstream
 git remote add origin "https://github.com/${FORK}.git"
 git fetch origin || true
 
-git config user.name "openshift-trt-bot"
+git config user.name "${FORK_OWNER}"
 git config user.email "noreply@github.com"
 
 # ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ process_existing_pr() {
 
     # Find the last comment from the bot to determine --since-comment-id
     LAST_BOT_COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-        --jq "[.[] | select(.user.login == \"openshift-trt-bot\" or .user.login | test(\"\\\\[bot\\\\]$\")) | .id] | max // 0")
+        --jq "[.[] | select(.user.login == \"${FORK_OWNER}\" or .user.login | test(\"\\\\[bot\\\\]$\")) | .id] | max // 0")
 
     echo "Last bot comment ID: ${LAST_BOT_COMMENT_ID}"
     echo "Fetching new comments..."
@@ -403,7 +404,7 @@ EOF
 
     PR_URL=$(gh pr create \
         --repo "${REPO}" \
-        --head "${FORK_ORG}:${BRANCH_NAME}" \
+        --head "${FORK_OWNER}:${BRANCH_NAME}" \
         --title "chore: prune stale marketplace content" \
         --body "${PR_BODY}")
 
