@@ -178,17 +178,21 @@ if [[ -n "${INSTALLER_VM_TEMPLATE}" ]]; then
     AAP_ROUTE_HOST=$(oc get routes -n "${INSTALLER_NAMESPACE}" --no-headers osac-aap -o jsonpath='{.spec.host}')
     AAP_URL="https://${AAP_ROUTE_HOST}"
     AAP_TOKEN=$(oc get secret osac-aap-api-token -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.data.token}' | base64 -d)
-    JT_ID=$(curl -kfsS -H "Authorization: Bearer ${AAP_TOKEN}" \
-        "${AAP_URL}/api/controller/v2/job_templates/?name=osac-publish-templates" | jq -er '.results[0].id // empty') || {
-        echo "Failed to find osac-publish-templates AAP job template"
-        exit 1
-    }
+    echo "Waiting for AAP controller API to be ready..."
+    for attempt in $(seq 1 30); do
+        JT_ID=$(curl -kfsS -H "Authorization: Bearer ${AAP_TOKEN}" \
+            "${AAP_URL}/api/controller/v2/job_templates/?name=osac-publish-templates" 2>/dev/null | jq -er '.results[0].id // empty' 2>/dev/null) && break
+        echo "  attempt ${attempt}/30 - AAP controller API not ready, retrying in 10s..."
+        sleep 10
+    done
+    [[ -z "${JT_ID:-}" ]] && { echo "Failed to find osac-publish-templates AAP job template after 30 attempts"; exit 1; }
     echo "Launching publish-templates AAP job (template ID: ${JT_ID})..."
-    curl -kfsS -X POST -H "Authorization: Bearer ${AAP_TOKEN}" -H "Content-Type: application/json" \
-        "${AAP_URL}/api/controller/v2/job_templates/${JT_ID}/launch/" >/dev/null || {
-        echo "Failed to launch osac-publish-templates AAP job"
-        exit 1
-    }
+    for attempt in $(seq 1 10); do
+        curl -kfsS -X POST -H "Authorization: Bearer ${AAP_TOKEN}" -H "Content-Type: application/json" \
+            "${AAP_URL}/api/controller/v2/job_templates/${JT_ID}/launch/" >/dev/null 2>&1 && break
+        echo "  launch attempt ${attempt}/10 - retrying in 10s..."
+        sleep 10
+    done
 
     echo "Waiting for computeinstancetemplate ${INSTALLER_VM_TEMPLATE} to be published..."
     retry_until 300 5 '[[ -n "$(osac get computeinstancetemplate -o json | jq -r --arg tpl "$INSTALLER_VM_TEMPLATE" '"'"'select(.id == $tpl)'"'"' 2> /dev/null)" ]]' || {
