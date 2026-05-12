@@ -93,47 +93,27 @@ echo "Overlay: ${INSTALLER_KUSTOMIZE_OVERLAY}"
 echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo ""
 
-echo "[0/9] Waiting for AAP operator initial reconciliation (background)..."
-(retry_until 300 10 '[[ "$(oc get ansibleautomationplatform osac-aap -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Running")].message}'"'"' 2>/dev/null)" == "Awaiting next reconciliation" ]]') &
-AAP_WAIT_PID=$!
+echo "[1/8] Patching stale routes with new domain..."
+OLD_DOMAIN=$(oc get route osac-aap -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null | sed "s/^osac-aap-${INSTALLER_NAMESPACE}\.//")
+echo "  Old domain: ${OLD_DOMAIN}"
+echo "  New domain: ${CLUSTER_DOMAIN}"
+for route in $(oc get routes -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    OLD_HOST=$(oc get route "${route}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.spec.host}')
+    NEW_HOST=$(echo "${OLD_HOST}" | sed "s/${OLD_DOMAIN}/${CLUSTER_DOMAIN}/")
+    oc patch route "${route}" -n "${INSTALLER_NAMESPACE}" --type=merge -p "{\"spec\":{\"host\":\"${NEW_HOST}\"}}"
+done
 
-echo "[1/9] Deleting stale routes..."
-oc delete routes -n "${INSTALLER_NAMESPACE}" --all
-
-echo "[2/9] Applying kustomize overlay..."
+echo "[2/8] Applying kustomize overlay..."
 oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 
-echo "[3/9] Waiting for AAP operator to be ready, then triggering reconciliation..."
-wait ${AAP_WAIT_PID} || {
-    echo "Timed out waiting for AAP operator initial reconciliation"
-    exit 1
-}
-echo "AAP operator ready. Triggering reconciliation..."
-RECONCILE_TS=$(date +%s)
-oc annotate ansibleautomationplatform osac-aap -n "${INSTALLER_NAMESPACE}" \
-    force-reconcile="${RECONCILE_TS}" --overwrite
-oc annotate automationcontroller osac-aap-controller -n "${INSTALLER_NAMESPACE}" \
-    force-reconcile="${RECONCILE_TS}" --overwrite
-oc annotate eda osac-aap-eda -n "${INSTALLER_NAMESPACE}" \
-    force-reconcile="${RECONCILE_TS}" --overwrite
-
-echo "Waiting for AAP routes..."
-for route in osac-aap osac-aap-controller osac-aap-eda; do
-    retry_until 300 5 "[[ \"\$(oc get route ${route} -n ${INSTALLER_NAMESPACE} -o jsonpath='{.spec.host}' 2>/dev/null)\" == *\"${CLUSTER_DOMAIN}\"* ]]" || {
-        echo "Timed out waiting for route ${route} with domain ${CLUSTER_DOMAIN}"
-        exit 1
-    }
-done
-echo "All routes ready."
-
-echo "[4/9] Applying AAP configuration..."
+echo "[3/8] Applying AAP configuration..."
 INSTALLER_NAMESPACE="${INSTALLER_NAMESPACE}" \
 INSTALLER_KUSTOMIZE_OVERLAY="${INSTALLER_KUSTOMIZE_OVERLAY}" \
     ./scripts/aap-configuration.sh
 
 oc config set-context --current --namespace="${INSTALLER_NAMESPACE}"
 
-echo "[5/9] Waiting for AAP controller..."
+echo "[4/8] Waiting for AAP controller..."
 retry_until 300 10 '[[ "$(oc get automationcontroller osac-aap-controller -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Running")].status}'"'"' 2>/dev/null)" == "True" ]]' || {
     echo "Timed out waiting for AAP controller to be Running"
     exit 1
@@ -144,13 +124,13 @@ retry_until 120 5 '[[ "$(curl -sk -o /dev/null -w %{http_code} https://'"${AAP_R
     exit 1
 }
 
-echo "[6/9] Configuring AAP access..."
+echo "[5/8] Configuring AAP access..."
 ./scripts/prepare-aap.sh
 
-echo "[7/9] Configuring fulfillment service..."
+echo "[6/8] Configuring fulfillment service..."
 ./scripts/prepare-fulfillment-service.sh
 
-echo "[8/9] Restarting fulfillment pods..."
+echo "[7/8] Restarting fulfillment pods..."
 oc rollout restart deploy/fulfillment-controller -n "${INSTALLER_NAMESPACE}"
 oc rollout restart deploy/fulfillment-grpc-server -n "${INSTALLER_NAMESPACE}"
 oc rollout restart deploy/fulfillment-rest-gateway -n "${INSTALLER_NAMESPACE}"
@@ -160,7 +140,7 @@ oc rollout status deploy/fulfillment-grpc-server -n "${INSTALLER_NAMESPACE}" --t
 oc rollout status deploy/fulfillment-rest-gateway -n "${INSTALLER_NAMESPACE}" --timeout=120s
 oc rollout status deploy/fulfillment-ingress-proxy -n "${INSTALLER_NAMESPACE}" --timeout=120s
 
-echo "[9/9] Configuring tenant..."
+echo "[8/8] Configuring tenant..."
 ./scripts/prepare-tenant.sh
 
 echo ""
