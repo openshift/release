@@ -1,0 +1,36 @@
+chain:
+  as: hypershift-azure-dump-selfmanaged-guests
+  steps:
+  - as: dump
+    cli: latest
+    commands: |-
+      set -xuo pipefail
+
+      # Use the nested management cluster kubeconfig
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+
+      if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+
+      # Re-derive cluster names from job ID (same logic as create/destroy steps)
+      PUBLIC_NAME="$(echo -n "${PROW_JOB_ID}-pub"|sha256sum|cut -c-20)"
+      PRIVATE_NAME="$(echo -n "${PROW_JOB_ID}-prv"|sha256sum|cut -c-20)"
+      OAUTH_LB_NAME="$(echo -n "${PROW_JOB_ID}-oau"|sha256sum|cut -c-20)"
+
+      for CLUSTER in "${PUBLIC_NAME}" "${PRIVATE_NAME}" "${OAUTH_LB_NAME}"; do
+        echo "$(date) Dumping self-managed guest cluster: ${CLUSTER}"
+        DUMP_DIR="${ARTIFACT_DIR}/${CLUSTER}"
+        mkdir -p "${DUMP_DIR}"
+        bin/hypershift dump cluster \
+          --artifact-dir="${DUMP_DIR}" \
+          --dump-guest-cluster=true \
+          --name="${CLUSTER}" || echo "$(date) WARNING: Failed to dump cluster ${CLUSTER}"
+      done
+    from: hypershift-operator
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 15m0s
+  - ref: hypershift-debug
+  - ref: hypershift-k8sgpt

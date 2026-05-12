@@ -527,12 +527,33 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
+- as: e2e-metal-ovn-two-node-arbiter-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-agent-ovn-two-node-arbiter
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-agent-ovn-two-node-arbiter-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=TNA_IPV4
+        FEATURE_SET="TechPreviewNoUpgrade"
+      OSSTREAM: rhel-10
     workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   capabilities:
@@ -831,6 +852,38 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
+- as: e2e-agent-ovn-two-node-arbiter-none-platform
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=TNA_IPV4
+        AGENT_PLATFORM_TYPE=none
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+    test:
+    - chain: agent-test
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-metal-ovn-two-node-arbiter-private-tests-rhcos10-tp
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=32768
+        MASTER_DISK=100
+        FEATURE_SET="TechPreviewNoUpgrade"
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended
   capabilities:
   - intranet
@@ -1101,6 +1154,7 @@ tests:
     workflow: openshift-e2e-vsphere-hybrid-env
 - as: e2e-vsphere-ovn-hybrid-env-serial-techpreview
   cron: 35 18 * * 1
+  shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -2357,14 +2411,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
-- as: e2e-rosa-hcp-ovn
-  cron: '@daily'
-  steps:
-    cluster_profile: aws-perfscale-qe
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: rosa-aws-hcp-conformance
 - as: e2e-rosa-sts-ovn
   cron: '@daily'
   steps:
