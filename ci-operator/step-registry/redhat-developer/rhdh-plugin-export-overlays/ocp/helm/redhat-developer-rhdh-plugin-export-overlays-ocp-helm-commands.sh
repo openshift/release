@@ -159,11 +159,10 @@ collect_artifacts() {
         cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] e2e-test-results not found"
     fi
     # Copy JUnit results to SHARED_DIR for data-router step
-    for junit_file in playwright-report/junit-*.xml; do
-        [[ -f "$junit_file" ]] || continue
-        cp "$junit_file" "${SHARED_DIR}/"
-        echo "[INFO] Copied $(basename "$junit_file") to ${SHARED_DIR}/"
-    done
+    if [[ -f "playwright-report/junit-results.xml" ]]; then
+        cp "playwright-report/junit-results.xml" "${SHARED_DIR}/"
+        echo "[INFO] Copied junit-results.xml to ${SHARED_DIR}/"
+    fi
 }
 
 # ── Post GitHub comment ──────────────────────────────────────────────────────

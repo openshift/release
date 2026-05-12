@@ -12,7 +12,7 @@ set +o nounset
 # Prerequisites (written by the test step to SHARED_DIR):
 #   - IS_OPENSHIFT.txt, CONTAINER_PLATFORM.txt, CONTAINER_PLATFORM_VERSION.txt
 #   - RHDH_VERSION.txt
-#   - junit-*.xml
+#   - junit-results.xml
 # =============================================================================
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
@@ -67,45 +67,42 @@ get_artifacts_url() {
   echo "${artifacts_complete_url}"
 }
 
-# Process JUnit files: fix XML property tags for Data Router compatibility
-process_junit_files() {
-  echo "Processing JUnit files for Data Router compatibility..."
+# Process JUnit file: fix XML property tags for Data Router compatibility
+process_junit_file() {
+  echo "Processing JUnit file for Data Router compatibility..."
 
-  for junit_file in "${SHARED_DIR}"/junit-*.xml; do
-    if [[ ! -f "$junit_file" ]]; then
-      continue
-    fi
+  local junit_file="${SHARED_DIR}/junit-results.xml"
+  if [[ ! -f "$junit_file" ]]; then
+    echo "WARNING: junit-results.xml not found in ${SHARED_DIR}, skipping processing"
+    return
+  fi
 
-    local filename
-    filename=$(basename "$junit_file")
-    echo "Processing: ${filename}"
+  echo "Processing: junit-results.xml"
 
-    # Create backup in ARTIFACT_DIR
-    mkdir -p "${ARTIFACT_DIR}/data-router"
-    cp "$junit_file" "${ARTIFACT_DIR}/data-router/${filename}.original.xml"
+  # Create backup in ARTIFACT_DIR
+  mkdir -p "${ARTIFACT_DIR}/data-router"
+  cp "$junit_file" "${ARTIFACT_DIR}/data-router/junit-results.xml.original.xml"
 
-    # Construct artifacts URL for attachment placeholder replacement
-    local artifacts_url
-    artifacts_url=$(get_artifacts_url)
+  # Construct artifacts URL for attachment placeholder replacement
+  local artifacts_url
+  artifacts_url=$(get_artifacts_url)
 
-    # Replace attachment placeholders with full URLs to OpenShift CI storage.
-    # Playwright generates relative paths like ../node_modules/.cache/e2e-test-results/...
-    # which map to artifacts/e2e-test-results/... in GCS (collect_artifacts copies them there).
-    sed -i "s#\[\[ATTACHMENT|\.\./node_modules/\.cache/\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
-    # Catch any remaining attachment placeholders that don't match the pattern above
-    sed -i "s#\[\[ATTACHMENT|\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
+  # Replace attachment placeholders with full URLs to OpenShift CI storage.
+  # Playwright generates relative paths like ../node_modules/.cache/e2e-test-results/...
+  # which map to artifacts/e2e-test-results/... in GCS (collect_artifacts copies them there).
+  sed -i "s#\[\[ATTACHMENT|\.\./node_modules/\.cache/\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
+  # Catch any remaining attachment placeholders that don't match the pattern above
+  sed -i "s#\[\[ATTACHMENT|\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
 
-    # Fix XML property tags format for Data Router compatibility
-    sed -i 's#</property>##g' "$junit_file"
-    sed -i 's#<property name="\([^"]*\)" value="\([^"]*\)">#<property name="\1" value="\2"/>#g' "$junit_file"
+  # Fix XML property tags format for Data Router compatibility
+  sed -i 's#</property>##g' "$junit_file"
+  sed -i 's#<property name="\([^"]*\)" value="\([^"]*\)">#<property name="\1" value="\2"/>#g' "$junit_file"
 
-    # Save the processed file
-    cp "$junit_file" "${ARTIFACT_DIR}/data-router/${filename}.processed.xml"
+  # Save the processed file
+  cp "$junit_file" "${ARTIFACT_DIR}/data-router/junit-results.xml.processed.xml"
 
-    echo "Processed: ${filename}"
-  done
-
-  echo "JUnit files processed and ready for Data Router"
+  echo "Processed: junit-results.xml"
+  echo "JUnit file processed and ready for Data Router"
 }
 
 get_job_url() {
@@ -232,7 +229,7 @@ main() {
 
   ls -la "${SHARED_DIR}"
 
-  process_junit_files
+  process_junit_file
 
   # Send test results through Data Router
   local max_attempts=10
@@ -240,27 +237,19 @@ main() {
   local output=""
   local DATA_ROUTER_REQUEST_ID=""
 
+  if [[ ! -f "${SHARED_DIR}/junit-results.xml" ]]; then
+    echo "ERROR: No JUnit results file (junit-results.xml) found in ${SHARED_DIR}"
+    return
+  fi
+
   for ((i = 1; i <= max_attempts; i++)); do
     echo "Attempt ${i} of ${max_attempts} to send test results through Data Router."
-
-    local junit_files_found=false
-    for file in "${SHARED_DIR}"/junit-*.xml; do
-      if [[ -f "$file" ]]; then
-        junit_files_found=true
-        break
-      fi
-    done
-
-    if [[ "$junit_files_found" == false ]]; then
-      echo "ERROR: No JUnit results files (junit-*.xml) found in ${SHARED_DIR}"
-      return
-    fi
 
     if output=$(droute send --metadata "$(get_metadata_output_path)" \
         --url "${DATA_ROUTER_URL}" \
         --username "${DATA_ROUTER_USERNAME}" \
         --password "${DATA_ROUTER_PASSWORD}" \
-        --results "${SHARED_DIR}/junit-*.xml" \
+        --results "${SHARED_DIR}/junit-results.xml" \
         --verbose --wirelog 2>&1) && \
       DATA_ROUTER_REQUEST_ID=$(echo "$output" | grep "request:" | awk '{print $2}') &&
       [ -n "$DATA_ROUTER_REQUEST_ID" ]; then
