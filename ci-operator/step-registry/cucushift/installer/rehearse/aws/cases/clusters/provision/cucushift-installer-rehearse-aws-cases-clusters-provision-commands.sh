@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+EDGE_ZONE_NAMES_FROM_SHEET=""
+EDGE_INSTANCE_TYPE=""
 
 trap 'post_actions' EXIT TERM INT
 
@@ -82,6 +84,8 @@ function post_actions() {
   update_result "CType" "${COMPUTE_INSTANCE_TYPE}"
   update_result "CFamily" "${COMPUTE_INSTANCE_TYPE_FAMILY}"
   update_result "Arch" "${ARCH}"
+  update_result "EdgeZone" "${EDGE_ZONE_NAMES_FROM_SHEET}"
+  update_result "EdgeType" "${EDGE_INSTANCE_TYPE}"
   update_result "AMI" "${AMI_RESULT}"
   update_result "Install" "${INSTALL_RESULT}"
   update_result "CreatedDate" "${CREATED_DATE}"
@@ -111,6 +115,9 @@ CONTROL_PLANE_INSTANCE_TYPE_FAMILY="$(jq -r '.CPFamily' "${OUT_SELECT_DICT}")"
 COMPUTE_INSTANCE_TYPE="$(jq -r '.CType' "${OUT_SELECT_DICT}")"
 COMPUTE_INSTANCE_TYPE_FAMILY="$(jq -r '.CFamily' "${OUT_SELECT_DICT}")"
 
+EDGE_ZONE_NAMES_FROM_SHEET="$(jq -r '.EdgeZone // ""' "${OUT_SELECT_DICT}")"
+EDGE_INSTANCE_TYPE="$(jq -r '.EdgeType // ""' "${OUT_SELECT_DICT}")"
+
 if is_empty "$ARCH"; then
   # Default ARCH is determined by each plarform.
   # For most of cased, default is arm.
@@ -122,6 +129,8 @@ echo "Creating cluster in region ${REGION}:"
 echo "ARCH: $ARCH"
 echo "CONTROL_PLANE_INSTANCE*: $CONTROL_PLANE_INSTANCE_TYPE $CONTROL_PLANE_INSTANCE_TYPE_FAMILY"
 echo "COMPUTE_INSTANCE*: $COMPUTE_INSTANCE_TYPE $COMPUTE_INSTANCE_TYPE_FAMILY"
+echo "EDGE_ZONE_NAMES_FROM_SHEET: $EDGE_ZONE_NAMES_FROM_SHEET"
+echo "EDGE_INSTANCE_TYPE: $EDGE_INSTANCE_TYPE"
 
 AMI_RESULT=""
 INSTALL_RESULT=""
@@ -279,9 +288,6 @@ fi
 # Patch Edge nodes
 if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZones" ]; then
 
-  # patch edge node
-  EDGE_ZONES_JSON=/tmp/edge_zones.json
-
   if [ "$TEST_OBJECT" == "WavelengthZones" ]; then
     ZONE_TYPE="wavelength-zone"
   fi
@@ -290,10 +296,25 @@ if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZone
     ZONE_TYPE="local-zone"
   fi
 
-  jq -r --arg t "$ZONE_TYPE" '[.AvailabilityZones[] | select(.ZoneType==$t)]' "${ZONES_JSON}" > "${EDGE_ZONES_JSON}"
+  if is_empty "$EDGE_ZONE_NAMES_FROM_SHEET"; then
+    echo "EdgeZone column is empty or absent, discovering edge zones from AWS API ..."
+    EDGE_ZONES_JSON=/tmp/edge_zones.json
+    jq -r --arg t "$ZONE_TYPE" '[.AvailabilityZones[] | select(.ZoneType==$t)]' "${ZONES_JSON}" > "${EDGE_ZONES_JSON}"
 
-  EDGE_ZONE_COUNT=$(jq -r '. | length' ${EDGE_ZONES_JSON})
-  EDGE_ZONE_NAMES=$(jq -r '.[].ZoneName' ${EDGE_ZONES_JSON})
+    EDGE_ZONE_COUNT=$(jq -r '. | length' ${EDGE_ZONES_JSON})
+    EDGE_ZONE_NAMES=$(jq -r '.[].ZoneName' ${EDGE_ZONES_JSON})
+  else
+    echo "Using edge zones from spreadsheet: ${EDGE_ZONE_NAMES_FROM_SHEET}"
+    EDGE_ZONE_NAMES=$(echo "${EDGE_ZONE_NAMES_FROM_SHEET}" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed '/^$/d' | tr '\n' ' ')
+    EDGE_ZONE_COUNT=$(echo ${EDGE_ZONE_NAMES} | wc -w)
+  fi
+
+  echo "Edge zones (${EDGE_ZONE_COUNT}): ${EDGE_ZONE_NAMES}"
+
+  if [[ "${EDGE_ZONE_COUNT}" -eq 0 ]]; then
+    echo "ERROR: No edge zones resolved for ${TEST_OBJECT} in region ${REGION}"
+    exit 1
+  fi
 
   if [ "${ARCH}" == "" ]; then
     yq-v4 eval -i '.compute[1].architecture = "amd64"' "${CONFIG}"
@@ -311,6 +332,12 @@ if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZone
     yq-v4 eval -i '.compute[1].platform.aws.zones += [env(edge_zone)]' "${CONFIG}"
     unset edge_zone
   done
+
+  if ! is_empty "$EDGE_INSTANCE_TYPE"; then
+    echo "Setting edge compute instance type from spreadsheet: ${EDGE_INSTANCE_TYPE}"
+    export EDGE_INSTANCE_TYPE
+    yq-v4 eval -i '.compute[1].platform.aws.type = env(EDGE_INSTANCE_TYPE)' "${CONFIG}"
+  fi
 fi
 
 echo "install-config.yaml:"

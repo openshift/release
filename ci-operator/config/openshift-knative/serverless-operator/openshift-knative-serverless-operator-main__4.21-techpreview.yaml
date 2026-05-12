@@ -171,6 +171,43 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: olmv1-operator-upgrade
+  cron: 45 7 * * 0
+  steps:
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
+    test:
+    - as: operator-upgrade
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin OLM_VERSION=v1 make test-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_MUST_GATHER
+        name: serverless-must-gather
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift-knative

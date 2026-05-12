@@ -1,0 +1,44 @@
+chain:
+  as: etcd-encryption-vault-setup
+  steps:
+  - ref: etcd-encryption-vault-install
+  - ref: etcd-encryption-vault-configure
+  documentation: |-
+    Installs and configures HashiCorp Vault Enterprise for KMS encryption testing.
+
+    This chain combines the vault installation and configuration steps into a single
+    reusable component that can be used across different platform workflows.
+
+    What this chain does:
+    1. Installs HashiCorp Vault Enterprise via Helm (vault-install step)
+       - Deploys Vault in dev mode to vault-kms namespace
+       - Creates vault-license secret from mounted credentials
+       - Waits for Vault pod to be ready
+
+    2. Configures Vault for KMS encryption (vault-configure step)
+       - Enables transit secret engine
+       - Creates KMS encryption key
+       - Configures AppRole authentication
+       - Stores credentials in vault-credentials secret
+
+    Prerequisites:
+    - OpenShift cluster with adequate resources
+    - Vault Enterprise license secret named 'tests-private-account' in test-credentials namespace
+      containing the license file at key 'kms-vault-license'
+
+    Outputs:
+    - Vault service: vault.vault-kms.svc:8200
+    - Vault pod: vault-0 (Ready state)
+    - Credentials secret: vault-credentials in vault-kms namespace
+      * role-id: AppRole role ID for KMS plugin
+      * secret-id: AppRole secret ID for KMS plugin
+      * root-token: Vault root token (dev mode)
+
+    Environment variables (inherited from vault-install step):
+    - VAULT_VERSION: Vault Enterprise version (default: 2.0.0-ent)
+    - VAULT_CHART_VERSION: Helm chart version (default: 0.28.1)
+    - VAULT_NAMESPACE: Vault namespace (default: vault-kms)
+    - VAULT_IMAGE_REPOSITORY: Container image repo (default: docker.io/hashicorp/vault-enterprise)
+
+    Environment variables (inherited from vault-configure step):
+    - VAULT_KMS_KEY_NAME: Transit encryption key name (default: kms-key)

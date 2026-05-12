@@ -50,41 +50,24 @@ tests:
   commands: make test
   container:
     from: src
-- as: default-tls
+- as: smoke-tls
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 5h0m0s
+    timeout: 1h0m0s
     version: "4.22"
   optional: true
   steps:
+    env:
+      PQC_CHECK: "true"
+      SCAN_LIMIT_IPS: "10"
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
     test:
     - ref: tls-scanner-run
     workflow: generic-claim
-- as: default-pqc-readiness
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      PQC_CHECK: "true"
-    test:
-    - ref: tls-scanner-run
-    workflow: ipi-aws
-- as: tls13-adherence
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      PQC_CHECK: "false"
-      TLS_13_ENABLE_TLS_ADHERENCE: "true"
-      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
-    test:
-    - ref: tls-scanner-run
-    workflow: openshift-e2e-aws-ovn-tls-13
 - as: periodic-default-tls
   interval: 72h
   steps:
@@ -113,16 +96,6 @@ tests:
       PQC_CHECK: "false"
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
-    test:
-    - ref: tls-scanner-run
-    workflow: openshift-e2e-aws-ovn-tls-13
-- as: tls13-pqc-readiness
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      PQC_CHECK: "true"
     test:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-ovn-tls-13

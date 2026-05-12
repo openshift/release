@@ -1,20 +1,11 @@
 chain:
   as: kueue-operator-test-e2e-dra
   steps:
-  - as: enable-dra-feature-gate
-    cli: latest
-    from: cli
-    commands: |
-      oc patch featuregates cluster --type='merge' -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["DynamicResourceAllocation"]}}}'
-      oc wait co kube-apiserver --for='condition=Progressing=True' --timeout=5m || true
-      oc wait co kube-apiserver --for='condition=Progressing=False' --timeout=30m
-    resources:
-      requests:
-        cpu: 100m
-        memory: 200Mi
+  - ref: kueue-operator-test-e2e-dra-enable-feature-gate
   - ref: kueue-operator-image-env-setup
   - ref: nvidia-nfd-operator-install
   - ref: nvidia-gpu-operator-install
+  - ref: kueue-operator-test-e2e-dra-disable-device-plugin
   - ref: nvidia-dra-driver-install
   - ref: cert-manager-install-operator
   - as: run-sdk
