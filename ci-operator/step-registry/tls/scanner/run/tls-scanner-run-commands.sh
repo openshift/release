@@ -69,7 +69,7 @@ spec:
   - name: scanner
     image: ${SCANNER_IMAGE}
     command:
-    - /bin/sh
+    - /bin/bash
     - -c
     - |
       mkdir -p /results
@@ -78,9 +78,12 @@ spec:
         --csv-file /results/results.csv \
         --junit-file /results/junit_tls_scan.xml \
         --log-file /results/scan.log 2>&1 | tee /results/output.log
-      echo "Scan complete. Exit code: \$?" | tee -a /results/output.log
+      SCAN_EXIT_CODE=\${PIPESTATUS[0]}
+      echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
       # Keep pod alive for artifact collection
       sleep 120
+      # We are intentionally ignoring the scanner exit code for the moment
+      # exit \${SCAN_EXIT_CODE}
     resources:
       requests:
         cpu: "${SCANNER_CPU}"
