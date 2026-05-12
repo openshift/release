@@ -71,9 +71,16 @@ periodics:
         --slack-token-path=/etc/slack/oauth_token \
         --github-endpoint=http://ghproxy \
         --github-endpoint=https://api.github.com \
-        --github-token-path=/etc/oauth/oauth
+        --github-app-id=$(GITHUB_APP_ID) \
+        --github-app-private-key-path=/etc/github/cert
       command:
       - /bin/bash
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_pr-reminder_latest
       imagePullPolicy: Always
       name: ""
@@ -90,8 +97,9 @@ periodics:
       - mountPath: /etc/github-users
         name: github-users
         readOnly: true
-      - mountPath: /etc/oauth
-        name: github-token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
     - name: slack
       secret:
@@ -102,9 +110,9 @@ periodics:
     - configMap:
         name: sync-rover-groups
       name: github-users
-    - name: github-token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-ci-robot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
@@ -969,60 +977,6 @@ periodics:
         secretName: app-ci-openshift-user-workload-monitoring-credentials
 - agent: kubernetes
   cluster: app.ci
-  cron: 0 0 1 6 *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-auto-prow-job-dispatcher
-  spec:
-    containers:
-    - args:
-      - --upstream-branch=main
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --github-login=openshift-bot
-      - --git-name=openshift-bot
-      - --git-email=openshift-bot@redhat.com
-      - --target-dir=.
-      - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
-      - --prow-jobs-dir=./ci-operator/jobs
-      - --self-approve=true
-      - --prometheus-bearer-token-path=/etc/prometheus/token
-      - --create-pr=true
-      - --pr-body=@coderabbitai ignore
-      command:
-      - /usr/bin/prow-job-dispatcher
-      image: quay.io/openshift/ci-public:ci_prow-job-dispatcher_latest
-      imagePullPolicy: Always
-      name: auto-prow-job-dispatcher
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/prometheus
-        name: prometheus
-        readOnly: true
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: prometheus
-      secret:
-        items:
-        - key: sa.ci-monitoring.app.ci.token.txt
-          path: token
-        secretName: app-ci-openshift-user-workload-monitoring-credentials
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
   cron: 0 0 * * *
   decorate: true
   extra_refs:
@@ -1229,7 +1183,8 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --job-config-path=./ci-operator/jobs
       - --confirm=true
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
@@ -1237,6 +1192,12 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260508-77c4e0541
       imagePullPolicy: Always
       name: ""
@@ -1245,12 +1206,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-merge-robot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This job runs Prow branchprotector to reconcile the
@@ -1898,47 +1859,6 @@ periodics:
       name: config-volume
 - agent: kubernetes
   cluster: app.ci
-  cron: '@yearly'
-  decorate: true
-  extra_refs:
-  - base_ref: openshift-4.22
-    org: openshift
-    repo: ocp-build-data
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-ocp-build-data-enforcer
-  spec:
-    containers:
-    - args:
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --ocp-build-data-repo-dir=./
-      - --create-prs=true
-      - --minor=22
-      - --pr-creation-ceiling=1000
-      command:
-      - /usr/bin/ocp-build-data-enforcer
-      env:
-      - name: CLICOLOR_FORCE
-        value: "1"
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ocp-build-data-enforcer_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
   cron: '@daily'
   decorate: true
   extra_refs:
@@ -2576,12 +2496,21 @@ periodics:
 
         # Initiate prcreator to open a PR against sippy
         /usr/bin/prcreator \
-        -github-token-path=/etc/github/oauth \
+        -pr-source-mode=branch \
+        -github-app-id=$(GITHUB_APP_ID) \
+        -github-app-private-key-path=/etc/github/cert \
+        -github-endpoint=http://ghproxy \
+        -github-endpoint=https://api.github.com \
         -organization=openshift -repo=sippy -branch=main \
         -pr-title="Automated - Update config ./config/openshift.yaml"
       command:
       - /bin/bash
       env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       - name: GOOGLE_APPLICATION_CREDENTIALS
         value: /etc/bigquery/token
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-sippy-config-generator_latest
@@ -2592,15 +2521,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/bigquery
         name: bigquery-token
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
     - name: bigquery-token
       secret:
         secretName: ci-data-bigquery-readonly
