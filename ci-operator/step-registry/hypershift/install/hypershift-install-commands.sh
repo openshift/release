@@ -147,7 +147,6 @@ case "${CLOUD_PROVIDER}" in
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --enable-conversion-webhook=false \
   --external-dns-provider=google \
   --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
   --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \
