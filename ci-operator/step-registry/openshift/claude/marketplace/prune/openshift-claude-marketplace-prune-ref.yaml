@@ -1,0 +1,49 @@
+ref:
+  as: openshift-claude-marketplace-prune
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-claude-marketplace-prune-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: ai-helpers-github-app
+    mount_path: /var/run/github-app
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/token"
+  - name: CLAUDE_MODEL
+    default: "claude-sonnet-4-6"
+  - name: GITHUB_APP_ID_PATH
+    default: "/var/run/github-app/app-id"
+  - name: GITHUB_APP_KEY_PATH
+    default: "/var/run/github-app/private-key"
+  - name: GITHUB_APP_INSTALL_ID_FORK
+    default: "/var/run/github-app/install-id-fork"
+  - name: GITHUB_APP_INSTALL_ID_UPSTREAM
+    default: "/var/run/github-app/install-id-upstream"
+  - name: UPSTREAM_REPO
+    default: "openshift-eng/ai-helpers"
+  - name: FORK_ORG
+    default: "openshift-trt-bot"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 1h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Maintains the ai-helpers plugin marketplace by pruning stale plugins,
+    commands, and skills. Runs weekly: if no open prune PR exists, scores
+    all plugins/items deterministically and invokes Claude only for
+    qualitative item-level review, then opens a PR. If a prune PR is
+    already open, processes /save and /drop comments from collaborators.
