@@ -27,50 +27,51 @@ echo "HostedCluster name: $CLUSTER_NAME"
 export KUBECONFIG="$GUEST_KUBECONFIG"
 echo "Guest cluster: $(oc whoami --show-server)"
 
-# Determine PR number from Prow environment
-PR_NUMBER="${PULL_NUMBER:-}"
-if [ -z "$PR_NUMBER" ]; then
-  echo "ERROR: PULL_NUMBER not set — this job must run as a presubmit"
-  exit 1
-fi
-
-REPO_ORG="${REPO_OWNER:-openshift}"
-REPO_NAME="${REPO_NAME:-hypershift}"
+# TEMPORARY: hardcode to test against hypershift PR 8454 — revert before merging
+PR_NUMBER="8454"
+REPO_ORG="openshift"
+REPO_NAME="hypershift"
+SKIP_AUTH_CHECK="true"
 echo "Processing PR #${PR_NUMBER} from ${REPO_ORG}/${REPO_NAME}"
 
-# Verify the job was triggered by a core-approver
-echo "Checking who triggered the job..."
-TRIGGER_USER=$(curl -s "https://api.github.com/repos/${REPO_ORG}/${REPO_NAME}/issues/${PR_NUMBER}/comments?per_page=100&direction=desc" \
-  | jq -r '[.[] | select(.body | test("/test\\s+(|.* )agentic-qe"))] | last | .user.login // empty')
+# TEMPORARY: skip auth check for testing — revert before merging
+if [[ "${SKIP_AUTH_CHECK:-}" != "true" ]]; then
+  # Verify the job was triggered by a core-approver
+  echo "Checking who triggered the job..."
+  TRIGGER_USER=$(curl -s "https://api.github.com/repos/${REPO_ORG}/${REPO_NAME}/issues/${PR_NUMBER}/comments?per_page=100&direction=desc" \
+    | jq -r '[.[] | select(.body | test("/test\\s+(|.* )agentic-qe"))] | last | .user.login // empty')
 
-if [ -z "$TRIGGER_USER" ]; then
-  echo "WARNING: Could not determine who triggered the job"
-  echo "Exiting — only core-approvers can trigger this job"
-  exit 0
+  if [ -z "$TRIGGER_USER" ]; then
+    echo "WARNING: Could not determine who triggered the job"
+    echo "Exiting — only core-approvers can trigger this job"
+    exit 0
+  fi
+
+  echo "Job triggered by: $TRIGGER_USER"
+
+  # Fetch OWNERS_ALIASES and check if user is in the core-approvers group
+  CORE_APPROVERS=$(curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
+    | yq -r '.aliases.core-approvers[]' 2>/dev/null \
+    || curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
+      | python3 -c "import sys,yaml; print('\n'.join(yaml.safe_load(sys.stdin)['aliases']['core-approvers']))" 2>/dev/null \
+    || echo "")
+
+  if [ -z "$CORE_APPROVERS" ]; then
+    echo "WARNING: Could not fetch core-approvers from OWNERS_ALIASES"
+    exit 0
+  fi
+
+  if ! echo "$CORE_APPROVERS" | grep -qx "$TRIGGER_USER"; then
+    echo "ERROR: $TRIGGER_USER is not a core-approver"
+    echo "Only core-approvers can trigger the agentic-qe job:"
+    echo "$CORE_APPROVERS" | sed 's/^/  - /'
+    exit 0
+  fi
+
+  echo "Verified: $TRIGGER_USER is a core-approver"
+else
+  echo "TEMPORARY: skipping auth check for testing"
 fi
-
-echo "Job triggered by: $TRIGGER_USER"
-
-# Fetch OWNERS_ALIASES and check if user is in the core-approvers group
-CORE_APPROVERS=$(curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
-  | yq -r '.aliases.core-approvers[]' 2>/dev/null \
-  || curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
-    | python3 -c "import sys,yaml; print('\n'.join(yaml.safe_load(sys.stdin)['aliases']['core-approvers']))" 2>/dev/null \
-  || echo "")
-
-if [ -z "$CORE_APPROVERS" ]; then
-  echo "WARNING: Could not fetch core-approvers from OWNERS_ALIASES"
-  exit 0
-fi
-
-if ! echo "$CORE_APPROVERS" | grep -qx "$TRIGGER_USER"; then
-  echo "ERROR: $TRIGGER_USER is not a core-approver"
-  echo "Only core-approvers can trigger the agentic-qe job:"
-  echo "$CORE_APPROVERS" | sed 's/^/  - /'
-  exit 0
-fi
-
-echo "Verified: $TRIGGER_USER is a core-approver"
 
 # Clone the PR head
 echo "Cloning repository at PR head..."
