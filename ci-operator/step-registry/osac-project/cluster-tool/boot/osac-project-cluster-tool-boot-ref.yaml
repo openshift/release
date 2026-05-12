@@ -1,0 +1,42 @@
+ref:
+  as: osac-project-cluster-tool-boot
+  from: dev-scripts
+  dependencies:
+  - name: osac-installer
+    env: OSAC_INSTALLER_IMAGE
+  - name: component-image
+    env: COMPONENT_IMAGE
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: osac-project-cluster-tool-boot-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: osac-installer-aap
+    mount_path: /var/run/osac-installer-aap
+  env:
+  - name: E2E_NAMESPACE
+    default: "osac-e2e-ci"
+    documentation: The namespace to use for OSAC deployment
+  - name: E2E_KUSTOMIZE_OVERLAY
+    default: "vmaas-ci"
+    documentation: The kustomize overlay to use
+  - name: E2E_VM_TEMPLATE
+    default: "osac.templates.ocp_virt_vm"
+    documentation: The VM template to publish
+  - name: COMPONENT_IMAGE_NAME
+    default: ""
+    documentation: Image name to override (e.g. ghcr.io/osac-project/fulfillment-service)
+  - name: CLUSTER_TOOL_COMMIT
+    default: "main"
+    documentation: cluster-tool git ref to download (branch, tag, or commit)
+  - name: CLUSTER_TOOL_FLAVOR_IMAGE
+    default: "quay.io/rh-ee-ovishlit/cluster-flavors:osac-vmaas"
+    documentation: OCI image containing the OSAC snapshot flavor
+  documentation: |-
+    Boots an OSAC cluster from a pre-built snapshot using cluster-tool,
+    then refreshes domain-sensitive resources. Optionally overrides a
+    component image for PR testing.
