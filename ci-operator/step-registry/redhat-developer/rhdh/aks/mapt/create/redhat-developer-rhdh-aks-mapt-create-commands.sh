@@ -33,6 +33,12 @@ function cleanup() {
   fi
 }
 
+if [[ -z "${MAPT_KUBERNETES_VERSION:-}" ]]; then
+  echo "[ERROR] MAPT_KUBERNETES_VERSION is not set. Set it in the CI config env for this test entry."
+  exit 1
+fi
+echo "[INFO] Using Kubernetes version: ${MAPT_KUBERNETES_VERSION}"
+
 echo "[INFO] 🔐 Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
@@ -56,7 +62,7 @@ mapt azure aks create \
   --project-name "aks" \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
-  --version 1.34 \
+  --version "${MAPT_KUBERNETES_VERSION}" \
   --vmsize "Standard_D4as_v6" \
   --spot \
   --spot-eviction-tolerance "low" \

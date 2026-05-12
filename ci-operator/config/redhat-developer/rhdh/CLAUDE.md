@@ -2,7 +2,7 @@
 
 ## Available Skills
 
-Skills in `.claude/skills/` are loaded on demand by the agent. Use them when working with RHDH OCP version management in this repository.
+Skills in `.claude/skills/` are loaded on demand by the agent. Use them when working with RHDH version management in this repository.
 
 ### `rhdh-ocp-lifecycle` — Check RHDH & OCP version support
 
@@ -31,6 +31,42 @@ Cross-reference cluster pools, CI test configs, RHDH lifecycle, and OCP lifecycl
 ### `rhdh-decommission-release` — Decommission EOL release branch
 
 Remove all CI configuration for an end-of-life RHDH release branch: CI config file, generated Prow jobs, and branch protection entry.
+
+### `rhdh-aks-lifecycle` — Check AKS K8s version support
+
+Query the official AKS release status API (`releases.aks.azure.com`) for supported K8s versions (major.minor) and compare against the versions configured per branch in CI config files. Cross-verifies with endoflife.date for EOL dates.
+
+**Scripts**: `check-aks-lifecycle.sh [--mapt-ref <path>] [--test-pattern <regex>]`
+
+### `rhdh-aks-tests` — Manage AKS test entries and K8s version
+
+List AKS test entries (`e2e-aks-*`) across RHDH release branches and update the K8s version. The version is set per branch via `MAPT_KUBERNETES_VERSION` in each CI config file's `steps.env`. `make update` is not required for version changes.
+
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
+
+### `rhdh-eks-lifecycle` — Check EKS K8s version support
+
+Query the official AWS EKS docs source (`awsdocs/amazon-eks-user-guide` on GitHub) for supported K8s versions (standard/extended) and release calendar. Cross-verifies with endoflife.date for EOL dates.
+
+**Scripts**: `check-eks-lifecycle.sh [--mapt-ref <path>] [--test-pattern <regex>]`
+
+### `rhdh-eks-tests` — Manage EKS test entries and K8s version
+
+List EKS test entries (`e2e-eks-*`) across RHDH release branches and update the K8s version. The version is set per branch via `MAPT_KUBERNETES_VERSION` in each CI config file's `steps.env`. `make update` is not required for version changes.
+
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
+
+### `rhdh-gke-lifecycle` — Check GKE K8s version support
+
+Query the endoflife.date API (auto-scraped from Google's GKE release schedule page) for supported K8s versions with standard/maintenance status and EOL dates. GKE uses a long-running static cluster whose version is not managed in CI config.
+
+**Scripts**: `check-gke-lifecycle.sh`
+
+### `rhdh-gke-tests` — Manage GKE test entries
+
+List GKE test entries (`e2e-gke-*`) across RHDH release branches. Unlike AKS/EKS, GKE uses a pre-existing static cluster — version upgrades are performed via the GCP Console. `make update` is not required.
+
+**Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
 
 ## New Release Branch Checklist
 
