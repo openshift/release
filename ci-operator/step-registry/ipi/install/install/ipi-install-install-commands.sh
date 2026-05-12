@@ -6,7 +6,8 @@ set -o pipefail
 
 # shellcheck disable=SC1090
 source "$LEASE_PROXY_CLIENT_SH"
-install_lease_handle=''
+create_cluster_install_lease_handle=''
+destroy_cluster_install_lease_handle=''
 
 function set-cluster-version-spec-update-service() {
     local payload_version
@@ -238,8 +239,9 @@ function write_install_status() {
 }
 
 function prepare_next_steps() {
-  printf 'Releasing install lease (if any)\n'
-  lease__release --handle="$install_lease_handle" || true
+  printf 'Releasing install leases (if any)\n'
+  lease__release --handle="$create_cluster_install_lease_handle" || true
+  lease__release --handle="$destroy_cluster_install_lease_handle" || true
   write_install_status
   set +e
   echo "Tear down the backgroup process of copying kube config"
@@ -582,20 +584,30 @@ function get_arch() {
   echo "${ARCH}"
 }
 
-function release_install_lease() {
-  lease__release --delay=20m --handle="$install_lease_handle"
-  printf 'Install lease released at %s\n' "$(date "+%F %X")"
+function release_create_cluster_install_lease() {
+  lease__release --delay=20m --handle="$create_cluster_install_lease_handle"
+  printf 'Create cluster install lease released at %s\n' "$(date "+%F %X")"
 }
 
-function refresh_install_lease() {
+function refresh_create_cluster_install_lease() {
   if ! lease__install_lease_eligible; then
       return 0
   fi
 
-  lease__release --handle="$install_lease_handle"
-  install_lease_handle=$(lease__acquire --type="${CLUSTER_PROFILE_SET_NAME}--${CLUSTER_PROFILE_NAME}--install-quota-slice" --scope=step)
-  printf 'Install lease acquired at %s: %s\n' "$(date "+%F %X")" "$(lease__cat --handle="$install_lease_handle" --format=csv)"
-  release_install_lease &
+  lease__release --handle="$create_cluster_install_lease_handle"
+  create_cluster_install_lease_handle=$(lease__acquire --type="${CLUSTER_PROFILE_SET_NAME}--${CLUSTER_PROFILE_NAME}--install-quota-slice" --scope=step)
+  printf 'Create cluster install lease acquired at %s: %s\n' "$(date "+%F %X")" "$(lease__cat --handle="$create_cluster_install_lease_handle" --format=csv)"
+  release_create_cluster_install_lease &
+}
+
+function refresh_destroy_cluster_install_lease() {
+  if ! lease__install_lease_eligible; then
+      return 0
+  fi
+
+  lease__release --handle="$destroy_cluster_install_lease_handle"
+  destroy_cluster_install_lease_handle=$(lease__acquire --type="${CLUSTER_PROFILE_SET_NAME}--${CLUSTER_PROFILE_NAME}--install-quota-slice" --scope=step)
+  printf 'Destroy cluster install lease acquired at %s: %s\n' "$(date "+%F %X")" "$(lease__cat --handle="$destroy_cluster_install_lease_handle" --format=csv)"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -857,7 +869,9 @@ do
   if [ $tries -gt 1 ]; then
     write_install_status
     populate_artifact_dir
+    refresh_destroy_cluster_install_lease || true
     ${INSTALLER_BINARY} --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    lease__release --handle="$destroy_cluster_install_lease_handle" || true
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -875,7 +889,7 @@ do
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
 
-  refresh_install_lease || true
+  refresh_create_cluster_install_lease || true
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
   ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
