@@ -34,7 +34,11 @@ if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then
     else
         export IMG=${PROW_JOB_ID/-telco5g/}
     fi
-    IMG_URL="registry.ci.openshift.org/ocp/release:$IMG"
+    if [[ "$IMG" == "5"* ]]; then
+        IMG_URL="registry.ci.openshift.org/ocp/release-5:$IMG"
+    else
+        IMG_URL="registry.ci.openshift.org/ocp/release:$IMG"
+    fi
 
     echo "export T5_JOB_TRIGGER=nightly" >> "$MAINENV"
     echo "export T5_JOB_DESC='nightly-${T5CI_JOB_TYPE}'" >> "$MAINENV"
