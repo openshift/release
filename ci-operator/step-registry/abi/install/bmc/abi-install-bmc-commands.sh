@@ -23,7 +23,7 @@ eval "$(
 )"
 eval "$(
     curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
-)"; EnsureReqs yq chisel
+)"; EnsureReqs yq chisel bw
 
 typeset bmcInfo="${SHARED_DIR}/ocp--bmc--info.json"; [ -f "${bmcInfo}" ]
 typeset isoFile='' isoURL='' chiselCrdUsr='' chiselCrdPwd=''
