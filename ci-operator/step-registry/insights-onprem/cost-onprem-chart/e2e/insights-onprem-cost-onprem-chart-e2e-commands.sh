@@ -290,6 +290,10 @@ if [[ -n "${CHART_REF:-}" ]]; then
                 if [[ -z "$CHART_VERSION" ]]; then
                     echo "WARNING: Could not determine RC version from Helm repo, falling back to git"
                     DEVEL_SUPPORTED="false"
+                elif [[ "$CHART_VERSION" != *-* ]]; then
+                    # helm --devel returns stable versions when no prerelease exists
+                    echo "WARNING: Helm returned stable version ${CHART_VERSION} (no prerelease available), falling back to git"
+                    DEVEL_SUPPORTED="false"
                 else
                     echo "Helm repo has RC version: ${CHART_VERSION}"
                     
