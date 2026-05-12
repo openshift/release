@@ -51,11 +51,11 @@ The script outputs three sections:
 
 3. **Cross-verify (endoflife.date)** — independent EOL dates. If these disagree with the primary source, investigate further before making changes.
 
-Compare the configured version against the supported list. If the configured version is deprecated or missing from the supported list, it needs updating.
+## Action
 
-## Next Steps
+**Always update the main branch to the newest GA version.** If the configured version on main is not the newest GA version, proceed to update it using the `rhdh-aks-tests` skill to change `MAPT_KUBERNETES_VERSION` in the main CI config file.
 
-If a version update is needed, use `rhdh-aks-tests` to change `MAPT_KUBERNETES_VERSION` in the CI config files.
+For release branches (e.g., release-1.9, release-1.8), **ask the user** whether they should also be updated before making changes.
 
 ## Related Skills
 

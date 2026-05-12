@@ -47,11 +47,9 @@ The script outputs supported GKE K8s versions with their support status and date
 - **Maintenance**: past standard support end date but still receives critical security patches for a limited time
 - Versions past both standard and maintenance support are not shown
 
-Since GKE version is not in CI config, compare the output against the actual cluster version (check via GCP Console or ask the team).
+## Action
 
-## Next Steps
-
-If an upgrade is needed, use the GCP Console to upgrade the cluster. Use `rhdh-gke-tests` to verify which test entries reference this cluster.
+**Always recommend upgrading to the newest Standard version.** Since GKE version is not in CI config, check the actual cluster version via the GCP Console. If the cluster is not on the newest Standard version, recommend upgrading via the [GKE clusters page](https://console.cloud.google.com/kubernetes/list/overview).
 
 ## Related Skills
 
