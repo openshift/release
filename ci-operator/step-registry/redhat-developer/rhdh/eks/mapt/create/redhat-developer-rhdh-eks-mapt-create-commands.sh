@@ -34,6 +34,12 @@ function cleanup() {
   fi
 }
 
+if [[ -z "${MAPT_KUBERNETES_VERSION:-}" ]]; then
+  echo "[ERROR] MAPT_KUBERNETES_VERSION is not set. Set it in the CI config env for this test entry."
+  exit 1
+fi
+echo "[INFO] Using Kubernetes version: ${MAPT_KUBERNETES_VERSION}"
+
 echo "[INFO] 🔐 Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
@@ -54,7 +60,7 @@ mapt aws eks create \
   --project-name "eks" \
   --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
-  --version 1.34 \
+  --version "${MAPT_KUBERNETES_VERSION}" \
   --workers-max 3 \
   --workers-desired 3 \
   --cpus 2 \
