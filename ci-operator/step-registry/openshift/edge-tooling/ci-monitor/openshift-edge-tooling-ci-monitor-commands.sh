@@ -13,19 +13,7 @@ echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
 set +x
 
 if [[ -f "${GITHUB_APP_ID_PATH}" ]] && [[ -f "${GITHUB_KEY_PATH}" ]]; then
-    GH_TOKEN_VER="2.0.8"
-    GH_TOKEN_SHA="867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f"
-    GH_TOKEN_EXE="/tmp/gh-token-${GH_TOKEN_VER}"
-
-    curl -sSL --connect-timeout 10 --max-time 30 --fail "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" -o "${GH_TOKEN_EXE}"
-    if ! echo "${GH_TOKEN_SHA}  ${GH_TOKEN_EXE}" | sha256sum -c -; then
-        echo "ERROR: Failed to verify gh-token checksum."
-        exit 1
-    fi
-    chmod +x "${GH_TOKEN_EXE}"
-
-    GITHUB_TOKEN="$("${GH_TOKEN_EXE}" generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
-    rm -f "${GH_TOKEN_EXE}"
+    GITHUB_TOKEN="$(gh-token generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
     if [[ -z "${GITHUB_TOKEN}" ]] || [[ "${GITHUB_TOKEN}" == "null" ]]; then
         echo "ERROR: Failed to generate GitHub token from App credentials."
         exit 1
@@ -33,7 +21,7 @@ if [[ -f "${GITHUB_APP_ID_PATH}" ]] && [[ -f "${GITHUB_KEY_PATH}" ]]; then
     export GITHUB_TOKEN
     echo "GitHub token generated."
 else
-    echo "ERROR: GitHub App credentials not found. Cannot clone edge-tooling."
+    echo "ERROR: GitHub App credentials not found."
     exit 1
 fi
 
@@ -120,7 +108,7 @@ cd "${WORKDIR}"
 
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
-    local report_dir="${WORKDIR}/edge-tooling/payload-monitor/reports"
+    local report_dir="${EDGE_TOOLING_DIR}/payload-monitor/reports"
     if [[ -d "${report_dir}" ]]; then
         local latest_html
         latest_html=$(ls -t "${report_dir}"/*.html 2>/dev/null | head -1)
@@ -155,12 +143,6 @@ copy_artifacts() {
 trap copy_artifacts EXIT TERM INT
 
 # ---------------------------------------------------------------------------
-# Clone edge-tooling (needed for payload-monitor tool and plugin skills)
-# ---------------------------------------------------------------------------
-echo "Cloning edge-tooling repository..."
-gh repo clone openshift-eng/edge-tooling edge-tooling -- --depth 1 --branch main
-
-# ---------------------------------------------------------------------------
 # Register local marketplaces and install plugins
 # ---------------------------------------------------------------------------
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
@@ -170,7 +152,7 @@ echo "Cloning ai-helpers for CI analysis skills..."
 gh repo clone openshift-eng/ai-helpers ai-helpers -- --depth 1 --branch main
 
 echo "Registering local marketplaces..."
-claude plugin marketplace add "${WORKDIR}/edge-tooling"
+claude plugin marketplace add "${EDGE_TOOLING_DIR}"
 claude plugin marketplace add "${WORKDIR}/ai-helpers"
 
 echo "Installing plugins..."
