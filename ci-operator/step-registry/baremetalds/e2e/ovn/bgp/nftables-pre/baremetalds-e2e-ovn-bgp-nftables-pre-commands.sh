@@ -41,56 +41,64 @@ BOOTSTRAP_NETWORK="192.168.111.0/24"
 BOOTSTRAP_NETWORK_V6="fd2e:6f44:5dd8:c956::/64"
 INTERFACE_NAME="ostestbm"
 
-# Function to add nftables FORWARD rules for a given IP family
-# Using native nft commands since firewalld is stopped
-add_forward_rules() {
-    local cluster_network=$1
-    local family=$2   # ip | ip6
-
-    # Check if egress rule exists
-    if ! nft list chain "${family}" filter FORWARD 2>/dev/null | grep -q "iifname \"${INTERFACE_NAME}\" ${family} saddr ${cluster_network}"; then
-        sudo nft insert rule "${family}" filter FORWARD iifname "${INTERFACE_NAME}" "${family}" saddr "${cluster_network}" accept
-        echo "Added ${family} FORWARD rule for cluster network egress"
-    fi
-
-    # Check if return traffic rule exists
-    if ! nft list chain "${family}" filter FORWARD 2>/dev/null | grep -q "oifname \"${INTERFACE_NAME}\" ${family} daddr ${cluster_network}.*established"; then
-        sudo nft insert rule "${family}" filter FORWARD oifname "${INTERFACE_NAME}" "${family}" daddr "${cluster_network}" ct state related,established accept
-        echo "Added ${family} FORWARD rule for cluster network return traffic"
-    fi
-}
-
-add_masquerade_rule() {
-    local cluster_network=$1
-    local bootstrap_network=$2
-    local family=$3   # ip | ip6
-
-    # Check if masquerade rule exists
-    if ! nft list chain "${family}" nat POSTROUTING 2>/dev/null | grep -q "${family} saddr ${cluster_network}.*masquerade"; then
-        sudo nft insert rule "${family}" nat POSTROUTING "${family}" saddr "${cluster_network}" "${family}" daddr != "${bootstrap_network}" masquerade
-        echo "Added ${family} MASQUERADE rule for cluster network egress"
-    fi
-}
-
-# Stop and disable firewalld to prevent rule conflicts
-systemctl stop firewalld || true
-systemctl disable firewalld || true
-
 # Enable IP forwarding (CRITICAL for NoOverlay routing)
 sysctl -w net.ipv4.ip_forward=1
 sysctl -w net.ipv6.conf.all.forwarding=1
 
-# Remove ct state invalid drop rule from NETAVARK_FORWARD
+# --- Dedicated nft tables for NoOverlay forwarding and NAT ---
+# Place NoOverlay rules in separate tables (openshift_nooverlay) so they are
+# independent of firewalld.  firewalld only manages its own tables (e.g.
+# "inet firewalld") and will not flush or interfere with tables it does not
+# own.  nftables evaluates every registered base-chain at each hook point,
+# so our chains work alongside firewalld without conflict or the need to
+# stop it.  Priority -1 ensures evaluation before the default (priority 0)
+# filter/nat chains.
+
+# IPv4 forwarding and NAT
+nft add table ip openshift_nooverlay
+nft flush table ip openshift_nooverlay
+nft add chain ip openshift_nooverlay forward "{ type filter hook forward priority -1 ; policy accept ; }"
+nft add chain ip openshift_nooverlay postrouting "{ type nat hook postrouting priority -1 ; policy accept ; }"
+
+nft add rule ip openshift_nooverlay forward iifname "${INTERFACE_NAME}" ip saddr "${CLUSTER_NETWORK_V4}" accept
+nft add rule ip openshift_nooverlay forward oifname "${INTERFACE_NAME}" ip daddr "${CLUSTER_NETWORK_V4}" ct state related,established accept
+echo "Added IPv4 FORWARD rules in openshift_nooverlay table"
+
+nft add rule ip openshift_nooverlay postrouting ip saddr "${CLUSTER_NETWORK_V4}" ip daddr != "${BOOTSTRAP_NETWORK}" masquerade
+echo "Added IPv4 MASQUERADE rule in openshift_nooverlay table"
+
+# IPv6 forwarding and NAT
+nft add table ip6 openshift_nooverlay
+nft flush table ip6 openshift_nooverlay
+nft add chain ip6 openshift_nooverlay forward "{ type filter hook forward priority -1 ; policy accept ; }"
+nft add chain ip6 openshift_nooverlay postrouting "{ type nat hook postrouting priority -1 ; policy accept ; }"
+
+nft add rule ip6 openshift_nooverlay forward iifname "${INTERFACE_NAME}" ip6 saddr "${CLUSTER_NETWORK_V6}" accept
+nft add rule ip6 openshift_nooverlay forward oifname "${INTERFACE_NAME}" ip6 daddr "${CLUSTER_NETWORK_V6}" ct state related,established accept
+echo "Added IPv6 FORWARD rules in openshift_nooverlay table"
+
+nft add rule ip6 openshift_nooverlay postrouting ip6 saddr "${CLUSTER_NETWORK_V6}" ip6 daddr != "${BOOTSTRAP_NETWORK_V6}" masquerade
+echo "Added IPv6 MASQUERADE rule in openshift_nooverlay table"
+
+# --- Modifications to non-firewalld chains ---
+# The chains below are managed by podman (NETAVARK_FORWARD) and libvirt
+# (LIBVIRT_PRT), not by firewalld, so direct modification is safe.
+
+# Remove ct state invalid drop rule from NETAVARK_FORWARD.
+# In NoOverlay mode pod traffic arrives at the hypervisor via BGP-learned
+# routes with no prior conntrack entry.  Conntrack marks these packets as
+# "invalid" and netavark's default rule drops them.
 if nft list chain ip filter NETAVARK_FORWARD 2>/dev/null | grep -q "ct state invalid.*drop"; then
     HANDLE=$(nft --handle list chain ip filter NETAVARK_FORWARD 2>/dev/null | grep "ct state invalid.*drop" | awk '{print $NF}')
     if [ -n "$HANDLE" ]; then
-        nft delete rule ip filter NETAVARK_FORWARD handle $HANDLE
+        nft delete rule ip filter NETAVARK_FORWARD handle "$HANDLE"
         echo "Removed ct state invalid drop from NETAVARK_FORWARD"
     fi
 fi
 
-# Add NAT RETURN rule to skip masquerading for cluster-to-pod traffic from bootstrap host.
-# Must be at the beginning of the chain to match before any masquerade rules.
+# Add NAT RETURN rule in libvirt's LIBVIRT_PRT chain to skip masquerading
+# for bootstrap-to-pod traffic.  Without this, libvirt rewrites the source
+# IP and pods cannot route replies back via BGP.
 if nft list chain ip nat LIBVIRT_PRT 2>/dev/null > /dev/null; then
     if ! nft list chain ip nat LIBVIRT_PRT 2>/dev/null | head -5 | grep -q "${CLUSTER_NETWORK_V4}"; then
         HANDLE=$(nft --handle list chain ip nat LIBVIRT_PRT 2>/dev/null | grep "${CLUSTER_NETWORK_V4}" | awk '{print $NF}' | head -1)
@@ -101,14 +109,6 @@ if nft list chain ip nat LIBVIRT_PRT 2>/dev/null > /dev/null; then
         echo "Added NAT RETURN rule at top of LIBVIRT_PRT for cluster-to-pod traffic"
     fi
 fi
-
-# IPv4 rules
-add_forward_rules   "${CLUSTER_NETWORK_V4}" "ip"
-add_masquerade_rule "${CLUSTER_NETWORK_V4}" "${BOOTSTRAP_NETWORK}"    "ip"
-
-# IPv6 rules
-add_forward_rules   "${CLUSTER_NETWORK_V6}" "ip6"
-add_masquerade_rule "${CLUSTER_NETWORK_V6}" "${BOOTSTRAP_NETWORK_V6}" "ip6"
 
 echo "$(date): nftables rules applied successfully"
 EOFSCRIPT
