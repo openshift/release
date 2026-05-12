@@ -109,13 +109,27 @@ process_existing_pr() {
     DROP_COUNT=$(echo "${COMMENTS_JSON}" | jq '.drops | length')
     ERRORS=$(echo "${COMMENTS_JSON}" | jq -r '.errors[]' 2>/dev/null || true)
 
+    ERROR_COUNT=$(echo "${COMMENTS_JSON}" | jq '.errors | length')
+
     if [ -n "${ERRORS}" ]; then
         echo "Validation errors:"
         echo "${ERRORS}"
     fi
 
     if [ "${SAVE_COUNT}" -eq 0 ] && [ "${DROP_COUNT}" -eq 0 ]; then
-        echo "No new /save or /drop directives found. Nothing to do."
+        if [ "${ERROR_COUNT}" -gt 0 ]; then
+            ERROR_LIST=$(echo "${COMMENTS_JSON}" | jq -r '.errors[] | "- \(.)"')
+            gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body "$(cat <<EOF
+I found new comments but couldn't process any directives:
+
+${ERROR_LIST}
+
+**Usage:** \`/save plugins/foo/\` or \`/drop plugins/bar/commands/baz.md\`
+Paths must start with \`plugins/\` and have at least 2 components.
+EOF
+)"
+        fi
+        echo "No valid /save or /drop directives found. Nothing to do."
         exit 0
     fi
 
