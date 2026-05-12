@@ -43,6 +43,27 @@ RESULTS_DIR="$6"
 
 mkdir -p "${RESULTS_DIR}"
 
+export KUBECONFIG="${KUBECONFIG_PATH}"
+echo "Waiting for KubeVirt to be Available..."
+for attempt in $(seq 1 60); do
+    AVAILABLE=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "Unknown")
+    if [[ "${AVAILABLE}" == "True" ]]; then
+        echo "  KubeVirt Available after $((attempt * 10))s"
+        break
+    fi
+    if [[ $((attempt % 6)) -eq 0 ]]; then
+        PROGRESSING=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.status.conditions[?(@.type=="Progressing")].message}' 2>/dev/null || echo "unknown")
+        echo "  [${attempt}0s] KubeVirt not Available yet: ${PROGRESSING}"
+    fi
+    sleep 10
+done
+if [[ "${AVAILABLE}" != "True" ]]; then
+    echo "ERROR: KubeVirt not Available after 600s"
+    oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o yaml 2>/dev/null || true
+    exit 1
+fi
+unset KUBECONFIG
+
 echo "Running vmaas tests..."
 podman run --authfile /root/pull-secret --rm --network=host \
     -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
