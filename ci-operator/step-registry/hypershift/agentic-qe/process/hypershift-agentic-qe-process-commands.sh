@@ -196,7 +196,7 @@ This file is required — the job result depends on it."
         cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
         cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
         model_usage: (.modelUsage // {}),
-        model: ((.modelUsage // {} | keys | first) // "unknown")
+        model: ((.modelUsage // {} | to_entries | sort_by(.value.output_tokens // 0) | last | .key) // "unknown")
       }' > "${SHARED_DIR}/claude-${PLAN_BASENAME}-tokens.json" 2>/dev/null \
     || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' \
       > "${SHARED_DIR}/claude-${PLAN_BASENAME}-tokens.json"
