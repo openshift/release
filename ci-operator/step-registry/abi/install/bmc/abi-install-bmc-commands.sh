@@ -124,8 +124,36 @@ function WipeDisks () {
     typeset bmcSysId="${1:?}"; (($#)) && shift
     typeset bmcMgrId="${1:?}"; (($#)) && shift
     typeset wipeMethod="${1?}"; (($#)) && shift
+    typeset rmtScript=''
     typeset -i es=0
     case ${wipeMethod} in
+      ('')  rmtScript="$(cat - 0<<'sshEOF'
+sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
+    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
+    true
+shEOF
+sshEOF
+                    )"
+        ;;&
+      (OS)  rmtScript="$(cat - 0<<'sshEOF'
+sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
+    typeset dev=
+    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
+    udevadm settle
+    while IFS= read -r dev; do
+        sgdisk --zap-all "${dev}"
+        wipefs -a "${dev}"
+        blkdiscard "${dev}" 2> /dev/null || true
+    done 0< <(
+        lsblk -dpno NAME,TYPE | awk '($2 == "disk"){print $1}'
+    )
+    true
+shEOF
+)"
+sshEOF
+                    )"
+        ;;&
+      ('')  ;&
       (OS)  (
         typeset stdErr='' rgx=''
         typeset hostIPv4=''
@@ -145,23 +173,9 @@ function WipeDisks () {
                     -o ConnectTimeout=5 \
                     -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
                     "core@${hostIPv4}" \
-                    "$(cat - 0<<'sshEOF'
-sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
-    typeset dev=
-    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
-    udevadm settle
-    while IFS= read -r dev; do
-        sgdisk --zap-all "${dev}"
-        wipefs -a "${dev}"
-        blkdiscard "${dev}" 2> /dev/null || true
-    done 0< <(
-        lsblk -dpno NAME,TYPE | awk '($2 == "disk"){print $1}'
-    )
-    true
-shEOF
-)"
-sshEOF
-                    )" 2> >(tee /dev/fd/3) 1>&3 || es=$?
+                    "${rmtScript}" \
+                    2> >(tee /dev/fd/3) 1>&3 ||
+                es=$?
             } 3>&2; exit ${es})" || es=$?
             case ${es} in
               (0)   break ;;
@@ -237,7 +251,6 @@ sshEOF
             break
         done
       ) || es=$?;;
-      ('')  ;;
       (*)   : "Unknown method: ${wipeMethod}"; es=1;;
     esac
     return ${es}
@@ -394,7 +407,7 @@ set -x
 ({
     typeset bmcURL='' bmcVend='' bmcSysId='' bmcMgrId=''
     typeset diskWipeMethod=''
-    typeset -i tryLeft=0
+    typeset -i tryLeft=0 didBMCwipe=0
     typeset -i myPID="${BASHPID}"
     typeset -i tPID
     tPID="$(ps -o ppid= -p "${myPID}")"
@@ -425,7 +438,12 @@ set -x
         esac
 
         # Ensure booting to ISO.
-        tryLeft=3
+        # Note: The BMC does not always guarantee booting to ISO. It has been
+        #   observed the Node can boot to the old OS, despite
+        #   `BootSourceOverrideEnabled=Continuous`. The `WipeDisks()`
+        #   implements ISO Boot detection and fails if it detects the Node
+        #   booted to the old OS, so the entire boot attempt can be retried.
+        tryLeft=3 didBMCwipe=0
         while ((tryLeft)); do
             kill -0 "${tPID}" 2>/dev/null || break
 
@@ -441,12 +459,18 @@ set -x
                         "BootSourceOverrideEnabled": "Continuous",
                         "BootSourceOverrideTarget": "Cd"
                     }}'
-            } || {
+            } || ((didBMCwipe)) || {
                 # Fallback to wiping Disks via BMC.
+                # Note: Currently, we do not have a solution to perform BMC
+                #   wipe on Dell BOSS Disk, if it is set as RAID. The BOSS RAID
+                #   Disk is most likely used as the Boot Disk, hence the above
+                #   ISO Booting instability issue may still cause the Node to
+                #   boot to the old OS.
                 diskWipeMethod=''
                 WipeDisks "${tPID}" "${bmcInfo}" \
                     "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
                     BMC
+                didBMCwipe=1
             }
             # Mount ISO.
             RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
@@ -471,7 +495,7 @@ set -x
             }
             # Restart Host.
             Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
-            # Wipe Disks via Host OS (no-op for BMC Wipe).
+            # Wipe Disks via Host OS (only detect ISO Boot for BMC Wipe).
             WipeDisks "${tPID}" "${bmcInfo}" \
                 "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
                 "${diskWipeMethod}" && break || true
