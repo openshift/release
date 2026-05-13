@@ -7,6 +7,7 @@ echo "========================================="
 echo "Vault Configuration for KMS"
 echo "========================================="
 echo "Namespace: ${VAULT_NAMESPACE}"
+echo "Release Name: ${VAULT_RELEASE_NAME}"
 echo ""
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -19,22 +20,22 @@ echo ""
 
 # Enable transit secret engine
 echo "Enabling transit secret engine..."
-oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault secrets enable -path=transit transit
 
 # Create encryption key
 echo "Creating transit encryption key..."
-oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault write -f transit/keys/${VAULT_KMS_KEY_NAME}
 
 # Enable AppRole auth
 echo "Enabling AppRole authentication..."
-oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault auth enable approle
 
 # Create KMS policy
 echo "Creating KMS policy..."
-oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   sh -c "VAULT_TOKEN=${ROOT_TOKEN} vault policy write kms-policy - <<POLICY
 path \"transit/encrypt/${VAULT_KMS_KEY_NAME}\" {
   capabilities = [\"update\"]
@@ -52,7 +53,7 @@ POLICY"
 
 # Create AppRole role
 echo "Creating AppRole role..."
-oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault write auth/approle/role/kms-plugin \
     token_policies=kms-policy \
     token_ttl=1h \
@@ -60,9 +61,9 @@ oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
 
 # Get AppRole credentials
 echo "Retrieving AppRole credentials..."
-ROLE_ID=$(oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+ROLE_ID=$(oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault read -field=role_id auth/approle/role/kms-plugin/role-id)
-SECRET_ID=$(oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
+SECRET_ID=$(oc exec ${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault write -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
 
 # Create vault-credentials secret
@@ -81,7 +82,7 @@ echo "Vault Configuration Complete"
 echo "========================================="
 echo ""
 echo "Summary:"
-echo "  - Vault Service: vault.${VAULT_NAMESPACE}.svc:8200"
+echo "  - Vault Service: ${VAULT_RELEASE_NAME}.${VAULT_NAMESPACE}.svc:8200"
 echo "  - Credentials Secret: vault-credentials (namespace: ${VAULT_NAMESPACE})"
 echo "  - Transit Key: ${VAULT_KMS_KEY_NAME}"
 echo "  - ROLE_ID: ${ROLE_ID}"

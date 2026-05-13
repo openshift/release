@@ -6,6 +6,7 @@ echo "Vault Enterprise Installation via Helm"
 echo "========================================="
 echo "Version: ${VAULT_VERSION}"
 echo "Namespace: ${VAULT_NAMESPACE}"
+echo "Release Name: ${VAULT_RELEASE_NAME}"
 echo ""
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -54,7 +55,7 @@ echo ""
 
 # Install Vault via Helm with dev mode enabled
 echo "Installing Vault Enterprise v${VAULT_VERSION} in dev mode..."
-helm upgrade --install vault hashicorp/vault \
+helm upgrade --install "${VAULT_RELEASE_NAME}" hashicorp/vault \
   --namespace "${VAULT_NAMESPACE}" \
   --version "${VAULT_CHART_VERSION}" \
   --set global.enabled=true \
@@ -70,8 +71,8 @@ helm upgrade --install vault hashicorp/vault \
   --timeout 10m
 
 #helm wait passes even vault pod is 0/1 Running. So, added the below wait to correctly verify the vault pod status
-echo "Waiting for Vault pod to be ready..."  
-oc wait --for=condition=ready pod/vault-0 -n "${VAULT_NAMESPACE}" --timeout=5m
+echo "Waiting for Vault pod to be ready..."
+oc wait --for=condition=ready pod/${VAULT_RELEASE_NAME}-0 -n "${VAULT_NAMESPACE}" --timeout=5m
 
 echo "========================================="
 echo "Vault Enterprise Installation Complete"
@@ -79,9 +80,10 @@ echo "========================================="
 echo ""
 echo "Summary:"
 echo "  - Namespace: ${VAULT_NAMESPACE}"
+echo "  - Release Name: ${VAULT_RELEASE_NAME}"
 echo "  - Version: ${VAULT_VERSION}"
-echo "  - Service: vault.${VAULT_NAMESPACE}.svc:8200"
-echo "  - Pod: vault-0 (Ready)"
+echo "  - Service: ${VAULT_RELEASE_NAME}.${VAULT_NAMESPACE}.svc:8200"
+echo "  - Pod: ${VAULT_RELEASE_NAME}-0 (Ready)"
 echo ""
 echo "Next step: Run etcd-encryption-vault-configure to configure Vault for KMS"
 echo ""
