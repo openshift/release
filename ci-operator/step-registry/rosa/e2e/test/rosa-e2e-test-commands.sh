@@ -61,7 +61,8 @@ fi
 
 # Run tests
 GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
-if [[ -n "${LABEL_FILTER}" ]]; then
+log "LABEL_FILTER='${LABEL_FILTER:-}'"
+if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter '${LABEL_FILTER}'"
 fi
 
@@ -69,11 +70,11 @@ if [[ -n "${CLUSTER_TOPOLOGY:-}" ]]; then
   export CLUSTER_TOPOLOGY
 fi
 
-if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
+if [[ -n "${EXCLUDE_CLUSTER_OPERATORS:-}" ]]; then
   export EXCLUDE_CLUSTER_OPERATORS
 fi
 
-log "Running rosa-e2e tests..."
+log "Running rosa-e2e tests: /usr/local/bin/e2e.test ${GINKGO_FLAGS}"
 /usr/local/bin/e2e.test ${GINKGO_FLAGS}
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"
