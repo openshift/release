@@ -27,13 +27,13 @@ images:
     from: ubi9-minimal-entitled
     to: hive
   - dockerfile_literal: |
-      FROM src as builder
+      FROM src
       RUN make -C test/ote build
-      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      RUN microdnf install -y gzip jq && microdnf clean all
-      COPY --from=builder /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
+      RUN dnf install -y gzip jq && dnf clean all
+      RUN cp /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
       RUN gzip -f -k /usr/bin/openshift-tests-extension
       WORKDIR /tmp
+    from: src
     to: hive-tests
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
