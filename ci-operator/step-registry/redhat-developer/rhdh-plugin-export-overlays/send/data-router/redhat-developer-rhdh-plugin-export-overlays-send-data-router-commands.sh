@@ -55,7 +55,7 @@ get_artifacts_url() {
   local artifacts_complete_url
 
   if [ -n "${PULL_NUMBER:-}" ]; then
-    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-plugin-export-overlays-main-}"
+    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-plugin-export-overlays-"${RELEASE_BRANCH_NAME}"-}"
     local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
     artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts"
   else
@@ -223,7 +223,7 @@ save_data_router_metadata() {
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-  validate_required_vars
+  validate_required_vars || return 1
 
   save_data_router_metadata
 
@@ -270,13 +270,13 @@ main() {
 
   # For periodic jobs, wait for completion and extract ReportPortal URL
   if [[ "$JOB_NAME" == *periodic-* ]]; then
-    local max_attempts=30
+    local poll_max_attempts=30
     local wait_seconds=2
     local DATA_ROUTER_REQUEST_OUTPUT=""
     local REPORTPORTAL_LAUNCH_URL=""
 
-    for ((i = 1; i <= max_attempts; i++)); do
-      echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
+    for ((i = 1; i <= poll_max_attempts; i++)); do
+      echo "Attempt ${i} of ${poll_max_attempts}: Checking Data Router request completion..."
 
       DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
         --url "${DATA_ROUTER_URL}" \
@@ -292,14 +292,14 @@ main() {
         save_status_data_router_failed false
         return 0
       else
-        echo "Attempt ${i} of ${max_attempts}: ReportPortal launch URL not ready yet."
-        if ((i < max_attempts)); then
+        echo "Attempt ${i} of ${poll_max_attempts}: ReportPortal launch URL not ready yet."
+        if ((i < poll_max_attempts)); then
           sleep "${wait_seconds}"
         fi
       fi
     done
 
-    echo "Warning: Could not retrieve ReportPortal launch URL after ${max_attempts} attempts"
+    echo "Warning: Could not retrieve ReportPortal launch URL after ${poll_max_attempts} attempts"
   fi
 }
 
