@@ -132,6 +132,7 @@ sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
     grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
     true
 shEOF
+)"
 sshEOF
                     )"
         ;;&
