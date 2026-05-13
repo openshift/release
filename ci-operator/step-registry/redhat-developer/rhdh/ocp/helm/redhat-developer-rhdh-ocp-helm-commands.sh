@@ -124,19 +124,21 @@ else
     oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
 fi
 
-echo "========== [TMP] HTPasswd Login Verification =========="
-echo "OAuth identity providers:"
-oc get oauth cluster -o jsonpath='{.spec.identityProviders}' | jq .
-echo "Authentication pods:"
-oc get pods -n openshift-authentication
-echo "Attempting login as EPHEMERAL_CLUSTER_ADMIN_USERNAME..."
-oc login "$(oc whoami --show-server)" \
-    --username "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" \
-    --password "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)" \
-    --insecure-skip-tls-verify=true && echo "Login successful" || echo "Login failed"
-echo "Current user: $(oc whoami)"
-echo "========== [TMP] Exiting early for rehearsal =========="
-exit 0
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if echo "${PR_TITLE}" | grep -qF '[verify-htpasswd]'; then
+    echo "========== HTPasswd Login Verification =========="
+    echo "OAuth identity providers:"
+    oc get oauth cluster -o jsonpath='{.spec.identityProviders}' | jq .
+    echo "Authentication pods:"
+    oc get pods -n openshift-authentication
+    echo "Attempting login as EPHEMERAL_CLUSTER_ADMIN_USERNAME..."
+    oc login "$(oc whoami --show-server)" \
+        --username "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" \
+        --password "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)" \
+        --insecure-skip-tls-verify=true && echo "Login successful" || echo "Login failed"
+    echo "Current user: $(oc whoami)"
+    exit 0
+fi
 
 echo "========== Cluster Service Account and Token Management =========="
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
