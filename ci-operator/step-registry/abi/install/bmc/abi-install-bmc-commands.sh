@@ -134,8 +134,7 @@ sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
 shEOF
 )"
 sshEOF
-                    )"
-        ;;&
+      )";;&
       (OS)  rmtScript="$(cat - 0<<'sshEOF'
 sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
     typeset dev=
@@ -152,8 +151,7 @@ sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'shEOF'
 shEOF
 )"
 sshEOF
-                    )"
-        ;;&
+      )";;&
       ('')  ;&
       (OS)  (
         typeset stdErr='' rgx=''
@@ -584,7 +582,8 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -f "${KUBECONFIG}" ]
 
 # Upload `KUBECONFIG` to BitWarden.
-[ -z "${BW__OBJ_NAME}" ] || Vault--BitWarden--UploadAttachment \
+[ -z "${BW__OBJ_NAME}" ] || XDG_CONFIG_HOME=/tmp/abi \
+    Vault--BitWarden--UploadAttachment \
     "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW "${KUBECONFIG}"
 
 # Ensure Nodes readiness before Day-2 customization.
