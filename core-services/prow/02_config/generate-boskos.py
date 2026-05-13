@@ -90,10 +90,6 @@ CONFIG = {
         'us-east-1': 10,
         'us-west-2': 10,
     },
-    'aws-splat-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
@@ -264,6 +260,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'azure-perfscale-qe-quota-slice': {
+        'centralus': 6,
+   },
     'aro-classic-int-quota-slice': {
         'default': 1,
     },
@@ -283,7 +282,7 @@ CONFIG = {
         'default': 10
     },
     'aro-hcp-dev-quota-slice': {
-        'default': 15,
+        'default': 14,
     },
     'aro-hcp-dev-global-pipeline-quota-slice': {
         'default': 1,
@@ -298,6 +297,9 @@ CONFIG = {
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
+    # BEGIN ARO-HCP E2E SLOT TYPES
+    'aro-hcp-dev-shard0-westus3-slot': {},
+    # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
@@ -462,9 +464,7 @@ CONFIG = {
         'syd04': 1,
         'syd05': 1,
     },
-    'powervs-3-quota-slice': {
-        'dal10': 1,
-    },
+    'powervs-3-quota-slice': {},
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
@@ -729,6 +729,9 @@ for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in range(4):
+    CONFIG['powervs-3-quota-slice']['dal10-powervs-3-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
 
 for i in range(4):
@@ -750,6 +753,10 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
+# BEGIN ARO-HCP E2E SLOT RESOURCES
+for i in range(1):
+    CONFIG['aro-hcp-dev-shard0-westus3-slot']['aro-hcp-dev-shard0-westus3-slot-{i:0>2}'.format(i=i)] = 1
+# END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
 

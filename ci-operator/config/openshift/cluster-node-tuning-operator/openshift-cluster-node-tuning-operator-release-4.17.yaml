@@ -96,6 +96,16 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-nightly
   cron: 28 18 11 4 *
+  reporter_config:
+    channel: '#psap-ci-alerts'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     test:

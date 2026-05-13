@@ -45,15 +45,17 @@ export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
 export AWS_REGION="${LEASED_RESOURCE}"
 
-# Try to get MC access via backplane
-log "Attempting MC access via backplane..."
+# Try to get manager cluster access via backplane
+# HCP: --manager accesses the Management Cluster (HyperShift operator, HCP namespaces)
+# Classic: --manager accesses the Hive cluster (ClusterDeployment)
+log "Attempting manager cluster access via backplane..."
 if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
   export MC_KUBECONFIG="${HOME}/.kube/config"
   MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
   if [[ "${MC_SERVER}" == *"backplane"* ]]; then
     MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
     export MANAGEMENT_CLUSTER_ID
-    log "MC access established: ${MANAGEMENT_CLUSTER_ID}"
+    log "Manager cluster access established: ${MANAGEMENT_CLUSTER_ID}"
   fi
 fi
 
@@ -61,6 +63,10 @@ fi
 GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
 if [[ -n "${LABEL_FILTER}" ]]; then
   GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${LABEL_FILTER}"
+fi
+
+if [[ -n "${CLUSTER_TOPOLOGY:-}" ]]; then
+  export CLUSTER_TOPOLOGY
 fi
 
 if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then

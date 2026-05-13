@@ -37,7 +37,7 @@ function get_payload_list() {
     declare -A payload_list
 
     # Get all guest versions and the release image for each guest version
-    for version in $(echo "${mce_to_guest[@]}" | tr ' ' '\n' | sort -uV); do
+    for version in $(echo "${!hub_to_mce[@]}" | tr ' ' '\n' | sort -uV); do
         image=$(curl -s "https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/api/v1/releasestream/${version}.0-0.nightly/latest" | jq -r '.pullSpec')
         payload_list["$version"]=$image
     done
@@ -60,26 +60,24 @@ function trigger_prow_job() {
     local max_retries=30
     local retry_interval=10
 
-    set +x
     for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
+        set +x
         response=$(curl -s -X POST -d "${_http_post_data}" \
             -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
             "${GANGWAY_API}/v1/executions/${_job_name}" \
             -w "%{http_code}")
-
+        set -x
         json_body=$(echo "$response" | sed '$d')    # Extract JSON response body
         http_status=$(echo "$response" | tail -n 1) # Extract HTTP status code
 
         if [ "$http_status" -eq 200 ]; then
             echo "JOB_ID###$(jq -r '.id' <<< "$json_body")###"
-            set -x
             return 0
         else
-            (set -x; echo "[$retry_count/$max_retries] Gangway API not available (HTTP $response). Retrying in $retry_interval sec...")
+            (echo "[$retry_count/$max_retries] Gangway API not available (HTTP $response). Retrying in $retry_interval sec...")
             sleep "$retry_interval"
         fi
     done
-    set -x
     echo "Gangway API is still not available after $max_retries retries. Aborting." && return 0
 }
 
@@ -109,11 +107,11 @@ function wait_for_jobs() {
             local job_status=""
             local job_url=""
             local http_status=""
-            set +x
             for ((retry_count=1; retry_count<=max_retries; retry_count++)); do
+                set +x
                 response=$(curl -s -X GET -H "Authorization: Bearer $(cat "${TOKEN_PATH}")" \
                     "${GANGWAY_API}/v1/executions/${job_id}" -w "%{http_code}")
-
+                set -x
                 json_body=$(echo "$response" | sed '$d')
                 http_status=$(echo "$response" | tail -n 1)
 
@@ -129,7 +127,6 @@ function wait_for_jobs() {
                     sleep "$retry_interval"
                 fi
             done
-            set -x
 
             if [ "$http_status" -ne 200 ]; then
                 echo "${prefix}, JOB_URL=, JOB_STATUS=QueryNotFound" >> "${SHARED_DIR}/job_list"
