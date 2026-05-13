@@ -424,3 +424,51 @@ oc delete pod/test --now
 ```
 When using this method ensure you delete all pods you created from the
 ``main build OCP`` otherwise it'll be blocked until the hard timeout.
+
+## Claude Code Skill for OSC Prow Development
+
+The OSC team maintains a Claude Code skill to help automate creating and updating prow CI steps, chains, and workflows. This skill guides Claude through the proper conventions and structure for OSC step-registry work.
+
+### Installing the Skill
+
+The skill is located in this repository at `.claude/skills/osc-prow-step-create/`.
+
+**Option 1: Install from packaged .skill file**
+
+```bash
+claude skill install .claude/skills/osc-prow-step-create.skill
+```
+
+**Option 2: Install from source directory**
+
+```bash
+claude skill install .claude/skills/osc-prow-step-create/
+```
+
+### Using the Skill
+
+Once installed, the skill automatically activates when you ask Claude to work with OSC prow steps. Example prompts:
+
+- "Add a new prow step to validate networking setup for peer pods"
+- "Update the env-cm step to add a parameter for custom trustee URL"
+- "Create a workflow for testing OSC on GCP"
+
+The skill will guide Claude through:
+- Creating properly named step files (ref.yaml, commands.sh, metadata.json)
+- Following OSC naming conventions
+- Setting up proper OWNERS and permissions
+- Running validation (make update, make validate-step-registry)
+- Creating test prowjobs with appropriate parameters
+- Managing branches and PRs with [DEBUG] [DO NOT MERGE] conventions
+
+### Scope
+
+The skill restricts Claude to only modify files in OSC-owned directories:
+- `ci-operator/step-registry/sandboxed-containers-operator/`
+- `ci-operator/config/openshift/sandboxed-containers-operator/`
+
+This ensures changes stay within OSC territory and don't accidentally modify other teams' configurations.
+
+### Documentation
+
+For detailed information on what the skill does, see the [SKILL.md file](.claude/skills/osc-prow-step-create/SKILL.md).
