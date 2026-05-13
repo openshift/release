@@ -38,6 +38,15 @@ tests:
     workflow: codeready-toolchain-aws
 - as: ci-daily
   cron: 0 9 * * *
+  reporter_config:
+    channel: '#sandbox-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :succeeded: {{ else }} :failed:
+      {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
   steps:
     cluster_profile: devsandboxci-aws
     env:

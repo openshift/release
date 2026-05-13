@@ -50,14 +50,37 @@ tests:
   run_if_changed: .sh$
 - as: ocp-ci-monitor
   cron: 0 7 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-collab'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     workflow: openshift-edge-tooling-ci-monitor
 - as: microshift-ci-doctor
   cron: 0 8,14 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-collab'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |
+      :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/microshift-ci-doctor-report.html|View report> | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/analyze-ci-create-bugs-merged.txt|View bugs> | <{{.Status.URL}}|View logs> |
   steps:
     workflow: openshift-edge-tooling-microshift-ci-doctor
 - as: pr-notifier
   cron: 0 7 * * 0-5
+  reporter_config:
+    channel: '#team-ocp-edge-collab'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   restrict_network_access: false
   steps:
     env:

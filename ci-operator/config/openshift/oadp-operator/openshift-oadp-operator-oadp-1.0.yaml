@@ -42,6 +42,15 @@ tests:
           memory: 200Mi
 - as: unit-test-periodic
   cron: 0 4 * * *
+  reporter_config:
+    channel: '#oadp-cicd'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :alert-siren: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :alert-siren: {{end}}'
   steps:
     test:
     - as: unit
