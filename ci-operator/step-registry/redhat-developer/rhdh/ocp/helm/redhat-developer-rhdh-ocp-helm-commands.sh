@@ -111,7 +111,10 @@ fi
 echo "All nodes are ready"
 
 echo "========== HTPasswd Identity Provider =========="
-if [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if [[ "$JOB_TYPE" != "periodic" ]] && [[ "$PR_TITLE" != *"[setup-htpasswd]"* ]]; then
+    echo "Skipping HTPasswd identity provider setup. Add [setup-htpasswd] to PR title to enable."
+elif [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
     echo "WARNING: EPHEMERAL_CLUSTER_ADMIN_* secrets not found, skipping HTPasswd identity provider setup"
 else
     htpasswd -c -B -i users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" <<< "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
@@ -122,22 +125,6 @@ else
     oc wait --for=condition=Available=True clusteroperator/authentication --timeout=10m
     oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
     oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
-fi
-
-PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
-if echo "${PR_TITLE}" | grep -qF '[verify-htpasswd]'; then
-    echo "========== HTPasswd Login Verification =========="
-    echo "OAuth identity providers:"
-    oc get oauth cluster -o jsonpath='{.spec.identityProviders}' | jq .
-    echo "Authentication pods:"
-    oc get pods -n openshift-authentication
-    echo "Attempting login as EPHEMERAL_CLUSTER_ADMIN_USERNAME..."
-    oc login "$(oc whoami --show-server)" \
-        --username "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" \
-        --password "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)" \
-        --insecure-skip-tls-verify=true && echo "Login successful" || echo "Login failed"
-    echo "Current user: $(oc whoami)"
-    exit 0
 fi
 
 echo "========== Cluster Service Account and Token Management =========="

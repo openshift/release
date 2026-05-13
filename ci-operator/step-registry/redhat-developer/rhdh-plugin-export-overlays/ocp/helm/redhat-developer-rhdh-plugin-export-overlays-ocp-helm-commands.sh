@@ -102,7 +102,10 @@ if ! timeout --foreground 5m bash -c '
 fi
 
 echo "========== HTPasswd Identity Provider =========="
-if [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if [[ "$JOB_TYPE" != "periodic" ]] && [[ "$PR_TITLE" != *"[setup-htpasswd]"* ]]; then
+    echo "Skipping HTPasswd identity provider setup. Add [setup-htpasswd] to PR title to enable."
+elif [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
     echo "WARNING: EPHEMERAL_CLUSTER_ADMIN_* secrets not found, skipping HTPasswd identity provider setup"
 else
     htpasswd -c -B -i users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" <<< "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
