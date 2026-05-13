@@ -1,0 +1,23 @@
+workflow:
+  as: osac-project-cluster-tool-vmaas
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: osac-project-cluster-tool-boot
+    test:
+      - ref: osac-project-cluster-tool-test
+    post:
+      - ref: osac-project-gather
+      - ref: osac-project-cluster-tool-destroy
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+  documentation: |-
+    Boots an OSAC cluster from a pre-built snapshot via cluster-tool,
+    runs the refresh script to fix domain-sensitive resources, then
+    executes all vmaas e2e tests on the single cluster.
+    Replaces the per-test osac-project-ofcir-baremetal workflow.

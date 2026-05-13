@@ -28,6 +28,16 @@ resources:
 tests:
 - as: tempo-stage-tests
   cron: 0 0 30 2 *
+  reporter_config:
+    channel: '#distributed-tracing-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: gcp-observability
     env:
