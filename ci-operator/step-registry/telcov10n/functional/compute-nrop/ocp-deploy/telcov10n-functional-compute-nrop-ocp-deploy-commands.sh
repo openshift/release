@@ -37,6 +37,7 @@ cd /eco-ci-cd
 
 echo "Clean old clusters"
 ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+    -e "cluster_name=${CLUSTER_NAME}" \
     -i ./inventories/ocp-deployment/build-inventory.py
 
 EXTRA_VARS="kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
