@@ -313,3 +313,53 @@ ssh ${SSH_ARGS} root@${bastion} "
 "
 
 scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig
+
+# IPv6 reconfig test: after successful IPv4 deploy, reconfigure for IPv6
+# and redeploy on the same bastion WITHOUT cleaning up containers.
+# This tests that setup-bastion.yml properly reconfigures the assisted-service pod.
+if [[ "${REDEPLOY_IPV6:-false}" == "true" ]]; then
+  echo "=== REDEPLOY_IPV6: Reconfiguring for IPv6 and redeploying ==="
+
+  # Write IPv6 network overrides to append to all.yml
+  cat > /tmp/ipv6-overrides.yml << 'IPV6_EOF'
+
+# IPv6 reconfiguration - appended by REDEPLOY_IPV6
+controlplane_network:
+- fd00:198:18:10::/64
+controlplane_network_prefix:
+- 64
+cluster_network_cidr:
+- fd01::/48
+cluster_network_host_prefix:
+- 64
+service_network_cidr:
+- fd02::/112
+setup_bastion_registry: true
+use_bastion_registry: true
+IPV6_EOF
+
+  scp -q ${SSH_ARGS} /tmp/ipv6-overrides.yml root@${bastion}:/tmp/ipv6-overrides.yml
+  ssh ${SSH_ARGS} root@${bastion} "cat /tmp/ipv6-overrides.yml >> ${jetlag_repo}/ansible/vars/all.yml"
+
+  echo "Updated all.yml for IPv6:"
+  ssh ${SSH_ARGS} root@${bastion} "cat ${jetlag_repo}/ansible/vars/all.yml"
+
+  # Redeploy: re-bootstrap, re-run setup-bastion + deploy (NO clean-resources.sh)
+  ssh ${SSH_ARGS} root@${bastion} "
+    set -e
+    set -o pipefail
+    cd ${jetlag_repo}
+    source bootstrap.sh
+    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-ipv6-\$(date +%s)
+    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-ipv6-\$(date +%s)
+    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/sno-deploy.yml -v | tee /tmp/ansible-sno-deploy-ipv6-\$(date +%s)
+    mkdir -p /root/$LAB/$LAB_CLOUD/sno-ipv6
+    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/sno-ipv6/kubeconfig flat=true'
+    deactivate
+    rm -rf .ansible
+  "
+
+  # Overwrite kubeconfig with IPv6 cluster's version
+  scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/sno-ipv6/kubeconfig ${SHARED_DIR}/kubeconfig
+  echo "=== REDEPLOY_IPV6: IPv6 redeploy completed successfully ==="
+fi
