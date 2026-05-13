@@ -27,12 +27,21 @@ resources:
 test_binary_build_commands: "true"
 tests:
 - as: test-unit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow test-local
-  container:
-    from: src
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+  steps:
+    test:
+    - as: test-unit
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow test-local
+      from: src
+      resources:
+        limits:
+          cpu: "8"
+          memory: 18Gi
+        requests:
+          cpu: "4"
+          memory: 1Gi
 - as: ocm-ci-rbac
   steps:
     workflow: ocm-ci-rbac
