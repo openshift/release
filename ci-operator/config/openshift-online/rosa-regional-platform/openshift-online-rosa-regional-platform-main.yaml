@@ -54,11 +54,19 @@ tests:
   cron: 0 4 * * *
   steps:
     test:
-    - ref: rosa-regional-platform-e2e
+    - as: e2e
+      commands: |-
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        ./ci/e2e-tests.sh
       credentials:
-      - namespace: test-credentials
+      - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-integration-creds
-        mount_path: /var/run/rosa-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - always_run: false
   as: on-demand-e2e
   steps:
