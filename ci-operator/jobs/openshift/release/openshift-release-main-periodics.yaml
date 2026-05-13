@@ -302653,7 +302653,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: core-ci
+  cluster: app.ci
   decorate: true
   interval: 6h
   labels:
@@ -302664,12 +302664,16 @@ periodics:
     - args:
       - |-
         --query=repo:openshift/release
+        is:issue
         -label:lifecycle/frozen
         label:lifecycle/stale
         -label:lifecycle/rotten
         comments:<2500
       - --updated=360h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Stale issue in openshift/release rot after 15d of inactivity.
 
@@ -302685,7 +302689,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -302693,12 +302703,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: build09
   cron: 47 10 27 5 *
@@ -303367,7 +303378,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: core-ci
+  cluster: app.ci
   decorate: true
   interval: 6h
   labels:
@@ -303378,12 +303389,16 @@ periodics:
     - args:
       - |-
         --query=repo:openshift/release
+        is:issue
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
         comments:<2500
       - --updated=720h
-      - --token=/etc/oauth/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
         --comment=Issues in openshift/release go stale after 30d of inactivity.
 
@@ -303398,7 +303413,13 @@ periodics:
       - --ceiling=10
       - --confirm
       command:
-      - /ko-app/commenter
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
       name: ""
@@ -303406,12 +303427,13 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   decorate: true
