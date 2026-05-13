@@ -29,6 +29,25 @@ GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
 OVERLAY_BRANCH=""
 REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
 
+# ── Gangway API Overrides ────────────────────────────────────────────────────
+
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}" ]]; then
+    GITHUB_ORG_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+    echo "Override applied: GITHUB_ORG_NAME=${GITHUB_ORG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}" ]]; then
+    GITHUB_REPOSITORY_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+    echo "Override applied: GITHUB_REPOSITORY_NAME=${GITHUB_REPOSITORY_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}" ]]; then
+    OVERLAY_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+    echo "Override applied: OVERLAY_BRANCH=${OVERLAY_BRANCH}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}" ]]; then
+    REHEARSE_PR_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+    echo "Override applied: REHEARSE_PR_NUMBER=${REHEARSE_PR_NUMBER}"
+fi
+
 # ── Environment ──────────────────────────────────────────────────────────────
 
 export HOME=/tmp

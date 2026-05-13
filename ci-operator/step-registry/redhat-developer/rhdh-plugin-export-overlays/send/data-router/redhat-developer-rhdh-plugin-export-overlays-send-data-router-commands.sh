@@ -3,6 +3,20 @@
 set +o errexit
 set +o nounset
 
+# Skip data router reporting when job was triggered via Gangway API with overrides
+OVERRIDE_VARS=(
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+)
+for override in "${OVERRIDE_VARS[@]}"; do
+  if [[ -n "${override}" ]]; then
+    echo "Gangway API override detected, skipping data router reporting."
+    exit 0
+  fi
+done
+
 # =============================================================================
 # RHDH Plugin Export Overlays — Data Router / ReportPortal Integration
 #
