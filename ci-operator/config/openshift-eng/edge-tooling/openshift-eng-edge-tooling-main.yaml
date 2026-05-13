@@ -3,6 +3,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  promotedmarkdownlint:
+    name: markdownlint-cli2
+    namespace: ci
+    tag: latest
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -37,15 +41,13 @@ resources:
 tests:
 - always_run: false
   as: markdownlint
-  commands: make lint-markdown
+  commands: pwd && ls -la && cat Makefile && make lint-markdown
   container:
-    clone: true
-    from: markdownlint-cli2
+    from: promotedmarkdownlint
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
 - as: shellcheck
   commands: make lint-shellcheck
   container:
-    clone: true
     from: shellcheck
   run_if_changed: .sh$
 - as: ocp-ci-monitor
