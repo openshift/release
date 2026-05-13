@@ -101,6 +101,12 @@ if ! timeout --foreground 5m bash -c '
     exit 1
 fi
 
+htpasswd -c -B -b users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
+oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
+oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"cluster_admin","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
+oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
+oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
+
 # ── Service account & platform info ──────────────────────────────────────────
 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
