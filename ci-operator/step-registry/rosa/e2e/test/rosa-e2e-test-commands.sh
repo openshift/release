@@ -46,34 +46,35 @@ export CLUSTER_ID
 export AWS_REGION="${LEASED_RESOURCE}"
 
 # Try to get manager cluster access via backplane
-# HCP: --manager accesses the Management Cluster (HyperShift operator, HCP namespaces)
-# Classic: --manager accesses the Hive cluster (ClusterDeployment)
 log "Attempting manager cluster access via backplane..."
-if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
+if ocm backplane login "${CLUSTER_ID}" --manager --multi 2>&1; then
   export MC_KUBECONFIG="${HOME}/.kube/config"
   MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
-  if [[ "${MC_SERVER}" == *"backplane"* ]]; then
+  if [[ -n "${MC_SERVER}" && "${MC_SERVER}" == *"backplane"* ]]; then
     MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
     export MANAGEMENT_CLUSTER_ID
     log "Manager cluster access established: ${MANAGEMENT_CLUSTER_ID}"
   fi
+else
+  log "WARNING: Backplane login failed (expected in CI without network access to MC)"
 fi
 
 # Run tests
-GINKGO_FLAGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml --ginkgo.v"
-if [[ -n "${LABEL_FILTER}" ]]; then
-  GINKGO_FLAGS="${GINKGO_FLAGS} --ginkgo.label-filter=${LABEL_FILTER}"
+GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml" "--ginkgo.v")
+log "LABEL_FILTER='${LABEL_FILTER:-}'"
+if [[ -n "${LABEL_FILTER:-}" ]]; then
+  GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
 fi
 
 if [[ -n "${CLUSTER_TOPOLOGY:-}" ]]; then
   export CLUSTER_TOPOLOGY
 fi
 
-if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
+if [[ -n "${EXCLUDE_CLUSTER_OPERATORS:-}" ]]; then
   export EXCLUDE_CLUSTER_OPERATORS
 fi
 
-log "Running rosa-e2e tests..."
-/usr/local/bin/e2e.test ${GINKGO_FLAGS}
+log "Running rosa-e2e tests: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
+/usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"
