@@ -87,6 +87,13 @@ run_command "oc version --client"
 ocp_full_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
 echo "Target OCP version: ${ocp_full_version}"
 
+# Detect architecture for oc-mirror download
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
 # Determine which oc-mirror version to download
 # Nightly/CI/pre-release builds aren't published to mirror.openshift.com
 if [[ "${ocp_full_version}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
@@ -94,7 +101,7 @@ if [[ "${ocp_full_version}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
     if [[ "${ocp_full_version}" =~ (nightly|ci|rc|ec) ]]; then
         # For nightly/CI/RC/EC builds, try stable-X.Y channel, fall back to latest if it doesn't exist
         # Check if stable channel exists (released versions only)
-        if curl -sf --head "https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/stable-${ocp_minor_version}/" >/dev/null 2>&1; then
+        if curl -sf --head "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable-${ocp_minor_version}/" >/dev/null 2>&1; then
             oc_mirror_version="stable-${ocp_minor_version}"
             echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is pre-release build)"
         else
@@ -113,11 +120,6 @@ else
 fi
 
 # Download oc-mirror from mirror.openshift.com
-ARCH=$(uname -m)
-case ${ARCH} in
-    x86_64) ARCH="amd64" ;;
-    aarch64) ARCH="arm64" ;;
-esac
 
 oc_mirror_download_dir=$(mktemp -d)
 pushd "${oc_mirror_download_dir}"
