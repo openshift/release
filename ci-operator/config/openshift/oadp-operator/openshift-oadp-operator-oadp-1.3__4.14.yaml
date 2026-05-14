@@ -1,3 +1,8 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 build_root:
   image_stream_tag:
     name: builder
@@ -11,7 +16,9 @@ images:
     to: test-oadp-operator-1.3
 operator:
   bundles:
-  - dockerfile_path: build/Dockerfile.bundle
+  - as: oadp-operator-bundle
+    dockerfile_path: build/Dockerfile.bundle
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:oadp-1.3
     with: oadp-operator-1.3
@@ -34,12 +41,10 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: stable-1.3
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -53,7 +58,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-test-aws-periodic
   cron: 0 4 * * *
   reporter_config:
@@ -68,12 +73,10 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: stable-1.3
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -87,7 +90,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: oadp-1.3
   org: openshift

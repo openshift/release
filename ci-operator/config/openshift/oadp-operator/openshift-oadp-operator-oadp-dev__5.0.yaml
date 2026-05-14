@@ -1,3 +1,8 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 build_root:
   image_stream_tag:
     name: builder
@@ -11,7 +16,9 @@ images:
     to: test-oadp-operator
 operator:
   bundles:
-  - dockerfile_path: build/Dockerfile.bundle
+  - as: oadp-operator-bundle
+    dockerfile_path: build/Dockerfile.bundle
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
@@ -35,12 +42,11 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -54,19 +60,18 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
   as: e2e-test-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -80,7 +85,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-test-aws-periodic
   cron: 0 4 * * *
   reporter_config:
@@ -95,12 +100,11 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -114,7 +118,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-test-kubevirt-aws-periodic
   cron: 0 4 * * *
   reporter_config:
@@ -129,12 +133,11 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -148,18 +151,17 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-test-hcp-aws-periodic
   cron: 0 5 * * *
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -173,18 +175,17 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-test-cli-aws-periodic
   cron: 0 2 * * *
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: oadp-operator-bundle
     env:
-      OO_CHANNEL: dev
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: e2e
       cli: latest
@@ -198,7 +199,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: oadp-dev
   org: openshift
