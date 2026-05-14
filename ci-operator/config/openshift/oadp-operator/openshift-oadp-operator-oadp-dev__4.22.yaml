@@ -10,13 +10,34 @@ build_root:
     tag: ubi9-v1.24
 images:
   items:
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/upstream-opm-builder:latest AS builder
+      COPY manifests/ /tmp/bundle/manifests/
+      COPY metadata/ /tmp/bundle/metadata/
+      RUN mkdir -p /configs/oadp-operator && \
+          opm render /tmp/bundle -o yaml > /configs/oadp-operator/index.yaml && \
+          opm validate /configs/oadp-operator
+      FROM quay.io/operator-framework/opm:latest
+      COPY --from=builder /configs /configs
+      EXPOSE 50051
+      ENTRYPOINT ["/bin/opm", "serve", "/configs"]
+    inputs:
+      oadp-operator-bundle:
+        paths:
+        - destination_dir: .
+          source_path: /manifests
+        - destination_dir: .
+          source_path: /metadata
+    to: oadp-operator-catalog
   - dockerfile_path: Dockerfile
     to: oadp-operator
   - dockerfile_path: build/ci-Dockerfile
     to: test-oadp-operator
 operator:
   bundles:
-  - dockerfile_path: build/Dockerfile.bundle
+  - as: oadp-operator-bundle
+    dockerfile_path: build/Dockerfile.bundle
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
@@ -40,8 +61,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: oadp-operator-catalog
     env:
+      FEATURE_SET: TechPreviewNoUpgrade
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
@@ -66,8 +88,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: oadp-operator-catalog
     env:
+      FEATURE_SET: TechPreviewNoUpgrade
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
@@ -100,8 +123,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: oadp-operator-catalog
     env:
+      FEATURE_SET: TechPreviewNoUpgrade
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
@@ -125,8 +149,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: oadp-operator-catalog
     env:
+      FEATURE_SET: TechPreviewNoUpgrade
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
