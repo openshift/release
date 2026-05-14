@@ -12,6 +12,7 @@ OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
 PERMISSIONS_BOUNDARY=${PERMISSIONS_BOUNDARY:-}
 ACCOUNT_ROLES_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
+FALLBACK_OCCURRED=false
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -121,6 +122,7 @@ elif [[ "${create_ret}" -ne 0 ]]; then
     echo "Retrying with version ${fallback_version} (was ${OPENSHIFT_VERSION})"
     OPENSHIFT_VERSION="${fallback_version}"
     VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
+    FALLBACK_OCCURRED=true
     rosa create account-roles -y --mode auto \
                               --prefix ${ACCOUNT_ROLES_PREFIX} \
                               ${CLUSTER_SWITCH} \
@@ -134,10 +136,10 @@ elif [[ "${create_ret}" -ne 0 ]]; then
   fi
 fi
 
-# Share the resolved version (includes fallback if one was used)
-if [[ "${CHANNEL_GROUP}" != "stable" && -n "${OPENSHIFT_VERSION:-}" ]]; then
+# Share the resolved version only if a fallback occurred
+if [[ "${FALLBACK_OCCURRED}" == "true" && "${CHANNEL_GROUP}" != "stable" && -n "${OPENSHIFT_VERSION:-}" ]]; then
   echo -n "${OPENSHIFT_VERSION}" > "${SHARED_DIR}/openshift_version"
-  echo "Stored resolved version ${OPENSHIFT_VERSION} to SHARED_DIR"
+  echo "Stored fallback version ${OPENSHIFT_VERSION} to SHARED_DIR"
 fi
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
