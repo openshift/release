@@ -256,9 +256,17 @@ timeout 600 claude \
     --verbose 2>&1 | tee "${CLAUDE_BUG_CREATION_LOG}"
 echo "Bug creation for failed jobs completed"
 
-# After the analysis, attempt to restart failed rebase PRs tests. If the
-# restarted tests complete successfully, the PR will be automatically
-# approved next time the analysis runs.
+# Close duplicate rebase PRs before attempting to restart failed test jobs.
+echo "Running automatic closing of duplicate rebase PRs..."
+"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --mode close-duplicates \
+    --execute \
+    --author 'microshift-rebase-script[bot]' \
+    --filter 'NO-ISSUE: rebase-release'
+echo "Automatic closing of duplicate rebase PRs completed"
+
+# Now attempt to restart failed rebase PRs tests. If the restarted tests
+# complete successfully, the PR will be automatically merged.
 echo "Running automatic restart of failed rebase PRs tests..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
     --mode restart \
