@@ -69,6 +69,16 @@ tests:
     workflow: ocm-e2e-kind
 - as: periodic-e2e
   cron: 42 2 * * 0
+  reporter_config:
+    channel: '#olm-starks'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind

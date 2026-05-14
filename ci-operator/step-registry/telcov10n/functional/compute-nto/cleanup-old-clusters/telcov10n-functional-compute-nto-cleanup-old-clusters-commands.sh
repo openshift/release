@@ -69,6 +69,7 @@ main() {
 
     echo "Clean old clusters"
     ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+        -e "cluster_name=${CLUSTER_NAME}" \
         -i ./inventories/ocp-deployment/build-inventory.py
 }
 

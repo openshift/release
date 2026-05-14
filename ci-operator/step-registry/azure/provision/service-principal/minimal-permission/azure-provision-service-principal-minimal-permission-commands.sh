@@ -56,7 +56,7 @@ function run_cmd_with_retries()
         ret=0
         res=$(eval "${cmd}") || ret=$?
     done
-    if [ ${try} -eq ${max} ]; then
+    if [ ${try} -eq ${max} ] && [[ ${ret} -ne 0 || -z "${res}" ]]; then
         echo "Never succeed or Timeout"
         return 1
     fi
@@ -122,8 +122,17 @@ for sp_type in ${sp_list}; do
     fi
 
     echo "Creating ${sp_type} sp with role ${role_name} granted..."
-    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"    
+    create_sp_with_custom_role "${sp_name}" "${role_name}" "${AZURE_AUTH_SUBSCRIPTION_ID}" "${sp_output}"
     sp_app_id=$(jq -r .appId "${sp_output}")
+
+    # Wait for Azure AD propagation - newly created service principals may not be immediately visible
+    echo "Waiting for service principal ${sp_app_id} to be visible in Azure AD..."
+    cmd="az ad sp show --id '${sp_app_id}' --query id -otsv"
+    if ! run_cmd_with_retries "${cmd}" 4 "az ad sp show"; then
+        echo "Error: Service principal ${sp_app_id} failed to become visible in Azure AD after polling. Azure AD propagation may have failed."
+        exit 1
+    fi
+
     sp_id=$(az ad sp show --id ${sp_app_id} --query id -otsv)
     sp_password=$(jq -r .password "${sp_output}")
     sp_tenant=$(jq -r .tenant "${sp_output}")

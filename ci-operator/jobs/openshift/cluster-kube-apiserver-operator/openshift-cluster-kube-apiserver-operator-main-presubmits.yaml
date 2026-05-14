@@ -8,6 +8,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-operator-disruptive-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -89,6 +93,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -169,6 +177,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -250,6 +262,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ovn-serial-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -331,6 +347,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -412,6 +432,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -492,6 +516,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-azure-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -573,6 +601,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -653,6 +685,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-aescbc
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -735,6 +771,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-aesgcm
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -815,16 +855,20 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build04
-    context: ci/prow/e2e-gcp-operator-encryption-kms
+    context: ci/prow/e2e-gcp-operator-encryption-kms-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-kube-apiserver-operator-main-e2e-gcp-operator-encryption-kms
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-main-e2e-gcp-operator-encryption-kms-1of2
     optional: true
-    rerun_command: /test e2e-gcp-operator-encryption-kms
+    rerun_command: /test e2e-gcp-operator-encryption-kms-1of2
     run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
     spec:
       containers:
@@ -832,6 +876,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-gcp-operator-encryption-kms
@@ -890,22 +935,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build04
-    context: ci/prow/e2e-gcp-operator-encryption-kms-ote
+    context: ci/prow/e2e-gcp-operator-encryption-kms-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-kube-apiserver-operator-main-e2e-gcp-operator-encryption-kms-ote
-    rerun_command: /test e2e-gcp-operator-encryption-kms-ote
+    name: pull-ci-openshift-cluster-kube-apiserver-operator-main-e2e-gcp-operator-encryption-kms-2of2
+    optional: true
+    rerun_command: /test e2e-gcp-operator-encryption-kms-2of2
     run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
     spec:
       containers:
@@ -913,9 +963,10 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcp-operator-encryption-kms-ote
+        - --target=e2e-gcp-operator-encryption-kms
         command:
         - ci-operator
         env:
@@ -971,7 +1022,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms-ote,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -980,6 +1031,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-perf-aescbc
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1062,6 +1117,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-perf-aesgcm
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1144,6 +1203,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-perf-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1226,6 +1289,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aescbc
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1308,6 +1375,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-rotation-aesgcm
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1390,6 +1461,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-rotation-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1472,6 +1547,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1554,6 +1633,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-serial-ote
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1634,6 +1717,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-gcp-operator-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1715,6 +1802,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-180d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1796,6 +1887,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-1y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1877,6 +1972,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-shutdown-90d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -1958,6 +2057,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-180d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2039,6 +2142,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-1y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2120,6 +2227,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-ha-cert-rotation-suspend-90d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2201,6 +2312,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-180d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2282,6 +2397,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-1y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2363,6 +2482,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-shutdown-90d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2444,6 +2567,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-180d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2525,6 +2652,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-1y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2606,6 +2737,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-2y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2687,6 +2822,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-3y
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2768,6 +2907,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-ovn-sno-cert-rotation-suspend-90d
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -2849,6 +2992,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
@@ -2930,6 +3077,10 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-short-cert-rotation
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -3011,6 +3162,10 @@ presubmits:
     cluster: build04
     context: ci/prow/e2e-short-cert-rotation-azure
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -3092,6 +3247,10 @@ presubmits:
     cluster: build04
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3146,6 +3305,10 @@ presubmits:
     cluster: build04
     context: ci/prow/k8s-e2e-gcp
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3226,6 +3389,10 @@ presubmits:
     cluster: build04
     context: ci/prow/k8s-e2e-gcp-serial
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3308,7 +3475,8 @@ presubmits:
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -3393,7 +3561,8 @@ presubmits:
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
@@ -3450,10 +3619,14 @@ presubmits:
     cluster: build04
     context: ci/prow/periodics-images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci-operator.openshift.io/variant: periodics
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-kube-apiserver-operator-main-periodics-images
     rerun_command: /test periodics-images
@@ -3506,6 +3679,10 @@ presubmits:
     cluster: build04
     context: ci/prow/unit
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3567,6 +3744,10 @@ presubmits:
     cluster: build04
     context: ci/prow/verify
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3628,6 +3809,10 @@ presubmits:
     cluster: build04
     context: ci/prow/verify-deps
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
