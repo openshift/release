@@ -4,6 +4,25 @@ This directory contains custom slash commands to help developers work with the O
 
 ## Available Commands
 
+### `/pj-rehearse-debug` - Debug CI Jobs with Iterative Testing
+
+**Purpose**: Debug and fix CI job configuration issues using `/pj-rehearse` for rapid iteration.
+
+**Usage**:
+```bash
+/pj-rehearse-debug [job_name]
+```
+
+**What it does**:
+- Identifies failing job configuration and step-registry files  
+- Analyzes common failure patterns (base images, network access, missing tools)
+- Guides through fix-commit-test iteration cycle  
+- Automates PR creation and rehearsal triggering
+
+See detailed workflow in `.claude/commands/pj-rehearse-debug.md`.
+
+---
+
 ### `/step-finder` - Step Registry Component Discovery
 
 **Purpose**: Search and discover existing step-registry steps, workflows, and chains to reuse in CI configurations.
