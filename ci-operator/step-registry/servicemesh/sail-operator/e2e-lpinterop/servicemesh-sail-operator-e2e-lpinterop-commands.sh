@@ -225,8 +225,9 @@ mkdir ./test_artifacts
 ARTIFACTS="$(pwd)/test_artifacts"
 export ARTIFACTS
 
-# workaround for node instability, for now, ztunnel image only
+# workaround for a node network instability during test execution, prepull images which must be on each node
 prepull_image_on_nodes "ztunnel"
+prepull_image_on_nodes "cni"
 
 FIPS_CLUSTER=false
 # If fips cluster, patch network config to be able to run ambient tests
