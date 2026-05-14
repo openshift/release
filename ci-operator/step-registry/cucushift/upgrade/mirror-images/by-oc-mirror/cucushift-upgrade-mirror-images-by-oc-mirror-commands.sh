@@ -83,8 +83,12 @@ KUBECONFIG="" oc registry login
 run_command "which oc"
 run_command "oc version --client"
 
+# Extract the full OCP version from the target release
+ocp_full_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
+echo "Target OCP version: ${ocp_full_version}"
+
 # Download oc-mirror from mirror.openshift.com
-echo "Downloading oc-mirror from mirror.openshift.com"
+echo "Downloading oc-mirror version ${ocp_full_version} from mirror.openshift.com"
 ARCH=$(uname -m)
 case ${ARCH} in
     x86_64) ARCH="amd64" ;;
@@ -93,8 +97,12 @@ esac
 
 oc_mirror_download_dir=$(mktemp -d)
 pushd "${oc_mirror_download_dir}"
+# Download version-specific oc-mirror from mirror.openshift.com to match the payload version
 curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${ocp_full_version}/oc-mirror.tar.gz"
+# When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
+# curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+#     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
 tar -xzf oc-mirror.tar.gz
 chmod +x oc-mirror
 oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
@@ -134,7 +142,8 @@ check_signed "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" || payload_signed="fa
 mirrorCmd="'${oc_mirror_bin}' -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
 
 # ref OCPBUGS-56009
-ocp_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}' | cut -d. -f 1,2)
+# Extract major.minor version for comparison (already extracted full version earlier)
+ocp_version=$(echo "${ocp_full_version}" | cut -d. -f 1,2)
 if ! isPreVersion "${ocp_version}" "4.19" && [[ "${payload_signed}" == "false" ]] ; then
     mirrorCmd="${mirrorCmd} --ignore-release-signature"
 fi
