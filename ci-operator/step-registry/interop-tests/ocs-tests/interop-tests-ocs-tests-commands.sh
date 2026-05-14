@@ -153,8 +153,8 @@ cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
-    echo " \xF0\x9F\x9A\xA8  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  \xF0\x9F\x98\xB4 \xF0\x9F\x98\xB4 \xF0\x9F\x98\xB4"
+    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
+    echo "  😴 😴 😴"
     sleep 7200
     exit 1
 else
