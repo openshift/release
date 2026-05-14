@@ -24,27 +24,33 @@ resources:
       memory: 200Mi
 tests:
 - as: catalog-sync-verify
-  commands: |
-    set -euo pipefail
-    export PULL_SECRET_PATH=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
-    export CATALOG_DATA_DIR=/tmp/catalog-data
-    export MAX_PARALLEL_JOBS=3
-    cd /app
-    ./sync-catalogs.sh
-    echo "--- Verification ---"
-    cat /tmp/catalog-data/catalog-index.json
-    CATALOG_COUNT=$(jq -r 'if (.catalogs | type) == "array" then (.catalogs | length) else 0 end' /tmp/catalog-data/catalog-index.json)
-    echo "Synced catalog entries: $CATALOG_COUNT"
-    if [ "$CATALOG_COUNT" -lt 1 ]; then
-      echo "ERROR: No catalogs synced"
-      exit 1
-    fi
-  container:
-    from: mirror-gui
-  credentials:
-  - mount_path: /var/run/secrets/ci-pull-credentials
-    name: ci-pull-credentials
-    namespace: ci
+  steps:
+    test:
+    - as: catalog-sync-verify
+      commands: |
+        set -euo pipefail
+        export PULL_SECRET_PATH=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+        export CATALOG_DATA_DIR=/tmp/catalog-data
+        export MAX_PARALLEL_JOBS=3
+        cd /app
+        ./sync-catalogs.sh
+        echo "--- Verification ---"
+        cat /tmp/catalog-data/catalog-index.json
+        CATALOG_COUNT=$(jq -r 'if (.catalogs | type) == "array" then (.catalogs | length) else 0 end' /tmp/catalog-data/catalog-index.json)
+        echo "Synced catalog entries: $CATALOG_COUNT"
+        if [ "$CATALOG_COUNT" -lt 1 ]; then
+          echo "ERROR: No catalogs synced"
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: mirror-gui
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
