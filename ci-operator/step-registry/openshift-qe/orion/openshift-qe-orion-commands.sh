@@ -300,23 +300,25 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 # Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
 (
-    EXP_DIR="${ARTIFACT_DIR}/orion-original-edivisive"
+    EXP_DIR="/tmp/orion-original-edivisive"
     mkdir -p "$EXP_DIR"
-    EXP_BINARY="/tmp/orion-original-edivisive"
+    pushd "$EXP_DIR"
+    git clone -q --branch orig-edivisive-exp $ORION_REPO --depth 1
+    pushd orion
+    pip install -q -r requirements.txt
+    pip install -q .
 
-    echo "Downloading experimental orion binary..."
-    if ! curl -fsSL "https://github.com/cloud-bulldozer/orion/releases/download/orig-edivisive-exp/orion-amd64" -o "$EXP_BINARY"; then
-        echo "Failed to download experimental orion binary, skipping."
-        exit 0
-    fi
-    chmod +x "$EXP_BINARY"
 
     echo "Running experimental orion (original e-divisive)..."
-    "$EXP_BINARY" --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee "$EXP_DIR/${FILENAME}.txt" || true
+    # Strip JIRA flags for experimental run
+    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
+    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
 
     # Copy all results except .xml files into the experimental artifacts subdirectory
-    cp *.csv *.json *.txt *.html "$EXP_DIR/" 2>/dev/null || true
-
+    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
+    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
+    popd
+    popd
     echo "Experimental orion run complete."
 ) || echo "Experimental orion block failed, continuing."
 
