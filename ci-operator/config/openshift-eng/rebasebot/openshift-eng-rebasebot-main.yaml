@@ -33,6 +33,35 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make deps
 tests:
+- as: apiserver-network-proxy
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: apiserver-network-proxy
+      commands: |
+        rebasebot --source https://github.com/kubernetes-sigs/apiserver-network-proxy:master \
+                  --dest openshift/apiserver-network-proxy:main \
+                  --rebase openshift/apiserver-network-proxy:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-app-id 3706026 \
+                  --github-cloner-id 3706026 \
+                  --git-username hypershift-rebase-bot \
+                  --git-email hypershift-rebase-bot@redhat.com \
+                  --bot-emails hypershift-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: hypershift-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-aws
   cron: 0 12 * * Mon,Thu
   steps:
