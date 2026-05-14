@@ -28,8 +28,9 @@ images:
           ./cmd/zero-trust-workload-identity-manager/main.go
       FROM registry.access.redhat.com/ubi9-minimal:9.4
       WORKDIR /
+      RUN microdnf install -y tar && microdnf clean all
       COPY --from=builder /workspace/zero-trust-workload-identity-manager /usr/bin
-      RUN mkdir -p /tmp/e2e-cover && chmod 777 /tmp/e2e-cover
+      RUN mkdir -p /tmp/e2e-cover && chown 65532:65532 /tmp/e2e-cover && chmod 700 /tmp/e2e-cover
       USER 65532:65532
       ENV GOCOVERDIR=/tmp/e2e-cover
       ENTRYPOINT ["/usr/bin/zero-trust-workload-identity-manager"]
@@ -84,10 +85,8 @@ tests:
       commands: |
         set -euo pipefail
         NAMESPACE="zero-trust-workload-identity-manager"
-        DEPLOYMENT="zero-trust-workload-identity-manager-controller-manager"
-        PVC_NAME="e2e-coverage-pvc"
+        POD_LABEL="name=zero-trust-workload-identity-manager"
         GOCOVERDIR_PATH="/tmp/e2e-cover"
-        EXTRACTOR_IMAGE="golang:1.25"
         CODECOV_SECRET="/var/run/secrets/codecov/CODECOV_TOKEN"
 
         artifact_dir="${ARTIFACT_DIR:-.}"
@@ -99,32 +98,23 @@ tests:
           export CODECOV_TOKEN
         fi
 
-        echo "Scaling down operator to flush coverage data via SIGTERM..."
-        oc scale "deployment/${DEPLOYMENT}" --replicas=0 -n "${NAMESPACE}" || true
-        oc wait --for=delete pod -l name=zero-trust-workload-identity-manager \
-          -n "${NAMESPACE}" --timeout=60s 2>/dev/null || true
+        pod=$(oc get pod -n "${NAMESPACE}" -l "${POD_LABEL}" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [ -z "${pod}" ]; then
+          echo "Error: no operator pod found"; exit 1
+        fi
+        echo "Operator pod: ${pod}"
 
-        oc delete pod coverage-extractor -n "${NAMESPACE}" --ignore-not-found --wait=false 2>/dev/null || true
+        echo "Sending SIGTERM to operator process to flush coverage data..."
+        oc exec -n "${NAMESPACE}" "${pod}" -c manager -- kill -s TERM 1 || true
 
-        echo "Creating extractor pod..."
-        oc run coverage-extractor \
-          --image="${EXTRACTOR_IMAGE}" \
-          --restart=Never \
-          --overrides="{
-            \"spec\": {
-              \"volumes\": [{\"name\": \"cov\", \"persistentVolumeClaim\": {\"claimName\": \"${PVC_NAME}\"}}],
-              \"containers\": [{\"name\": \"coverage-extractor\", \"image\": \"${EXTRACTOR_IMAGE}\",
-                \"command\": [\"sleep\", \"600\"],
-                \"volumeMounts\": [{\"name\": \"cov\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}]
-              }]
-            }
-          }" \
-          -n "${NAMESPACE}"
-
-        oc wait pod/coverage-extractor --for=condition=Ready -n "${NAMESPACE}" --timeout=120s
+        echo "Waiting for container to restart..."
+        sleep 10
+        oc wait pod/"${pod}" --for=condition=Ready -n "${NAMESPACE}" --timeout=120s
 
         mkdir -p "${coverage_dir}"
-        oc cp "${NAMESPACE}/coverage-extractor:${GOCOVERDIR_PATH}/." "${coverage_dir}"
+        echo "Copying coverage data from operator pod..."
+        oc cp "${NAMESPACE}/${pod}:${GOCOVERDIR_PATH}/." "${coverage_dir}" -c manager
 
         echo "Coverage files:"
         ls -la "${coverage_dir}/" 2>/dev/null || true
@@ -195,26 +185,10 @@ tests:
         set -euo pipefail
         NAMESPACE="zero-trust-workload-identity-manager"
         DEPLOYMENT="zero-trust-workload-identity-manager-controller-manager"
-        PVC_NAME="e2e-coverage-pvc"
         GOCOVERDIR_PATH="/tmp/e2e-cover"
 
         echo "--- E2E Coverage Setup ---"
         echo "Coverage image: ${COVERAGE_IMAGE}"
-
-        echo "Creating PVC..."
-        oc apply -f - <<EOF
-        apiVersion: v1
-        kind: PersistentVolumeClaim
-        metadata:
-          name: ${PVC_NAME}
-          namespace: ${NAMESPACE}
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
-        EOF
 
         echo "Discovering CSV from deployment ownerReference..."
         csv=$(oc get deployment "${DEPLOYMENT}" -n "${NAMESPACE}" \
@@ -224,12 +198,12 @@ tests:
         fi
         echo "Found CSV: ${csv}"
 
-        echo "Patching CSV..."
+        echo "Patching CSV with coverage image, GOCOVERDIR, and emptyDir volume..."
         oc patch csv "${csv}" -n "${NAMESPACE}" --type=json -p "[
           {\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"${COVERAGE_IMAGE}\"},
           {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-\", \"value\": {\"name\": \"GOCOVERDIR\", \"value\": \"${GOCOVERDIR_PATH}\"}},
           {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/volumeMounts/-\", \"value\": {\"name\": \"coverage-data\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}},
-          {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/volumes/-\", \"value\": {\"name\": \"coverage-data\", \"persistentVolumeClaim\": {\"claimName\": \"${PVC_NAME}\"}}}
+          {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/volumes/-\", \"value\": {\"name\": \"coverage-data\", \"emptyDir\": {}}}
         ]"
 
         echo "Waiting for rollout..."
