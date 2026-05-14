@@ -347,20 +347,6 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
     wait "$!"
 }
 
-function heavy_build() {
-    TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
-    VERBOSITY="" # "--v 9"
-
-    set -x
-    openshift-tests run \
-        ${VERBOSITY} \
-        "${TEST_SUITE}" \
-        ${TEST_ARGS:-} \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
-}
-
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
@@ -397,9 +383,6 @@ jenkins-e2e-rhel-only)
     ;;
 image-ecosystem)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/image-ecosystem suite
-    ;;
-heavy-build)
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel heavy_build
     ;;
 upgrade)
     upgrade
