@@ -4,6 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function archive_pod_info() {
+  local ns="quay-enterprise"
+  echo "Archiving pod status and logs from namespace ${ns}..."
+  oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
+  oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
+  mkdir -p "${ARTIFACT_DIR}/pod_logs"
+  while read -r pod; do
+    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
+      oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+}
+
 #Get the credentials and Email of new Quay User
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
@@ -232,8 +247,10 @@ for _ in {1..60}; do
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    archive_pod_info
     exit 0
   fi
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+archive_pod_info
