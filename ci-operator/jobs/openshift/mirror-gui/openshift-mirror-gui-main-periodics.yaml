@@ -3,65 +3,78 @@ periodics:
   cluster: build03
   cron: 0 2 * * *
   decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     repo: mirror-gui
-    sparse_checkout_files:
-    - Dockerfile
   labels:
     ci-operator.openshift.io/is-promotion: "true"
-    ci-operator.openshift.io/variant: catalog-sync
   max_concurrency: 1
   name: periodic-ci-openshift-mirror-gui-main-catalog-sync-images
   spec:
     containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --promote
-      - --report-credentials-file=/etc/report/credentials
-      - --target=[images]
-      - --variant=catalog-sync
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        set -euxo pipefail
+
+        # Install oc CLI
+        curl -sSfL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /usr/local/bin oc
+        oc version --client
+
+        # Install sync-catalogs.sh dependencies (python3 and jq ship with UBI9)
+        dnf install -y --nodocs python3-pyyaml && dnf clean all
+
+        cd /home/prow/go/src/github.com/openshift/mirror-gui
+
+        # ── 1. Sync catalogs from registry.redhat.io ──
+        export PULL_SECRET_PATH=/etc/ci-pull-credentials/.dockerconfigjson
+        export CATALOG_DATA_DIR=./catalog-data
+        export MAX_PARALLEL_JOBS=3
+        chmod +x ./sync-catalogs.sh
+        ./sync-catalogs.sh
+
+        # ── 2. Build the image (catalog-data is now fresh in the workspace) ──
+        BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        VCS_REF="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+        buildah bud \
+          --storage-driver=vfs \
+          --build-arg "BUILD_DATE=${BUILD_DATE}" \
+          --build-arg "VCS_REF=${VCS_REF}" \
+          -t "${TARGET_IMAGE}" \
+          .
+
+        # ── 3. Push the image ──
+        buildah push \
+          --storage-driver=vfs \
+          --authfile=/etc/push-secret/.dockerconfigjson \
+          "${TARGET_IMAGE}"
+      env:
+      - name: TARGET_IMAGE
+        value: quay.io/openshift-release-dev/ocp-v4.0-art-dev:mirror-gui
+      image: registry.access.redhat.com/ubi9/buildah:latest
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
-          cpu: 10m
+          cpu: 500m
+          memory: 2Gi
+      securityContext:
+        privileged: true
       volumeMounts:
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
+      - mountPath: /etc/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /etc/push-secret
         name: push-secret
         readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: manifest-tool-local-pusher
+    - name: ci-pull-credentials
       secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
+        secretName: ci-pull-credentials
     - name: push-secret
       secret:
         secretName: registry-push-credentials-ci-central
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
