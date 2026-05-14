@@ -45,18 +45,36 @@ export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
 export AWS_REGION="${LEASED_RESOURCE}"
 
-# Try to get manager cluster access via backplane
-log "Attempting manager cluster access via backplane..."
-if ocm backplane login "${CLUSTER_ID}" --manager --multi 2>&1; then
-  export MC_KUBECONFIG="${HOME}/.kube/config"
-  MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
-  if [[ -n "${MC_SERVER}" && "${MC_SERVER}" == *"backplane"* ]]; then
-    MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
-    export MANAGEMENT_CLUSTER_ID
-    log "Manager cluster access established: ${MANAGEMENT_CLUSTER_ID}"
+# Try to get management cluster access via OCM API
+log "Attempting management cluster access..."
+MC_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}"/hypershift 2>/dev/null | jq -r '.management_cluster // empty')
+if [[ -n "${MC_NAME}" ]]; then
+  log "Management cluster name: ${MC_NAME}"
+  MANAGEMENT_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name='${MC_NAME}'" --parameter size=1 2>/dev/null | jq -r '.items[0].id // empty')
+  if [[ -n "${MANAGEMENT_CLUSTER_ID}" ]]; then
+    MC_LISTENING=$(ocm get /api/clusters_mgmt/v1/clusters/"${MANAGEMENT_CLUSTER_ID}" 2>/dev/null | jq -r '.api.listening // empty')
+    if [[ "${MC_LISTENING}" == "external" ]]; then
+      log "Management cluster ${MANAGEMENT_CLUSTER_ID} API is external, fetching kubeconfig..."
+      MC_KUBECONFIG_FILE="${SHARED_DIR}/mc-kubeconfig"
+      set +x
+      ocm get /api/clusters_mgmt/v1/clusters/"${MANAGEMENT_CLUSTER_ID}"/credentials 2>/dev/null | jq -r '.kubeconfig' > "${MC_KUBECONFIG_FILE}"
+      set -x 2>/dev/null || true
+      if KUBECONFIG="${MC_KUBECONFIG_FILE}" oc whoami &>/dev/null; then
+        export MC_KUBECONFIG="${MC_KUBECONFIG_FILE}"
+        export MANAGEMENT_CLUSTER_ID
+        log "Management cluster access established: ${MANAGEMENT_CLUSTER_ID}"
+      else
+        log "WARNING: MC kubeconfig fetched but failed validation (oc whoami failed), skipping MC access"
+        rm -f "${MC_KUBECONFIG_FILE}"
+      fi
+    else
+      log "Management cluster ${MANAGEMENT_CLUSTER_ID} API is ${MC_LISTENING:-unknown}, skipping MC access"
+    fi
+  else
+    log "Could not resolve management cluster ID for ${MC_NAME}"
   fi
 else
-  log "WARNING: Backplane login failed (expected in CI without network access to MC)"
+  log "No management cluster found for cluster ${CLUSTER_ID} (not HCP or hypershift info unavailable)"
 fi
 
 # Run tests
