@@ -87,8 +87,26 @@ run_command "oc version --client"
 ocp_full_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
 echo "Target OCP version: ${ocp_full_version}"
 
+# Determine which oc-mirror version to download
+# Nightly/CI builds aren't published to mirror.openshift.com, so use stable-X.Y channel for them
+if [[ "${ocp_full_version}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+    ocp_minor_version="${BASH_REMATCH[1]}"
+    if [[ "${ocp_full_version}" =~ (nightly|ci|rc) ]]; then
+        # For nightly/CI/RC builds, use stable-X.Y channel
+        oc_mirror_version="stable-${ocp_minor_version}"
+        echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is nightly/CI build)"
+    else
+        # For GA releases, use the exact version
+        oc_mirror_version="${ocp_full_version}"
+        echo "Using oc-mirror version ${ocp_full_version} (target is GA release)"
+    fi
+else
+    # Fallback to latest if version format is unexpected
+    oc_mirror_version="latest"
+    echo "Warning: Unexpected version format '${ocp_full_version}', using latest oc-mirror"
+fi
+
 # Download oc-mirror from mirror.openshift.com
-echo "Downloading oc-mirror version ${ocp_full_version} from mirror.openshift.com"
 ARCH=$(uname -m)
 case ${ARCH} in
     x86_64) ARCH="amd64" ;;
@@ -97,9 +115,10 @@ esac
 
 oc_mirror_download_dir=$(mktemp -d)
 pushd "${oc_mirror_download_dir}"
+echo "Downloading oc-mirror from https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/"
 # Download version-specific oc-mirror from mirror.openshift.com to match the payload version
 curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${ocp_full_version}/oc-mirror.tar.gz"
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/oc-mirror.tar.gz"
 # When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
 # curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
 #     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
@@ -107,7 +126,7 @@ curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
 # Verify the integrity of the downloaded tarball
 echo "Verifying oc-mirror.tar.gz integrity..."
 curl -L --retry 5 --connect-timeout 30 -o sha256sum.txt \
-    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${ocp_full_version}/sha256sum.txt"
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/sha256sum.txt"
 grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
     echo "ERROR: oc-mirror.tar.gz checksum verification failed"
     exit 1
