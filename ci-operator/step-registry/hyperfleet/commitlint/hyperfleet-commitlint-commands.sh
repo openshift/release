@@ -9,7 +9,7 @@ if [ -z "${PULL_BASE_SHA:-}" ]; then
     exit 1
 fi
 
-HOOKS_VERSION="v0.1.3"
+HOOKS_VERSION="v0.2.0"
 HOOKS_URL="https://github.com/openshift-hyperfleet/hyperfleet-hooks/releases/download/${HOOKS_VERSION}/hyperfleet-hooks-linux-amd64"
 HOOKS_BIN="/tmp/hyperfleet-hooks"
 
