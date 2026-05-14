@@ -120,6 +120,10 @@ ENV_DATA:
 __APPENDED_ENV_DATA__
 fi
 
+EXTRA_ARGS=""
+if [[ "${DISABLE_ENVIRONMENT_CHECKER}" == "true" ]]; then
+    EXTRA_ARGS="--disable-environment-checker"
+fi
 
 set -x
 START_TIME=$(date "+%s")
@@ -133,6 +137,7 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --cluster-name "${CLUSTER_NAME}"                   \
   --html         "${CLUSTER_PATH}/test-results.html" \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
+  ${EXTRA_ARGS} \
   || /bin/true
 
 
@@ -148,8 +153,8 @@ cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
+    echo " \xF0\x9F\x9A\xA8  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
+    echo "  \xF0\x9F\x98\xB4 \xF0\x9F\x98\xB4 \xF0\x9F\x98\xB4"
     sleep 7200
     exit 1
 else
