@@ -322,10 +322,41 @@ tests:
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         export PLATFORM=aws
+        export TEST_FILTER="59376"
         export TEST_SHARD_INDEX=0
         export TEST_TOTAL_SHARDS=2
-        export TEST_LIMIT=1
-        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+        /usr/bin/openshift-tests-extension list tests --suite openshift/hive -o names | tee ${ARTIFACT_DIR}/all_tests.txt
+        MATCHED=$(grep "${TEST_FILTER}" ${ARTIFACT_DIR}/all_tests.txt || true)
+        if [ -z "$MATCHED" ]; then
+          echo "ERROR: No tests found matching '${TEST_FILTER}'"
+          exit 1
+        fi
+        SHARD=$(echo "$MATCHED" | awk -v idx="$TEST_SHARD_INDEX" -v total="$TEST_TOTAL_SHARDS" '(NR-1) % total == idx')
+        if [ -z "$SHARD" ]; then
+          echo "No tests in shard ${TEST_SHARD_INDEX}/${TEST_TOTAL_SHARDS}"
+          exit 0
+        fi
+        echo "=== Shard ${TEST_SHARD_INDEX}/${TEST_TOTAL_SHARDS} tests ==="
+        echo "$SHARD"
+        echo "====================="
+        set +e
+        echo "$SHARD" | /usr/bin/openshift-tests-extension run-test -c 1 > ${ARTIFACT_DIR}/test_results.json 2>&1
+        RC=$?
+        set -e
+        jq -r '
+        def esc: gsub("&";"&amp;") | gsub("<";"&lt;") | gsub(">";"&gt;") | gsub("\"";"&quot;");
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<testsuite name=\"openshift/hive\" tests=\(length) failures=\([.[]|select(.result==\"failed\")]|length)>",
+        (.[] |
+          if .result == "failed" then
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"><failure message=\"test failed\"><![CDATA[\(.error // "")]]></failure></testcase>"
+          elif .result == "skipped" then
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"><skipped/></testcase>"
+          else
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"/>"
+          end),
+        "</testsuite>"' ${ARTIFACT_DIR}/test_results.json > ${ARTIFACT_DIR}/junit_results.xml || echo "Warning: JUnit conversion failed"
+        exit $RC
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
@@ -368,10 +399,41 @@ tests:
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         export PLATFORM=aws
+        export TEST_FILTER="41525"
         export TEST_SHARD_INDEX=1
         export TEST_TOTAL_SHARDS=2
-        export TEST_LIMIT=1
-        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
+        /usr/bin/openshift-tests-extension list tests --suite openshift/hive -o names | tee ${ARTIFACT_DIR}/all_tests.txt
+        MATCHED=$(grep "${TEST_FILTER}" ${ARTIFACT_DIR}/all_tests.txt || true)
+        if [ -z "$MATCHED" ]; then
+          echo "ERROR: No tests found matching '${TEST_FILTER}'"
+          exit 1
+        fi
+        SHARD=$(echo "$MATCHED" | awk -v idx="$TEST_SHARD_INDEX" -v total="$TEST_TOTAL_SHARDS" '(NR-1) % total == idx')
+        if [ -z "$SHARD" ]; then
+          echo "No tests in shard ${TEST_SHARD_INDEX}/${TEST_TOTAL_SHARDS}"
+          exit 0
+        fi
+        echo "=== Shard ${TEST_SHARD_INDEX}/${TEST_TOTAL_SHARDS} tests ==="
+        echo "$SHARD"
+        echo "====================="
+        set +e
+        echo "$SHARD" | /usr/bin/openshift-tests-extension run-test -c 1 > ${ARTIFACT_DIR}/test_results.json 2>&1
+        RC=$?
+        set -e
+        jq -r '
+        def esc: gsub("&";"&amp;") | gsub("<";"&lt;") | gsub(">";"&gt;") | gsub("\"";"&quot;");
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<testsuite name=\"openshift/hive\" tests=\(length) failures=\([.[]|select(.result==\"failed\")]|length)>",
+        (.[] |
+          if .result == "failed" then
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"><failure message=\"test failed\"><![CDATA[\(.error // "")]]></failure></testcase>"
+          elif .result == "skipped" then
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"><skipped/></testcase>"
+          else
+            "  <testcase name=\"\(.name|esc)\" time=\"\(.duration/1000)\"/>"
+          end),
+        "</testsuite>"' ${ARTIFACT_DIR}/test_results.json > ${ARTIFACT_DIR}/junit_results.xml || echo "Warning: JUnit conversion failed"
+        exit $RC
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
