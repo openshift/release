@@ -88,15 +88,21 @@ ocp_full_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/
 echo "Target OCP version: ${ocp_full_version}"
 
 # Determine which oc-mirror version to download
-# Nightly/CI builds aren't published to mirror.openshift.com, so use stable-X.Y channel for them
+# Nightly/CI/pre-release builds aren't published to mirror.openshift.com
 if [[ "${ocp_full_version}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
     ocp_minor_version="${BASH_REMATCH[1]}"
-    if [[ "${ocp_full_version}" =~ (nightly|ci|rc) ]]; then
-        # For nightly/CI/RC builds, use stable-X.Y channel
-        oc_mirror_version="stable-${ocp_minor_version}"
-        echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is nightly/CI build)"
+    if [[ "${ocp_full_version}" =~ (nightly|ci|rc|ec) ]]; then
+        # For nightly/CI/RC/EC builds, try stable-X.Y channel, fall back to latest if it doesn't exist
+        # Check if stable channel exists (released versions only)
+        if curl -sf --head "https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/stable-${ocp_minor_version}/" >/dev/null 2>&1; then
+            oc_mirror_version="stable-${ocp_minor_version}"
+            echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is pre-release build)"
+        else
+            oc_mirror_version="latest"
+            echo "Using oc-mirror from latest channel (stable-${ocp_minor_version} not yet available)"
+        fi
     else
-        # For GA releases, use the exact version
+        # For what looks like GA releases, use exact version
         oc_mirror_version="${ocp_full_version}"
         echo "Using oc-mirror version ${ocp_full_version} (target is GA release)"
     fi
