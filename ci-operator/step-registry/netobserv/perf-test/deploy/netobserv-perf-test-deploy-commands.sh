@@ -62,13 +62,73 @@ fi
 
 createFlowCollector ${PARAMETERS}
 
+
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "$FLP_PR_IMAGE"
+    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:f581902"
 fi
+
+
+oc process --ignore-unknown-parameters=true -f /scripts/netobserv/flows_v1beta2_flowcollector.yaml -p DeploymentModel=Kafka KafkaConsumerReplicas=6 -n default -o yaml >"$ARTIFACT_DIR"/flowcollector.yaml
+
+oc apply -f "$ARTIFACT_DIR"/flowcollector.yaml
+
+
+oc patch flowcollector/cluster --type=merge -p '{
+  "spec": {
+    "processor": {
+      "informers": {
+        "enabled": true,
+        "replicas": 2,
+        "resources": {
+          "requests": {
+            "memory": "128Mi",
+            "cpu": "50m"
+          },
+          "limits": {
+            "memory": "256Mi",
+            "cpu": "200m"
+          }
+        },
+        "advanced": {
+          "resyncInterval": 60,
+          "batchSize": 100,
+          "sendTimeout": 10,
+          "updateBufferSize": 100,
+          "processorPort": 9090
+        }
+      }
+    }
+  }
+}'
+
+
+waitForFlowcollectorReady() {
+  echo "====> Waiting for eBPF pods to be ready"
+  timeout=30
+  while [ $timeout -lt 300 ]; do
+    oc get daemonset netobserv-ebpf-agent -n netobserv-privileged && break
+    sleep 10
+    timeout=$((timeout+10))
+  done
+  sleep 60
+  timeout=0
+  while [ $timeout -lt 3600 ]; do
+    agentsDesired=$(oc get daemonset netobserv-ebpf-agent -n netobserv-privileged -o jsonpath='{.status.desiredNumberScheduled}')
+    agentsReady=$(oc get daemonset netobserv-ebpf-agent -n netobserv-privileged -o jsonpath='{.status.numberReady}')
+    [[ $agentsDesired -eq "$agentsReady" ]] && break
+    sleep 30
+    timeout=$((timeout+30))
+    echo "====> ebpf agents are not ready after $timeout, checking again..."
+  done
+  oc wait --timeout=1200s --for=condition=ready flowcollector cluster
+}
+
+waitForFlowcollectorReady
+
 
 # get NetObserv metadata
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
