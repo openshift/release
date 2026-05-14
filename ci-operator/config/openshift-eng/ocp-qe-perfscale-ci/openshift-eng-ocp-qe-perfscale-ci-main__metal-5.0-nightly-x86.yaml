@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -44,13 +44,13 @@ tests:
     cluster_profile: metal-perfscale-cpt
     env:
       BOND: "true"
-      CNV_VERSION: "4.21"
+      CNV_VERSION: "5.0"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       OUTPUT_FORMAT: JUNIT
       PUBLIC_VLAN: "false"
       RUN_ORION: deferred
-      VERSION: "4.21"
+      VERSION: "5.0"
       VM: "true"
     post:
     - ref: openshift-qe-installer-bm-must-gather
@@ -63,8 +63,8 @@ tests:
     - ref: openshift-qe-orion-virt-data-path
     - ref: openshift-qe-virt-udn-density
     - ref: openshift-qe-orion-virt-udn-density
-    - ref: openshift-qe-virt-density
-    - ref: openshift-qe-orion-virt-density
+    - ref: openshift-qe-virt-density-nomount
+    - ref: openshift-qe-orion-virt-density-nomount
     - ref: openshift-qe-orion-report
     workflow: openshift-qe-installer-bm-deploy
 - as: udn-bgp
@@ -105,8 +105,31 @@ tests:
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-network-workloads
     - ref: openshift-qe-udn-bgp
+- as: weekly-eip
+  capabilities:
+  - intranet
+  cron: 0 17 * * 3
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      ITERATIONS: "2400"
+      NUM_HYBRID_WORKER_NODES: "24"
+      NUM_NODES: "6"
+      NUM_WORKER_NODES: "0"
+      PUBLIC_VLAN: "false"
+      STARTING_NODE: "4"
+      TYPE: hmno
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-egressip
 zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: metal-4.21-nightly-x86
+  variant: metal-5.0-nightly-x86
