@@ -1,0 +1,51 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci-operator/build-root/Dockerfile
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: mirror-gui
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: catalog-sync-verify
+  commands: |
+    export PULL_SECRET_PATH=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+    export CATALOG_DATA_DIR=/tmp/catalog-data
+    export MAX_PARALLEL_JOBS=3
+    cd /app
+    ./sync-catalogs.sh
+    echo "--- Verification ---"
+    cat /tmp/catalog-data/catalog-index.json
+    CATALOG_COUNT=$(jq '.catalogs | length' /tmp/catalog-data/catalog-index.json)
+    echo "Synced catalog entries: $CATALOG_COUNT"
+    if [ "$CATALOG_COUNT" -lt 1 ]; then
+      echo "ERROR: No catalogs synced"
+      exit 1
+    fi
+  container:
+    from: mirror-gui
+  credentials:
+  - mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: ci
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: mirror-gui
+  variant: catalog-sync
