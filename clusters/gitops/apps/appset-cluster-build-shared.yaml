@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: appset-cluster-build-shared
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - matrix:
+      generators:
+      - list:
+          elements:
+          - cluster: build01
+            name: build01
+          - cluster: build02
+            name: build02
+          - cluster: build03
+            name: build03
+          - cluster: build04
+            name: build04
+          - cluster: build05
+            name: build05
+          - cluster: build06
+            name: build06
+          - cluster: build07
+            name: build07
+          - cluster: build08
+            name: build08
+          - cluster: build09
+            name: build09
+          - cluster: build10
+            name: build10
+          - cluster: build11
+            name: build11
+      - git:
+          directories:
+          - path: clusters/build-clusters/build-shared/*
+          repoURL: https://github.com/openshift/release.git
+          revision: main
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '{{.path.path}}'
+      name: 'build-shared-{{.cluster}}-{{.path.basename}}'
+      namespace: openshift-gitops
+    spec:
+      destination:
+        name: '{{.name}}'
+        namespace: openshift-gitops
+      project: build-clusters-common
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: '{{.path.path}}'
+        repoURL: https://github.com/openshift/release.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true

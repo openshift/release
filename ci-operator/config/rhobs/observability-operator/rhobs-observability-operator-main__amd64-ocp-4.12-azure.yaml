@@ -36,6 +36,16 @@ resources:
 tests:
 - as: coo-stage
   cron: 30 0 * * 1
+  reporter_config:
+    channel: '#observability-operator-cicd'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: azure-observability
     env:

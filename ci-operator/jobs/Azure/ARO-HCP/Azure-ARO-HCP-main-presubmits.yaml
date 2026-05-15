@@ -9,7 +9,17 @@ presubmits:
     context: ci/prow/api-validation
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -80,8 +90,80 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
+    context: ci/prow/baseimage-generator-go-smoke-test
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - dev-infrastructure/openshift-ci/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: baseimage-generator
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-baseimage-generator-go-smoke-test
+    rerun_command: /test baseimage-generator-go-smoke-test
+    run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.ci-operator\.yaml$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=go-smoke-test
+        - --variant=baseimage-generator
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )baseimage-generator-go-smoke-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/baseimage-generator-images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - dev-infrastructure/openshift-ci/Dockerfile
     labels:
       ci-operator.openshift.io/variant: baseimage-generator
       ci.openshift.io/generator: prowgen
@@ -139,7 +221,17 @@ presubmits:
     context: ci/prow/bicep-lint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -213,7 +305,17 @@ presubmits:
     context: ci/prow/config-change-detection
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -286,7 +388,8 @@ presubmits:
     context: ci/prow/e2e-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - test/Containerfile.e2e
     labels:
       ci-operator.openshift.io/variant: e2e
       ci.openshift.io/generator: prowgen
@@ -343,7 +446,17 @@ presubmits:
     context: ci/prow/e2e-parallel
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
       timeout: 10h0m0s
     labels:
       ci.openshift.io/generator: prowgen
@@ -410,81 +523,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-parallel,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/e2e-parallel-infra-ci01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 10h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-e2e-parallel-infra-ci01
-    optional: true
-    rerun_command: /test e2e-parallel-infra-ci01
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-parallel-infra-ci01
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-parallel-infra-ci01,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -550,7 +588,17 @@ presubmits:
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -606,7 +654,17 @@ presubmits:
     context: ci/prow/integration
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       capability/nested-podman: nested-podman
       ci.openshift.io/generator: prowgen
@@ -680,7 +738,17 @@ presubmits:
     context: ci/prow/integration-e2e-parallel
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -762,7 +830,17 @@ presubmits:
     context: ci/prow/integration-e2e-parallel-ocp-fast
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -836,7 +914,17 @@ presubmits:
     context: ci/prow/integration-e2e-parallel-ocp-nightly
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -910,7 +998,17 @@ presubmits:
     context: ci/prow/integration-e2e-parallel-ocp-stable
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -984,7 +1082,17 @@ presubmits:
     context: ci/prow/lint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1057,7 +1165,17 @@ presubmits:
     context: ci/prow/mega-linter
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       capability/nested-podman: nested-podman
       ci.openshift.io/generator: prowgen
@@ -1131,7 +1249,17 @@ presubmits:
     context: ci/prow/observability-prometheus
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1205,7 +1333,17 @@ presubmits:
     context: ci/prow/observability-verify
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1279,7 +1417,17 @@ presubmits:
     context: ci/prow/prod-e2e-parallel
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1361,7 +1509,17 @@ presubmits:
     context: ci/prow/prod-e2e-parallel-ocp-fast
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1435,7 +1593,17 @@ presubmits:
     context: ci/prow/prod-e2e-parallel-ocp-nightly
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1517,7 +1685,17 @@ presubmits:
     context: ci/prow/prod-e2e-parallel-ocp-stable
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1591,7 +1769,17 @@ presubmits:
     context: ci/prow/secrets-validation
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1665,7 +1853,17 @@ presubmits:
     context: ci/prow/stage-e2e-parallel
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1747,7 +1945,17 @@ presubmits:
     context: ci/prow/stage-e2e-parallel-ocp-fast
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1821,7 +2029,17 @@ presubmits:
     context: ci/prow/stage-e2e-parallel-ocp-nightly
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1903,7 +2121,17 @@ presubmits:
     context: ci/prow/stage-e2e-parallel-ocp-stable
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1977,7 +2205,17 @@ presubmits:
     context: ci/prow/test-unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2050,7 +2288,17 @@ presubmits:
     context: ci/prow/verify
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
