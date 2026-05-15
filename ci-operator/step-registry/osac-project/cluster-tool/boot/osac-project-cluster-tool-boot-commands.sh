@@ -272,7 +272,7 @@ echo "=== Pulling OSAC vmaas flavor ==="
 python3 /usr/local/bin/cluster-tool pull "${FLAVOR_IMAGE}"
 
 echo "=== Booting cluster ==="
-python3 /usr/local/bin/cluster-tool boot --flavor osac-vmaas --name "${CLONE}"
+python3 /usr/local/bin/cluster-tool boot --flavor osac-vmaas-pruned --name "${CLONE}"
 
 systemctl restart dnsmasq
 

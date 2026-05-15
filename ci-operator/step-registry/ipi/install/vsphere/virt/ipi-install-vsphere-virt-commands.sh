@@ -174,12 +174,6 @@ for (( i=0; i<${BM_COUNT}; i++ )); do
   oc adm taint nodes "${VM_NAME}-${i}" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
 done
 
-# add custom taint to prevent e2e from running on it due to current networking limitations.  Metrics do not seem to work when making calls from BM to ingress for data, but
-# everything else seems fine.
-for (( i=0; i<${BM_COUNT}; i++ )); do
-  oc adm taint nodes "${VM_NAME}-${i}" vsphere.openshift.io/e2e=true:NoSchedule --kubeconfig="${CLUSTER_KUBECONFIG}"
-done
-
 # Wait for node to be ready to prevent any interruption during the e2e tests
 wait_for_node_ready
 
