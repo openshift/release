@@ -268,26 +268,62 @@ fi
 #if OVERRIDE_OC_MIRROR then download oc-mirror from mirror.openshift.com
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "OCP Version: ${ocpVersion}"
-    if [[ "$ocpVersion" == *arm* ]] || [[ "${OCP_ARCH:-}" != "amd64" ]]; then
-        echo "[WARN]OCP_ARCH is not amd64, or OCP is not for amd64, currently do not support arm64 oc-mirror download"
-    fi
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
         cd ${tmpDir}
         echo "Downloading oc-mirror from mirror.openshift.com for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
         set -x
 
-        # Determine architecture
+        # Detect architecture for oc-mirror download
         ARCH=$(uname -m)
         case ${ARCH} in
             x86_64) ARCH="amd64" ;;
             aarch64) ARCH="arm64" ;;
         esac
 
+        # Determine which oc-mirror version to download
+        # Nightly/CI/pre-release builds aren't published to mirror.openshift.com
+        if [[ "${ocpVersion}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+            ocp_minor_version="${BASH_REMATCH[1]}"
+            if [[ "${ocpVersion}" =~ (nightly|ci|rc|ec) ]]; then
+                # For nightly/CI/RC/EC builds, try stable-X.Y channel, fall back to latest if it doesn't exist
+                # Check if stable channel exists (released versions only)
+                if curl -sf --head "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable-${ocp_minor_version}/" >/dev/null 2>&1; then
+                    oc_mirror_version="stable-${ocp_minor_version}"
+                    echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is pre-release build)"
+                else
+                    oc_mirror_version="latest"
+                    echo "Using oc-mirror from latest channel (stable-${ocp_minor_version} not yet available)"
+                fi
+            else
+                # For what looks like GA releases, use exact version
+                oc_mirror_version="${ocpVersion}"
+                echo "Using oc-mirror version ${ocpVersion} (target is GA release)"
+            fi
+        else
+            # Fallback to latest if version format is unexpected
+            oc_mirror_version="latest"
+            echo "Warning: Unexpected version format '${ocpVersion}', using latest oc-mirror"
+        fi
+
         # Download oc-mirror from mirror.openshift.com
-        echo "Downloading oc-mirror for architecture: ${ARCH}"
+        echo "Downloading oc-mirror from https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/"
+        # Download version-specific oc-mirror from mirror.openshift.com to match the payload version
         curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/oc-mirror.tar.gz"
+        # When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
+        # curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+        #     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+
+        # Verify the integrity of the downloaded tarball
+        echo "Verifying oc-mirror.tar.gz integrity..."
+        curl -L --retry 5 --connect-timeout 30 -o sha256sum.txt \
+            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/sha256sum.txt"
+        grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
+            echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+            exit 1
+        }
+        echo "Checksum verification passed"
 
         tar -xzf oc-mirror.tar.gz
         ls -la ./oc-mirror
