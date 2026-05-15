@@ -27,7 +27,7 @@ tests:
       variant: gpu
     owner: obs
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.20"
   cron: 10 4 * * *
   steps:
@@ -37,10 +37,14 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: "REPO_URL=\"https://github.com/lightspeed-core/lightspeed-stack.git\"\necho
-        \"===== Cloning lightspeed-stack repo =====\"\ngit clone \"$REPO_URL\"\ncd
-        lightspeed-stack\ncd tests/e2e-prow/rhoai\n\nchmod +x pipeline.sh\n./pipeline.sh
-        \    \n"
+      commands: |
+        REPO_URL="https://github.com/lightspeed-core/lightspeed-stack.git"
+        echo "===== Cloning lightspeed-stack repo ====="
+        git clone "$REPO_URL"
+        cd lightspeed-stack
+        cd tests/e2e-prow/rhoai
+        chmod +x pipeline.sh
+        ./pipeline.sh
       credentials:
       - mount_path: /var/run/huggingface
         name: hf-token
@@ -58,6 +62,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
