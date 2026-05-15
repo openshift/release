@@ -287,8 +287,24 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
             ocp_minor_version="${BASH_REMATCH[1]}"
             if [[ "${ocpVersion}" =~ (nightly|ci|rc|ec) ]]; then
                 # For nightly/CI/RC/EC builds, try stable-X.Y channel, fall back to latest if it doesn't exist
-                # Check if stable channel exists (released versions only)
-                if curl -sf --head "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable-${ocp_minor_version}/" >/dev/null 2>&1; then
+                # Check if stable channel exists (released versions only) with retry logic
+                stable_channel_url="https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable-${ocp_minor_version}/"
+                stable_exists=false
+                max_retries=3
+                retry_count=0
+                while [[ ${retry_count} -lt ${max_retries} ]]; do
+                    if curl -sf --head --connect-timeout 10 "${stable_channel_url}" >/dev/null 2>&1; then
+                        stable_exists=true
+                        break
+                    fi
+                    ((retry_count++))
+                    if [[ ${retry_count} -lt ${max_retries} ]]; then
+                        echo "Stable channel probe attempt ${retry_count} failed, retrying..."
+                        sleep 2
+                    fi
+                done
+
+                if [[ "${stable_exists}" == "true" ]]; then
                     oc_mirror_version="stable-${ocp_minor_version}"
                     echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is pre-release build)"
                 else
@@ -309,15 +325,15 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         # Download oc-mirror from mirror.openshift.com
         echo "Downloading oc-mirror from https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/"
         # Download version-specific oc-mirror from mirror.openshift.com to match the payload version
-        curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+        curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
             "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/oc-mirror.tar.gz"
         # When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
-        # curl -L --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+        # curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
         #     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
 
         # Verify the integrity of the downloaded tarball
         echo "Verifying oc-mirror.tar.gz integrity..."
-        curl -L --retry 5 --connect-timeout 30 -o sha256sum.txt \
+        curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
             "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/sha256sum.txt"
         grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
             echo "ERROR: oc-mirror.tar.gz checksum verification failed"
