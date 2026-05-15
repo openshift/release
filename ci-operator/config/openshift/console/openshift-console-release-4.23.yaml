@@ -102,6 +102,31 @@ tests:
           memory: 10Gi
       timeout: 6h0m0s
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-console-recorded
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
+      dependencies:
+      - env: CYPRESS_PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 6h0m0s
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.23
   org: openshift
