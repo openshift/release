@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: appset-cluster-core-ci
+  namespace: openshift-gitops
+spec:
+  generators:
+  - git:
+      directories:
+      - path: clusters/core-ci/*
+      repoURL: https://github.com/openshift/release.git
+      revision: main
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: .
+      name: '{{path.basename}}'
+      namespace: openshift-gitops
+    spec:
+      destination:
+        name: core-ci
+      project: core-ci
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: '{{path}}'
+        repoURL: https://github.com/openshift/release.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true

@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: appset-cluster-build-coredns
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - list:
+      elements:
+      - cluster: build05
+        name: build05
+      - cluster: build09
+        name: build09
+      - cluster: build10
+        name: build10
+      - cluster: build11
+        name: build11
+  template:
+    metadata:
+      name: 'app-cluster-{{.cluster}}-coredns'
+      namespace: openshift-gitops
+    spec:
+      destination:
+        name: '{{.name}}'
+        namespace: openshift-gitops
+      project: build-clusters-coredns
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: clusters/build-clusters/coredns/
+        repoURL: https://github.com/openshift/release.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+        - ApplyOutOfSyncOnly=true
+        - CreateNamespace=true
+        - PruneLast=true
+        - RespectIgnoreDifferences=true
+        - ServerSideApply=true

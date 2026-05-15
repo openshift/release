@@ -13,7 +13,7 @@ Currently, both jobs are daily executed and thus it might take up to two days to
 ## Special Cluster Role and their Rover groups
 
 A useful cluster role binding is
-[cluster-reader](/clusters/build-clusters/common_except_app.ci/admin_cluster-reader-0_list.yaml) which defines cluster readers for all CI clusters except `app.ci`.
+[cluster-reader](/clusters/build-clusters/build-shared/admin_cluster-reader-0_list.yaml) which defines cluster readers for all CI clusters except `app.ci`.
 The existing Rover groups are referred there to give them the permissions.
 
 | Rover Group Name                                                                                                 | Group Name On Cluster   | Role                                                                   |

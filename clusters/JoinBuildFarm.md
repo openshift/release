@@ -19,7 +19,7 @@ Make a softlink to each folder.
 ```
 $ cd build-clusters/vsphere
 $ ln -s ../common common
-$ ln -s ../common_except_app.ci common_except_app.ci
+$ ln -s ../build-shared build-shared
 ```
 
 Create a pull request with the changes above.
