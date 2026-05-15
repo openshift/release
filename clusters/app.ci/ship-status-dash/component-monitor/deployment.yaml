@@ -12,6 +12,12 @@ metadata:
     keel.sh/pollSchedule: "@every 5m"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 60
   selector:
     matchLabels:
       app: component-monitor
@@ -63,6 +69,27 @@ spec:
           - "--dashboard-url=https://protected.ship-status.ci.openshift.org"
           - "--kubeconfig-dir=/etc/kubeconfig"
           - "--report-auth-token-file=/etc/kubeconfig/sa.component-monitor.app.ci.token.txt"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 24
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          failureThreshold: 5
         volumeMounts:
           - name: release
             mountPath: /var/repo
