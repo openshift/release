@@ -169,67 +169,35 @@ gh pr checks <PR_NUMBER> --repo openshift/release
 
 **For long-running jobs (> 30 minutes):**
 
-Set up a background monitor (checks every 5 minutes for up to 3 hours):
+Use the standardized monitor script:
 
 ```bash
-cat > /tmp/monitor_rehearsal.sh << 'MONITOR_EOF'
-#!/bin/bash
-set -euo pipefail
+# Basic usage (3 hour timeout, 5 minute checks)
+.claude/scripts/monitor-rehearsal.sh <PR_NUMBER> <SHORT_JOB_NAME>
 
-PR_NUM=<PR_NUMBER>
-JOB_NAME="<short-job-name>"  # e.g., "azure-ipi-coco"
-END_TIME=$(($(date +%s) + 10800))  # 3 hours
-CHECK_INTERVAL=300  # 5 minutes
+# Examples:
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco
 
-echo "=== Rehearsal Monitoring Started ==="
-echo "PR: https://github.com/openshift/release/pull/${PR_NUM}"
-echo "Job: ci/rehearse/periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-${JOB_NAME}"
-echo "Monitoring for 3 hours (until $(date -d @${END_TIME} '+%Y-%m-%d %H:%M:%S'))"
-echo ""
+# Run in background
+.claude/scripts/monitor-rehearsal.sh 79244 aws-ipi-coco &
 
-iteration=1
-while true; do
-    current_time=$(date +%s)
-    
-    if [ ${current_time} -ge ${END_TIME} ]; then
-        echo "=== 3 Hour Monitoring Completed ==="
-        final_status=$(gh pr checks ${PR_NUM} --repo openshift/release 2>&1 | grep "${JOB_NAME}" || echo "Status unavailable")
-        echo "Final Status: ${final_status}"
-        exit 0
-    fi
-    
-    status_line=$(gh pr checks ${PR_NUM} --repo openshift/release 2>&1 | grep "${JOB_NAME}" || echo "")
-    
-    if [ -n "${status_line}" ]; then
-        job_status=$(echo "${status_line}" | awk '{print $2}')
-        elapsed_mins=$(( (current_time - (END_TIME - 10800)) / 60 ))
-        
-        echo "[${iteration}] $(date '+%H:%M:%S') (${elapsed_mins}m) - Status: ${job_status}"
-        
-        if echo "${job_status}" | grep -qE "^(pass|fail)$"; then
-            echo ""
-            echo "=== Job Completed: ${job_status} ==="
-            prow_url=$(echo "${status_line}" | awk '{print $4}')
-            echo "Prow Logs: ${prow_url}"
-            
-            if [ "${job_status}" = "pass" ]; then
-                echo "✓ SUCCESS: Test passed"
-            else
-                echo "✗ FAILURE: Check logs for error details"
-            fi
-            exit 0
-        fi
-    fi
-    
-    iteration=$((iteration + 1))
-    sleep ${CHECK_INTERVAL}
-done
-MONITOR_EOF
-chmod +x /tmp/monitor_rehearsal.sh
-/tmp/monitor_rehearsal.sh &
+# Custom duration and interval
+.claude/scripts/monitor-rehearsal.sh <PR> <JOB> <HOURS> <SECONDS>
+.claude/scripts/monitor-rehearsal.sh 79244 aro-ipi-coco 4 600
+
+# Parameters:
+#   PR_NUMBER: GitHub PR number (required)
+#   SHORT_JOB_NAME: Part of job name to grep (e.g., "azure-ipi-coco") (required)
+#   DURATION_HOURS: Monitoring duration in hours (default: 3)
+#   CHECK_INTERVAL: Seconds between checks (default: 300 = 5 minutes)
 ```
 
-This runs in the background and reports when the job completes or after 3 hours.
+**What the monitor does:**
+- Checks job status every 5 minutes (configurable)
+- Auto-detects completion (pass or fail)
+- Reports Prow URL for detailed logs
+- Times out after 3 hours (configurable)
+- Can run in foreground or background (&)
 
 **View logs if failed:**
 - Click through to Prow job URL in PR checks
@@ -312,6 +280,8 @@ bash: python3: command not found
 - Use `/test <job-name>` to run full job after rehearsal passes
 - Search for similar working jobs as reference patterns
 - Read error logs carefully - they often contain the exact fix needed
+- Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
+- Run monitors in background with `&` to continue working
 
 ### Analyzing Prow Build Logs
 

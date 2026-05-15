@@ -31,8 +31,9 @@ After the current debugging PR is complete and validated, create two separate PR
 **Branch**: Create new branch from `main` (e.g., `add-pj-rehearse-debug-skill`)
 
 **Files to include**:
-- `.claude/commands/pj-rehearse-debug.md` (the skill)
+- `.claude/commands/pj-rehearse-debug.md` (the skill documentation)
 - `.claude/commands/README.md` (documentation section for the skill)
+- `.claude/scripts/monitor-rehearsal.sh` (standardized monitoring script)
 
 **Files to EXCLUDE**:
 - No sandboxed-containers-operator specific changes
