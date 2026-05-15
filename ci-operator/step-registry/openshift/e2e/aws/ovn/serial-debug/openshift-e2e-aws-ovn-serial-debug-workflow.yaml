@@ -1,0 +1,36 @@
+workflow:
+  as: openshift-e2e-aws-ovn-serial-debug
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-multi-network-policy-manifest
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+      - ref: cucushift-installer-wait
+        timeout: 12h0m0s
+        best_effort: true
+        optional_on_success: true
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+    env:
+      TEST_SUITE: openshift/conformance/serial
+  documentation: |-
+    Debug version of openshift-e2e-aws-ovn-serial workflow with cucushift-installer-wait
+    for extended cluster access. Supports SLEEP_DURATION environment variable for debugging.
+
+    This workflow:
+    - Installs OpenShift cluster on AWS with OVN network plugin
+    - Configures multi-network policy support
+    - Runs e2e tests (can be skipped with TEST_ARGS="--dry-run")
+    - Includes cucushift-installer-wait step for extended debugging (up to 12 hours)
+    - Supports SLEEP_DURATION environment variable (default 2h, max 72h)
+
+    Usage with gangway-cli:
+      --env SLEEP_DURATION=8h
+      --env TEST_ARGS="--dry-run"  (to skip actual test execution)
