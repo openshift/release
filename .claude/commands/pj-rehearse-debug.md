@@ -81,6 +81,24 @@ Common failure patterns:
 
 ### 4. Make Fixes
 
+**CRITICAL**: DO NOT push commits while a rehearsal cluster is running!
+
+- Pushing to the PR branch **immediately aborts the running rehearsal**
+- The cluster is terminated and all test progress is lost
+- This happens even for documentation-only changes
+- Always verify no rehearsal is running before pushing
+
+**Check if rehearsal is running before pushing:**
+```bash
+# Check for active rehearsal
+gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+
+# Check Prow job state
+curl -sS "<gcs-url>/<job-id>/prowjob.json" | jq -r '.status.state'
+# States: pending, running → DO NOT PUSH
+# States: success, failure, aborted → Safe to push
+```
+
 Apply fixes based on error analysis (see Common Debugging Patterns below):
 
 **Base image issues:**
@@ -232,26 +250,22 @@ If rehearsal fails:
 1. Analyze new errors
 2. Make additional fixes
 3. Run `make update`
-4. **IMPORTANT**: Wait for current rehearsal to complete before pushing
-   - Pushing new commits **aborts running rehearsals**
-   - You lose the opportunity to see actual test results
-   - Only push if the fix is critical to the current failure
-   - For minor improvements (documentation, variable names, cosmetic changes), wait
-5. Commit and push
+4. **CRITICAL**: Verify no cluster is running before pushing
+   ```bash
+   # Check for active rehearsal
+   gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+   ```
+   - Pushing while a cluster is running **KILLS THE CLUSTER IMMEDIATELY**
+   - The rehearsal is aborted and all test progress is lost
+   - This happens for ANY push, even documentation-only changes
+   - Must wait for rehearsal to complete (success, failure, or aborted state)
+5. Commit and push (only when no cluster is running)
 6. Wait for new REHEARSALNOTIFIER
 7. Trigger `/pj-rehearse` again
 
 Repeat until the job passes.
 
-**When to push during active rehearsal:**
-- ✅ Critical fix that blocks the current test (e.g., syntax error, missing file)
-- ✅ You've confirmed the current rehearsal will definitely fail
-- ❌ Minor improvements that don't affect test outcome
-- ❌ Documentation updates
-- ❌ Cosmetic changes (delimiter changes, variable renaming)
-- ❌ "Just in case" preventive fixes
-
-**Best practice**: Let each rehearsal complete to see actual results, then push all accumulated fixes together.
+**Rule: NEVER push while a cluster is running. Always wait for completion.**
 
 ## Common Debugging Patterns
 
@@ -320,10 +334,14 @@ bash: python3: command not found
 - Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
 - Run monitors in background with `&` to continue working
 - Use GCS browser URLs to check artifacts and step logs directly with curl
-- **CRITICAL**: Wait for running rehearsals to complete before pushing new commits
-  - Pushing aborts active tests and you lose the results
-  - Only push critical fixes that block the current test
-  - Accumulate minor improvements and push after rehearsal completes
+
+**CRITICAL - DO NOT PUSH WHILE CLUSTER IS RUNNING:**
+- Pushing to PR branch **kills the running cluster immediately**
+- Rehearsal is aborted and all test progress is lost
+- Happens for ANY push (even documentation, comments, or minor changes)
+- Always check `gh pr checks` before pushing
+- Wait for cluster to complete (success/failure/aborted) before pushing
+- Accumulate fixes locally and push when no cluster is running
 
 ### Accessing Prow Logs and Artifacts
 
