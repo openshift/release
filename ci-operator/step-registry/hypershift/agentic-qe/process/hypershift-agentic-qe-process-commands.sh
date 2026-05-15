@@ -146,7 +146,6 @@ INSTRUCTIONS:
 - Execute the test plan step by step using oc/kubectl commands.
 - Report pass/fail for each step.
 - If a step fails, continue executing remaining steps and report all results.
-- Do NOT delete the HostedCluster or NodePool resources — cleanup is handled separately.
 - SECURITY: Do NOT run commands that reveal credentials.
 
 RESULT FILE (MANDATORY):
