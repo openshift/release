@@ -302,8 +302,8 @@ function install_trustee_operator() {
   echo ">>> Using image: ${TRUSTEE_IMAGE_REPO}:${TRUSTEE_IMAGE_TAG}"
 
   get_trustee_operator_manifests | \
-    sed "s|TRUSTEE_NAMESPACE_PLACEHOLDER|${TRUSTEE_NAMESPACE}|g" | \
-    sed "s|TRUSTEE_IMAGE_PLACEHOLDER|${TRUSTEE_IMAGE_REPO}:${TRUSTEE_IMAGE_TAG}|g" | \
+    sed "s@TRUSTEE_NAMESPACE_PLACEHOLDER@${TRUSTEE_NAMESPACE}@g" | \
+    sed "s@TRUSTEE_IMAGE_PLACEHOLDER@${TRUSTEE_IMAGE_REPO}:${TRUSTEE_IMAGE_TAG}@g" | \
     oc apply -f -
 }
 
@@ -333,8 +333,8 @@ function install_trustee_operands() {
   echo ">>> Using cluster domain: ${CLUSTER_DOMAIN}"
 
   get_trustee_operands_manifests | \
-    sed "s|TRUSTEE_NAMESPACE_PLACEHOLDER|${TRUSTEE_NAMESPACE}|g" | \
-    sed "s|CLUSTER_DOMAIN_PLACEHOLDER|${CLUSTER_DOMAIN}|g" | \
+    sed "s@TRUSTEE_NAMESPACE_PLACEHOLDER@${TRUSTEE_NAMESPACE}@g" | \
+    sed "s@CLUSTER_DOMAIN_PLACEHOLDER@${CLUSTER_DOMAIN}@g" | \
     oc apply -f -
 
   echo ">>> Trustee operands manifests applied"
