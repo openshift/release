@@ -49,6 +49,7 @@ images:
       COPY --from=community-4-20 /configs catalog-data/community-operator-index/v4.20/configs/
       COPY --from=community-4-21 /configs catalog-data/community-operator-index/v4.21/configs/
 
+      SHELL ["/bin/bash", "-c"]
       RUN set -euo pipefail && \
           CATALOG_DATA_DIR=./catalog-data && \
           OCP_VERSIONS="4.16 4.17 4.18 4.19 4.20 4.21" && \
@@ -85,6 +86,10 @@ images:
               fi; \
             done; \
           done && \
+          if [ "$FAILED" -gt 0 ]; then \
+            echo "ERROR: ${FAILED}/${TOTAL} catalogs failed to process"; \
+            exit 1; \
+          fi && \
           OCP_JSON=$(echo $OCP_VERSIONS | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd,) && \
           CAT_JSON=$(echo $CATALOG_TYPES | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd,) && \
           printf '{"ocp_versions":[%s],"catalog_types":[%s],"catalogs":[]}\n' "$OCP_JSON" "$CAT_JSON" \
@@ -99,9 +104,9 @@ images:
               fi; \
             done; \
           done && \
-          echo "Completed: ${SUCCESS}/${TOTAL} catalogs successful, ${FAILED} failed" && \
           find "${CATALOG_DATA_DIR}" -type d -name configs -exec rm -rf {} + 2>/dev/null; \
-          echo "--- catalog-data contents (minimal, no raw configs) ---" && \
+          echo "Completed: ${SUCCESS}/${TOTAL} catalogs successful, ${FAILED} failed" && \
+          echo "--- catalog-data contents ---" && \
           find "${CATALOG_DATA_DIR}" -type f && \
           cat "${CATALOG_DATA_DIR}/catalog-index.json"
     from: src
