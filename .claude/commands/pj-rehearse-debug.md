@@ -217,14 +217,15 @@ Use the standardized monitor script:
 ```
 
 **What the monitor does:**
-- **Default**: Waits for full job completion (pass or fail)
+- **Default**: Waits for full job completion (pass, fail, aborted, or error)
 - **Two-phase mode** (RECOMMENDED): Validates step, then continues to full job
   - Phase 1: Monitors step completion + artifact wait
   - Phase 2: Continues to full job completion
   - Reports both step success and final job results
 - **Step-only mode**: Exits when step succeeds (CONTINUE_AFTER_STEP=false)
 - Checks status every 5 minutes (configurable)
-- Auto-detects completion and reports Prow URL
+- Auto-detects completion (pass/fail/aborted/error) and reports Prow URL
+- Automatically exits when rehearsal is aborted (e.g., when commits are pushed)
 - Times out after 3 hours (configurable)
 - Can run in foreground or background (&)
 
@@ -239,10 +240,98 @@ Use the standardized monitor script:
 - Only care about step validation, not full test results
 - Need immediate feedback to iterate on step fixes quickly
 
+**Managing background monitors:**
+
+The monitor script automatically exits when rehearsals complete (pass, fail, aborted, or error states). However, if you manually interrupt rehearsals by pushing commits, orphaned monitors may continue running until timeout.
+
+```bash
+# Check running monitors
+ps aux | grep -E "monitor-rehearsal.sh.*<PR_NUMBER>" | grep -v grep
+
+# Check active rehearsals
+gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+
+# Kill orphaned monitors (when no matching cluster exists)
+kill <PID>
+
+# Example workflow:
+# 1. Check what's running
+ps aux | grep "monitor-rehearsal.sh.*79244" | grep -v grep
+# Output shows PIDs: 35703, 38822, 41883
+
+# 2. Check active rehearsals
+gh pr checks 79244 --repo openshift/release | grep rehearse
+# Output shows only 1 active rehearsal (Job ID: 2055361377505120256)
+
+# 3. Kill orphaned monitors from aborted rehearsals
+kill 35703 38822
+```
+
+**Best practices:**
+- Start only one monitor per active rehearsal
+- When a rehearsal is aborted (by pushing commits), the monitor will auto-exit within ~5 minutes (one check interval)
+- Periodically check for orphaned monitors: `ps aux | grep monitor-rehearsal | grep -v grep`
+- Monitors log to `/tmp/monitor-rehearsal-<JOB_ID>.log` - check logs to see what they're monitoring
+- If you manually abort a rehearsal, you don't need to kill the monitor - it will detect the abort and exit
+
 **View logs if failed:**
 - Click through to Prow job URL in PR checks
 - Or use: `gh pr view <PR_NUMBER> --repo openshift/release --json statusCheckRollup`
 - Download build logs: `curl -sL "<prow-gcs-url>/build-log.txt" | tail -500`
+
+**Analyze failure with prowjob-analyzer:**
+
+For deeper analysis of failed rehearsals (especially for sandboxed-containers-operator tests), use the prowjob-analyzer tool from https://github.com/openshift/sandboxed-containers-operator (devel branch - actively developed):
+
+```bash
+# Clone the repo if not already available (use devel branch)
+git clone -b devel https://github.com/openshift/sandboxed-containers-operator.git /tmp/osc-analyzer
+
+# Run analysis on failed rehearsal
+cd /tmp/osc-analyzer
+python3 scripts/prowjob-analyzer/dig.py <PROW_JOB_URL>
+```
+
+**What prowjob-analyzer provides:**
+
+- **Metadata extraction**: Provider (AWS/Azure/GCP), OCP version, workload type (kata/peerpods/coco), Kata RPM version
+- **Failed step identification**: Accurately identifies which Prow step failed (not just grep through build-log.txt)
+- **Test result summary**: Lists failing tests if tests executed
+- **Pattern detection**: Recognizes common failure patterns (timeouts, OOM, network issues)
+- **Intelligent analysis**: Distinguishes between infrastructure failures (tests never ran) vs. test failures
+
+**Example:**
+```bash
+# Get Prow URL from rehearsal check
+PROW_URL=$(gh pr checks 79244 --repo openshift/release | grep azure-ipi-coco | awk '{print $4}')
+
+# Clone analyzer (if not already available) and analyze
+git clone -b devel https://github.com/openshift/sandboxed-containers-operator.git /tmp/osc-analyzer
+cd /tmp/osc-analyzer
+python3 scripts/prowjob-analyzer/dig.py "$PROW_URL"
+```
+
+**Output includes:**
+- Job status (pass/fail/timeout)
+- Provider and OCP version
+- Which step(s) failed (e.g., `install-trustee-operator`, `ipi-install-install`, `openshift-extended-test`)
+- For test failures: List of failing tests with metadata (case ID, author, priority)
+- Links to relevant artifacts
+- Detected failure patterns
+
+**When to use:**
+- Rehearsal fails and you need to understand which component failed
+- Multiple tests failing - helps identify if it's infrastructure setup or actual test issues
+- Need to extract metadata for bug reports (OCP version, provider, workload type)
+- Want pattern recognition across multiple failures
+
+**For sandboxed-containers-operator debugging:**
+The prowjob-analyzer is specifically designed for OSC tests and understands:
+- Test execution flow (setup phase, node reboots, workload types)
+- Common failure patterns (RPM installation, operator installation, KataConfig creation)
+- First test root cause analysis (when 90%+ tests fail, first test contains the real error)
+
+See https://github.com/openshift/sandboxed-containers-operator/blob/devel/scripts/prowjob-analyzer/README.md for full documentation.
 
 ### 10. Iterate
 
@@ -334,6 +423,8 @@ bash: python3: command not found
 - Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
 - Run monitors in background with `&` to continue working
 - Use GCS browser URLs to check artifacts and step logs directly with curl
+- For deep failure analysis, use prowjob-analyzer from sandboxed-containers-operator repo
+- Keep running monitors in sync with active rehearsals (ps aux | grep monitor-rehearsal)
 
 **CRITICAL - DO NOT PUSH WHILE CLUSTER IS RUNNING:**
 - Pushing to PR branch **kills the running cluster immediately**

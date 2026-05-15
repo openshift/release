@@ -124,8 +124,8 @@ while true; do
             echo "[${iteration}] ${timestamp} (${elapsed_mins}m) - Status: ${job_status}"
         fi
 
-        # Check if job completed (default behavior or if step monitoring not requested)
-        if echo "${job_status}" | grep -qE "^(pass|fail)$"; then
+        # Check if job completed (pass, fail, aborted, or error)
+        if echo "${job_status}" | grep -qE "^(pass|fail|aborted|error)$"; then
             echo ""
             echo "=========================================="
             echo "=== Job Completed ==="
