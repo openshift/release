@@ -179,11 +179,11 @@ Use the standardized monitor script:
 # Full job completion
 .claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco
 
-# Monitor specific step only (exits when step succeeds)
-.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator"
+# Two-phase: Monitor step, then full job (RECOMMENDED for debugging)
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120 true
 
-# Monitor step with custom artifact wait time
-.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120
+# Monitor step only (exits when step succeeds)
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120 false
 
 # Run in background
 .claude/scripts/monitor-rehearsal.sh 79244 aws-ipi-coco &
@@ -193,23 +193,33 @@ Use the standardized monitor script:
 #   SHORT_JOB_NAME: Part of job name to grep (e.g., "azure-ipi-coco") (required)
 #   DURATION_HOURS: Monitoring duration in hours (default: 3)
 #   CHECK_INTERVAL: Seconds between checks (default: 300 = 5 minutes)
-#   STEP_NAME: Optional - monitor specific step completion (e.g., "install-trustee-operator")
+#   STEP_NAME: Optional - monitor specific step (e.g., "install-trustee-operator")
 #   ARTIFACT_WAIT: Seconds to wait after step success for artifacts (default: 60)
+#   CONTINUE_AFTER_STEP: Continue to full job after step succeeds (default: true)
 ```
 
 **What the monitor does:**
 - **Default**: Waits for full job completion (pass or fail)
-- **Step mode**: Exits when specific step succeeds (after artifact wait)
-- Checks job status every 5 minutes (configurable)
+- **Two-phase mode** (RECOMMENDED): Validates step, then continues to full job
+  - Phase 1: Monitors step completion + artifact wait
+  - Phase 2: Continues to full job completion
+  - Reports both step success and final job results
+- **Step-only mode**: Exits when step succeeds (CONTINUE_AFTER_STEP=false)
+- Checks status every 5 minutes (configurable)
 - Auto-detects completion and reports Prow URL
 - Times out after 3 hours (configurable)
 - Can run in foreground or background (&)
 
-**When to use step monitoring:**
-- Debugging a specific step (e.g., trustee operator installation)
-- Don't need full test results, just step validation
-- Want faster feedback when step completes
-- Note: Job continues running after monitor exits
+**When to use two-phase monitoring:**
+- **Debugging installation steps** (e.g., trustee operator)
+  - Validates installation succeeds (Phase 1)
+  - Validates integration works (Phase 2: INITDATA, TRUSTEE_URL, tests)
+- Want faster feedback when step completes, but need full results
+- Debugging configuration integration issues
+
+**When to use step-only mode:**
+- Only care about step validation, not full test results
+- Need immediate feedback to iterate on step fixes quickly
 
 **View logs if failed:**
 - Click through to Prow job URL in PR checks
