@@ -106,7 +106,7 @@ run_command "oc version --client"
 
 # Create combined pull secret early (needed to access private mirror for version detection)
 combined_pull_secret_tmp=$(mktemp)
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${combined_pull_secret_tmp}"
 
 # Extract the full OCP version from the target release (using combined pull secret to access mirror)
