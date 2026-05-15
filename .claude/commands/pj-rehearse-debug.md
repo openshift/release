@@ -1,6 +1,6 @@
 ---
 description: Debug CI job failures using /pj-rehearse iterative testing
-args: "[job_name]"
+args: "[job_name] [org] [repo]"
 allowed-tools: Read, Edit, Bash, Grep, Glob, AskUserQuestion
 ---
 
@@ -8,15 +8,28 @@ allowed-tools: Read, Edit, Bash, Grep, Glob, AskUserQuestion
 
 Debug and fix CI job configuration issues using /pj-rehearse for rapid iteration.
 
-**Arguments**: job_name={{job_name}} (optional - will search if not provided)
+**Arguments**: 
+- `job_name` (optional): Specific job to debug (e.g., "azure-ipi-coco")
+- `org` (optional): GitHub organization (default: "openshift")
+- `repo` (optional): Repository name (will search if not provided)
 
 ## Overview
 
-This skill helps debug CI job failures by:
-1. Identifying the failing job configuration
-2. Making targeted fixes based on error analysis
-3. Testing changes with /pj-rehearse
-4. Iterating until the job passes
+This skill provides a systematic workflow for debugging CI job failures in the openshift/release repository:
+
+1. **Identify** the failing job configuration and related files
+2. **Analyze** error patterns in Prow build logs
+3. **Fix** issues based on common patterns (base images, network access, environment variables)
+4. **Test** changes using /pj-rehearse
+5. **Monitor** long-running rehearsals with background scripts
+6. **Iterate** until the job passes
+
+**Use cases:**
+- New step-registry components failing in rehearsals
+- Configuration changes causing unexpected failures
+- Base image or tool availability issues
+- Network restriction debugging
+- Environment variable and secret issues
 
 ## Workflow
 
@@ -24,15 +37,38 @@ This skill helps debug CI job failures by:
 
 If no branch exists for this work:
 ```bash
-git checkout main && git pull && git checkout -b debug-{{job_name}}
+git checkout main && git pull && git checkout -b debug-<job-name>
 ```
+
+Replace `<job-name>` with a descriptive name for the issue you're debugging.
 
 ### 2. Locate Configuration Files
 
-Find the relevant files:
-- **CI config**: `ci-operator/config/<org>/<repo>/*.yaml`
-- **Step registry**: `ci-operator/step-registry/<component>/`
-- **Generated jobs**: `ci-operator/jobs/<org>/<repo>/*.yaml` (auto-generated, don't edit directly)
+Find the relevant files for your job:
+
+**CI configuration** (source of truth - edit these):
+```bash
+# Find config file
+find ci-operator/config/<org>/<repo> -name "*.yaml" | grep -v "__periodics"
+
+# Example: ci-operator/config/openshift/my-repo/openshift-my-repo-main.yaml
+```
+
+**Step registry** (reusable test components):
+```bash
+# Find step definitions
+find ci-operator/step-registry -name "*<step-name>*"
+
+# Example: ci-operator/step-registry/my-component/install/
+#   - my-component-install-ref.yaml (metadata)
+#   - my-component-install-commands.sh (script)
+```
+
+**Generated jobs** (auto-generated - don't edit):
+```bash
+# View generated jobs (for reference only)
+find ci-operator/jobs/<org>/<repo> -name "*.yaml"
+```
 
 ### 3. Analyze the Failure
 
@@ -45,11 +81,46 @@ Common failure patterns:
 
 ### 4. Make Fixes
 
-Based on error analysis:
-- **If "image not found" error**: Fix base image reference (use `from: cli` not `from_image: ... tag: latest`)
-- **If "command not found" error**: Switch base image or install tool in script
-- **If "network unreachable" error**: Either remove `restrict_network_access: true` or use pre-built image with required assets
-- **If "variable not set" error**: Add environment variable to CI config or step ref
+Apply fixes based on error analysis (see Common Debugging Patterns below):
+
+**Base image issues:**
+```yaml
+# Wrong - uses non-existent tag
+from_image:
+  namespace: ocp
+  name: cli
+  tag: latest
+
+# Right - references base_images definition
+from: cli
+```
+
+**Missing commands:**
+```yaml
+# If you need git, make, go, python:
+from: tools
+
+# If you only need oc/kubectl:
+from: cli
+```
+
+**Network restrictions:**
+```yaml
+# Allow network access (requires network-access-rehearsals-ok label)
+restrict_network_access: false
+```
+
+**Environment variables:**
+```yaml
+# In step ref:
+env:
+  - name: MY_VAR
+    default: "default_value"
+    
+# In CI config test:
+env:
+  MY_VAR: "override_value"
+```
 
 ### 5. Generate and Commit
 
@@ -277,11 +348,32 @@ curl -sL "<prow-gcs-url>/build-log.txt" | grep -i "error\|failed\|command not fo
 
 Jobs may fail for multiple reasons - fix them one at a time:
 
-**Example from this session**:
-- Issue 1: Network blocked → Fixed: `restrict_network_access: false`
-- Issue 2: Git missing → Fixed: `from: tools` instead of `from: cli`
+**Example scenario**:
+- **Iteration 1**: Network blocked → Fix: `restrict_network_access: false` → Retest
+- **Iteration 2**: Git missing → Fix: `from: tools` instead of `from: cli` → Retest
+- **Iteration 3**: Missing env var → Fix: Add to step env → Retest
+- **Iteration 4**: All pass! → Ready to merge
 
 After each fix, re-run rehearsal to discover the next issue.
+
+## Example Debugging Session
+
+**Scenario**: New installation step failing in rehearsal
+
+1. **Initial failure**: "command not found: git"
+   - **Analysis**: Script tries to `git clone` but git not available
+   - **Root cause**: Using `from: cli` (only has oc/kubectl)
+   - **Fix**: Change to `from: tools` (includes git)
+
+2. **After fix**: "Could not resolve host: github.com"
+   - **Analysis**: Network request blocked
+   - **Root cause**: Test has `restrict_network_access: true`
+   - **Fix**: Change to `restrict_network_access: false`
+   - **Note**: Rehearsal needs `network-access-rehearsals-ok` label
+
+3. **Success**: Installation completes, test passes
+
+This demonstrates the iterative process: each rehearsal reveals the next issue.
 
 ## Output
 
