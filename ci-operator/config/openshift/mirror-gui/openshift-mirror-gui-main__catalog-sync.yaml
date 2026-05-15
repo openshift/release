@@ -3,6 +3,24 @@ build_root:
     dockerfile_path: .ci-operator/build-root/Dockerfile
 images:
   items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      RUN microdnf install -y jq 2>/dev/null || true && \
+          echo "=== Auth file probe ===" && \
+          find / -maxdepth 4 \( -name "auth.json" -o -name ".dockerconfigjson" -o -name "config.json" -o -name "pull-secret*" \) 2>/dev/null | while read f; do \
+            echo "FOUND: $f"; \
+            jq -r '.auths // {} | keys[]' "$f" 2>/dev/null || echo "not-json"; \
+            echo "---"; \
+          done && \
+          for p in /run/containers/0/auth.json \
+                   /var/run/secrets/openshift.io/pull/.dockerconfigjson \
+                   /etc/containers/auth.json \
+                   /tmp/auth.json \
+                   /root/.docker/config.json; do \
+            [ -f "$p" ] && echo "EXISTS: $p" || echo "MISSING: $p"; \
+          done && \
+          echo "=== End probe ==="
+    to: auth-probe
   - build_args:
     - name: SYNC_CATALOGS
       value: "true"
