@@ -147,6 +147,15 @@ chainsaw test \
 tests/e2e-instrumentation \
 tests/e2e-multi-instrumentation || any_errors=true
 
+# Execute TLS profile tests
+chainsaw test \
+--quiet \
+--report-name "junit_otel_e2e_tls_profile" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-openshift-tls-profile || any_errors=true
+
 # Check if any errors occurred
 if $any_errors; then
   echo "Tests failed, check the logs for more details."
