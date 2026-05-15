@@ -3,6 +3,106 @@ build_root:
     dockerfile_path: .ci-operator/build-root/Dockerfile
 images:
   items:
+  - dockerfile_literal: |
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.16 AS redhat-4-16
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.17 AS redhat-4-17
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.18 AS redhat-4-18
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.19 AS redhat-4-19
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.20 AS redhat-4-20
+      FROM registry.redhat.io/redhat/redhat-operator-index:v4.21 AS redhat-4-21
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.16 AS certified-4-16
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.17 AS certified-4-17
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.18 AS certified-4-18
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.19 AS certified-4-19
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.20 AS certified-4-20
+      FROM registry.redhat.io/redhat/certified-operator-index:v4.21 AS certified-4-21
+      FROM registry.redhat.io/redhat/community-operator-index:v4.16 AS community-4-16
+      FROM registry.redhat.io/redhat/community-operator-index:v4.17 AS community-4-17
+      FROM registry.redhat.io/redhat/community-operator-index:v4.18 AS community-4-18
+      FROM registry.redhat.io/redhat/community-operator-index:v4.19 AS community-4-19
+      FROM registry.redhat.io/redhat/community-operator-index:v4.20 AS community-4-20
+      FROM registry.redhat.io/redhat/community-operator-index:v4.21 AS community-4-21
+
+      FROM pipeline:src
+      WORKDIR /go/src/github.com/openshift/mirror-gui
+
+      RUN apt-get update && \
+          apt-get install -y --no-install-recommends jq python3 python3-yaml && \
+          rm -rf /var/lib/apt/lists/*
+
+      COPY --from=redhat-4-16 /configs catalog-data/redhat-operator-index/v4.16/configs/
+      COPY --from=redhat-4-17 /configs catalog-data/redhat-operator-index/v4.17/configs/
+      COPY --from=redhat-4-18 /configs catalog-data/redhat-operator-index/v4.18/configs/
+      COPY --from=redhat-4-19 /configs catalog-data/redhat-operator-index/v4.19/configs/
+      COPY --from=redhat-4-20 /configs catalog-data/redhat-operator-index/v4.20/configs/
+      COPY --from=redhat-4-21 /configs catalog-data/redhat-operator-index/v4.21/configs/
+      COPY --from=certified-4-16 /configs catalog-data/certified-operator-index/v4.16/configs/
+      COPY --from=certified-4-17 /configs catalog-data/certified-operator-index/v4.17/configs/
+      COPY --from=certified-4-18 /configs catalog-data/certified-operator-index/v4.18/configs/
+      COPY --from=certified-4-19 /configs catalog-data/certified-operator-index/v4.19/configs/
+      COPY --from=certified-4-20 /configs catalog-data/certified-operator-index/v4.20/configs/
+      COPY --from=certified-4-21 /configs catalog-data/certified-operator-index/v4.21/configs/
+      COPY --from=community-4-16 /configs catalog-data/community-operator-index/v4.16/configs/
+      COPY --from=community-4-17 /configs catalog-data/community-operator-index/v4.17/configs/
+      COPY --from=community-4-18 /configs catalog-data/community-operator-index/v4.18/configs/
+      COPY --from=community-4-19 /configs catalog-data/community-operator-index/v4.19/configs/
+      COPY --from=community-4-20 /configs catalog-data/community-operator-index/v4.20/configs/
+      COPY --from=community-4-21 /configs catalog-data/community-operator-index/v4.21/configs/
+
+      RUN set -euo pipefail && \
+          CATALOG_DATA_DIR=./catalog-data && \
+          OCP_VERSIONS="4.16 4.17 4.18 4.19 4.20 4.21" && \
+          CATALOG_TYPES="redhat-operator-index certified-operator-index community-operator-index" && \
+          TOTAL=0 && SUCCESS=0 && FAILED=0 && \
+          for ocp_version in $OCP_VERSIONS; do \
+            for catalog_type in $CATALOG_TYPES; do \
+              TOTAL=$((TOTAL + 1)); \
+              catalog_dir="${CATALOG_DATA_DIR}/${catalog_type}/v${ocp_version}"; \
+              if [ ! -d "${catalog_dir}/configs" ]; then \
+                echo "WARN: No configs for ${catalog_type} v${ocp_version}, skipping"; \
+                FAILED=$((FAILED + 1)); \
+                continue; \
+              fi; \
+              operators_file="${catalog_dir}/operators.json"; \
+              dependencies_file="${catalog_dir}/dependencies.json"; \
+              if python3 ./scripts/catalog_metadata.py generate \
+                  --catalog-dir "$catalog_dir" \
+                  --catalog-type "$catalog_type" \
+                  --ocp-version "v${ocp_version}" \
+                  --operators-file "$operators_file" \
+                  --dependencies-file "$dependencies_file"; then \
+                operator_count=$(jq '. | length' "$operators_file" 2>/dev/null || echo "0"); \
+                synced_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+                printf '{"catalog_type":"%s","ocp_version":"v%s","catalog_url":"registry.redhat.io/redhat/%s:v%s","operator_count":%s,"digest":"from-build","synced_at":"%s"}\n' \
+                  "$catalog_type" "$ocp_version" "$catalog_type" "$ocp_version" "$operator_count" "$synced_at" \
+                  > "${catalog_dir}/catalog-info.json"; \
+                rm -rf "${catalog_dir}/configs"; \
+                SUCCESS=$((SUCCESS + 1)); \
+              else \
+                echo "ERROR: Failed to process ${catalog_type} v${ocp_version}"; \
+                rm -rf "${catalog_dir}/configs" 2>/dev/null; \
+                FAILED=$((FAILED + 1)); \
+              fi; \
+            done; \
+          done && \
+          OCP_JSON=$(echo $OCP_VERSIONS | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd,) && \
+          CAT_JSON=$(echo $CATALOG_TYPES | tr ' ' '\n' | sed 's/.*/"&"/' | paste -sd,) && \
+          printf '{"ocp_versions":[%s],"catalog_types":[%s],"catalogs":[]}\n' "$OCP_JSON" "$CAT_JSON" \
+            > "${CATALOG_DATA_DIR}/catalog-index.json" && \
+          for ocp_version in $OCP_VERSIONS; do \
+            for catalog_type in $CATALOG_TYPES; do \
+              info="${CATALOG_DATA_DIR}/${catalog_type}/v${ocp_version}/catalog-info.json"; \
+              if [ -f "$info" ]; then \
+                jq --argjson entry "$(cat "$info")" '.catalogs += [$entry]' \
+                  "${CATALOG_DATA_DIR}/catalog-index.json" > "${CATALOG_DATA_DIR}/catalog-index.json.tmp" && \
+                  mv "${CATALOG_DATA_DIR}/catalog-index.json.tmp" "${CATALOG_DATA_DIR}/catalog-index.json"; \
+              fi; \
+            done; \
+          done && \
+          echo "Completed: ${SUCCESS}/${TOTAL} catalogs successful, ${FAILED} failed" && \
+          cat "${CATALOG_DATA_DIR}/catalog-index.json"
+    from: src
+    to: synced-catalog-data
   - dockerfile_path: Dockerfile
     inputs:
       synced-catalog-data:
@@ -14,49 +114,6 @@ promotion:
   to:
   - name: "5.0"
     namespace: ocp
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      set -euo pipefail
-
-      cd /go/src/github.com/openshift/mirror-gui
-
-      apt-get update
-      apt-get install -y --no-install-recommends jq python3 python3-yaml wget tar ca-certificates
-      rm -rf /var/lib/apt/lists/*
-
-      PULL_SECRET_PATH=""
-      for candidate in \
-        /var/run/secrets/openshift.io/pull/.dockerconfigjson \
-        /var/run/secrets/openshift.io/pull/config.json \
-        /var/run/secrets/openshift.io/pull/.dockercfg; do
-        if [ -s "$candidate" ]; then
-          PULL_SECRET_PATH="$candidate"
-          break
-        fi
-      done
-
-      if [ -z "$PULL_SECRET_PATH" ]; then
-        echo "ERROR: build pull secret not found under /var/run/secrets/openshift.io/pull"
-        ls -al /var/run/secrets/openshift.io/pull || true
-        exit 1
-      fi
-
-      if [ "${PULL_SECRET_PATH##*.}" = "dockercfg" ]; then
-        jq '{auths: .}' "$PULL_SECRET_PATH" > /tmp/ci-pull-secret-dockerconfigjson
-        PULL_SECRET_PATH=/tmp/ci-pull-secret-dockerconfigjson
-      fi
-
-      wget -qO /tmp/oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
-      tar -xzf /tmp/oc.tar.gz -C /usr/local/bin oc
-      rm -f /tmp/oc.tar.gz
-
-      export PULL_SECRET_PATH
-      export CATALOG_DATA_DIR=./catalog-data
-      export MAX_PARALLEL_JOBS=3
-      ./sync-catalogs.sh
-    from: src
-    to: synced-catalog-data
 releases:
   initial:
     integration:
