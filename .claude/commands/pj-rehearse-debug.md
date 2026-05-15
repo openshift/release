@@ -172,32 +172,44 @@ gh pr checks <PR_NUMBER> --repo openshift/release
 Use the standardized monitor script:
 
 ```bash
-# Basic usage (3 hour timeout, 5 minute checks)
+# Monitor full job completion (default)
 .claude/scripts/monitor-rehearsal.sh <PR_NUMBER> <SHORT_JOB_NAME>
 
 # Examples:
+# Full job completion
 .claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco
+
+# Monitor specific step only (exits when step succeeds)
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator"
+
+# Monitor step with custom artifact wait time
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120
 
 # Run in background
 .claude/scripts/monitor-rehearsal.sh 79244 aws-ipi-coco &
-
-# Custom duration and interval
-.claude/scripts/monitor-rehearsal.sh <PR> <JOB> <HOURS> <SECONDS>
-.claude/scripts/monitor-rehearsal.sh 79244 aro-ipi-coco 4 600
 
 # Parameters:
 #   PR_NUMBER: GitHub PR number (required)
 #   SHORT_JOB_NAME: Part of job name to grep (e.g., "azure-ipi-coco") (required)
 #   DURATION_HOURS: Monitoring duration in hours (default: 3)
 #   CHECK_INTERVAL: Seconds between checks (default: 300 = 5 minutes)
+#   STEP_NAME: Optional - monitor specific step completion (e.g., "install-trustee-operator")
+#   ARTIFACT_WAIT: Seconds to wait after step success for artifacts (default: 60)
 ```
 
 **What the monitor does:**
+- **Default**: Waits for full job completion (pass or fail)
+- **Step mode**: Exits when specific step succeeds (after artifact wait)
 - Checks job status every 5 minutes (configurable)
-- Auto-detects completion (pass or fail)
-- Reports Prow URL for detailed logs
+- Auto-detects completion and reports Prow URL
 - Times out after 3 hours (configurable)
 - Can run in foreground or background (&)
+
+**When to use step monitoring:**
+- Debugging a specific step (e.g., trustee operator installation)
+- Don't need full test results, just step validation
+- Want faster feedback when step completes
+- Note: Job continues running after monitor exits
 
 **View logs if failed:**
 - Click through to Prow job URL in PR checks
