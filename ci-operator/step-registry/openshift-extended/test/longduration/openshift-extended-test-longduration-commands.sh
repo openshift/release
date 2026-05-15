@@ -266,12 +266,12 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
 fi
 
 #if OVERRIDE_OC_MIRROR then download oc-mirror from mirror.openshift.com
-if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
-    echo "OCP Version: ${ocpVersion}"
+if [[ "${OVERRIDE_OC_MIRROR:-}" == "true" ]]; then
+    echo "OCP Version: ${ocpVersion:-}"
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
-        cd ${tmpDir}
-        echo "Downloading oc-mirror from mirror.openshift.com for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
+        cd "${tmpDir}"
+        echo "Downloading oc-mirror from mirror.openshift.com for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH:-}"
         set -x
 
         # Detect architecture for oc-mirror download
