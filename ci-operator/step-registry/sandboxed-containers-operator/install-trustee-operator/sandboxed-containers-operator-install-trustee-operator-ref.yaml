@@ -29,10 +29,10 @@ ref:
     documentation: |-
       The git ref (branch/tag/commit) to use from the confidential-devhub/charts repository
   documentation: |-
-    A step that installs the trustee operator and operands on the cluster using helm charts
-    from https://github.com/confidential-devhub/charts. First installs the trustee-operator,
-    waits for it to be ready, then installs the trustee-operands with the derived cluster domain.
-    After installation, retrieves the Trustee KBS service URL and saves it to ${SHARED_DIR}/TRUSTEE_URL,
+    A step that installs the trustee operator and operands on the cluster using pre-rendered
+    manifests embedded in the script. First installs the trustee-operator, waits for it to be
+    ready, then installs the trustee-operands with the derived cluster domain. After installation,
+    retrieves the Trustee KBS service URL and saves it to ${SHARED_DIR}/TRUSTEE_URL,
     ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT for use by subsequent test steps.
     Also creates INITDATA for confidential containers including TLS certificate and image security
     policy, saving both the encoded INITDATA and plain text initdata.toml to ${SHARED_DIR}.
@@ -42,6 +42,5 @@ ref:
     capturing KBS pod logs showing attestation attempts to ${ARTIFACT_DIR}/kbs-attestation-logs.txt
     for inclusion in CI job artifacts.
 
-    NETWORK ACCESS REQUIREMENT: This step requires network access (restrict_network_access: false)
-    to download helm from get.helm.sh and clone the confidential-devhub/charts repository.
-    Tests using this step need network-access-rehearsals-ok label for /pj-rehearse to work.
+    NO NETWORK ACCESS REQUIRED: This step uses pre-rendered manifests with runtime variable
+    substitution via sed, eliminating the need for helm or git. Works with restrict_network_access: true.
