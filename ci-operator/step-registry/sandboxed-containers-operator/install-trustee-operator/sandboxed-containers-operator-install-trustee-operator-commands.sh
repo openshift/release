@@ -78,7 +78,7 @@ function retry() {
 }
 
 function get_cluster_domain() {
-  echo ">>> Deriving cluster domain"
+  echo ">>> Deriving cluster domain" >&2
   local cluster_domain=""
 
   # Method 1: Try to get domain from ingress config (most reliable)
@@ -86,13 +86,13 @@ function get_cluster_domain() {
 
   # Method 2: If that fails, try getting it from a console route
   if [[ -z "${cluster_domain}" ]]; then
-    echo ">>> Trying alternative method to get cluster domain"
+    echo ">>> Trying alternative method to get cluster domain" >&2
     cluster_domain=$(oc get route -n openshift-console console -o jsonpath='{.spec.host}' 2>/dev/null | sed 's/^console-openshift-console\.//' || true)
   fi
 
   # Method 3: If that fails, try parsing from cluster console URL
   if [[ -z "${cluster_domain}" ]]; then
-    echo ">>> Trying to derive from console URL"
+    echo ">>> Trying to derive from console URL" >&2
     local console_url
     console_url=$(oc whoami --show-console 2>/dev/null || true)
     if [[ -n "${console_url}" ]]; then
@@ -101,11 +101,11 @@ function get_cluster_domain() {
   fi
 
   if [[ -z "${cluster_domain}" ]]; then
-    echo "ERROR: Failed to derive cluster domain"
+    echo "ERROR: Failed to derive cluster domain" >&2
     return 1
   fi
 
-  echo ">>> Cluster domain: ${cluster_domain}"
+  echo ">>> Cluster domain: ${cluster_domain}" >&2
   echo "${cluster_domain}"
 }
 
