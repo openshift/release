@@ -3,33 +3,60 @@ build_root:
     dockerfile_path: .ci-operator/build-root/Dockerfile
 images:
   items:
-  - dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      RUN microdnf install -y jq 2>/dev/null || true && \
-          echo "=== Auth file probe ===" && \
-          find / -maxdepth 4 \( -name "auth.json" -o -name ".dockerconfigjson" -o -name "config.json" -o -name "pull-secret*" \) 2>/dev/null | while read f; do \
-            echo "FOUND: $f"; \
-            jq -r '.auths // {} | keys[]' "$f" 2>/dev/null || echo "not-json"; \
-            echo "---"; \
-          done && \
-          for p in /run/containers/0/auth.json \
-                   /var/run/secrets/openshift.io/pull/.dockerconfigjson \
-                   /etc/containers/auth.json \
-                   /tmp/auth.json \
-                   /root/.docker/config.json; do \
-            [ -f "$p" ] && echo "EXISTS: $p" || echo "MISSING: $p"; \
-          done && \
-          echo "=== End probe ==="
-    to: auth-probe
-  - build_args:
-    - name: SYNC_CATALOGS
-      value: "true"
-    dockerfile_path: Dockerfile
+  - dockerfile_path: Dockerfile
+    inputs:
+      synced-catalog-data:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/mirror-gui/catalog-data
     to: mirror-gui
 promotion:
   to:
   - name: "5.0"
     namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      set -euo pipefail
+
+      cd /go/src/github.com/openshift/mirror-gui
+
+      apt-get update
+      apt-get install -y --no-install-recommends jq python3 python3-yaml wget tar ca-certificates
+      rm -rf /var/lib/apt/lists/*
+
+      PULL_SECRET_PATH=""
+      for candidate in \
+        /var/run/secrets/openshift.io/pull/.dockerconfigjson \
+        /var/run/secrets/openshift.io/pull/config.json \
+        /var/run/secrets/openshift.io/pull/.dockercfg; do
+        if [ -s "$candidate" ]; then
+          PULL_SECRET_PATH="$candidate"
+          break
+        fi
+      done
+
+      if [ -z "$PULL_SECRET_PATH" ]; then
+        echo "ERROR: build pull secret not found under /var/run/secrets/openshift.io/pull"
+        ls -al /var/run/secrets/openshift.io/pull || true
+        exit 1
+      fi
+
+      if [ "${PULL_SECRET_PATH##*.}" = "dockercfg" ]; then
+        jq '{auths: .}' "$PULL_SECRET_PATH" > /tmp/ci-pull-secret-dockerconfigjson
+        PULL_SECRET_PATH=/tmp/ci-pull-secret-dockerconfigjson
+      fi
+
+      wget -qO /tmp/oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+      tar -xzf /tmp/oc.tar.gz -C /usr/local/bin oc
+      rm -f /tmp/oc.tar.gz
+
+      export PULL_SECRET_PATH
+      export CATALOG_DATA_DIR=./catalog-data
+      export MAX_PARALLEL_JOBS=3
+      ./sync-catalogs.sh
+    from: src
+    to: synced-catalog-data
 releases:
   initial:
     integration:
