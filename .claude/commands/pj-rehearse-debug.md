@@ -232,11 +232,26 @@ If rehearsal fails:
 1. Analyze new errors
 2. Make additional fixes
 3. Run `make update`
-4. Commit and push
-5. Wait for new REHEARSALNOTIFIER
-6. Trigger `/pj-rehearse` again
+4. **IMPORTANT**: Wait for current rehearsal to complete before pushing
+   - Pushing new commits **aborts running rehearsals**
+   - You lose the opportunity to see actual test results
+   - Only push if the fix is critical to the current failure
+   - For minor improvements (documentation, variable names, cosmetic changes), wait
+5. Commit and push
+6. Wait for new REHEARSALNOTIFIER
+7. Trigger `/pj-rehearse` again
 
 Repeat until the job passes.
+
+**When to push during active rehearsal:**
+- ✅ Critical fix that blocks the current test (e.g., syntax error, missing file)
+- ✅ You've confirmed the current rehearsal will definitely fail
+- ❌ Minor improvements that don't affect test outcome
+- ❌ Documentation updates
+- ❌ Cosmetic changes (delimiter changes, variable renaming)
+- ❌ "Just in case" preventive fixes
+
+**Best practice**: Let each rehearsal complete to see actual results, then push all accumulated fixes together.
 
 ## Common Debugging Patterns
 
@@ -305,7 +320,10 @@ bash: python3: command not found
 - Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
 - Run monitors in background with `&` to continue working
 - Use GCS browser URLs to check artifacts and step logs directly with curl
-- Wait for running rehearsals to complete before pushing new commits (avoid aborting active tests)
+- **CRITICAL**: Wait for running rehearsals to complete before pushing new commits
+  - Pushing aborts active tests and you lose the results
+  - Only push critical fixes that block the current test
+  - Accumulate minor improvements and push after rehearsal completes
 
 ### Accessing Prow Logs and Artifacts
 
