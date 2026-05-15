@@ -304,19 +304,62 @@ bash: python3: command not found
 - Read error logs carefully - they often contain the exact fix needed
 - Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
 - Run monitors in background with `&` to continue working
+- Use GCS browser URLs to check artifacts and step logs directly with curl
+- Wait for running rehearsals to complete before pushing new commits (avoid aborting active tests)
+
+### Accessing Prow Logs and Artifacts
+
+**URLs you can freely access**:
+
+Prow provides two URL patterns for accessing build logs and artifacts:
+
+1. **Prow viewer** (web interface):
+   ```
+   https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/<PR>/<JOB_NAME>/<JOB_ID>/
+   ```
+
+2. **GCS browser** (direct artifact access):
+   ```
+   https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/<PR>/<JOB_NAME>/<JOB_ID>/
+   ```
+
+Both URLs provide access to:
+- `build-log.txt` - Full job execution log
+- `artifacts/` - Step-specific logs and output files
+- `started.json` - Job start time and commit info
+- `finished.json` - Job completion status and result
+- `prowjob.json` - Full Prow job definition and status
+
+**Example URLs**:
+```bash
+# Build log
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/build-log.txt
+
+# Job artifacts directory
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/artifacts/azure-ipi-coco/
+
+# Specific step logs
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/artifacts/azure-ipi-coco/sandboxed-containers-operator-install-trustee-operator/build-log.txt
+```
 
 ### Analyzing Prow Build Logs
 
 **Finding the failure**:
 ```bash
 # Get last 200 lines (usually contains the error)
-curl -sL "<prow-gcs-url>/build-log.txt" | tail -200
+curl -sS "<gcs-url>/build-log.txt" | tail -200
 
 # Search for specific step
-curl -sL "<prow-gcs-url>/build-log.txt" | grep -A 100 "Running step <step-name>"
+curl -sS "<gcs-url>/build-log.txt" | grep -A 100 "Running step <step-name>"
 
 # Find error messages
-curl -sL "<prow-gcs-url>/build-log.txt" | grep -i "error\|failed\|command not found"
+curl -sS "<gcs-url>/build-log.txt" | grep -i "error\|failed\|command not found"
+
+# Check if a specific step ran
+curl -sS "<gcs-url>/artifacts/azure-ipi-coco/" | grep -o "install-trustee-operator"
+
+# Get step-specific logs
+curl -sS "<gcs-url>/artifacts/azure-ipi-coco/<step-name>/build-log.txt" | tail -100
 ```
 
 **Common error patterns**:
