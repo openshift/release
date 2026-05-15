@@ -279,6 +279,11 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         case ${ARCH} in
             x86_64) ARCH="amd64" ;;
             aarch64) ARCH="arm64" ;;
+            *)
+                echo "ERROR: Unsupported architecture: ${ARCH}"
+                echo "oc-mirror downloads are only available for amd64 (x86_64) and arm64 (aarch64)"
+                exit 1
+                ;;
         esac
 
         # Determine which oc-mirror version to download
