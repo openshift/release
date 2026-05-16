@@ -1,0 +1,46 @@
+ref:
+  as: medik8s-konflux-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.17"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-konflux-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CATALOG_MODE
+    documentation: |-
+      Catalog source mode: "konflux" (default) or "direct".
+      In konflux mode, resolves a Konflux FBC image from Quay and applies IDMS.
+      In direct mode, creates a CatalogSource from a provided image reference (no IDMS needed).
+    default: "konflux"
+  - name: OCP_VERSION
+    documentation: OCP version suffix for the FBC catalog image (e.g., "422" for OCP 4.22). Required in konflux mode.
+    default: ""
+  - name: FBC_COMMIT_SHA
+    documentation: |-
+      Pin to a specific dragonfly/rhwa-fbc commit SHA for reproducibility.
+      If empty, the step resolves the latest commit from the main branch.
+      Only used in konflux mode.
+    default: ""
+  - name: CATALOG_IMAGE_REF
+    documentation: |-
+      Direct catalog image reference (any OCI image: IIB, FBC, or registry.redhat.io).
+      Example: registry-proxy.engineering.redhat.com/rh-osbs/iib:1132469
+      Required when CATALOG_MODE=direct.
+    default: ""
+  - name: CATALOG_SOURCE_NAME
+    documentation: The name of the CatalogSource to create.
+    default: "medik8s-konflux-catalog"
+  - name: IDMS_NAME
+    documentation: The name of the ImageDigestMirrorSet to create. Only used in konflux mode.
+    default: "medik8s-konflux"
+  documentation: |-
+    Creates a CatalogSource for medik8s/RHWA operator testing.
+    Two modes: "konflux" (default) resolves Konflux FBC artifacts from Quay with IDMS;
+    "direct" creates a CatalogSource from a provided image reference (no IDMS needed).
+    Quay repos and GitLab API are public — no credentials needed.
