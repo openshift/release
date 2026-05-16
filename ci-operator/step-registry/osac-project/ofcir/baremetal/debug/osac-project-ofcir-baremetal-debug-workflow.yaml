@@ -1,0 +1,25 @@
+workflow:
+  as: osac-project-ofcir-baremetal-debug
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: false
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - chain: assisted-common-pre
+      - ref: osac-project-installer
+    test:
+      - ref: osac-project-baremetal-test
+      - ref: wait
+    post:
+      - ref: osac-project-gather
+      - ref: ofcir-gather
+    env:
+      CLUSTERTYPE: "assisted_medium_el9"
+      TEST: "test_compute_instance_creation.py"
+  documentation: |-
+    Debug variant of osac-project-ofcir-baremetal. Runs only
+    test_compute_instance_creation.py, skips ofcir-release so the server
+    stays alive, and pauses with the wait step after the test for interactive
+    debugging via oc rsh.
