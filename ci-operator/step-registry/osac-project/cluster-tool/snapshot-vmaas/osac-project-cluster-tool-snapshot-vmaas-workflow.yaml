@@ -1,0 +1,23 @@
+workflow:
+  as: osac-project-cluster-tool-snapshot-vmaas
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - chain: assisted-common-pre
+      - ref: osac-project-installer
+    test:
+      - ref: osac-project-cluster-tool-snapshot
+    post:
+      - ref: osac-project-gather
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+  documentation: |-
+    Provisions a baremetal cluster via assisted-installer, installs OSAC,
+    then snapshots the cluster using cluster-tool and pushes the snapshot
+    OCI image to a container registry. Used as a nightly job to keep the
+    snapshot current for presubmit cluster-tool boot jobs.

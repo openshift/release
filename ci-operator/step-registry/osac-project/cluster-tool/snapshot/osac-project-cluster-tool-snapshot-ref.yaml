@@ -1,0 +1,26 @@
+ref:
+  as: osac-project-cluster-tool-snapshot
+  from: dev-scripts
+  grace_period: 10m
+  timeout: 2h0m0s
+  commands: osac-project-cluster-tool-snapshot-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: osac-quay-creds
+    mount_path: /var/run/vault/osac-quay-creds
+  env:
+  - name: CLUSTER_TOOL_COMMIT
+    default: "main"
+    documentation: cluster-tool git ref to download (branch, tag, or commit)
+  - name: SNAPSHOT_REGISTRY
+    default: "quay.io/rh-ee-ovishlit/cluster-flavors:osac-vmaas-pruned"
+    documentation: OCI image ref to push the snapshot to
+  documentation: |-
+    Snapshots a running OSAC cluster using cluster-tool and pushes the
+    resulting OCI image to a container registry. Expects the cluster to
+    have been provisioned by assisted-installer and OSAC installed via
+    osac-project-installer in a prior step.
