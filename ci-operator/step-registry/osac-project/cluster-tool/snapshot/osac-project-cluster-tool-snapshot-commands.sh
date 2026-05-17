@@ -7,18 +7,18 @@ set -o pipefail
 echo "************ cluster-tool snapshot ************"
 echo "CLUSTER_TOOL_COMMIT: ${CLUSTER_TOOL_COMMIT}"
 echo "SNAPSHOT_REGISTRY: ${SNAPSHOT_REGISTRY}"
+echo "SNAPSHOT_TAG: ${SNAPSHOT_TAG}"
 echo "-------------------------------------------"
 
-FLAVOR_NAME="osac-vmaas"
+FLAVOR_NAME="${SNAPSHOT_TAG}"
 QUAY_USER=$(cat /var/run/vault/osac-quay-creds/user)
 
-set +x
 QUAY_PASS=$(cat /var/run/vault/osac-quay-creds/password)
-set -x
 
 timeout -s 9 90m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s \
     "${CLUSTER_TOOL_COMMIT}" \
     "${SNAPSHOT_REGISTRY}" \
+    "${SNAPSHOT_TAG}" \
     "${FLAVOR_NAME}" \
     "${QUAY_USER}" \
     "${QUAY_PASS}" \
@@ -27,9 +27,10 @@ set -euo pipefail
 
 COMMIT="$1"
 REGISTRY="$2"
-FLAVOR="$3"
-QUAY_USER="$4"
-QUAY_PASS="$5"
+TAG="$3"
+FLAVOR="$4"
+QUAY_USER="$5"
+QUAY_PASS="$6"
 
 echo "=== Installing cluster-tool ==="
 curl -fsSL "https://raw.githubusercontent.com/omer-vishlitzky/cluster-tool/${COMMIT}/cluster-tool" \
@@ -48,14 +49,11 @@ echo "=== Creating snapshot ==="
 python3 /usr/local/bin/cluster-tool snapshot --name "${FLAVOR}" --source "${CLUSTER_ID}"
 
 echo "=== Authenticating to registry ==="
-set +x
-podman login --root /home/cluster-tool/containers/storage \
-    "$(echo ${REGISTRY} | cut -d/ -f1)" \
-    -u "${QUAY_USER}" -p "${QUAY_PASS}"
-set -x
+printf '%s' "${QUAY_PASS}" | podman login "$(echo "${REGISTRY}" | cut -d/ -f1)" \
+    -u "${QUAY_USER}" --password-stdin
 
 echo "=== Pushing snapshot ==="
-python3 /usr/local/bin/cluster-tool push --flavor "${FLAVOR}" --registry "${REGISTRY}"
+python3 /usr/local/bin/cluster-tool push "${FLAVOR}" --registry "${REGISTRY}" --tag "${TAG}"
 
 echo "=== Snapshot push complete ==="
 REMOTE_EOF
