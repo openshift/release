@@ -249,8 +249,8 @@ else #Install Quay operator with fbc image
   echo "Installing Quay from unreleased fbc image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   update_pull_secret
   create_icsp
+  wait_mcp_ready
   create_catalog_source
   check_catalog_source_status
-  wait_mcp_ready
   
 fi
