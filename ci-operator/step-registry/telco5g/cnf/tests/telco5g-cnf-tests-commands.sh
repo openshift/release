@@ -778,6 +778,35 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m |
 oc wait clusteroperators --all --for=condition=Available=true --timeout=15m || echo "WARNING: not all cluster operators are Available after 15m"
 oc wait clusteroperators --all --for=condition=Degraded=false --timeout=15m || echo "WARNING: some cluster operators are Degraded after 15m"
 
+# Discover SRIOV-enabled interfaces (sriov_totalvfs > 0) via oc debug and set
+# the filter so that e2e tests only run on interfaces where SR-IOV is enabled
+# in BIOS/firmware. Uses sysfs directly since the SRIOV operator may not be
+# installed yet at this point.
+sriov_pairs=()
+for node in ${test_nodes}; do
+    node_name="${node#node/}"
+    echo "Discovering SRIOV interfaces on $node_name..."
+    ifaces=$(oc debug "$node" --quiet -- chroot /host bash -c '
+        for f in /sys/class/net/*/device/sriov_totalvfs; do
+            [ -f "$f" ] || continue
+            totalvfs=$(cat "$f" 2>/dev/null)
+            if [ "$totalvfs" -gt 0 ] 2>/dev/null; then
+                basename $(dirname $(dirname "$f"))
+            fi
+        done
+    ' 2>/dev/null) || true
+    while IFS= read -r iface; do
+        [[ -n "$iface" ]] && sriov_pairs+=("${node_name}:${iface}")
+    done <<< "$ifaces"
+done
+if [[ ${#sriov_pairs[@]} -gt 0 ]]; then
+    sriov_filter=$(IFS='|'; echo "${sriov_pairs[*]}")
+    export SRIOV_NODE_AND_DEVICE_NAME_FILTER="$sriov_filter"
+    echo "SRIOV device filter set: $SRIOV_NODE_AND_DEVICE_NAME_FILTER"
+else
+    echo "WARNING: could not discover SRIOV-enabled interfaces, running without device filter"
+fi
+
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
