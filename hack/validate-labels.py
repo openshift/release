@@ -52,7 +52,7 @@ def main():
                 errors.append(f"repos/{repo}/{name}: duplicates org-level label from {org}")
 
     if errors:
-        print(f"Label validation errors:")
+        print("Label validation errors:")
         for err in errors:
             print(f"  {err}")
         sys.exit(1)
