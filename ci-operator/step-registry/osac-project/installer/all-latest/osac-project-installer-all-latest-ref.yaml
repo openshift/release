@@ -1,14 +1,18 @@
 ref:
-  as: osac-project-installer-component
+  as: osac-project-installer-all-latest
   from: dev-scripts
   dependencies:
   - name: osac-installer
     env: OSAC_INSTALLER_IMAGE
-  - name: component-image
-    env: COMPONENT_IMAGE
+  - name: fulfillment-service
+    env: FULFILLMENT_IMAGE
+  - name: osac-operator
+    env: OPERATOR_IMAGE
+  - name: osac-aap
+    env: AAP_IMAGE
   grace_period: 10m
   timeout: 3h0m0s
-  commands: osac-project-installer-component-commands.sh
+  commands: osac-project-installer-all-latest-commands.sh
   resources:
     requests:
       cpu: 100m
@@ -27,8 +31,7 @@ ref:
   - name: E2E_VM_TEMPLATE
     default: "osac.templates.ocp_virt_vm"
     documentation: The template to use for the e2e tests
-  - name: COMPONENT_IMAGE_NAME
-    documentation: The image name in base/kustomization.yaml to replace (e.g. ghcr.io/osac-project/fulfillment-service)
-  - name: AAP_EE_IMAGE_OVERRIDE
-    default: ""
-    documentation: If non-empty, also override AAP_EE_IMAGE in the overlay kustomization to use COMPONENT_IMAGE
+  documentation: |-
+    Installs OSAC with all component images overridden to their latest
+    CI-built versions. Swaps fulfillment-service, osac-operator, and
+    osac-aap (EE image + git branch) before running setup.sh.

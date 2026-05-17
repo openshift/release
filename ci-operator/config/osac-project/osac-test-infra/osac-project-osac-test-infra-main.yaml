@@ -27,10 +27,22 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  fulfillment-service:
+    name: latest
+    namespace: osac-project
+    tag: fulfillment-service
+  osac-aap:
+    name: latest
+    namespace: osac-project
+    tag: osac-aap
   osac-installer:
     name: latest
     namespace: osac-project
     tag: osac-installer
+  osac-operator:
+    name: latest
+    namespace: osac-project
+    tag: osac-operator
 build_root:
   image_stream_tag:
     name: release
@@ -67,6 +79,23 @@ tests:
   - intranet
   steps:
     workflow: osac-project-cluster-tool-vmaas
+- as: nightly-e2e-vmaas
+  capabilities:
+  - intranet
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=65536
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+    workflow: osac-project-ofcir-baremetal-nightly
 - as: e2e-metal-vmaas-compute-instance-creation
   capabilities:
   - intranet

@@ -1,0 +1,25 @@
+workflow:
+  as: osac-project-ofcir-baremetal-nightly
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - chain: assisted-common-pre
+      - ref: osac-project-installer-all-latest
+    test:
+      - ref: osac-project-baremetal-test-all
+    post:
+      - ref: osac-project-notify
+      - ref: osac-project-gather
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+  documentation: |-
+    Nightly full-installation E2E workflow. Provisions a baremetal cluster
+    via assisted-installer, installs OSAC with all component images
+    overridden to latest, runs all vmaas tests, and sends a Slack
+    notification with pass/fail, component versions, and Prow log link.
+    Notifications only fire for periodic jobs.
