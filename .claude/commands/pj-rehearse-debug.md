@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(curl -sS "https://prow.ci.openshift.org/*")
   - Bash(curl -sS "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/*")
   - Bash(.claude/scripts/monitor-rehearsal.sh *)
+  - Bash(.claude/scripts/analyze-prowjob.sh *)
 ---
 
 # PJ-Rehearse Debug - Iterative CI Job Debugging
@@ -294,6 +295,28 @@ kill 35703 38822
 
 For deeper analysis of failed rehearsals (especially for sandboxed-containers-operator tests), use the prowjob-analyzer tool from https://github.com/openshift/sandboxed-containers-operator (devel branch - actively developed):
 
+**Quick Usage (Recommended):**
+
+Use the wrapper script that automatically manages the analyzer installation:
+
+```bash
+# Analyze a failed rehearsal
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL>
+
+# Get JSON output
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL> --json
+
+# Verbose output
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL> --verbose
+```
+
+The script automatically:
+- Clones prowjob-analyzer to `~/.cache/prowjob-analyzer` (first run only)
+- Updates the cache daily
+- Runs the analyzer with all arguments passed through
+
+**Manual Usage (Alternative):**
+
 ```bash
 # Clone the repo if not already available (use devel branch)
 git clone -b devel https://github.com/openshift/sandboxed-containers-operator.git /tmp/osc-analyzer
@@ -316,10 +339,11 @@ python3 scripts/prowjob-analyzer/dig.py <PROW_JOB_URL>
 # Get Prow URL from rehearsal check
 PROW_URL=$(gh pr checks 79244 --repo openshift/release | grep azure-ipi-coco | awk '{print $4}')
 
-# Clone analyzer (if not already available) and analyze
-git clone -b devel https://github.com/openshift/sandboxed-containers-operator.git /tmp/osc-analyzer
-cd /tmp/osc-analyzer
-python3 scripts/prowjob-analyzer/dig.py "$PROW_URL"
+# Analyze the failed job
+.claude/scripts/analyze-prowjob.sh "$PROW_URL"
+
+# Or with JSON output for programmatic use
+.claude/scripts/analyze-prowjob.sh "$PROW_URL" --json
 ```
 
 **Output includes:**
@@ -434,7 +458,7 @@ bash: python3: command not found
 - Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
 - Run monitors in background with `&` to continue working
 - Use GCS browser URLs to check artifacts and step logs directly with curl
-- For deep failure analysis, use prowjob-analyzer from sandboxed-containers-operator repo
+- For deep failure analysis, use `.claude/scripts/analyze-prowjob.sh <PROW_URL>`
 - Keep running monitors in sync with active rehearsals (ps aux | grep monitor-rehearsal)
 
 **CRITICAL - DO NOT PUSH WHILE CLUSTER IS RUNNING:**
