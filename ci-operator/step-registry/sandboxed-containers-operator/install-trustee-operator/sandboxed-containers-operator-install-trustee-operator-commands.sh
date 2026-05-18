@@ -668,25 +668,18 @@ function update_env_configmap() {
   oc get configmap osc-config -n default -o yaml | grep -E "trusteeUrl|INITDATA" | head -2
 }
 
-function verify_trustee_connectivity() {
-  echo ">>> Verifying Trustee connectivity using kbs-client"
-
-  local kbs_client_pod="kbs-client-test"
-  local kbs_client_namespace="$TRUSTEE_NAMESPACE"
-  local kbs_client_image="quay.io/confidential-containers/kbs-client:v0.17.0"
-
-  # Create kbs-client pod
-  echo ">>> Creating kbs-client pod"
-  cat <<EOF | oc apply -f -
+function get_kbs_client_manifest() {
+  cat << 'MANIFEST_EOF'
+---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ${kbs_client_pod}
-  namespace: ${kbs_client_namespace}
+  name: KBS_CLIENT_POD_PLACEHOLDER
+  namespace: KBS_CLIENT_NAMESPACE_PLACEHOLDER
 spec:
   containers:
   - name: kbs-client
-    image: ${kbs_client_image}
+    image: KBS_CLIENT_IMAGE_PLACEHOLDER
     command: ["sleep", "infinity"]
     securityContext:
       allowPrivilegeEscalation: false
@@ -697,7 +690,23 @@ spec:
         drop:
         - ALL
   restartPolicy: Never
-EOF
+MANIFEST_EOF
+}
+
+function verify_trustee_connectivity() {
+  echo ">>> Verifying Trustee connectivity using kbs-client"
+
+  local kbs_client_pod="kbs-client-test"
+  local kbs_client_namespace="$TRUSTEE_NAMESPACE"
+  local kbs_client_image="quay.io/confidential-containers/kbs-client:v0.17.0"
+
+  # Create kbs-client pod
+  echo ">>> Creating kbs-client pod"
+  get_kbs_client_manifest | \
+    sed "s@KBS_CLIENT_POD_PLACEHOLDER@${kbs_client_pod}@g" | \
+    sed "s@KBS_CLIENT_NAMESPACE_PLACEHOLDER@${kbs_client_namespace}@g" | \
+    sed "s@KBS_CLIENT_IMAGE_PLACEHOLDER@${kbs_client_image}@g" | \
+    oc apply -f -
 
   # Wait for pod to be ready
   echo ">>> Waiting for kbs-client pod to be ready"
