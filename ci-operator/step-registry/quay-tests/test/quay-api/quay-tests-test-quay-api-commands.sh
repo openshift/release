@@ -36,4 +36,4 @@ cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_re
 cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
 cp cypress/videos/* $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
 
-sleep 6h
+sleep 8h
