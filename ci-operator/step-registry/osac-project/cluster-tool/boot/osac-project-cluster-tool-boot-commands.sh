@@ -180,6 +180,44 @@ podman run --authfile /root/pull-secret --rm --network=host \
     "${INSTALLER_IMAGE}" \
     bash -c "${COMPONENT_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
 
+# --- Phase 6: MetalLB operator ---
+echo "=== Installing MetalLB operator ==="
+podman run --authfile /root/pull-secret --rm \
+    -v /tmp:/target:z \
+    "${INSTALLER_IMAGE}" \
+    cp -r /installer/prerequisites/metallb /target/metallb
+
+oc apply -f /tmp/metallb/metallb-operator.yaml
+
+echo "Waiting for MetalLB CSV to appear..."
+METALLB_TIMEOUT=300
+METALLB_START=${SECONDS}
+until [[ -n "$(oc get csv --no-headers -n metallb-system 2>/dev/null | grep metallb)" ]]; do
+    if (( SECONDS - METALLB_START >= METALLB_TIMEOUT )); then
+        echo "ERROR: Timed out waiting for MetalLB CSV to exist"
+        exit 1
+    fi
+    oc apply -f /tmp/metallb/metallb-operator.yaml 2>/dev/null || true
+    sleep 3
+done
+
+METALLB_CSV=$(oc get csv --no-headers -n metallb-system | awk '/metallb/ { print $1 }' | tail -1)
+echo "Found CSV: ${METALLB_CSV}"
+
+echo "Waiting for CSV to succeed..."
+oc wait --for=jsonpath='{.status.phase}'=Succeeded "clusterserviceversion/${METALLB_CSV}" -n metallb-system --timeout=300s
+
+echo "Waiting for MetalLB operator deployments..."
+oc wait --for=condition=Available deployment/metallb-operator-controller-manager -n metallb-system --timeout=300s
+oc wait --for=condition=Available deployment/metallb-operator-webhook-server -n metallb-system --timeout=300s
+
+echo "Applying MetalLB configuration..."
+oc apply -f /tmp/metallb/metallb-config.yaml
+
+rm -rf /tmp/metallb
+
+echo "MetalLB operator installed successfully"
+
 echo "=== Boot + refresh complete ==="
 REMOTE_SCRIPT
 
