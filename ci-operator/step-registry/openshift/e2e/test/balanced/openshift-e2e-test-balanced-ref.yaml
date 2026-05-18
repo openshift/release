@@ -1,0 +1,69 @@
+ref:
+  as: openshift-e2e-test-balanced
+  from: tests
+  grace_period: 10m
+  commands: openshift-e2e-test-balanced-commands.sh
+  timeout: 14400s
+  env:
+  - name: TEST_ARGS
+    default: ""
+    documentation: |-
+      Additional arguments to be passed to 'openshift-tests'
+  - name: SHARD_ARGS
+    default: ""
+    documentation: |-
+      Sharding parameters auto-set by ci-operator when shard_count is used.
+      This step parses shard-id and shard-count from SHARD_ARGS and distributes
+      tests using round-robin instead of the default hash-based algorithm.
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run. Use 'openshift-tests run --help' to list available suites.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |-
+      Regular expression (POSIX basic regular expression) of tests to skip.
+  - name: SLOW_TESTS
+    default: ""
+    documentation: |-
+      Regular expression matching known slow/long-running tests. When set,
+      matched tests are placed first in the list before round-robin assignment,
+      ensuring they are spread across different shards rather than clustering
+      on the same one. This prevents one shard from running all the slow tests
+      while others finish quickly.
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the CSI driver manifest file to use. The file must be present in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the OCP specific CSI driver manifest file to use. The file must be present in ${SHARED_DIR}.
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 10Gi
+  documentation: |-
+    Drop-in replacement for openshift-e2e-test that uses round-robin test
+    distribution across shards instead of the default hash-based algorithm.
+
+    When used with shard_count, the default openshift-e2e-test uses a hash of
+    each test name to assign it to a shard. This can result in uneven distribution,
+    especially with small test suites (e.g., 2 tests both assigned to the same shard).
+
+    This step instead:
+    1. Parses SHARD_ARGS to extract shard-id and shard-count
+    2. Lists all tests via --dry-run
+    3. Assigns tests round-robin (test 1 -> shard 1, test 2 -> shard 2, etc.)
+    4. Runs openshift-tests with --file containing only the assigned tests
+
+    This guarantees equal distribution: with N tests and S shards, each shard
+    gets exactly N/S (or N/S + 1) tests.
+
+    When SLOW_TESTS is set (regex), matched tests are placed first in the list
+    so round-robin spreads them across different shards. This prevents multiple
+    long-running tests from clustering on the same shard.
+
+    Includes the same cloud provider setup, image-puller grants, proxy
+    configuration, and junit reporting as the standard openshift-e2e-test step.
