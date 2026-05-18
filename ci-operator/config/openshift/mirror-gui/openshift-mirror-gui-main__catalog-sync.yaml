@@ -62,6 +62,44 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: catalog-data-freshness
+  steps:
+    test:
+    - as: catalog-data-freshness
+      commands: |
+        set -euo pipefail
+        cd /app
+        echo "=== Verifying baked-in catalog data is from build (not git) ==="
+        INDEX=./catalog-data/catalog-index.json
+        if [ ! -f "$INDEX" ]; then
+          echo "ERROR: catalog-index.json not found in image"
+          exit 1
+        fi
+        cat "$INDEX"
+        CATALOG_COUNT=$(jq '.catalogs | length' "$INDEX")
+        echo "Baked-in catalog entries: $CATALOG_COUNT"
+        if [ "$CATALOG_COUNT" -lt 18 ]; then
+          echo "ERROR: Expected 18 catalogs, got $CATALOG_COUNT"
+          exit 1
+        fi
+        FROM_BUILD_COUNT=$(jq '[.catalogs[] | select(.digest == "from-build")] | length' "$INDEX")
+        echo "Entries with digest=from-build: $FROM_BUILD_COUNT"
+        if [ "$FROM_BUILD_COUNT" -lt 18 ]; then
+          echo "ERROR: Expected all 18 catalogs to have digest=from-build (got $FROM_BUILD_COUNT). Data may be from git, not from build."
+          exit 1
+        fi
+        TODAY=$(date -u +"%Y-%m-%d")
+        RECENT_COUNT=$(jq --arg today "$TODAY" '[.catalogs[] | select(.synced_at | startswith($today))] | length' "$INDEX")
+        echo "Entries synced today ($TODAY): $RECENT_COUNT"
+        if [ "$RECENT_COUNT" -lt 1 ]; then
+          echo "WARN: No catalogs have today's timestamp (may be stale or timezone difference)"
+        fi
+        echo "=== Catalog data freshness verified ==="
+      from: mirror-gui
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
