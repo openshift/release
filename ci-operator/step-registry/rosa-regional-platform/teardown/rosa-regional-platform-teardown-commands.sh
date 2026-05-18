@@ -18,5 +18,10 @@ git clone https://github.com/openshift-online/rosa-regional-platform.git "${WORK
 cd "${WORK_DIR}/platform"
 git checkout "${CLONE_REF}"
 
-echo "Starting ephemeral teardown (fire-and-forget)..."
-uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
+if [[ "${ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET:-true}" == "true" ]]; then
+  echo "Starting ephemeral teardown (fire-and-forget)..."
+  uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
+else
+  echo "Starting ephemeral teardown (synchronous)..."
+  uv run --no-cache ci/ephemeral-provider/main.py --teardown
+fi

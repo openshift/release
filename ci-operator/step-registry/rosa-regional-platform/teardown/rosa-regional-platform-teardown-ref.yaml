@@ -15,11 +15,22 @@ ref:
     name: rosa-regional-platform-ephemeral-creds
     mount_path: /var/run/rosa-credentials
   env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  - name: ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET
+    default: "true"
+    documentation: |-
+      When "true", teardown runs asynchronously (fire-and-forget) so the job
+      finishes quickly. Set to "false" for full synchronous teardown (nightly jobs).
   - name: ROSA_REGIONAL_PLATFORM_REF
     default: "main"
     documentation: |-
       Git ref of openshift-online/rosa-regional-platform to clone for teardown.
   documentation: |-
     Tears down an ephemeral rosa-regional-platform environment provisioned
-    by the rosa-regional-platform-provision step. Uses fire-and-forget mode
-    so teardown does not block job completion.
+    by the rosa-regional-platform-provision step. Defaults to fire-and-forget
+    mode; set ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET=false for synchronous
+    teardown.
