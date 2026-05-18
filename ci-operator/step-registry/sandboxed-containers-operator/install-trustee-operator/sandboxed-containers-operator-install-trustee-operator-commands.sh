@@ -723,19 +723,32 @@ function verify_trustee_connectivity() {
   # Test basic connectivity to Trustee KBS
   echo ">>> Testing connectivity to Trustee KBS at ${TRUSTEE_URL}"
 
+  local kbs_test_failed=false
+
   # Try to fetch a resource (basic connectivity test)
   if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
     kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 2>&1 | tee /tmp/kbs-test-output.txt; then
-    echo ">>> SUCCESS: Successfully connected to Trustee KBS"
+    echo ">>> SUCCESS: Successfully connected to Trustee KBS and retrieved resource"
   else
     # Check if it's a "resource not found" error (which is OK - means KBS is responding)
     if grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
-      echo ">>> INFO: Trustee KBS is responding (resource not found is expected for test resource)"
-      echo ">>> This confirms connectivity is working"
+      echo ">>> SUCCESS: Trustee KBS is responding (404 for test resource is expected)"
+      echo ">>> This confirms KBS connectivity is working correctly"
     else
-      echo ">>> WARNING: Failed to connect to Trustee KBS"
-      echo ">>> This may be expected if resources haven't been populated yet"
+      # Connection failed for other reasons (timeout, SSL, network, etc.)
+      echo ">>> ERROR: Failed to connect to Trustee KBS"
+      echo ">>> kbs-client must be able to connect to KBS service"
       cat /tmp/kbs-test-output.txt || true
+
+      # Check for specific error patterns
+      if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output.txt; then
+        echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
+      fi
+      if grep -q "certificate verify failed\|SSL\|TLS" /tmp/kbs-test-output.txt; then
+        echo ">>> ERROR: SSL/TLS certificate error - route configuration issue"
+      fi
+
+      kbs_test_failed=true
     fi
   fi
 
@@ -801,7 +814,14 @@ function verify_trustee_connectivity() {
   echo ">>> Cleaning up kbs-client pod"
   oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
 
-  echo ">>> Trustee connectivity verification completed"
+  # Fail the step if kbs-client could not connect
+  if [[ "${kbs_test_failed}" == "true" ]]; then
+    echo ">>> FAILED: kbs-client connectivity test failed"
+    echo ">>> The Trustee KBS service must be accessible for CoCo workloads to function"
+    return 1
+  fi
+
+  echo ">>> SUCCESS: Trustee connectivity verification completed"
   return 0
 }
 
