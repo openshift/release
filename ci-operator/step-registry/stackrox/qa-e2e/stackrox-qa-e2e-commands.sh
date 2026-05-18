@@ -12,7 +12,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
-        LP_IO__ET_PPP__NEW_TS_NAME="${REPORTPORTAL_CMP}--%s" \
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--stackrox__qa-e2e__stackrox-qa-e2e.xml
     ' EXIT
 fi
