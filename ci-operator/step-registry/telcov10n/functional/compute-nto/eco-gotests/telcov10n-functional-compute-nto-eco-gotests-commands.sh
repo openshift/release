@@ -110,6 +110,11 @@ if [[ $ssh_ret -ne 0 ]]; then
     echo
 fi
 
+echo "Copy eco Gotest script to artifacts directory"
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+    "${BASTION_USER}@${BASTION_IP}":/tmp/gotest/run_gotests.sh "${ARTIFACT_DIR}/run_gotests.sh"
+
+echo "Copy junit test reports to artifacts directory"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":"${REPORT_DIR}/*.xml" "${ARTIFACT_DIR}/junit_eco_gotests/"
 
@@ -124,9 +129,6 @@ for xml_file in "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml; do
     echo "Created junit copy: ${basename_file} -> ${junit_name}"
   fi
 done
-
-ls -la "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml
-
 
 if ls ${ARTIFACT_DIR}/junit_eco_gotests/*.xml 1> /dev/null 2>&1; then
   echo "Copy junit test reports to shared directory for reporter step"
