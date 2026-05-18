@@ -159,8 +159,8 @@ _Agent: ${CLAUDE_MODEL}_"
     ELAPSED=$((ELAPSED + POLL_INTERVAL))
     if [[ ${ELAPSED} -ge ${MAX_WAIT} ]]; then
         echo ""
-        echo "Timed out after $((MAX_WAIT / 3600)) hours waiting for blocking jobs to complete (${PENDING} still pending)."
-        exit 1
+        echo "ERROR: Timed out after $((MAX_WAIT / 3600)) hours waiting for blocking jobs to complete (${PENDING} still pending). Proceeding to analyze what we have..."
+        break
     fi
 
     echo "  Next check in $((POLL_INTERVAL / 60)) minutes..."
