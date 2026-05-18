@@ -11,6 +11,8 @@ mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_ANALYSIS_LOG="${WORKDIR}/claude-analysis.log"
 CLAUDE_BUG_CREATION_LOG="${WORKDIR}/claude-bug-creation.log"
+CLAUDE_REPORT_REFRESH_LOG="${WORKDIR}/claude-report-refresh.log"
+JIRA_MCP_LOG="${WORKDIR}/jira-mcp.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
@@ -41,7 +43,7 @@ atexit_handler() {
     fi
 
     # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_ANALYSIS_LOG}" "${CLAUDE_BUG_CREATION_LOG}"; do
+    for log_file in "${CLAUDE_ANALYSIS_LOG}" "${CLAUDE_BUG_CREATION_LOG}" "${CLAUDE_REPORT_REFRESH_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -185,16 +187,18 @@ EOF
     echo "Claude permissions configured."
     cat "${CLAUDE_HOME}/settings.json"
 
-    # Configure JIRA MCP
+    # Configure JIRA MCP, redirecting stderr to the JIRA MCP log file.
+    # Set MCP_VERBOSE=true to enable verbose logging.
     if [[ -n "${JIRA_API_TOKEN:-}" ]] && [[ -n "${JIRA_USERNAME:-}" ]]; then
         echo "Configuring JIRA MCP..."
         claude mcp add \
             -e JIRA_URL="${JIRA_URL}" \
             -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
             -e JIRA_USERNAME="${JIRA_USERNAME}" \
+            -e MCP_VERBOSE=true \
             --scope user \
             --transport stdio \
-            jira -- uvx mcp-atlassian@0.21.0
+            jira -- bash -c "uvx mcp-atlassian@0.21.0 2>>${JIRA_MCP_LOG}"
 
         echo "Waiting for JIRA MCP to become available..."
         wait_for_mcp_status "jira" "Connected"
@@ -229,10 +233,9 @@ cd "${SRC_DIR}"
 # Configure the GitHub token for MicroShift repo operations
 { set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
 
-# Run analysis on all releases and open rebase PRs.
-# Time-box analysis and limit turns to avoid uncontrolled billable minutes.
+# Run analysis on all releases and open rebase PRs (45m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-timeout 3000 claude \
+timeout 2700 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
@@ -241,21 +244,39 @@ timeout 3000 claude \
     --verbose 2>&1 | tee "${CLAUDE_ANALYSIS_LOG}"
 echo "Analysis for MicroShift CI jobs and pull requests completed"
 
-# Run bug creation for failed jobs (dry-run mode).
-# Time-box bug creation and limit turns to avoid uncontrolled billable minutes.
+# Run bug creation for failed jobs (10m and 50 turns).
 echo "Running Claude to create bugs for failed jobs..."
 timeout 600 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS}" \
+    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create --auto" \
     --verbose 2>&1 | tee "${CLAUDE_BUG_CREATION_LOG}"
 echo "Bug creation for failed jobs completed"
 
-# After the analysis, attempt to restart failed rebase PRs tests. If the
-# restarted tests complete successfully, the PR will be automatically
-# approved next time the analysis runs.
+# Run HTML report refresh to include the new bugs (5m and 30 turns).
+echo "Running Claude to refresh the HTML report..."
+timeout 300 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 30 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
+    --verbose 2>&1 | tee "${CLAUDE_REPORT_REFRESH_LOG}"
+echo "HTML report refresh completed"
+
+# Close duplicate rebase PRs before attempting to restart failed test jobs.
+echo "Running automatic closing of duplicate rebase PRs..."
+"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --mode close-duplicates \
+    --execute \
+    --author 'microshift-rebase-script[bot]' \
+    --filter 'NO-ISSUE: rebase-release'
+echo "Automatic closing of duplicate rebase PRs completed"
+
+# Now attempt to restart failed rebase PRs tests. If the restarted tests
+# complete successfully, the PR will be automatically merged.
 echo "Running automatic restart of failed rebase PRs tests..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
     --mode restart \

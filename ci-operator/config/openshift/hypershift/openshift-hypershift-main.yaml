@@ -240,11 +240,13 @@ tests:
     - ref: hypershift-analyze-e2e-failure
     - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
-- always_run: true
+- always_run: false
   as: e2e-azure-v2-self-managed
   optional: true
   steps:
     cluster_profile: hypershift-azure
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
@@ -321,6 +323,7 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+      RUN_KARPENTER_TESTS: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
@@ -549,8 +552,7 @@ tests:
   as: e2e-v2-gke
   capabilities:
   - build-tmpfs
-  optional: true
-  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-gcp
     env:

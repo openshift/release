@@ -28,6 +28,15 @@ resources:
 tests:
 - as: quay-quayio-push-pull-images-monitoring
   cron: 0 1 * * *
+  reporter_config:
+    channel: '#oncall-quay'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     test:
     - ref: quay-tests-quayio

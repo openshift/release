@@ -4,13 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Get OCP version from the release image metadata.
-# Must run before proxy setup: the build farm registry needs a direct connection.
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-mkdir -p "${XDG_RUNTIME_DIR}"
-KUBECONFIG="" oc registry login
-OCP_VERSION="$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f1,2)"
+# Get OCP version from the installer binary itself.
+# This ensures the Glance image name matches the RHCOS content that the
+# installer embeds, which is important for upgrade jobs where the installer
+# version can differ from the release under test.
+OCP_VERSION="$(openshift-install version 2>/dev/null | sed -n 's/^release image\s\+.*:\([0-9]\+\.[0-9]\+\).*/\1/p')"
+if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+	echo "ERROR: Failed to extract OCP version from openshift-install:" >&2
+	openshift-install version >&2
+	exit 1
+fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
