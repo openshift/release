@@ -120,6 +120,24 @@ if ! timeout --foreground 5m bash -c '
     exit 1
 fi
 
+echo "========== HTPasswd Identity Provider =========="
+# HTPasswd setup is opt-in via [debug] in the PR title — auth pod restarts add significant job time
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if [[ "$JOB_TYPE" != "periodic" ]] && [[ "$PR_TITLE" != *"[debug]"* ]]; then
+    echo "Skipping HTPasswd identity provider setup. Add [debug] to PR title to enable."
+elif [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
+    echo "WARNING: EPHEMERAL_CLUSTER_ADMIN_* secrets not found, skipping HTPasswd identity provider setup"
+else
+    htpasswd -c -B -i users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" <<< "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
+    oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
+    rm -f users.htpasswd
+    oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"cluster_admin","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
+    oc wait --for=condition=Progressing=False clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Available=True clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
+    oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
+fi
+
 # ── Service account & platform info ──────────────────────────────────────────
 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
