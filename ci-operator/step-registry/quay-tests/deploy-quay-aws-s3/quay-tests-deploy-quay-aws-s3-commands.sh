@@ -254,4 +254,4 @@ for _ in {1..60}; do
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
 archive_pod_info
-sleep 6h
+exit 1
