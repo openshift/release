@@ -142,8 +142,9 @@ TEST PLAN:
 ${PLAN_CONTENT}
 
 INSTRUCTIONS:
-- Execute the test plan step by step using oc/kubectl commands.
-- Report pass/fail for each step.
+- Execute EVERY scenario and step in the test plan. Do NOT skip or omit any.
+- If a scenario cannot be executed (e.g., the cluster was already destroyed by a prior scenario, or a prerequisite is missing), you MUST still include it in the results as FAILED with a detail explaining why it could not be run. Never silently drop a scenario.
+- Report pass/fail for each step with evidence (the command you ran and key output).
 - If a step fails, continue executing remaining steps and report all results.
 - SECURITY: Do NOT run commands that reveal credentials.
 
