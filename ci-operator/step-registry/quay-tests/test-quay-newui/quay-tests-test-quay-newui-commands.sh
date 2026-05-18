@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-sleep 8h
-
 #Get the credentials and Email of new Quay User
 #QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 #QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
