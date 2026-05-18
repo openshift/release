@@ -1,7 +1,18 @@
 ---
 description: Debug CI job failures using /pj-rehearse iterative testing
 args: "[job_name] [org] [repo]"
-allowed-tools: Read, Edit, Bash, Grep, Glob, AskUserQuestion
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Glob
+  - AskUserQuestion
+  - Bash(make update)
+  - Bash(git *)
+  - Bash(gh pr *)
+  - Bash(curl -sS "https://prow.ci.openshift.org/*")
+  - Bash(curl -sS "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/*")
+  - Bash(.claude/scripts/monitor-rehearsal.sh *)
 ---
 
 # PJ-Rehearse Debug - Iterative CI Job Debugging
