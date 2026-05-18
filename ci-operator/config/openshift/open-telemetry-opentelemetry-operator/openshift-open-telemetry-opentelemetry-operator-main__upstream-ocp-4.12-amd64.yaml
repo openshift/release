@@ -109,7 +109,7 @@ tests:
   as: security-sast-otel
   steps:
     env:
-      PROJECT_NAME: opentelemetry-operator
+      PROJECT_NAME: opentelemetry-operator-system
       SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
     workflow: openshift-ci-security
 - as: opentelemetry-upstream-tests
@@ -128,10 +128,10 @@ tests:
     - as: install
       cli: latest
       commands: |
-        oc create namespace opentelemetry-operator
-        oc label namespace opentelemetry-operator openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
