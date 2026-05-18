@@ -342,13 +342,32 @@ function suite() {
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
     fi &&
 
-    set -x &&
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!" &&
-    set +x
+    # Support running the test suite multiple times via TEST_ITERATIONS
+    local iterations="${TEST_ITERATIONS:-1}"
+    local iteration_exit_code=0
+    for i in $(seq 1 ${iterations}); do
+        if [[ ${iterations} -gt 1 ]]; then
+            echo "===== Test iteration $i of ${iterations} ====="
+            local log_suffix="-${i}"
+            local junit_suffix="-${i}"
+        else
+            local log_suffix=""
+            local junit_suffix=""
+        fi &&
+
+        set -x &&
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER}" \
+            -o "${ARTIFACT_DIR}/e2e${log_suffix}.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit${junit_suffix}" &
+        wait "$!" || iteration_exit_code=$? &&
+        set +x &&
+
+        if [[ ${iterations} -gt 1 ]]; then
+            echo "Completed iteration $i of ${iterations} (exit code: ${iteration_exit_code})"
+        fi
+    done &&
+    return ${iteration_exit_code}
 }
 
 function wait_for_ipsec_full_mode() {
