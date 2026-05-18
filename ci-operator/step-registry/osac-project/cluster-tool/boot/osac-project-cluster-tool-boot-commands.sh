@@ -104,7 +104,7 @@ echo "Overlay: ${INSTALLER_KUSTOMIZE_OVERLAY}"
 echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo ""
 
-echo "[1/8] Patching stale routes with new domain..."
+echo "[1/9] Patching stale routes with new domain..."
 OLD_DOMAIN=$(oc get route osac-aap -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null | sed "s/^osac-aap-${INSTALLER_NAMESPACE}\.//")
 echo "  Old domain: ${OLD_DOMAIN}"
 echo "  New domain: ${CLUSTER_DOMAIN}"
@@ -114,18 +114,41 @@ for route in $(oc get routes -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.items[*]
     oc patch route "${route}" -n "${INSTALLER_NAMESPACE}" --type=merge -p "{\"spec\":{\"host\":\"${NEW_HOST}\"}}"
 done
 
-echo "[2/8] Applying kustomize overlay..."
+echo "[2/9] Applying kustomize overlay..."
 oc delete job -n "${INSTALLER_NAMESPACE}" --all --ignore-not-found
 oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 
-echo "[3/8] Applying AAP configuration..."
+if [[ "${INSTALL_METALLB:-}" == "true" ]]; then
+    echo "[3/9] Installing MetalLB operator..."
+    oc apply -f prerequisites/metallb/metallb-operator.yaml
+    echo "  Waiting for MetalLB CSV to appear..."
+    retry_until 300 3 'oc apply -f prerequisites/metallb/metallb-operator.yaml 2>/dev/null; oc get csv -n metallb-system 2>/dev/null | grep -q metallb' || {
+        echo "Timed out waiting for MetalLB CSV to appear"
+        exit 1
+    }
+    METALLB_CSV=$(oc get csv -n metallb-system --no-headers 2>/dev/null | awk '/metallb/{print $1; exit}')
+    echo "  Waiting for CSV ${METALLB_CSV} to succeed..."
+    retry_until 300 10 '[[ "$(oc get csv -n metallb-system '"${METALLB_CSV}"' -o jsonpath='"'"'{.status.phase}'"'"' 2>/dev/null)" == "Succeeded" ]]' || {
+        echo "Timed out waiting for MetalLB operator CSV"
+        exit 1
+    }
+    echo "  Waiting for MetalLB deployments..."
+    oc wait deployment/metallb-operator-controller-manager -n metallb-system --for=condition=Available --timeout=300s
+    oc wait deployment/metallb-operator-webhook-server -n metallb-system --for=condition=Available --timeout=300s
+    echo "  Applying MetalLB configuration..."
+    oc apply -f prerequisites/metallb/metallb-config.yaml
+else
+    echo "[3/9] Skipping MetalLB operator installation"
+fi
+
+echo "[4/9] Applying AAP configuration..."
 INSTALLER_NAMESPACE="${INSTALLER_NAMESPACE}" \
 INSTALLER_KUSTOMIZE_OVERLAY="${INSTALLER_KUSTOMIZE_OVERLAY}" \
     ./scripts/aap-configuration.sh
 
 oc config set-context --current --namespace="${INSTALLER_NAMESPACE}"
 
-echo "[4/8] Waiting for AAP controller..."
+echo "[5/9] Waiting for AAP controller..."
 retry_until 300 10 '[[ "$(oc get automationcontroller osac-aap-controller -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Running")].status}'"'"' 2>/dev/null)" == "True" ]]' || {
     echo "Timed out waiting for AAP controller to be Running"
     exit 1
@@ -136,13 +159,13 @@ retry_until 120 5 '[[ "$(curl -sk -o /dev/null -w %{http_code} https://'"${AAP_R
     exit 1
 }
 
-echo "[5/8] Configuring AAP access..."
+echo "[6/9] Configuring AAP access..."
 ./scripts/prepare-aap.sh
 
-echo "[6/8] Configuring fulfillment service..."
+echo "[7/9] Configuring fulfillment service..."
 ./scripts/prepare-fulfillment-service.sh
 
-echo "[7/8] Restarting fulfillment pods..."
+echo "[8/9] Restarting fulfillment pods..."
 oc rollout restart deploy/fulfillment-controller -n "${INSTALLER_NAMESPACE}"
 oc rollout restart deploy/fulfillment-grpc-server -n "${INSTALLER_NAMESPACE}"
 oc rollout restart deploy/fulfillment-rest-gateway -n "${INSTALLER_NAMESPACE}"
@@ -152,7 +175,7 @@ oc rollout status deploy/fulfillment-grpc-server -n "${INSTALLER_NAMESPACE}" --t
 oc rollout status deploy/fulfillment-rest-gateway -n "${INSTALLER_NAMESPACE}" --timeout=120s
 oc rollout status deploy/fulfillment-ingress-proxy -n "${INSTALLER_NAMESPACE}" --timeout=120s
 
-echo "[8/8] Configuring tenant..."
+echo "[9/9] Configuring tenant..."
 ./scripts/prepare-tenant.sh
 
 echo ""
@@ -229,6 +252,7 @@ VM_TEMPLATE="$6"
 COMPONENT_IMAGE="${7:-}"
 COMPONENT_IMAGE_NAME="${8:-}"
 NAMESPACE="${9:-osac-e2e-ci}"
+INSTALL_METALLB="${10:-false}"
 
 # --- Phase 1: cluster-tool setup ---
 echo "=== Downloading cluster-tool ==="
@@ -314,6 +338,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
     -e INSTALLER_KUSTOMIZE_OVERLAY="${KUSTOMIZE_OVERLAY}" \
     -e INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
     -e INSTALLER_NAMESPACE="${NAMESPACE}" \
+    -e INSTALL_METALLB="${INSTALL_METALLB}" \
     "${INSTALLER_IMAGE}" \
     bash -c "${COMPONENT_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
 
@@ -331,6 +356,7 @@ timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     '${E2E_VM_TEMPLATE}' \
     '${COMPONENT_IMAGE:-}' \
     '${COMPONENT_IMAGE_NAME:-}' \
-    '${E2E_NAMESPACE}'"
+    '${E2E_NAMESPACE}' \
+    '${INSTALL_METALLB}'"
 
 echo "Boot step finished successfully."
