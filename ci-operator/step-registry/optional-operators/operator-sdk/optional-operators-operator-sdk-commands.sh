@@ -53,7 +53,7 @@ fi
 
 INSTALL_MODE_ARG=""
 if [[ -n ${OO_INSTALL_MODE} ]]; then
-  INSTALL_MODE_ARG=--install-mode="${INSTALL_MODE_ARG}"
+  INSTALL_MODE_ARG=--install-mode="${OO_INSTALL_MODE}"
 fi
 (
   cd /tmp
