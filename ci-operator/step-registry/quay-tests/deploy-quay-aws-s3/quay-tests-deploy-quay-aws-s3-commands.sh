@@ -267,10 +267,14 @@ for _ in {1..60}; do
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
+    echo "DEBUG: Sleeping 6 hours for cluster inspection..."
+    sleep 6h
     exit 0
   fi
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
 archive_pod_info
+echo "DEBUG: Sleeping 6 hours for cluster inspection..."
+sleep 6h
 exit 1
