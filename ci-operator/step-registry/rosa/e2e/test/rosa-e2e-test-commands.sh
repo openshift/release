@@ -47,7 +47,7 @@ export AWS_REGION="${LEASED_RESOURCE}"
 
 # Try to get management cluster access via OCM API
 log "Attempting management cluster access..."
-MC_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}"/hypershift 2>/dev/null | jq -r '.management_cluster // empty')
+MC_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}"/hypershift 2>/dev/null | jq -r '.management_cluster // empty') || true
 if [[ -n "${MC_NAME}" ]]; then
   log "Management cluster name: ${MC_NAME}"
   MANAGEMENT_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name='${MC_NAME}'" --parameter size=1 2>/dev/null | jq -r '.items[0].id // empty')
