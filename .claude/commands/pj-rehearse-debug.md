@@ -10,10 +10,9 @@ allowed-tools:
   - Bash(make update)
   - Bash(git *)
   - Bash(gh pr *)
-  - Bash(curl -sS "https://prow.ci.openshift.org/*")
-  - Bash(curl -sS "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/*")
   - Bash(.claude/scripts/monitor-rehearsal.sh *)
   - Bash(.claude/scripts/analyze-prowjob.sh *)
+  - Bash(.claude/scripts/prow-fetch.sh *)
 ---
 
 # PJ-Rehearse Debug - Iterative CI Job Debugging
@@ -286,10 +285,74 @@ kill 35703 38822
 - Monitors log to `/tmp/monitor-rehearsal-<JOB_ID>.log` - check logs to see what they're monitoring
 - If you manually abort a rehearsal, you don't need to kill the monitor - it will detect the abort and exit
 
+**Fetch artifacts with prow-fetch.sh:**
+
+Use the wrapper script to fetch data from **prow.ci.openshift.org** and **gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com** without repeated permission prompts:
+
+**RECOMMENDED:** Just copy/paste URLs from Prow UI or monitor output:
+
+```bash
+# Fetch any artifact URL (easiest - no job name lookup required)
+.claude/scripts/prow-fetch.sh https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-.../2056429033742143488/finished.json
+
+# Or from Prow view URLs
+.claude/scripts/prow-fetch.sh https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/...
+```
+
+**Convenience commands** (auto-lookup job name from job ID):
+
+```bash
+# Get PR check status (find job IDs)
+.claude/scripts/prow-fetch.sh pr-checks <PR_NUMBER> [PATTERN]
+
+# Fetch build log for a step
+.claude/scripts/prow-fetch.sh build-log <PR_NUMBER> <JOB_ID> <STEP_NAME>
+
+# Fetch finished.json (job result)
+.claude/scripts/prow-fetch.sh finished <PR_NUMBER> <JOB_ID>
+
+# Fetch started.json (job start info)
+.claude/scripts/prow-fetch.sh started <PR_NUMBER> <JOB_ID>
+
+# Fetch clone-records.json
+.claude/scripts/prow-fetch.sh clone-records <PR_NUMBER> <JOB_ID>
+```
+
+**Common examples:**
+
+```bash
+# Get job result (copy URL from monitor or Prow)
+.claude/scripts/prow-fetch.sh https://.../finished.json | jq -r '.result'
+
+# Or with convenience command
+.claude/scripts/prow-fetch.sh finished 79244 2056429033742143488 | jq -r '.result'
+
+# Get build log tail (will try multiple paths for step)
+.claude/scripts/prow-fetch.sh build-log 79244 2056429033742143488 install-trustee-operator | tail -100
+
+# Find job IDs
+.claude/scripts/prow-fetch.sh pr-checks 79244 azure-ipi-coco
+
+# Quiet mode (suppress informational messages)
+PROW_FETCH_QUIET=1 .claude/scripts/prow-fetch.sh finished 79244 2056429033742143488
+```
+
+**What the script does:**
+- Wraps curl to prow.ci.openshift.org and gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com
+- Wraps `gh pr checks` for getting PR status
+- **Eliminates repeated permission prompts** (script is pre-approved in allowed-tools)
+- Direct URL fetching (just paste URLs) requires no job name lookup
+- Convenience commands auto-lookup job name using `gh pr checks`
+- Environment variables:
+  - `PROW_FETCH_QUIET=1` - Suppress stderr messages (only output data)
+  - `PROW_FETCH_HEADERS=1` - Include HTTP headers in output
+
+**Note:** For `api.github.com` access, use `gh` commands directly (already pre-approved: `gh pr *`)
+
 **View logs if failed:**
 - Click through to Prow job URL in PR checks
 - Or use: `gh pr view <PR_NUMBER> --repo openshift/release --json statusCheckRollup`
-- Download build logs: `curl -sL "<prow-gcs-url>/build-log.txt" | tail -500`
+- Or use prow-fetch.sh as shown above
 
 **Analyze failure with prowjob-analyzer:**
 
