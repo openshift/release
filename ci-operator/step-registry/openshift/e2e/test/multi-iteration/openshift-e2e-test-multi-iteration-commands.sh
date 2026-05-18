@@ -30,7 +30,7 @@ fi
 # have steps use an HTTP(S) proxy to reach the API server.
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -68,7 +68,7 @@ azurestack)
     export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1091
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
     oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
@@ -82,10 +82,10 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-# Build test args
-TEST_ARGS=""
+# Build test args as array
+TEST_ARGS=()
 if [[ -n "${TEST_FOCUS}" ]]; then
-    TEST_ARGS="--run '${TEST_FOCUS}'"
+    TEST_ARGS+=("--run" "${TEST_FOCUS}")
 fi
 
 if [[ -n "${TEST_SKIPS}" ]]; then
@@ -93,7 +93,7 @@ if [[ -n "${TEST_SKIPS}" ]]; then
     echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
     echo "Skipping tests:"
     echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; exit $exit_code; }
-    TEST_ARGS="${TEST_ARGS} --file /tmp/tests"
+    TEST_ARGS+=("--file" "/tmp/tests")
 fi
 
 # Run the test multiple times
@@ -103,7 +103,7 @@ echo "Test focus: ${TEST_FOCUS}"
 echo "Test suite: ${TEST_SUITE}"
 
 TOTAL_FAILURES=0
-for i in $(seq 1 ${ITERATIONS}); do
+for i in $(seq 1 "${ITERATIONS}"); do
     echo "========================================="
     echo "Iteration $i of ${ITERATIONS}"
     echo "========================================="
@@ -113,7 +113,7 @@ for i in $(seq 1 ${ITERATIONS}); do
 
     set +e
     set -x
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS} \
+    openshift-tests run "${TEST_SUITE}" "${TEST_ARGS[@]}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ITERATION_DIR}/e2e.log" \
         --junit-dir "${ITERATION_DIR}/junit"
@@ -139,11 +139,11 @@ echo "========================================="
 # Consolidate JUnit results
 echo "Consolidating JUnit results..."
 mkdir -p "${ARTIFACT_DIR}/junit"
-for i in $(seq 1 ${ITERATIONS}); do
+for i in $(seq 1 "${ITERATIONS}"); do
     if [[ -d "${ARTIFACT_DIR}/iteration-${i}/junit" ]]; then
         for junit_file in "${ARTIFACT_DIR}/iteration-${i}/junit"/*.xml; do
             if [[ -f "${junit_file}" ]]; then
-                cp "${junit_file}" "${ARTIFACT_DIR}/junit/iteration-${i}-$(basename ${junit_file})"
+                cp "${junit_file}" "${ARTIFACT_DIR}/junit/iteration-${i}-$(basename "${junit_file}")"
             fi
         done
     fi
