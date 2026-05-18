@@ -431,22 +431,13 @@ function get_trustee_url() {
   if oc get route -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
     trustee_host=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
     if [[ -n "${trustee_host}" ]]; then
-      local route_port=""
       # Check if route has TLS configured
+      # Routes always use standard ports (443 for HTTPS, 80 for HTTP)
+      # The targetPort is for the backend service, not the client-facing route
       if oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.tls}' 2>/dev/null | grep -q termination; then
-        route_port=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.port.targetPort}' 2>/dev/null || echo "")
-        if [[ -n "${route_port}" && "${route_port}" != "443" && "${route_port}" != "https" ]]; then
-          trustee_url="https://${trustee_host}:${trustee_port}"
-        else
-          trustee_url="https://${trustee_host}"
-        fi
+        trustee_url="https://${trustee_host}"
       else
-        route_port=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.port.targetPort}' 2>/dev/null || echo "")
-        if [[ -n "${route_port}" && "${route_port}" != "80" && "${route_port}" != "http" ]]; then
-          trustee_url="http://${trustee_host}:${trustee_port}"
-        else
-          trustee_url="http://${trustee_host}"
-        fi
+        trustee_url="http://${trustee_host}"
       fi
       echo ">>> Found OpenShift route: ${trustee_url}"
     fi
