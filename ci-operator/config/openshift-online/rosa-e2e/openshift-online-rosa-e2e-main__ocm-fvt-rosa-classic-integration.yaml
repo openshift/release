@@ -26,6 +26,12 @@ tests:
   capabilities:
   - nested-podman
   commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
     JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
     if [ -n "${PULL_NUMBER:-}" ]; then
       JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
@@ -33,7 +39,7 @@ tests:
       JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
     fi
 
-    env -i bash --norc --noprofile << EOF > /tmp/podman.env
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
     export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
     export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
     export ENABLE_JIRA_REPORTING=true
@@ -45,7 +51,7 @@ tests:
 
     podman run \
     --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-    --env-file /tmp/podman.env \
+    --env-file "${podman_env_file}" \
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
