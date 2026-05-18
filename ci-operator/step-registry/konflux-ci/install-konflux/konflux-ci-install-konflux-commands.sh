@@ -79,6 +79,14 @@ cd "${INFRA_DIR}"
 git remote add origin "https://github.com/redhat-appstudio-qe/infra-deployments.git" || true
 git pull --rebase upstream main
 
+# If this is a PR job for infra-deployments, apply the PR changes
+if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
+    echo "[INFO] Fetching infra-deployments PR #${PULL_NUMBER} changes..."
+    git fetch upstream "refs/pull/${PULL_NUMBER}/head"
+    git merge --no-edit FETCH_HEAD
+    echo "[INFO] Merged PR #${PULL_NUMBER} into working tree"
+fi
+
 # Mark master nodes as schedulable (for small clusters)
 oc patch scheduler cluster --type=merge -p '{"spec":{"mastersSchedulable":true}}' 2>&1 || \
     echo "[WARN] Could not modify scheduler (might be HyperShift cluster)"
