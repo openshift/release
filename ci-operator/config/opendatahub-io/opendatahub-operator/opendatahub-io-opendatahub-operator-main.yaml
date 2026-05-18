@@ -105,6 +105,55 @@ tests:
           memory: 3Gi
       timeout: 2h0m0s
     workflow: generic-claim
+- as: opendatahub-operator-e2e-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 0 16 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+    pre:
+    - ref: ipi-install-rbac
+    - ref: opendatahub-operator-e2e-cluster-preflight-health-check
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opendatahub-operator
+        oc label ns opendatahub-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        operator-sdk run bundle --timeout=5m -n opendatahub-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available --timeout=3m -n opendatahub-operator deployment opendatahub-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: opendatahub-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
+    - ref: opendatahub-io-ci-image-mirror-generic-claim
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=opendatahub-operator
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+      timeout: 2h0m0s
+    workflow: generic-claim
 - as: opendatahub-operator-rhoai-e2e
   cluster_claim:
     architecture: amd64
