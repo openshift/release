@@ -7,6 +7,10 @@ base_images:
     name: openapi-validator
     namespace: cincinnati-ci-public
     tag: ci-1.35.2
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
   ubi:
     name: ubi
     namespace: ocp
@@ -64,6 +68,12 @@ promotion:
     - rustup-build
     name: cincinnati-build-root
     namespace: cincinnati-ci
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -165,6 +175,27 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- always_run: false
+  as: olm-e2e-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: openshift-update-service
+    test:
+    - as: openshift-e2e-test
+      commands: just run_e2e
+      dependencies:
+      - env: CINCINNATI_IMAGE
+        name: deploy
+      from: e2e-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - as: osus-e2e
   cluster_claim:
     architecture: amd64
