@@ -83,6 +83,7 @@ fi
 
 echo "Running ansible-playbook with extra vars: ${EXTRA_VARS}"
 export ANSIBLE_REMOTE_TEMP="/tmp"
+
 ansible-playbook ./playbooks/compute/config-cluster.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
