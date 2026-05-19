@@ -310,18 +310,37 @@ function install_trustee_operator() {
 function wait_for_operator() {
   echo ">>> Waiting for trustee operator to be ready"
 
-  # Wait for the operator deployment to be ready
-  retry oc wait --for=condition=Available --timeout=300s \
-    deployment -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager \
-    || {
-      echo ">>> Deployment status:"
-      oc get deployment -n "${TRUSTEE_NAMESPACE}" || true
-      echo ">>> Pod status:"
-      oc get pods -n "${TRUSTEE_NAMESPACE}" || true
-      echo ">>> Pod describe:"
-      oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
-      return 1
-    }
+  # Poll for operator deployment to be ready (10 tries, 15s apart = 150s total)
+  local deployment_ready=false
+  for i in {1..10}; do
+    echo ">>> Attempt ${i}/10: Checking operator deployment status"
+
+    if oc get deployment -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q "True"; then
+      echo ">>> Trustee operator deployment is Available"
+      deployment_ready=true
+      break
+    fi
+
+    # Show current status
+    echo ">>> Current deployment status:"
+    oc get deployment -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[0].status}' 2>/dev/null || echo "Deployment not found yet"
+
+    if [[ ${i} -lt 10 ]]; then
+      echo ">>> Waiting 15 seconds before retry..."
+      sleep 15
+    fi
+  done
+
+  if [[ "${deployment_ready}" != "true" ]]; then
+    echo ">>> ERROR: Operator deployment failed to become ready after 10 attempts (150s)"
+    echo ">>> Final deployment status:"
+    oc get deployment -n "${TRUSTEE_NAMESPACE}" || true
+    echo ">>> Pod status:"
+    oc get pods -n "${TRUSTEE_NAMESPACE}" || true
+    echo ">>> Pod describe:"
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
+    return 1
+  fi
 
   echo ">>> Trustee operator is ready"
   oc get all -n "${TRUSTEE_NAMESPACE}"
@@ -346,20 +365,42 @@ function wait_for_operands() {
   # Give some time for operands to be created
   sleep 10
 
-  # Wait for operand deployments to be ready
+  # Get operand deployments (exclude operator controller)
   local operand_deployments
   operand_deployments=$(oc get deployment -n "${TRUSTEE_NAMESPACE}" -o name 2>/dev/null | grep -v controller-manager || true)
 
   if [[ -n "${operand_deployments}" ]]; then
     for deployment in ${operand_deployments}; do
-      echo ">>> Waiting for ${deployment}"
-      retry oc wait --for=condition=Available --timeout=300s \
-        -n "${TRUSTEE_NAMESPACE}" "${deployment}" \
-        || {
-          echo ">>> Failed to wait for ${deployment}"
-          oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
-          oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
-        }
+      echo ">>> Waiting for ${deployment} to be ready"
+
+      # Poll for deployment to be ready (10 tries, 15s apart = 150s total)
+      local deployment_ready=false
+      for i in {1..10}; do
+        echo ">>> Attempt ${i}/10: Checking ${deployment} status"
+
+        if oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q "True"; then
+          echo ">>> ${deployment} is Available"
+          deployment_ready=true
+          break
+        fi
+
+        # Show current status
+        echo ">>> Current status:"
+        oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status}' 2>/dev/null || echo "Deployment status unavailable"
+
+        if [[ ${i} -lt 10 ]]; then
+          echo ">>> Waiting 15 seconds before retry..."
+          sleep 15
+        fi
+      done
+
+      if [[ "${deployment_ready}" != "true" ]]; then
+        echo ">>> WARNING: ${deployment} failed to become ready after 10 attempts (150s)"
+        echo ">>> Final status:"
+        oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
+        oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
+        # Continue checking other deployments instead of failing immediately
+      fi
     done
   else
     echo ">>> No operand deployments found, checking for other resources"
@@ -705,11 +746,35 @@ function verify_trustee_connectivity() {
     sed "s@KBS_CLIENT_IMAGE_PLACEHOLDER@${kbs_client_image}@g" | \
     oc apply -f -
 
-  # Wait for pod to be ready
+  # Poll for pod to be ready (10 tries, 15s apart = 150s total)
   echo ">>> Waiting for kbs-client pod to be ready"
-  if ! retry oc wait --for=condition=Ready --timeout=120s pod/${kbs_client_pod} -n ${kbs_client_namespace}; then
-    echo ">>> ERROR: kbs-client pod failed to become ready"
+  local pod_ready=false
+  for i in {1..10}; do
+    echo ">>> Attempt ${i}/10: Checking kbs-client pod status"
+
+    if oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; then
+      echo ">>> kbs-client pod is Ready"
+      pod_ready=true
+      break
+    fi
+
+    # Show current status
+    echo ">>> Current pod phase:"
+    oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pod not found yet"
+    echo ">>> Current pod conditions:"
+    oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[*].type}' 2>/dev/null || true
+
+    if [[ ${i} -lt 10 ]]; then
+      echo ">>> Waiting 15 seconds before retry..."
+      sleep 15
+    fi
+  done
+
+  if [[ "${pod_ready}" != "true" ]]; then
+    echo ">>> ERROR: kbs-client pod failed to become ready after 10 attempts (150s)"
+    echo ">>> Pod describe:"
     oc describe pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
+    echo ">>> Pod logs:"
     oc logs pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
     oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
     return 1
