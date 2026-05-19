@@ -1,0 +1,71 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Containerfile
+  use_build_cache: true
+images:
+  items:
+  - dockerfile_path: ci/Containerfile
+    to: rosa-gap-analysis
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: nightly-4-19
+  commands: |
+    set -euo pipefail
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export OPENSHIFT_VERSION=4.19
+    ./scripts/gap-all.sh
+  container:
+    from: rosa-gap-analysis
+  cron: 0 6 * * *
+- as: nightly-4-20
+  commands: |
+    set -euo pipefail
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export OPENSHIFT_VERSION=4.20
+    ./scripts/gap-all.sh
+  container:
+    from: rosa-gap-analysis
+  cron: 30 6 * * *
+- as: nightly-4-21
+  commands: |
+    set -euo pipefail
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export OPENSHIFT_VERSION=4.21
+    ./scripts/gap-all.sh
+  container:
+    from: rosa-gap-analysis
+  cron: 0 7 * * *
+- as: nightly-4-22
+  commands: |
+    set -euo pipefail
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export OPENSHIFT_VERSION=4.22
+    ./scripts/gap-all.sh
+  container:
+    from: rosa-gap-analysis
+  cron: 30 7 * * *
+- as: nightly-5-0
+  commands: |
+    set -euo pipefail
+    mkdir -p ${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export REPORT_DIR=${ARTIFACT_DIR}/rosa-gap-analysis-reports
+    export OPENSHIFT_VERSION=5.0
+    ./scripts/gap-all.sh
+  container:
+    from: rosa-gap-analysis
+  cron: 0 8 * * *
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-gap-analysis
+  variant: periodics
