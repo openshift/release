@@ -37,20 +37,6 @@ function approve_csrs() {
   done
 }
 
-# Add 'node.openshift.io/platform-type=vsphere' label to any node that is missing it.
-function label_vsphere_nodes() {
-  echo "$(date -u --rfc-3339=seconds) - Adding labels to vsphere nodes for builds that do not have upstream ccm changes..."
-  NODES=$(oc get nodes -o name --kubeconfig="${CLUSTER_KUBECONFIG}")
-  for node in ${NODES}; do
-    echo "$(date -u --rfc-3339=seconds) - Checking ${node}"
-    LABEL_FOUND=$(oc get ${node} -o json | jq -r '.metadata.labels | has("node.openshift.io/platform-type")')
-    if [ "${LABEL_FOUND}" == "false" ]; then
-      echo "$(date -u --rfc-3339=seconds) - Adding 'node.openshift.io/platform-type=vsphere' label"
-      oc label "${node}" "node.openshift.io/platform-type"=vsphere --kubeconfig="${CLUSTER_KUBECONFIG}"
-    fi
-  done
-}
-
 # Enable storage operator / capability.  If operator is already enabled, this function will log no changes made and operator is ready.
 function enable_storage_operator() {
   echo "$(date -u --rfc-3339=seconds) - Enabling storage capability (operator)..."
@@ -111,10 +97,6 @@ function patch_csi_driver_removed() {
   oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
 }
 
-# We are going to apply the 'node.openshift.io/platform-type=vsphere' label to all existing nodes as a workaround while waiting for upstream CCM changes
-# When upstream changes are merged downstream, the function will output that no nodes were updated.
-label_vsphere_nodes
-
 # Enable storage operator now that the labels are in place
 if [ "${ENABLE_HYBRID_STORAGE}" == "true" ]; then
   enable_storage_operator
@@ -172,12 +154,6 @@ approve_csrs
 # Remove provider taint
 for (( i=0; i<${BM_COUNT}; i++ )); do
   oc adm taint nodes "${VM_NAME}-${i}" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
-done
-
-# add custom taint to prevent e2e from running on it due to current networking limitations.  Metrics do not seem to work when making calls from BM to ingress for data, but
-# everything else seems fine.
-for (( i=0; i<${BM_COUNT}; i++ )); do
-  oc adm taint nodes "${VM_NAME}-${i}" vsphere.openshift.io/e2e=true:NoSchedule --kubeconfig="${CLUSTER_KUBECONFIG}"
 done
 
 # Wait for node to be ready to prevent any interruption during the e2e tests

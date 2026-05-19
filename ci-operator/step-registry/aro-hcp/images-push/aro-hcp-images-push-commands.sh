@@ -27,8 +27,10 @@ ADMIN_API_REPO=$(yq '.adminApi.image.repository' "${CONFIG_FILE}")
 SESSIONGATE_REPO=$(yq '.sessiongate.image.repository' "${CONFIG_FILE}")
 EXPORTER_REPO=$(yq '.customExporter.image.repository' "${CONFIG_FILE}")
 OC_MIRROR_REPO=$(yq '.imageSync.ocMirror.image.repository' "${CONFIG_FILE}")
+MGMT_AGENT_REPO=$(yq '.mgmtAgent.image.repository' "${CONFIG_FILE}")
+KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
 echo "Target ACR: ${ACR_URL}"
-echo "Repos: backend=${BACKEND_REPO}, frontend=${FRONTEND_REPO}, admin-api=${ADMIN_API_REPO}, sessiongate=${SESSIONGATE_REPO}, exporter=${EXPORTER_REPO}, oc-mirror=${OC_MIRROR_REPO}"
+echo "Repos: backend=${BACKEND_REPO}, frontend=${FRONTEND_REPO}, admin-api=${ADMIN_API_REPO}, sessiongate=${SESSIONGATE_REPO}, exporter=${EXPORTER_REPO}, oc-mirror=${OC_MIRROR_REPO}, mgmt-agent=${MGMT_AGENT_REPO}, kube-applier=${KUBE_APPLIER_REPO}"
 
 # Authenticate to CI registry
 export XDG_RUNTIME_DIR="/tmp/run"
@@ -76,5 +78,11 @@ retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/${OC_MIRROR_REPO}:${IMA
 
 echo "Pushing oc-mirror latest: ${ARO_HCP_OC_MIRROR} -> ${ACR_URL}/${OC_MIRROR_REPO}:latest"
 retry oc image mirror "${ARO_HCP_OC_MIRROR}" "${ACR_URL}/${OC_MIRROR_REPO}:latest"
+
+echo "Pushing mgmt-agent: ${ARO_HCP_MGMT_AGENT} -> ${ACR_URL}/${MGMT_AGENT_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_MGMT_AGENT}" "${ACR_URL}/${MGMT_AGENT_REPO}:${IMAGE_TAG}"
+
+echo "Pushing kube-applier: ${ARO_HCP_KUBE_APPLIER} -> ${ACR_URL}/${KUBE_APPLIER_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_KUBE_APPLIER}" "${ACR_URL}/${KUBE_APPLIER_REPO}:${IMAGE_TAG}"
 
 echo "All images pushed successfully."

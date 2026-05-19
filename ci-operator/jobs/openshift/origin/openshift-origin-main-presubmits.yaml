@@ -694,6 +694,92 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build09
+    context: ci/prow/e2e-aws-ovn-dra-example
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-aws-ovn-dra-example
+    optional: true
+    rerun_command: /test e2e-aws-ovn-dra-example
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-dra-example
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-dra-example,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
     decoration_config:
@@ -4658,7 +4744,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn
     decorate: true
     decoration_config:
@@ -4745,7 +4831,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
     decoration_config:
@@ -4832,7 +4918,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     decorate: true
     decoration_config:
@@ -4919,7 +5005,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -5006,7 +5092,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
     decoration_config:
@@ -5093,7 +5179,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
     decoration_config:
@@ -5180,7 +5266,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
     decoration_config:
@@ -5267,7 +5353,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -5353,7 +5439,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-kube-apiserver-rollout
     decorate: true
     decoration_config:
@@ -5440,7 +5526,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-1of2
     decorate: true
     decoration_config:
@@ -5528,7 +5614,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-2of2
     decorate: true
     decoration_config:
@@ -5616,7 +5702,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-ovn-ipv6-1of2
     decorate: true
     decoration_config:
@@ -5704,7 +5790,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-ovn-ipv6-2of2
     decorate: true
     decoration_config:
@@ -5792,7 +5878,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -6053,7 +6139,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-arbiter
     decorate: true
     decoration_config:
@@ -6142,7 +6228,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-fencing
     decorate: true
     decoration_config:
@@ -6231,7 +6317,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-fencing-recovery
     decorate: true
     decoration_config:
