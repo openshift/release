@@ -431,15 +431,12 @@ function get_trustee_url() {
   if oc get route -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
     trustee_host=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
     if [[ -n "${trustee_host}" ]]; then
-      # Check if route has TLS configured
-      # Routes always use standard ports (443 for HTTPS, 80 for HTTP)
-      # The targetPort is for the backend service, not the client-facing route
-      if oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.tls}' 2>/dev/null | grep -q termination; then
-        trustee_url="https://${trustee_host}"
-      else
-        trustee_url="http://${trustee_host}"
-      fi
+      # Use HTTP for test environments to avoid self-signed certificate issues
+      # The route has insecureEdgeTerminationPolicy: Allow which permits HTTP
+      # Production CoCo workloads will use the certificate embedded in INITDATA
+      trustee_url="http://${trustee_host}"
       echo ">>> Found OpenShift route: ${trustee_url}"
+      echo ">>> Using HTTP to avoid self-signed certificate issues in test environment"
     fi
   fi
 
@@ -722,101 +719,35 @@ function verify_trustee_connectivity() {
 
   # Test basic connectivity to Trustee KBS
   echo ">>> Testing connectivity to Trustee KBS at ${TRUSTEE_URL}"
+  echo ">>> Using HTTP to avoid certificate issues in test environment"
 
   local kbs_test_failed=false
 
-  # Get the route's TLS certificate for verification
-  echo ">>> Retrieving route TLS certificate"
-  local route_cert=""
-  route_cert=$(echo | timeout 5 openssl s_client -connect "${TRUSTEE_HOST}:443" -servername "${TRUSTEE_HOST}" 2>/dev/null | openssl x509 2>/dev/null || echo "")
+  # Try to fetch a resource (basic connectivity test using HTTP)
+  if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
+    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 2>&1 | tee /tmp/kbs-test-output.txt; then
+    echo ">>> SUCCESS: Successfully connected to Trustee KBS and retrieved resource"
+    kbs_test_failed=false
+  elif grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
+    echo ">>> SUCCESS: Trustee KBS is responding (404 for test resource is expected)"
+    echo ">>> This confirms KBS connectivity is working correctly"
+    kbs_test_failed=false
+  else
+    # Connection failed
+    echo ">>> ERROR: Failed to connect to Trustee KBS"
+    echo ">>> kbs-client must be able to connect to KBS service"
+    cat /tmp/kbs-test-output.txt || true
 
-  if [[ -n "${route_cert}" ]]; then
-    echo ">>> Route certificate retrieved, copying to kbs-client pod"
-    echo "${route_cert}" | oc exec -i ${kbs_client_pod} -n ${kbs_client_namespace} -- sh -c 'cat > /tmp/route-cert.pem'
-
-    # Also try to get the CA cert from ingress
-    local ingress_ca=""
-    ingress_ca=$(oc get configmap -n openshift-config-managed router-ca -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
-
-    if [[ -n "${ingress_ca}" ]]; then
-      echo ">>> Ingress CA bundle retrieved, copying to kbs-client pod"
-      echo "${ingress_ca}" | oc exec -i ${kbs_client_pod} -n ${kbs_client_namespace} -- sh -c 'cat > /tmp/ingress-ca.pem'
-
-      # Combine both certificates
-      oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- sh -c 'cat /tmp/route-cert.pem /tmp/ingress-ca.pem > /tmp/combined-ca.pem'
-      local cert_file="/tmp/combined-ca.pem"
-    else
-      local cert_file="/tmp/route-cert.pem"
+    # Check for specific error patterns
+    if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output.txt; then
+      echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
+    fi
+    if grep -q "certificate verify failed\|SSL\|TLS" /tmp/kbs-test-output.txt; then
+      echo ">>> ERROR: SSL/TLS error - URL should be HTTP, not HTTPS"
+      echo ">>> Current TRUSTEE_URL: ${TRUSTEE_URL}"
     fi
 
-    echo ">>> Using certificate file: ${cert_file}"
-  else
-    echo ">>> WARNING: Could not retrieve route certificate"
-    local cert_file=""
-  fi
-
-  # Try to fetch a resource (basic connectivity test)
-  # First attempt: with certificate if available
-  if [[ -n "${cert_file}" ]]; then
-    echo ">>> Attempting kbs-client connection with certificate..."
-    if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-      sh -c "SSL_CERT_FILE=${cert_file} kbs-client --url \"${TRUSTEE_URL}\" get-resource --path default/kbsres1/key1" 2>&1 | tee /tmp/kbs-test-output.txt; then
-      echo ">>> SUCCESS: Successfully connected to Trustee KBS and retrieved resource"
-      kbs_test_failed=false
-    elif grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
-      echo ">>> SUCCESS: Trustee KBS is responding (404 for test resource is expected)"
-      echo ">>> This confirms KBS connectivity is working correctly"
-      kbs_test_failed=false
-    else
-      echo ">>> WARNING: kbs-client failed with certificate, trying alternative methods"
-      kbs_test_failed=true
-    fi
-  else
-    # No cert file, mark as needing alternative method
     kbs_test_failed=true
-  fi
-
-  # Second attempt: if first failed, try without SSL verification (test environment only)
-  if [[ "${kbs_test_failed}" == "true" ]]; then
-    echo ">>> ERROR: Failed initial connection attempt to Trustee KBS"
-    cat /tmp/kbs-test-output.txt 2>/dev/null || true
-
-    if grep -q "certificate verify failed\|SSL\|TLS" /tmp/kbs-test-output.txt 2>/dev/null; then
-      echo ">>> ERROR: SSL/TLS certificate verification failed"
-      echo ">>> Note: In production, CoCo workloads will use the certificate embedded in INITDATA"
-      echo ">>> Attempting connection without certificate verification (test environment only)"
-
-      # Try with DANGER_ACCEPT_INVALID_CERTS_AND_JWTS environment variable (kbs-client specific)
-      if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-        sh -c "DANGER_ACCEPT_INVALID_CERTS_AND_JWTS=1 kbs-client --url \"${TRUSTEE_URL}\" get-resource --path default/kbsres1/key1" 2>&1 | tee /tmp/kbs-test-output-insecure.txt; then
-        echo ">>> SUCCESS: kbs-client connected with insecure mode"
-        kbs_test_failed=false
-      elif grep -q "404\|not found\|NotFound" /tmp/kbs-test-output-insecure.txt; then
-        echo ">>> SUCCESS: Trustee KBS is responding (404 for test resource is expected)"
-        echo ">>> This confirms KBS connectivity is working correctly"
-        kbs_test_failed=false
-      else
-        echo ">>> ERROR: kbs-client still cannot connect"
-        cat /tmp/kbs-test-output-insecure.txt || true
-
-        # Check for specific error patterns
-        if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output-insecure.txt; then
-          echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
-        fi
-
-        kbs_test_failed=true
-      fi
-    else
-      # Not a certificate error, some other issue
-      echo ">>> ERROR: kbs-client connection failed for non-SSL reasons"
-      cat /tmp/kbs-test-output.txt || true
-
-      if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output.txt; then
-        echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
-      fi
-
-      kbs_test_failed=true
-    fi
   fi
 
   # Capture logs from KBS pod showing the attestation attempts
