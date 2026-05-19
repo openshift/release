@@ -42,6 +42,49 @@ This skill provides a systematic workflow for debugging CI job failures in the o
 - Network restriction debugging
 - Environment variable and secret issues
 
+## Autonomous Iteration Mode
+
+This skill can autonomously iterate through the debug cycle:
+
+**Iteration Loop:**
+1. **Analyze** failure from previous rehearsal (or initial failure)
+2. **Make changes** to step scripts, configs, or manifests
+3. **Regenerate** with `make update`
+4. **Commit** changes with descriptive message
+5. **Wait** for any running rehearsal to complete
+6. **Push** changes when safe (no active cluster)
+7. **Trigger** new rehearsal with `/pj-rehearse <job-name>`
+8. **Monitor** until step completes (or full job if needed)
+9. **Evaluate** results and decide: iterate or done
+
+**Success Criteria (when to stop iterating):**
+- ✅ Step completes successfully (no errors in build log)
+- ✅ Step validation passes (e.g., kbs-client connects, pods ready)
+- ✅ Integration works (INITDATA/TRUSTEE_URL for CoCo tests)
+- ✅ Full test passes if integration validation is needed
+
+**Failure Patterns (when to iterate):**
+- ❌ Pod/deployment fails to become ready
+- ❌ Missing commands/tools in container
+- ❌ Network connectivity failures
+- ❌ Certificate/authentication issues
+- ❌ Configuration errors (missing env vars, wrong paths)
+- ❌ Timeout waiting for resources
+
+**Iteration Guidelines:**
+- **Maximum 5 iterations** before asking user for guidance
+- **Always wait** for rehearsal completion before pushing next change
+- **Monitor step-only** for quick feedback (use `CONTINUE_AFTER_STEP=false`)
+- **Monitor full job** when validating integration (default behavior)
+- **Commit each fix** separately with clear description of what changed
+- **Use polling loops** instead of `oc wait` for better diagnostics
+
+**When to ask user:**
+- After 5 failed iterations (may need different approach)
+- Encountering unexpected errors not matching common patterns
+- Need to make architectural decisions (e.g., HTTP vs HTTPS)
+- Clarification needed on requirements or expected behavior
+
 ## Workflow
 
 ### 1. Initial Setup
@@ -634,6 +677,68 @@ After each fix, re-run rehearsal to discover the next issue.
 3. **Success**: Installation completes, test passes
 
 This demonstrates the iterative process: each rehearsal reveals the next issue.
+
+## Autonomous Iteration Example
+
+**Scenario**: Trustee operator installation failing with certificate errors
+
+**Iteration 1: Base image fix**
+```
+Analysis: "git: command not found" in build log
+Fix: Change from: cli → from: tools
+Commit: "[DEBUG] Fix install-trustee-operator to use tools base image"
+Push: Wait for completion (no active cluster) → push → trigger rehearsal
+Monitor: .claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 2 300 "install-trustee-operator" 60 false
+Result: ✅ Git works now
+Status: ❌ New error - network access denied
+```
+
+**Iteration 2: Network access fix**
+```
+Analysis: "Could not resolve host" - network blocked
+Fix: Embed pre-rendered manifests to avoid network downloads
+Commit: "[DEBUG] Embed manifests to work with restrict_network_access"
+Push: Wait → push → trigger
+Monitor: Same command (step-only for quick feedback)
+Result: ✅ Manifests apply successfully
+Status: ❌ New error - SSL certificate verification failed
+```
+
+**Iteration 3: Certificate fix**
+```
+Analysis: kbs-client rejects self-signed certificate
+Fix: Use HTTP instead of HTTPS (route has insecureEdgeTerminationPolicy: Allow)
+Commit: "[DEBUG] Use HTTP for Trustee URL to avoid certificate issues"
+Push: Wait → push → trigger
+Monitor: Switch to full job: CONTINUE_AFTER_STEP=true (validate integration)
+Result: ✅ kbs-client connects successfully
+Status: ✅ Step passes, full job passes
+```
+
+**Iteration 4: Diagnostic improvements**
+```
+Analysis: Step succeeds but diagnostics could be better
+Fix: Replace oc wait with polling loops for better error messages
+Commit: "[DEBUG] Replace oc wait with polling loops for better diagnostics"
+Push: Wait → push → trigger
+Monitor: Full job
+Result: ✅ Better progress reporting, clearer errors
+Status: ✅ Complete - ready for review
+```
+
+**Autonomous workflow:**
+- 4 iterations total (under 5-iteration limit)
+- Each iteration: analyze → fix → commit → push when safe → test → evaluate
+- Progressed from "command not found" to working installation
+- Final result: step works + has good diagnostics
+- No user intervention needed during iteration
+
+**Key practices demonstrated:**
+- Commit each fix separately with clear description
+- Wait for rehearsal completion before pushing
+- Use step-only monitoring for quick fixes (iterations 1-2)
+- Use full job monitoring for integration validation (iteration 3)
+- Continue improving even after success (iteration 4)
 
 ## Output
 
