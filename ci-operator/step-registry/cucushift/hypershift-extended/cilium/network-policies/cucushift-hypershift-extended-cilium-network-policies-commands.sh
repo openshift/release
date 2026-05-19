@@ -1,10 +1,12 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+set -x
 
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"

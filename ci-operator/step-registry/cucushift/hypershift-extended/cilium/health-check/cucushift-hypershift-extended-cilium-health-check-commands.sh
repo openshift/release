@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 function cleanup_connectivity_test() {
     oc delete scc cilium-test --ignore-not-found
@@ -17,6 +17,8 @@ function dump_connectivity_test_namespace() {
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+set -x
 
 # Target the guest cluster
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then

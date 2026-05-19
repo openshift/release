@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 CILIUM_VERSION=${CILIUM_VERSION:-"1.19.4"}
 CILIUM_CLI_VERSION=${CILIUM_CLI_VERSION:-"0.19.2"}
@@ -17,6 +17,8 @@ function set_proxy () {
 }
 
 set_proxy
+
+set -x
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
