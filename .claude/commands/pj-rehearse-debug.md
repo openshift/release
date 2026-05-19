@@ -9,10 +9,17 @@ allowed-tools:
   - AskUserQuestion
   - Bash(make update)
   - Bash(git *)
-  - Bash(gh *)
   - Bash(.claude/scripts/monitor-rehearsal.sh *)
   - Bash(.claude/scripts/analyze-prowjob.sh *)
   - Bash(.claude/scripts/prow-fetch.sh *)
+  - Bash(.claude/scripts/trigger-rehearsal.sh *)
+  - Bash(ps aux | grep *)
+  - Bash(kill *)
+  - Bash(sleep *)
+  - Bash(date)
+  - Bash(wc *)
+  - Bash(grep *)
+  - Bash(jq *)
 ---
 
 # PJ-Rehearse Debug - Iterative CI Job Debugging
@@ -42,20 +49,92 @@ This skill provides a systematic workflow for debugging CI job failures in the o
 - Network restriction debugging
 - Environment variable and secret issues
 
+## Mandatory Wrapper Usage
+
+**CRITICAL:** This skill MUST use wrapper scripts for all Prow and GitHub access. Direct `curl` and `gh` commands are NOT allowed.
+
+**Required wrappers (pre-approved in allowed-tools):**
+
+**`.claude/scripts/prow-fetch.sh`** - For ALL Prow, GCS, and GitHub API access:
+```bash
+# Get PR checks (wraps gh pr checks internally)
+.claude/scripts/prow-fetch.sh pr-checks <PR> [PATTERN]
+
+# Fetch any Prow/GCS URL
+.claude/scripts/prow-fetch.sh <URL>
+
+# Fetch build logs
+.claude/scripts/prow-fetch.sh build-log <PR> <JOB_ID> <STEP_NAME>
+
+# Fetch job results
+.claude/scripts/prow-fetch.sh finished <PR> <JOB_ID>
+.claude/scripts/prow-fetch.sh started <PR> <JOB_ID>
+```
+
+**`.claude/scripts/monitor-rehearsal.sh`** - For monitoring rehearsals:
+```bash
+.claude/scripts/monitor-rehearsal.sh <PR> <SHORT_JOB_NAME> [DURATION_HOURS] [CHECK_INTERVAL] [STEP_NAME] [ARTIFACT_WAIT] [CONTINUE_AFTER_STEP]
+```
+
+**`.claude/scripts/analyze-prowjob.sh`** - For analyzing failures:
+```bash
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL>
+```
+
+**`.claude/scripts/trigger-rehearsal.sh`** - For triggering rehearsals:
+```bash
+.claude/scripts/trigger-rehearsal.sh <PR> <JOB_NAME>
+# Example: .claude/scripts/trigger-rehearsal.sh 79244 periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco
+```
+
+**Why wrappers are required:**
+- ❌ **Direct curl**: `curl https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/...` → triggers permission prompts
+- ❌ **Direct gh**: `gh pr checks`, `gh api` → triggers api.github.com permission prompts
+- ✅ **Wrapper**: `.claude/scripts/prow-fetch.sh <URL>` → pre-approved, no prompts
+
+**Examples of correct usage:**
+
+✅ **Correct:**
+```bash
+.claude/scripts/prow-fetch.sh pr-checks 79244 azure-ipi-coco
+.claude/scripts/prow-fetch.sh "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/.../finished.json"
+```
+
+❌ **WRONG (triggers prompts):**
+```bash
+gh pr checks 79244 --repo openshift/release
+curl https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/.../finished.json
+curl https://api.github.com/repos/openshift/release/issues/79244/comments
+gh api repos/openshift/release/issues/79244/comments
+```
+
+**Enforcement:**
+- Wrapper scripts are the ONLY approved way to access Prow/GitHub
+- `gh` commands are NOT in allowed-tools (removed)
+- Direct `curl` to prow/gcsweb/api.github.com is NOT allowed
+- Violating this will trigger permission prompts and break autonomous iteration
+
 ## Autonomous Iteration Mode
 
-This skill can autonomously iterate through the debug cycle:
+**AUTONOMOUS EXECUTION:** This skill automatically executes the full debug cycle:
 
-**Iteration Loop:**
+**Iteration Loop (automatic):**
 1. **Analyze** failure from previous rehearsal (or initial failure)
 2. **Make changes** to step scripts, configs, or manifests
-3. **Regenerate** with `make update`
+3. **Regenerate** with `make update` (if needed)
 4. **Commit** changes with descriptive message
 5. **Wait** for any running rehearsal to complete
-6. **Push** changes when safe (no active cluster)
-7. **Trigger** new rehearsal with `/pj-rehearse <job-name>`
+6. **Push** changes to current branch: `git push origin HEAD`
+7. **Trigger** new rehearsal: `.claude/scripts/trigger-rehearsal.sh <PR> <JOB_NAME>`
 8. **Monitor** until step completes (or full job if needed)
-9. **Evaluate** results and decide: iterate or done
+9. **Evaluate** results and decide: iterate or **WAIT FOR USER**
+
+**CRITICAL:** After each iteration completes (success or failure), the skill will:
+- ✅ Report findings
+- ✅ Show what was changed
+- ✅ Display logs/errors
+- ⏸️ **WAIT FOR USER** before triggering next rehearsal
+- User can say "continue" to iterate, or give new instructions
 
 **Success Criteria (when to stop iterating):**
 - ✅ Step completes successfully (no errors in build log)
