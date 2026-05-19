@@ -277,9 +277,27 @@ function wait_for_operator() {
 
   if [[ "${deployment_ready}" != "true" ]]; then
     echo ">>> ERROR: Operator deployment not ready after 150s"
-    oc get deployment -n "${TRUSTEE_NAMESPACE}" || true
-    oc get pods -n "${TRUSTEE_NAMESPACE}" || true
-    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
+
+    # Check OLM resources to diagnose why operator didn't install
+    echo ">>> Checking CatalogSource status:"
+    oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o yaml 2>&1 | grep -A20 "status:" || echo "CatalogSource not found or no status"
+
+    echo ">>> Checking CatalogSource pod:"
+    oc get pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog 2>&1 || echo "No catalog pod found"
+    oc describe pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog 2>&1 | tail -50 || true
+
+    echo ">>> Checking Subscription status:"
+    oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml 2>&1 | grep -A30 "status:" || echo "Subscription not found or no status"
+
+    echo ">>> Checking InstallPlan:"
+    oc get installplan -n "${TRUSTEE_NAMESPACE}" 2>&1 || echo "No InstallPlan found"
+
+    echo ">>> Checking CSV:"
+    oc get csv -n "${TRUSTEE_NAMESPACE}" 2>&1 || echo "No CSV found"
+
+    echo ">>> All resources in ${TRUSTEE_NAMESPACE}:"
+    oc get all -n "${TRUSTEE_NAMESPACE}" || true
+
     return 1
   fi
 }
