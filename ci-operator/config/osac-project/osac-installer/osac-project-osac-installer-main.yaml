@@ -7,19 +7,18 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
-  osac-cli:
-    name: latest
-    namespace: osac-project
-    tag: osac-cli
   osac-test-infra:
     name: latest
     namespace: osac-project
     tag: osac-test-infra
+binary_build_commands: |
+  git submodule update --init base/osac-fulfillment-service
+  cd base/osac-fulfillment-service && GOFLAGS="-mod=readonly" go build -o /tmp/osac ./cmd/osac
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
   items:
   - dockerfile_literal: |
@@ -35,14 +34,14 @@ images:
       RUN cp osac /usr/local/bin/osac
     from: src
     inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/osac
       origin-cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
-      osac-cli:
-        paths:
-        - destination_dir: .
-          source_path: /app/osac
     to: osac-installer
   - dockerfile_literal: FROM scratch
     to: component-image
