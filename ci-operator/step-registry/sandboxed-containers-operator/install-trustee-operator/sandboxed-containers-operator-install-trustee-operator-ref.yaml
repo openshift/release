@@ -1,0 +1,52 @@
+ref:
+  as: sandboxed-containers-operator-install-trustee-operator
+  from: tools
+  grace_period: 10m
+  commands: sandboxed-containers-operator-install-trustee-operator-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2000Mi
+  env:
+  - name: TRUSTEE_INSTALL
+    default: "false"
+    documentation: |-
+      Whether to install the trustee operator. Set to "true" to enable installation.
+  - name: TRUSTEE_NAMESPACE
+    default: "trustee-operator-system"
+    documentation: |-
+      The namespace where the trustee operator will be installed
+  - name: TRUSTEE_IMAGE_REPO
+    default: "quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc"
+    documentation: |-
+      The container image repository for the trustee operator
+  - name: TRUSTEE_IMAGE_TAG
+    default: "1.1.0-1776506656"
+    documentation: |-
+      The container image tag for the trustee operator
+  - name: TRUSTEE_CHARTS_REF
+    default: "main"
+    documentation: |-
+      The git ref (branch/tag/commit) to use from the confidential-devhub/charts repository
+  - name: KBS_CLIENT_TAG
+    default: ""
+    documentation: |-
+      The kbs-client image tag to use for connectivity testing. If empty, automatically
+      discovers the latest v.X.Y.Z tag using skopeo. Override to pin a specific version
+      (e.g., "v0.19.0"). Fallback is v0.19.0 if skopeo lookup fails.
+  documentation: |-
+    A step that installs the trustee operator and operands on the cluster using pre-rendered
+    manifests embedded in the script. First installs the trustee-operator, waits for it to be
+    ready, then installs the trustee-operands with the derived cluster domain. After installation,
+    retrieves the Trustee KBS service URL and saves it to ${SHARED_DIR}/TRUSTEE_URL,
+    ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT for use by subsequent test steps.
+    Also creates INITDATA for confidential containers including TLS certificate and image security
+    policy, saving both the encoded INITDATA and plain text initdata.toml to ${SHARED_DIR}.
+    When TRUSTEE_INSTALL=true, updates the osc-config ConfigMap with the generated TRUSTEE_URL
+    and INITDATA values, overriding any empty values set in the job configuration. Finally,
+    verifies Trustee connectivity by creating a kbs-client pod, testing resource fetching, and
+    capturing KBS pod logs showing attestation attempts to ${ARTIFACT_DIR}/kbs-attestation-logs.txt
+    for inclusion in CI job artifacts.
+
+    NO NETWORK ACCESS REQUIRED: This step uses pre-rendered manifests with runtime variable
+    substitution via sed, eliminating the need for helm or git. Works with restrict_network_access: true.
