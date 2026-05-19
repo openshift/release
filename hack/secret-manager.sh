@@ -21,7 +21,9 @@ if [ "${1:-}" = "login" ]; then
         echo "Error: 'gcloud' is not installed. Install it with: brew install google-cloud-sdk" >&2
         exit 1
     fi
-    CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" exec gcloud auth application-default login --verbosity=error
+    CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
+    chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+    exit 0
 fi
 
 tty_flags=()
