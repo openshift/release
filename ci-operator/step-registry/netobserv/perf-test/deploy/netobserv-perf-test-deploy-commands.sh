@@ -77,33 +77,33 @@ oc process --ignore-unknown-parameters=true -f /scripts/netobserv/flows_v1beta2_
 oc apply -f "$ARTIFACT_DIR"/flowcollector.yaml
 
 
-oc patch flowcollector/cluster --type=merge -p '{
-  "spec": {
-    "processor": {
-      "informers": {
-        "enabled": true,
-        "replicas": 2,
-        "resources": {
-          "requests": {
-            "memory": "128Mi",
-            "cpu": "50m"
-          },
-          "limits": {
-            "memory": "256Mi",
-            "cpu": "200m"
-          }
-        },
-        "advanced": {
-          "resyncInterval": 60,
-          "batchSize": 100,
-          "sendTimeout": 10,
-          "updateBufferSize": 100,
-          "processorPort": 9090
-        }
-      }
-    }
-  }
-}'
+# oc patch flowcollector/cluster --type=merge -p '{
+#   "spec": {
+#     "processor": {
+#       "informers": {
+#         "enabled": true,
+#         "replicas": 2,
+#         "resources": {
+#           "requests": {
+#             "memory": "128Mi",
+#             "cpu": "50m"
+#           },
+#           "limits": {
+#             "memory": "256Mi",
+#             "cpu": "200m"
+#           }
+#         },
+#         "advanced": {
+#           "resyncInterval": 60,
+#           "batchSize": 100,
+#           "sendTimeout": 10,
+#           "updateBufferSize": 100,
+#           "processorPort": 9090
+#         }
+#       }
+#     }
+#   }
+# }'
 
 
 waitForFlowcollectorReady() {

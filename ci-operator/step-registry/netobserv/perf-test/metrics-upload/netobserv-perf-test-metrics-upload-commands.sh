@@ -73,7 +73,7 @@ function install_requirements(){
 
 function upload_metrics(){
     install_requirements scripts/requirements.txt
-    python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
+    python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION" --jira NETOBSERV-2675 --yaml-file netobserv_prometheus_queries_informers.yaml
     upload_metrics_rc=$?
     cp -r /tmp/data "$ARTIFACT_DIR"
 }
