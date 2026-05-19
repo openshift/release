@@ -265,41 +265,112 @@ function install_trustee_operator() {
 }
 
 function wait_for_operator() {
-  # Poll for operator deployment to be ready (10 tries, 15s apart = 150s total)
+  # OLM installation stages (poll each with timeout)
+  # 1. CatalogSource READY
+  # 2. Subscription has InstallPlan
+  # 3. InstallPlan Complete
+  # 4. CSV Succeeded
+  # 5. Deployment Available
+
+  # Stage 1: Wait for CatalogSource to be READY (60s)
+  echo ">>> Waiting for CatalogSource to be READY..."
+  local catalog_ready=false
+  for i in {1..12}; do
+    local state=$(oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
+    if [[ "${state}" == "READY" ]]; then
+      echo ">>> CatalogSource is READY"
+      catalog_ready=true
+      break
+    fi
+    [[ ${i} -lt 12 ]] && sleep 5
+  done
+
+  if [[ "${catalog_ready}" != "true" ]]; then
+    echo ">>> ERROR: CatalogSource not READY after 60s"
+    oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o yaml || true
+    oc get pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog || true
+    oc describe pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog | tail -50 || true
+    return 1
+  fi
+
+  # Stage 2: Wait for Subscription to reference an InstallPlan (60s)
+  echo ">>> Waiting for Subscription to reference InstallPlan..."
+  local installplan_ref=""
+  for i in {1..12}; do
+    installplan_ref=$(oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null || echo "")
+    if [[ -n "${installplan_ref}" ]]; then
+      echo ">>> Subscription references InstallPlan: ${installplan_ref}"
+      break
+    fi
+    [[ ${i} -lt 12 ]] && sleep 5
+  done
+
+  if [[ -z "${installplan_ref}" ]]; then
+    echo ">>> ERROR: Subscription has no InstallPlan reference after 60s"
+    oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml || true
+    return 1
+  fi
+
+  # Stage 3: Wait for InstallPlan to be Complete (60s)
+  echo ">>> Waiting for InstallPlan ${installplan_ref} to be Complete..."
+  local installplan_complete=false
+  for i in {1..12}; do
+    local phase=$(oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [[ "${phase}" == "Complete" ]]; then
+      echo ">>> InstallPlan is Complete"
+      installplan_complete=true
+      break
+    fi
+    [[ ${i} -lt 12 ]] && sleep 5
+  done
+
+  if [[ "${installplan_complete}" != "true" ]]; then
+    echo ">>> ERROR: InstallPlan not Complete after 60s"
+    oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o yaml || true
+    return 1
+  fi
+
+  # Stage 4: Wait for CSV to be Succeeded (60s)
+  echo ">>> Waiting for CSV to be Succeeded..."
+  local csv_succeeded=false
+  for i in {1..12}; do
+    local csv_phase=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
+    if [[ "${csv_phase}" == "Succeeded" ]]; then
+      local csv_name=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+      echo ">>> CSV ${csv_name} is Succeeded"
+      csv_succeeded=true
+      break
+    fi
+    [[ ${i} -lt 12 ]] && sleep 5
+  done
+
+  if [[ "${csv_succeeded}" != "true" ]]; then
+    echo ">>> ERROR: CSV not Succeeded after 60s"
+    oc get csv -n "${TRUSTEE_NAMESPACE}" -o yaml || true
+    return 1
+  fi
+
+  # Stage 5: Wait for Deployment to be Available (60s)
+  echo ">>> Waiting for operator deployment to be Available..."
   local deployment_ready=false
-  for i in {1..10}; do
+  for i in {1..12}; do
     if oc get deployment -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q "True"; then
+      echo ">>> Operator deployment is Available"
       deployment_ready=true
       break
     fi
-    [[ ${i} -lt 10 ]] && sleep 15
+    [[ ${i} -lt 12 ]] && sleep 5
   done
 
   if [[ "${deployment_ready}" != "true" ]]; then
-    echo ">>> ERROR: Operator deployment not ready after 150s"
-
-    # Check OLM resources to diagnose why operator didn't install
-    echo ">>> Checking CatalogSource status:"
-    oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o yaml 2>&1 | grep -A20 "status:" || echo "CatalogSource not found or no status"
-
-    echo ">>> Checking CatalogSource pod:"
-    oc get pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog 2>&1 || echo "No catalog pod found"
-    oc describe pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog 2>&1 | tail -50 || true
-
-    echo ">>> Checking Subscription status:"
-    oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml 2>&1 | grep -A30 "status:" || echo "Subscription not found or no status"
-
-    echo ">>> Checking InstallPlan:"
-    oc get installplan -n "${TRUSTEE_NAMESPACE}" 2>&1 || echo "No InstallPlan found"
-
-    echo ">>> Checking CSV:"
-    oc get csv -n "${TRUSTEE_NAMESPACE}" 2>&1 || echo "No CSV found"
-
-    echo ">>> All resources in ${TRUSTEE_NAMESPACE}:"
-    oc get all -n "${TRUSTEE_NAMESPACE}" || true
-
+    echo ">>> ERROR: Operator deployment not Available after 60s"
+    oc get deployment -n "${TRUSTEE_NAMESPACE}" || true
+    oc get pods -n "${TRUSTEE_NAMESPACE}" || true
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
     return 1
   fi
+
+  echo ">>> Operator installation complete"
 }
 
 function install_trustee_operands() {
