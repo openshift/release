@@ -731,12 +731,48 @@ spec:
 MANIFEST_EOF
 }
 
+function get_kbs_client_tag() {
+  echo ">>> Determining kbs-client image tag" >&2
+
+  # Check if tag is specified via environment variable
+  if [[ -n "${KBS_CLIENT_TAG:-}" ]]; then
+    echo ">>> Using KBS_CLIENT_TAG from environment: ${KBS_CLIENT_TAG}" >&2
+    echo "${KBS_CLIENT_TAG}"
+    return 0
+  fi
+
+  # Use skopeo to find the latest v.X.Y.Z tag
+  echo ">>> Looking up latest kbs-client tag with skopeo" >&2
+  local latest_tag=""
+  latest_tag=$(skopeo list-tags docker://quay.io/confidential-containers/kbs-client 2>/dev/null | \
+    jq -r '.Tags[]' | \
+    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | \
+    sort -V | \
+    tail -1 || echo "")
+
+  if [[ -n "${latest_tag}" ]]; then
+    echo ">>> Found latest kbs-client tag: ${latest_tag}" >&2
+    echo "${latest_tag}"
+    return 0
+  fi
+
+  # Fallback to known good version if skopeo fails
+  echo ">>> WARNING: Could not determine latest tag, using fallback: v0.19.0" >&2
+  echo "v0.19.0"
+}
+
 function verify_trustee_connectivity() {
   echo ">>> Verifying Trustee connectivity using kbs-client"
 
   local kbs_client_pod="kbs-client-test"
   local kbs_client_namespace="$TRUSTEE_NAMESPACE"
-  local kbs_client_image="quay.io/confidential-containers/kbs-client:v0.17.0"
+
+  # Get kbs-client tag (from env var or latest via skopeo)
+  local kbs_client_tag
+  kbs_client_tag=$(get_kbs_client_tag)
+  local kbs_client_image="quay.io/confidential-containers/kbs-client:${kbs_client_tag}"
+
+  echo ">>> Using kbs-client image: ${kbs_client_image}"
 
   # Create kbs-client pod
   echo ">>> Creating kbs-client pod"
@@ -782,28 +818,34 @@ function verify_trustee_connectivity() {
 
   echo ">>> kbs-client pod is ready"
 
-  # Test basic connectivity to Trustee KBS
+  # Test basic connectivity to Trustee KBS by retrieving a real resource
   echo ">>> Testing connectivity to Trustee KBS at ${TRUSTEE_URL}"
   echo ">>> Using HTTP to avoid certificate issues in test environment"
+  echo ">>> Retrieving cosign public key (configured in KbsConfig)"
 
   local kbs_test_failed=false
 
-  # Try to fetch a resource (basic connectivity test using HTTP)
+  # Try to fetch the cosign-keys/key-0 resource (should exist from KbsConfig)
   if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 2>&1 | tee /tmp/kbs-test-output.txt; then
-    echo ">>> SUCCESS: Successfully connected to Trustee KBS and retrieved resource"
-    kbs_test_failed=false
-  elif grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
-    echo ">>> SUCCESS: Trustee KBS is responding (404 for test resource is expected)"
-    echo ">>> This confirms KBS connectivity is working correctly"
+    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/cosign-keys/key-0 2>&1 | tee /tmp/kbs-test-output.txt; then
+    echo ">>> SUCCESS: Successfully retrieved resource from Trustee KBS"
+    echo ">>> Retrieved resource content:"
+    cat /tmp/kbs-test-output.txt | head -20
     kbs_test_failed=false
   else
-    # Connection failed
-    echo ">>> ERROR: Failed to connect to Trustee KBS"
-    echo ">>> kbs-client must be able to connect to KBS service"
+    # Failed to retrieve resource - this is a real failure
+    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS"
+    echo ">>> kbs-client MUST successfully retrieve resources for CoCo workloads to function"
+    echo ">>> Full output:"
     cat /tmp/kbs-test-output.txt || true
 
     # Check for specific error patterns
+    if grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
+      echo ">>> ERROR: Resource not found (404) - KbsConfig may not have published secrets correctly"
+    fi
+    if grep -q "401\|Unauthorized" /tmp/kbs-test-output.txt; then
+      echo ">>> ERROR: Unauthorized (401) - Attestation may have failed"
+    fi
     if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output.txt; then
       echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
     fi
