@@ -632,24 +632,55 @@ function verify_trustee_connectivity() {
 
   local kbs_test_failed=false
 
-  # Try to fetch the cosign-keys/key-0 resource (should exist from KbsConfig)
-  if ! oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/cosign-keys/key-0 2>&1 | tee /tmp/kbs-test-output.txt; then
-    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
-    echo ">>> Full output:"
-    cat /tmp/kbs-test-output.txt || true
+  # Test KBS connectivity by retrieving a real resource
+  # Note: kbs-client will perform RCA protocol handshake:
+  #   1. GET resource → 401 (no token)
+  #   2. POST /auth + POST /attest (get attestation token)
+  #   3. GET resource → 200 (with token)
+  # We suppress normal protocol warnings (stderr) on success
+  echo ">>> Testing KBS connectivity at ${TRUSTEE_URL}"
+  if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
+    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/cosign-keys/key-0 \
+    > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
-    # Check for specific error patterns
-    if grep -q "404\|not found\|NotFound" /tmp/kbs-test-output.txt; then
+    # Success - show that we got the resource
+    echo ">>> Successfully retrieved default/cosign-keys/key-0"
+    local resource_size
+    resource_size=$(wc -c < /tmp/kbs-resource.txt 2>/dev/null || echo "0")
+    echo ">>> Resource size: ${resource_size} bytes"
+
+    # Show first line of resource (should be base64 data or BEGIN PUBLIC KEY)
+    head -1 /tmp/kbs-resource.txt 2>/dev/null | head -c 80 || true
+    echo ""
+
+    kbs_test_failed=false
+  else
+    # Failed - show full diagnostics
+    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
+
+    # Show stderr (has the actual error)
+    if [[ -s /tmp/kbs-stderr.txt ]]; then
+      echo ">>> Error output:"
+      cat /tmp/kbs-stderr.txt
+    fi
+
+    # Show stdout (might have partial data)
+    if [[ -s /tmp/kbs-resource.txt ]]; then
+      echo ">>> Partial output:"
+      cat /tmp/kbs-resource.txt
+    fi
+
+    # Check for specific error patterns in both stdout and stderr
+    local all_output
+    all_output="$(cat /tmp/kbs-resource.txt /tmp/kbs-stderr.txt 2>/dev/null || true)"
+
+    if echo "${all_output}" | grep -q "404\|not found\|NotFound"; then
       echo ">>> ERROR: Resource not found (404) - KbsConfig may not have published secrets correctly"
     fi
-    if grep -q "401\|Unauthorized" /tmp/kbs-test-output.txt; then
-      echo ">>> ERROR: Unauthorized (401) - Attestation may have failed"
+    if echo "${all_output}" | grep -q "Connection refused\|Connection timed out\|timed out"; then
+      echo ">>> ERROR: Cannot connect to KBS service"
     fi
-    if grep -q "timed out\|Connection timed out" /tmp/kbs-test-output.txt; then
-      echo ">>> ERROR: Connection timeout - KBS service may not be accessible"
-    fi
-    if grep -q "certificate verify failed\|SSL\|TLS" /tmp/kbs-test-output.txt; then
+    if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
       echo ">>> ERROR: SSL/TLS error - URL should be HTTP, not HTTPS (current: ${TRUSTEE_URL})"
     fi
 
@@ -668,18 +699,18 @@ function verify_trustee_connectivity() {
       cp "${log_file}" "${SHARED_DIR}/kbs-attestation-logs.txt" 2>/dev/null || true
     fi
 
-    # Show attestation patterns
-    echo ">>> Attestation patterns:"
+    # Show attestation patterns (RCA protocol flow)
+    echo ">>> Attestation patterns (RCA protocol):"
     if grep -q "POST.*attest" "${log_file}" 2>/dev/null; then
-      echo "✓ Attestation POST requests:"
-      grep "POST.*attest" "${log_file}" | tail -3
+      echo "✓ Attestation (POST /auth, POST /attest):"
+      grep -E "POST.*/auth|POST.*attest" "${log_file}" | tail -4
     else
       echo "⚠ No attestation POST requests"
     fi
 
     if grep -q "GET.*resource" "${log_file}" 2>/dev/null; then
-      echo "✓ Resource GET requests:"
-      grep "GET.*resource" "${log_file}" | tail -3
+      echo "✓ Resource access (GET → 401 → attest → GET → 200):"
+      grep "GET.*resource" "${log_file}" | tail -5
     else
       echo "⚠ No resource GET requests"
     fi
