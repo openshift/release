@@ -265,5 +265,12 @@ EOF
 
 echo ""
 echo "JUnit XML written to ${JUNIT_FILE}"
-touch "${SHARED_DIR}/monitor-completed"
+
+if [[ "${CLAUDE_EXIT}" -eq 0 ]] || { [[ "${CLAUDE_EXIT}" -eq 124 ]] && [[ "${NUDGE_EXIT}" -eq 0 ]]; }; then
+    touch "${SHARED_DIR}/monitor-completed"
+elif grep -q 'BLOCKING_JOBS_START\|edge failures' "${ARTIFACT_DIR}/claude-analysis.log" 2>/dev/null; then
+    echo "Claude failed (exit ${CLAUDE_EXIT}) but payload_monitor data found — enabling Slack notification."
+    touch "${SHARED_DIR}/monitor-completed"
+fi
+
 echo "=== Edge CI Monitor complete ==="
