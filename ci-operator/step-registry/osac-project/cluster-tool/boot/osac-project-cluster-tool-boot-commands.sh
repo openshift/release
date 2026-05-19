@@ -167,6 +167,21 @@ if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     COMPONENT_OVERRIDE_CMD="curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xzf - -C /usr/local/bin && cd /installer/base && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && cd /installer && "
 fi
 
+# When testing an osac-aap PR, the installer-with-pr image contains
+# .aap-source-sha with the PR's head commit SHA. Override both
+# AAP_PROJECT_GIT_BRANCH (playbook sync) and AAP_EE_IMAGE (execution
+# environment) so AAP uses the PR's code instead of the pinned versions.
+AAP_OVERRIDE_CMD=""
+AAP_SOURCE_SHA=$(podman run --authfile /root/pull-secret --rm "${INSTALLER_IMAGE}" cat /installer/.aap-source-sha 2>/dev/null || true)
+if [[ -n "${AAP_SOURCE_SHA}" ]]; then
+    echo "=== AAP project git ref override: ${AAP_SOURCE_SHA} ==="
+    AAP_OVERRIDE_CMD="sed -i 's|AAP_PROJECT_GIT_BRANCH=.*|AAP_PROJECT_GIT_BRANCH=${AAP_SOURCE_SHA}|' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml && grep -q 'AAP_PROJECT_GIT_BRANCH=${AAP_SOURCE_SHA}' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml || { echo 'ERROR: AAP_PROJECT_GIT_BRANCH override failed'; exit 1; } && "
+    if [[ -n "${COMPONENT_IMAGE}" ]]; then
+        echo "=== AAP EE image override: ${COMPONENT_IMAGE} ==="
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|AAP_EE_IMAGE=.*|AAP_EE_IMAGE=${COMPONENT_IMAGE}|' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml && grep -q 'AAP_EE_IMAGE=${COMPONENT_IMAGE}' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml || { echo 'ERROR: AAP_EE_IMAGE override failed'; exit 1; } && "
+    fi
+fi
+
 # --- Phase 5: refresh ---
 echo "=== Running refresh ==="
 podman run --authfile /root/pull-secret --rm --network=host \
@@ -178,7 +193,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
     -e INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
     -e INSTALLER_NAMESPACE="${NAMESPACE}" \
     "${INSTALLER_IMAGE}" \
-    bash -c "${COMPONENT_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
+    bash -c "${COMPONENT_OVERRIDE_CMD}${AAP_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
 
 echo "=== Boot + refresh complete ==="
 REMOTE_SCRIPT
