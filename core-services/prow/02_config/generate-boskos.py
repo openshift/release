@@ -9,6 +9,9 @@ parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=Fa
 args = parser.parse_args()
 
 CONFIG = {
+    'aws-us-east-1-quota-slice': {
+        'us-east-1': 15,
+    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
