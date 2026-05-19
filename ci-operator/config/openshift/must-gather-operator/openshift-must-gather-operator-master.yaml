@@ -15,6 +15,8 @@ images:
   - dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
+  - dockerfile_path: Dockerfile.coverage
+    to: must-gather-operator-coverage
 operator:
   bundles:
   - as: must-gather-operator-bundle
@@ -93,6 +95,21 @@ tests:
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: e2e-gcp-operator
   steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: must-gather-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
     cluster_profile: openshift-org-gcp
     dependencies:
       OO_BUNDLE: must-gather-operator-bundle
@@ -107,6 +124,73 @@ tests:
       dependencies:
       - env: OO_BUNDLE
         name: must-gather-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: must-gather-operator-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: publish-e2e-coverage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  postsubmit: true
+  steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: must-gather-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: must-gather-operator-coverage
       from: src
       resources:
         requests:
