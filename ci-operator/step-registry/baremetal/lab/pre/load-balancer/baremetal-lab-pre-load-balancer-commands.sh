@@ -30,9 +30,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     MC="$MC
       server $name $ip:22623 check inter 1s
       server $name-v6 [$ipv6]:22623 check inter 1s"
-    MC22625="$MC22625
-      server $name $ip:22625 check inter 1s
-      server $name-v6 [$ipv6]:22625 check inter 1s"
     APISRV="$APISRV
       server $name $ip:6443 check inter 1s
       server $name-v6 [$ipv6]:6443 check inter 1s"
@@ -115,10 +112,6 @@ listen machine-config-server-22623
     bind :::22623
     mode tcp
 $MC
-listen machine-config-server-22625
-    bind :::22625
-    mode tcp
-$MC22625
 listen ingress-router-80
     bind :::80
     mode tcp
