@@ -16,58 +16,11 @@ workflow:
 
     test:
       - chain: hypershift-mce-ibmz-test
-      #- ref: openshift-extended-test
+      # Use s390x tests image via base_images.openshift-tests-s390x in periodics-mce config
+      - ref: openshift-extended-test
+        from: openshift-tests-s390x
       #- ref: openshift-extended-web-tests
       #- ref: openshift-e2e-test-qe-report
-      #Override the openshift-extended-test step with a direct Quay image
-      - as: openshift-extended-test-s390x
-        literal_from: quay.io/rh-ee-smuthuku/openshift-tests-s390x:latest
-        commands: openshift-extended-test-commands.sh
-        credentials:
-        - mount_path: /var/run/vault/tests-private-account
-          name: tests-private-account
-          namespace: test-credentials
-        dependencies:
-        - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
-          name: release:latest
-        env:
-        - name: KUBEADMIN_REMOVED
-          default: "false"
-        - name: TEST_SCENARIOS
-          default: |
-              MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
-              Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK
-              Workloads|Image_Registry|Container_Engine_Tools|INSTALLER_GENERAL
-              NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING|OAP|Network_Observability.*Critical
-        - name: TEST_ADDITIONAL
-          default: ""
-        - name: TEST_FILTERS
-          default: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&"
-        - name: FILTERS_ADDITIONAL
-          default: "~CPaasrunOnly&;~StressTest&"
-        - name: MODULE_FILTERS
-          default: ""
-        - name: TEST_IMPORTANCE
-          default: ""
-        - name: TEST_TIMEOUT
-          default: "15"
-        - name: TEST_PARALLEL
-          default: "6"
-        - name: TEST_ROSA_LOGIN_ENV
-          default: "staging"
-        - name: FORCE_SUCCESS_EXIT
-          default: "yes"
-        - name: IS_ACTIVE_CLUSTER_OPENSHIFT
-          default: "true"
-        - name: SHARD_ARGS
-          default: ""
-        - name: MULTISTAGE_PARAM_OVERRIDE_NETOBSERV_CS_IMAGE
-          default: ""
-        resources:
-          requests:
-            cpu: "1"
-            memory: 4Gi
-        timeout: 1h0m0s
       #- ref: cucushift-hypershift-extended-health-check
       #- ref: idp-htpasswd
       #- ref: cucushift-pre
