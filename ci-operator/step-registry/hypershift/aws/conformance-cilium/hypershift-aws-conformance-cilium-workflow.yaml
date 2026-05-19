@@ -25,8 +25,7 @@ workflow:
   steps:
     env:
       HYPERSHIFT_NETWORK_TYPE: "Other" # Required for Cilium.
-      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
-      # CLB tests: health check port 10256 unavailable with Cilium (OCPBUGS-62226)
+      CNI_PROVIDER: "cilium"
       # NLB tests: DNS resolution failure for VPC endpoints in HyperShift (OCPBUGS-74537)
       # CCO tests: broken test binary missing testdata/credentials_request.yaml (OCPBUGS-84630)
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
@@ -44,13 +43,13 @@ workflow:
         should work with TCP (when fully idled)\|
         Unidling with Deployments \[apigroup:route.openshift.io\] should work with UDP\|
         DNS should answer queries using the local DNS endpoint\|
-        Ensure HTTPRoute object is created\|
-        loadbalancer CLB should be reachable with default configurations\|
-        loadbalancer CLB internal should be reachable with hairpinning traffic\|
         loadbalancer NLB internal should be reachable with hairpinning traffic\|
         loadbalancer NLB should be reachable with target-node-labels\|
         Critical-CCO-based flow for olm managed operators and AWS STS\|
-        NonHyperShiftHOST-High-CCO metrics endpoint validation
+        NonHyperShiftHOST-High-CCO metrics endpoint validation\|
+        Services should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local\|
+        Services should be rejected when no endpoints exist\|
+        Services should be rejected for evicted pods
     post:
     - chain: hypershift-dump
     - chain: gather
@@ -65,5 +64,5 @@ workflow:
     - ref: hypershift-install
     - chain: hypershift-aws-create
     - ref: cucushift-hypershift-extended-cilium
-    - ref: cucushift-hypershift-extended-cilium-health-check
     - ref: cucushift-hypershift-extended-cilium-network-policies
+    - ref: cucushift-hypershift-extended-cilium-health-check
