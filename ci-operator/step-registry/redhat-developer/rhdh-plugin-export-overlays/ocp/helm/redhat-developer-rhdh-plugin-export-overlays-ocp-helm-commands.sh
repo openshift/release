@@ -29,6 +29,25 @@ GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
 OVERLAY_BRANCH=""
 REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
 
+# ── Gangway API Overrides ────────────────────────────────────────────────────
+
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}" ]]; then
+    GITHUB_ORG_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+    echo "Override applied: GITHUB_ORG_NAME=${GITHUB_ORG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}" ]]; then
+    GITHUB_REPOSITORY_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+    echo "Override applied: GITHUB_REPOSITORY_NAME=${GITHUB_REPOSITORY_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}" ]]; then
+    OVERLAY_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+    echo "Override applied: OVERLAY_BRANCH=${OVERLAY_BRANCH}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}" ]]; then
+    REHEARSE_PR_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+    echo "Override applied: REHEARSE_PR_NUMBER=${REHEARSE_PR_NUMBER}"
+fi
+
 # ── Environment ──────────────────────────────────────────────────────────────
 
 export HOME=/tmp
@@ -101,6 +120,24 @@ if ! timeout --foreground 5m bash -c '
     exit 1
 fi
 
+echo "========== HTPasswd Identity Provider =========="
+# HTPasswd setup is opt-in via [debug] in the PR title — auth pod restarts add significant job time
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if [[ "$JOB_TYPE" != "periodic" ]] && [[ "$PR_TITLE" != *"[debug]"* ]]; then
+    echo "Skipping HTPasswd identity provider setup. Add [debug] to PR title to enable."
+elif [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
+    echo "WARNING: EPHEMERAL_CLUSTER_ADMIN_* secrets not found, skipping HTPasswd identity provider setup"
+else
+    htpasswd -c -B -i users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" <<< "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
+    oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
+    rm -f users.htpasswd
+    oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"cluster_admin","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
+    oc wait --for=condition=Progressing=False clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Available=True clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
+    oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
+fi
+
 # ── Service account & platform info ──────────────────────────────────────────
 
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
@@ -114,6 +151,11 @@ export CONTAINER_PLATFORM="ocp"
 export CONTAINER_PLATFORM_VERSION
 CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 echo "Platform: ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION}"
+
+# Save platform info to SHARED_DIR for data-router step
+printf "%s" "${IS_OPENSHIFT}" > "${SHARED_DIR}/IS_OPENSHIFT.txt"
+printf "%s" "${CONTAINER_PLATFORM}" > "${SHARED_DIR}/CONTAINER_PLATFORM.txt"
+printf "%s" "${CONTAINER_PLATFORM_VERSION}" > "${SHARED_DIR}/CONTAINER_PLATFORM_VERSION.txt"
 
 # ── Clone & checkout ─────────────────────────────────────────────────────────
 
@@ -142,6 +184,9 @@ fi
 INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
+# Save RHDH version to SHARED_DIR for data-router step
+printf "%s" "${RHDH_VERSION}" > "${SHARED_DIR}/RHDH_VERSION.txt"
+
 # ── Artifact collection ──────────────────────────────────────────────────────
 
 collect_artifacts() {
@@ -149,6 +194,11 @@ collect_artifacts() {
         echo "[INFO] Copying artifacts to ${ARTIFACT_DIR}"
         cp -a playwright-report "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] playwright-report not found"
         cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] e2e-test-results not found"
+    fi
+    # Copy JUnit results to SHARED_DIR for data-router step
+    if [[ -f "playwright-report/junit-results.xml" ]]; then
+        cp "playwright-report/junit-results.xml" "${SHARED_DIR}/"
+        echo "[INFO] Copied junit-results.xml to ${SHARED_DIR}/"
     fi
 }
 

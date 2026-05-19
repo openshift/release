@@ -15,7 +15,11 @@ chain:
         export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
       fi
       
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+        CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+      else
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      fi
       bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
       --dump-guest-cluster=true \
       --name="${CLUSTER_NAME}"

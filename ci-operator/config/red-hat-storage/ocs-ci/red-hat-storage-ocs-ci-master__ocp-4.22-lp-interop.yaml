@@ -26,6 +26,16 @@ resources:
 tests:
 - as: cr-odf-aws
   cron: 0 3,15 * * *
+  reporter_config:
+    channel: '#odf-ocp-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -52,7 +62,6 @@ tests:
         [
             {"name": "odf-operator", "install_namespace": "openshift-storage", "channel": "stable-4.21", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
         ]
-      REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: ODF-lp-interop
       USER_TAGS: |
         scenario odf
@@ -65,6 +74,16 @@ tests:
     workflow: firewatch-ipi-aws-cr
 - as: odf-aws-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#odf-ocp-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -92,7 +111,6 @@ tests:
         [
             {"name": "odf-operator", "install_namespace": "openshift-storage", "channel": "stable-4.21","target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
         ]
-      REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: ODF-lp-interop
       USER_TAGS: |
         scenario odf

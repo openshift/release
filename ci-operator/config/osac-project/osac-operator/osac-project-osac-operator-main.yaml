@@ -1,3 +1,16 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
 build_root:
   image_stream_tag:
     name: release
@@ -7,10 +20,29 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: osac-operator
+  - dockerfile_path: Containerfile
+    to: osac-operator-pr
+  - dockerfile_literal: |
+      FROM osac-installer
+      COPY config/ /installer/base/osac-operator/config/
+    inputs:
+      osac-installer:
+        as:
+        - osac-installer
+    to: osac-installer-with-pr
 promotion:
   to:
-  - name: latest
+  - excluded_images:
+    - osac-operator-pr
+    - osac-installer-with-pr
+    name: latest
     namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -18,6 +50,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e-vmaas
+  capabilities:
+  - intranet
+  steps:
+    dependencies:
+      COMPONENT_IMAGE: osac-operator-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+      OSAC_TEST_IMAGE: osac-test-infra
+    env:
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/osac-operator
+    workflow: osac-project-cluster-tool-vmaas
 zz_generated_metadata:
   branch: main
   org: osac-project

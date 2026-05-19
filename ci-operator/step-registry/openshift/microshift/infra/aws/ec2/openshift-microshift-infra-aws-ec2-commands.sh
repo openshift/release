@@ -131,11 +131,12 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      echo "Waiting up to 5 min for RHEL host to be up."
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-ids "${INSTANCE_ID}"
+
       ci_script_prologue
       scp -F "${HOME}/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
 
-      echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared

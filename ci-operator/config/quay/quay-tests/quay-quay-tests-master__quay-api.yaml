@@ -32,6 +32,16 @@ resources:
 tests:
 - as: quay-e2e-tests-quay313-api-testing
   cron: 0 12 * * 6
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -117,7 +127,7 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4a1bf7b5365b5d8a7a72e765940d63903cbf6cfd91846b8ff33fe2458015ba17
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4d329eb8c32ce91a9844fd18959f6076da0e41cb4020544d2537f86dc875ccd7
       QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.17"
@@ -133,7 +143,7 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:f7f0740742d6588794af695a50d47cba3579537935d4996e7cf2a94a9deeaf61
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:91e8153ce3b59e493dbb16ebdda40fde02876ab0bbe01863b5ad841bfd4739f5
       QUAY_OPERATOR_CHANNEL: stable-3.18
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.18"

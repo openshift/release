@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: appset-cluster-hosted-mgmt
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - git:
+      directories:
+      - path: clusters/hosted-mgmt/*
+      - path: clusters/build-clusters/common_managed
+      - path: clusters/build-clusters/common_ocp
+      repoURL: https://github.com/openshift/release.git
+      revision: main
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '{{.path.path}}'
+      name: 'hosted-mgmt-{{.path.basename}}'
+      namespace: openshift-gitops
+    spec:
+      destination:
+        name: hosted-mgmt
+        namespace: openshift-gitops
+      ignoreDifferences:
+        - group: hive.openshift.io
+          jsonPointers:
+            - /spec/hibernationConfig
+          kind: ClusterPool
+        - group: rbac.authorization.k8s.io
+          jsonPointers:
+            - /rules
+          kind: ClusterRole
+          name: ci-admins-aggregated
+      project: hosted-mgmt
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: '{{.path.path}}'
+        repoURL: https://github.com/openshift/release.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
