@@ -9,7 +9,7 @@ allowed-tools:
   - AskUserQuestion
   - Bash(make update)
   - Bash(git *)
-  - Bash(gh pr *)
+  - Bash(gh *)
   - Bash(.claude/scripts/monitor-rehearsal.sh *)
   - Bash(.claude/scripts/analyze-prowjob.sh *)
   - Bash(.claude/scripts/prow-fetch.sh *)
