@@ -24,7 +24,7 @@ function getlogs() {
 trap getlogs EXIT
 
 echo "### Gathering logs..."
-timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 1h ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
 source /root/config
