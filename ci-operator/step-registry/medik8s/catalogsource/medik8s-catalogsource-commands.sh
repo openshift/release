@@ -153,15 +153,14 @@ EOF
 
 wait_for_catalogsource() {
     echo "Waiting for CatalogSource ${CATALOG_SOURCE_NAME} to be READY..."
-    local -i counter=0
+    local -i deadline=$(( SECONDS + 600 ))
     local status=""
 
-    while [[ $counter -lt 600 ]]; do
-        counter=$((counter + 20))
+    while (( SECONDS < deadline )); do
         sleep 20
         status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" \
             -o=jsonpath="{.status.connectionState.lastObservedState}" 2>/dev/null || true)
-        echo "  ${counter}s - status: ${status:-pending}"
+        echo "  $(( SECONDS ))s - status: ${status:-pending}"
         [[ "$status" == "READY" ]] && {
             echo "CatalogSource ${CATALOG_SOURCE_NAME} is READY"
             return 0
