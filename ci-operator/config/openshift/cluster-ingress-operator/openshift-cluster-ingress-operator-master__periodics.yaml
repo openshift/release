@@ -51,10 +51,6 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: govulncheck
-  commands: GOTOOLCHAIN=auto GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck
-    ./...
-  container:
-    from: govulncheck
   cron: 0 6 * * 1,4
   reporter_config:
     channel: '#tmp-network-edge-alerts'
@@ -63,6 +59,16 @@ tests:
     - error
     report_template: ':warning: *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
       logs>'
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOTOOLCHAIN=auto GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck
+        ./...
+      from: govulncheck
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: openshift
