@@ -75,6 +75,12 @@ releases:
       architecture: multi
       channel: stable
       version: "4.20"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -676,6 +682,26 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-dra
     workflow: ipi-aws
+- as: test-e2e-upstream-4-21-s390x
+  cluster: build01
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: openshift-e2e-ibmz-eco-kueue-operator-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
