@@ -38,7 +38,10 @@ spec:
 EOF
 
 # Wait for the object to exist in the API before checking its status
-oc wait --for=create storagecluster.ocs.openshift.io/ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" --timeout=600s
+echo "⏳ Waiting for StorageCluster object to appear..."
+until oc get storagecluster/ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" &>/dev/null; do
+  sleep 5
+done
 
 echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
