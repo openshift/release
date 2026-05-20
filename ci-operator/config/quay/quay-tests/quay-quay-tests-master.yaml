@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.21"
     namespace: ocp
     tag: cli
 build_root:
@@ -72,7 +72,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -109,6 +109,27 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: quay-e2e-tests-quay317-fips
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CSO_CHANNEL: stable-3.17
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4d329eb8c32ce91a9844fd18959f6076da0e41cb4020544d2537f86dc875ccd7
+      QBO_CHANNEL: stable-3.17
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
