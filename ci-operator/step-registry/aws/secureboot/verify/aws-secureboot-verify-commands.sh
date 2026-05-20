@@ -28,8 +28,6 @@ readarray -t INSTANCE_IDS < <(aws ec2 describe-instances \
   --query 'Reservations[].Instances[].InstanceId' --output text | tr '\t' '\n')
 
 for instance_id in "${INSTANCE_IDS[@]}"; do
-  boot_mode=$(aws ec2 describe-instances --instance-ids "${instance_id}" \
-    --query 'Reservations[0].Instances[0].BootMode' --output text)
   current_ami=$(aws ec2 describe-instances --instance-ids "${instance_id}" \
     --query 'Reservations[0].Instances[0].ImageId' --output text)
   ami_boot_mode=$(aws ec2 describe-images --image-ids "${current_ami}" \
