@@ -1,12 +1,12 @@
 ref:
-  as: medik8s-konflux-catalogsource
+  as: medik8s-catalogsource
   from_image:
     namespace: ocp
     name: "4.17"
     tag: upi-installer
   cli: latest
   grace_period: 10m
-  commands: medik8s-konflux-catalogsource-commands.sh
+  commands: medik8s-catalogsource-commands.sh
   resources:
     requests:
       cpu: 100m
@@ -21,10 +21,15 @@ ref:
   - name: OCP_VERSION
     documentation: OCP version suffix for the FBC catalog image (e.g., "422" for OCP 4.22). Required in konflux mode.
     default: ""
+  - name: GIT_REF
+    documentation: |-
+      The branch or git ref to resolve the FBC commit from. Only used in konflux mode.
+      Supports slash-containing refs (e.g., "release/v1.0") via URL encoding.
+    default: "main"
   - name: FBC_COMMIT_SHA
     documentation: |-
       Pin to a specific dragonfly/rhwa-fbc commit SHA for reproducibility.
-      If empty, the step resolves the latest commit from the main branch.
+      If empty, the step resolves the latest commit from GIT_REF (default: main).
       Only used in konflux mode.
     default: ""
   - name: CATALOG_IMAGE_REF
@@ -35,7 +40,7 @@ ref:
     default: ""
   - name: CATALOG_SOURCE_NAME
     documentation: The name of the CatalogSource to create.
-    default: "medik8s-konflux-catalog"
+    default: "medik8s-catalog"
   - name: IDMS_NAME
     documentation: The name of the ImageDigestMirrorSet to create. Only used in konflux mode.
     default: "medik8s-konflux"

@@ -10,7 +10,7 @@ declare FBC_IMAGE_REPO="quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc"
 declare FBC_IMAGE_PREFIX="rhwa-fbc"
 
 declare CATALOG_MODE="${CATALOG_MODE:-konflux}"
-declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-konflux-catalog}"
+declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare CATALOG_IMAGE=""
 declare IDMS_NAME="${IDMS_NAME:-medik8s-konflux}"
 declare OCP_VERSION="${OCP_VERSION:-}"
@@ -37,9 +37,12 @@ resolve_commit_sha() {
         return 0
     fi
 
-    echo "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} branch..."
+    local encoded_ref
+    encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
+
+    echo "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
     FBC_COMMIT_SHA=$(curl -sSf --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 10 --max-time 30 \
-        "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${GIT_REF}" | jq -r .id) || true
+        "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) || true
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
         echo "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API"
@@ -100,11 +103,10 @@ apply_idms() {
         exit 1
     }
 
-    echo "IDMS ${IDMS_NAME} applied. Waiting for MCO to process the change..."
-    sleep 15
-    echo "Waiting for MachineConfigPools to complete update..."
-    oc wait mcp --all --for=condition=Updated --timeout=300s || {
-        echo "WARNING: MCP not fully updated after 300s, proceeding anyway"
+    echo "IDMS ${IDMS_NAME} applied. Waiting for MachineConfigPool rollout..."
+    oc wait mcp --all --for=condition=Updating --timeout=5m || true
+    oc wait mcp --all --for=condition=Updated --timeout=20m || {
+        echo "WARNING: MCP not fully updated after 20m, proceeding anyway"
         run oc get mcp
     }
 }
@@ -134,7 +136,7 @@ metadata:
   name: ${CATALOG_SOURCE_NAME}
   namespace: openshift-marketplace
 spec:
-  displayName: medik8s Konflux Catalog
+  displayName: medik8s Catalog
   grpcPodConfig:
     extractContent:
       cacheDir: /tmp/cache
@@ -171,12 +173,14 @@ wait_for_catalogsource() {
     run oc get pods -o wide -n openshift-marketplace
     run oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml
     run oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml
+    echo "--- Marketplace events ---"
+    oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
 
     local node_name
     node_name=$(oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" \
         -o=jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
     if [[ -n "$node_name" ]]; then
-        run oc debug "node/$node_name" -- chroot /host podman pull --authfile /var/lib/kubelet/config.json "${CATALOG_IMAGE}"
+        run oc debug "node/$node_name" -- chroot /host podman pull --authfile /var/lib/kubelet/config.json "${CATALOG_IMAGE}" || true
     fi
 
     run oc get mcp,node
@@ -188,6 +192,11 @@ main() {
     set_proxy
     run oc whoami
     run oc version -o yaml
+
+    if [[ "$CATALOG_MODE" != "konflux" && "$CATALOG_MODE" != "direct" ]]; then
+        echo "ERROR: Unknown CATALOG_MODE '${CATALOG_MODE}'. Must be 'konflux' or 'direct'"
+        exit 1
+    fi
 
     if [[ "$CATALOG_MODE" == "direct" ]]; then
         if [[ -z "$CATALOG_IMAGE_REF" ]]; then
