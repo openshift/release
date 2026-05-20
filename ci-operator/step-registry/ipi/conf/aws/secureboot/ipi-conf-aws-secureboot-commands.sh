@@ -23,14 +23,16 @@ echo "REGION=${REGION}" > "${RESOURCES_FILE}"
 cleanup_on_error() {
   echo "ERROR: Secure Boot setup failed, cleaning up resources..."
   if [[ -f "${RESOURCES_FILE}" ]]; then
-    source "${RESOURCES_FILE}"
-    if [[ -n "${AMI_ID:-}" ]]; then
-      echo "Deregistering AMI: ${AMI_ID}"
-      aws ec2 deregister-image --image-id "${AMI_ID}" 2>/dev/null || true
+    local ami_id snapshot_id
+    ami_id=$(grep -oP '^AMI_ID=\K.+' "${RESOURCES_FILE}" || true)
+    snapshot_id=$(grep -oP '^SNAPSHOT_ID=\K.+' "${RESOURCES_FILE}" || true)
+    if [[ -n "${ami_id}" ]]; then
+      echo "Deregistering AMI: ${ami_id}"
+      aws ec2 deregister-image --image-id "${ami_id}" 2>/dev/null || true
     fi
-    if [[ -n "${SNAPSHOT_ID:-}" ]]; then
-      echo "Deleting snapshot: ${SNAPSHOT_ID}"
-      aws ec2 delete-snapshot --snapshot-id "${SNAPSHOT_ID}" 2>/dev/null || true
+    if [[ -n "${snapshot_id}" ]]; then
+      echo "Deleting snapshot: ${snapshot_id}"
+      aws ec2 delete-snapshot --snapshot-id "${snapshot_id}" 2>/dev/null || true
     fi
     rm -f "${RESOURCES_FILE}"
   fi

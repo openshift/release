@@ -11,12 +11,14 @@ if [[ ! -f "${RESOURCES_FILE}" ]]; then
   exit 0
 fi
 
-source "${RESOURCES_FILE}"
+AMI_ID=$(grep -oP '^AMI_ID=\K.+' "${RESOURCES_FILE}" || true)
+SNAPSHOT_ID=$(grep -oP '^SNAPSHOT_ID=\K.+' "${RESOURCES_FILE}" || true)
+REGION=$(grep -oP '^REGION=\K.+' "${RESOURCES_FILE}" || true)
 
 missing=()
-[[ -z "${AMI_ID:-}" ]] && missing+=(AMI_ID)
-[[ -z "${SNAPSHOT_ID:-}" ]] && missing+=(SNAPSHOT_ID)
-[[ -z "${REGION:-}" ]] && missing+=(REGION)
+[[ -z "${AMI_ID}" ]] && missing+=(AMI_ID)
+[[ -z "${SNAPSHOT_ID}" ]] && missing+=(SNAPSHOT_ID)
+[[ -z "${REGION}" ]] && missing+=(REGION)
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "ERROR: ${RESOURCES_FILE} is missing required variable(s): ${missing[*]}"
   exit 1
