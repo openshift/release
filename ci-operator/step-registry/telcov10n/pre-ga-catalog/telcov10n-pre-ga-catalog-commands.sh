@@ -258,38 +258,80 @@ IEOF
 
 function get_related_catalogs_and_idms_manifests {
   # Find the timestamped version on mirror site that matches the manifest digest
-  # from the stable tag query
+  # from the stable tag query using podman instead of Quay API
 
   local query_tag="${tag_version%.*}-"  # v4.21.0 -> v4.21-
 
   echo "" >&2
   echo "==============================================================================" >&2
-  echo "Finding timestamped version matching manifest digest on mirror" >&2
+  echo "Finding timestamped version matching manifest digest using podman" >&2
   echo "==============================================================================" >&2
   echo "Query pattern: ${query_tag}*" >&2
   echo "Target digest: ${selected_manifest_digest:0:20}..." >&2
 
-  # Search through Quay API pages to find matching timestamped tag
-  for ((page = 1; page < ${max_pages:=10}; page++)); do
-    local index_list=$(curl -sSL "${prega_operator_index_tags_url}/?filter_tag_name=like:${query_tag}&page=${page}" 2>/dev/null | jq 2>/dev/null || echo '{"tags":[]}')
+  # Create temporary auth file for podman
+  local prega_pull_secret_dir="$(mktemp -d)"
+  local prega_pull_secret_path="${prega_pull_secret_dir}/config.json"
 
-    local tag=$(echo "${index_list}" | jq -r '
-      [.tags[]
-      | select(.manifest_digest == "'"${selected_manifest_digest}"'")]
-      | first.name' 2>/dev/null || echo "null")
+  cat > "${prega_pull_secret_path}" <<IEOF
+  {
+    "auths": {
+      "quay.io": {
+        "auth": "${prega_pull_secret}"
+      }
+    }
+  }
+IEOF
 
-    if [ "${tag}" != "null" ] && [ -n "${tag}" ]; then
-      echo "✓ Found matching timestamped tag: ${tag} (page ${page})" >&2
-      echo "${tag}"
-      return 0
+  # Get repository from URL
+  local repo=$(echo "${prega_operator_index_tags_url}" | sed -E 's|https?://([^/]+)/api/v1/repository/([^/]+/[^/]+).*|\1/\2|')
+
+  # Get list of available timestamped tags from mirror site
+  # This is more efficient than brute-force checking all possible timestamps
+  echo "Fetching available tags from mirror site..." >&2
+  local available_tags=$(curl -sSL "${catalog_soruces_url}" 2>/dev/null | grep -oP '(?<=href=")[^"]+' | grep "^${query_tag}" | sort -r)
+
+  if [ -z "${available_tags}" ]; then
+    echo "WARNING: No timestamped tags found on mirror site for pattern ${query_tag}*" >&2
+    rm -rf "${prega_pull_secret_dir}"
+    echo "ERROR: Could not find timestamped tags on mirror site" >&2
+    echo "${selected_manifest_digest}-not-found"
+    return 1
+  fi
+
+  echo "Found $(echo "${available_tags}" | wc -l) candidate tags on mirror site" >&2
+
+  # Check each available tag with podman to find the one matching our digest
+  local found_tag=""
+  local checked_count=0
+
+  while IFS= read -r candidate_tag; do
+    # Remove trailing slash if present
+    candidate_tag="${candidate_tag%/}"
+
+    checked_count=$((checked_count + 1))
+    echo "Checking tag ${checked_count}: ${candidate_tag}..." >&2
+
+    local image="${repo}:${candidate_tag}"
+    local digest=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
+
+    if [ -n "${digest}" ] && [ "${digest}" == "${selected_manifest_digest}" ]; then
+      echo "✓ Found matching timestamped tag: ${candidate_tag}" >&2
+      found_tag="${candidate_tag}"
+      break
     fi
+  done <<< "${available_tags}"
 
-    local has_additional=$(echo "${index_list}" | jq -r '.has_additional' 2>/dev/null || echo "false")
-    [ "${has_additional}" == "false" ] && break
-  done
+  # Clean up temporary directory
+  rm -rf "${prega_pull_secret_dir}"
+
+  if [ -n "${found_tag}" ]; then
+    echo "${found_tag}"
+    return 0
+  fi
 
   # If not found, return error indication
-  echo "ERROR: Could not find timestamped tag matching manifest digest" >&2
+  echo "ERROR: Could not find timestamped tag matching manifest digest using podman (checked ${checked_count} tags)" >&2
   echo "${selected_manifest_digest}-not-found"
 }
 
