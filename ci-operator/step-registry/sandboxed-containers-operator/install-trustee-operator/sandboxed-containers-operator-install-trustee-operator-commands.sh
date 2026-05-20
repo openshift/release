@@ -221,6 +221,15 @@ stringData:
       }
     }
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kbsres1
+  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
+type: Opaque
+stringData:
+  key1: cmVzMXZhbDEK
+---
 apiVersion: confidentialcontainers.org/v1alpha1
 kind: KbsConfig
 metadata:
@@ -230,6 +239,7 @@ spec:
   kbsSecretResources:
     - containers-policy
     - cosign-keys
+    - kbsres1
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -728,19 +738,16 @@ function verify_trustee_connectivity() {
   #   3. GET resource → 200 (with token)
   # We suppress normal protocol warnings (stderr) on success
   echo ">>> Testing KBS connectivity at ${TRUSTEE_URL}"
+  echo ">>> Running: oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- kbs-client --url \"${TRUSTEE_URL}\" get-resource --path default/kbsres1/key1"
   if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/cosign-keys/key-0 \
+    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 \
     > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
     # Success - show that we got the resource
-    echo ">>> Successfully retrieved default/cosign-keys/key-0"
-    local resource_size
-    resource_size=$(wc -c < /tmp/kbs-resource.txt 2>/dev/null || echo "0")
-    echo ">>> Resource size: ${resource_size} bytes"
-
-    # Show first line of resource (should be base64 data or BEGIN PUBLIC KEY)
-    head -1 /tmp/kbs-resource.txt 2>/dev/null | head -c 80 || true
-    echo ""
+    echo ">>> Successfully retrieved default/kbsres1/key1"
+    local resource_value
+    resource_value=$(cat /tmp/kbs-resource.txt 2>/dev/null || echo "")
+    echo ">>> Resource value: ${resource_value}"
 
     kbs_test_failed=false
   else
