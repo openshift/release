@@ -22,7 +22,7 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-zcomm-apikey")
+IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 
 # Run the clone
