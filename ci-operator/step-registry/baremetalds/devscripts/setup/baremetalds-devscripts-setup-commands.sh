@@ -180,15 +180,6 @@ if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   done
 fi
 
-if [[ -n "${DEVSCRIPTS_CONFIG_EXTRA:-}" ]]; then
-  readarray -t config_extra <<< "${DEVSCRIPTS_CONFIG_EXTRA}"
-  for var in "${config_extra[@]}"; do
-    if [[ ! -z "${var}" ]]; then
-      echo "export ${var}" >> "${SHARED_DIR}/dev-scripts-additional-config"
-    fi
-  done
-fi
-
 # We always want to collect an installer log bundle for bootstrap,
 # even on success
 cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
