@@ -85,8 +85,14 @@ mkdir -p "${BIN_FOLDER}"
 
 export PATH="${BIN_FOLDER}:${PATH}"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+# login for interop
+if [ -s "${KUBECONFIG}" ]; then
+    oc whoami
+    cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
+    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+else #login for ROSA & Hypershift platforms
+    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+fi
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
