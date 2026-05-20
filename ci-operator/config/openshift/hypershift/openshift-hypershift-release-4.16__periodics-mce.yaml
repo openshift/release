@@ -238,6 +238,16 @@ tests:
     workflow: hypershift-mce-kubevirt-baremetalds-disconnected-conformance
 - as: e2e-ibmz-ovn-conformance
   cron: 2 12 23 8 *
+  reporter_config:
+    channel: '#ibmz-prowci-notifier'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
