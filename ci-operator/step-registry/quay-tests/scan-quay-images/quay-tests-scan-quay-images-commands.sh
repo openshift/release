@@ -5,9 +5,12 @@ set -euo pipefail
 #Retrieve the Quay Security Testing Hostname
 quay_security_testing_hostname="$(cat ${SHARED_DIR}/QUAY_SECURITY_TESTING_HOST_NAME)"
 
-#Retrieve the Credentials of Konflux image registry
+# Disable tracing due to credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 QUAY_KONFLUX_USERNAME=$(cat /var/run/konflux-quay-pull-auth/username)
 QUAY_KONFLUX_PASSWORD=$(cat /var/run/konflux-quay-pull-auth/password)
+$WAS_TRACING && set -x
 
 
 #Retrieve the private key of Quay Security Testing Hostname
