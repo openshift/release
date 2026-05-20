@@ -12,7 +12,7 @@ GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
 TAG_NAME=""
 IMAGE_REPO=""
-IMAGE_REGISTRY=""
+IMAGE_REGISTRY="quay.io"
 QUAY_REPO=""
 export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
@@ -174,7 +174,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "$
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "TAG_NAME: $TAG_NAME"
-    IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    IMAGE_NAME="${IMAGE_REPO:-rhdh-community/rhdh}:${TAG_NAME}"
     echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
@@ -221,11 +221,11 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
     IMAGE_REPO="rhdh-community/rhdh"
-    IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
+    IMAGE_NAME="${IMAGE_REPO}:${TAG_NAME}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
         echo "Waiting for Docker image availability..."
         # Timeout configuration for waiting for Docker image availability
-        MAX_WAIT_TIME_SECONDS=$((80*60))    # Maximum wait time: 1 hour 20 minutes
+        MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
         POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
         ELAPSED_TIME=0
@@ -258,7 +258,6 @@ else
         echo "INFO: Skipping image availability check for non-quay.io registry: ${IMAGE_REGISTRY}"
     fi
 fi
-IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
 QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
 export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
