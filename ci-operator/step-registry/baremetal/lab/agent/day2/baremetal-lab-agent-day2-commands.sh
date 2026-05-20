@@ -113,7 +113,7 @@ case "${BOOT_MODE}" in
   /tmp/oc adm node-image create --dir="${DAY2_INSTALL_DIR}" -a "${day2_pull_secret}" --insecure=true
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}/node.${arch}.iso" "root@${AUX_HOST}:/mnt/data-storage/html/${CLUSTER_NAME}.node.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
@@ -146,7 +146,7 @@ case "${BOOT_MODE}" in
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-initrd* \
    "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${arch}_2.img"
   scp "${SSHOPTS[@]}" "${DAY2_INSTALL_DIR}"/node.*-rootfs* \
-   "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${arch}_2.img"
+   "root@${AUX_HOST}:/mnt/data-storage/html/${CLUSTER_NAME}/rootfs-${arch}_2.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"

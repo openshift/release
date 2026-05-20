@@ -150,9 +150,9 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
   if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
-    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
+    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/mnt/data-storage/html/agent.$gnu_arch-rootfs.img"
   fi
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/mnt/data-storage/html/${CLUSTER_NAME}.${gnu_arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -190,7 +190,7 @@ case "${BOOT_MODE}" in
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
     "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
-    "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
+    "root@${AUX_HOST}:/mnt/data-storage/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"

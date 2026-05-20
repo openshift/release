@@ -53,7 +53,7 @@ scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUS
 
 ### Copy the agent configuration image to the auxiliary host
 echo -e "\nCopying the agent configuration image into the bastion host..."
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${AGENT_CONFIGURATION_IMAGE_NAME}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${AGENT_CONFIGURATION_IMAGE_NAME}" "root@${AUX_HOST}:/mnt/data-storage/html/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
 
 echo -e "\nCopying the agent configuration image to artifact dir..."
 
@@ -61,5 +61,5 @@ cp "${INSTALL_DIR}/${AGENT_CONFIGURATION_IMAGE_NAME}" "${ARTIFACT_DIR}/"
 
 echo -e "### Adjusting file permissions..."
 timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash - <<EOF
-chmod 644 /opt/html/${CLUSTER_NAME}/*.iso
+chmod 644 /mnt/data-storage/html/${CLUSTER_NAME}/*.iso
 EOF
