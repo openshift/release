@@ -82,6 +82,31 @@ mirror_konflux() {
   oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
 }
 
+wait_for_catsrc() {
+  local catsrc_name="$1"
+  echo ">>> Waiting for CatalogSource ${catsrc_name} to be READY..."
+
+  local ready=false
+  for i in {1..24}; do
+    local state=$(oc get catalogsource -n openshift-marketplace "${catsrc_name}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
+    if [[ "${state}" == "READY" ]]; then
+      echo ">>> CatalogSource ${catsrc_name} is READY"
+      ready=true
+      break
+    fi
+
+    if [[ $i -eq 24 ]]; then
+      echo ">>> WARNING: CatalogSource ${catsrc_name} not READY after 120s (state: ${state})"
+      oc get catalogsource -n openshift-marketplace "${catsrc_name}" -o yaml || true
+      return 1
+    fi
+
+    sleep 5
+  done
+
+  return 0
+}
+
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   mirror_konflux
 
@@ -97,6 +122,7 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   fi
 
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+  wait_for_catsrc "${CATALOG_SOURCE_NAME}"
 
   # Save resolved CATALOG_SOURCE_IMAGE for subsequent steps
   echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
