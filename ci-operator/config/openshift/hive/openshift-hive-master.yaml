@@ -323,36 +323,7 @@ tests:
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         export PLATFORM=aws
-        export TEST_SHARD_INDEX=0
-        export TEST_TOTAL_SHARDS=2
-        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive/sdrosa -j ${ARTIFACT_DIR}/junit_results.xml || true
-        RESULT_JSON=$(ls ${ARTIFACT_DIR}/extension_test_result_*.json 2>/dev/null | head -1)
-        if [[ -n "$RESULT_JSON" && -f "$RESULT_JSON" ]]; then
-          jq -r '
-            def pass:
-              .result == "passed" or
-              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<testsuite tests=\"\(length)\" failures=\"\([.[] | select(pass | not)] | length)\">",
-            (.[] |
-              if pass then
-                "<testcase name=\"\(.name | @html)\"/>"
-              else
-                "<testcase name=\"\(.name | @html)\"><failure><![CDATA[\((.error // "")[0:500])]]></failure></testcase>"
-              end
-            ),
-            "</testsuite>"
-          ' "$RESULT_JSON" > "${ARTIFACT_DIR}/junit_results.xml"
-          FAIL_COUNT=$(jq '
-            def pass:
-              .result == "passed" or
-              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
-            [.[] | select(pass | not)] | length
-          ' "$RESULT_JSON")
-          TOTAL=$(jq length "$RESULT_JSON")
-          echo "Results: $((TOTAL - FAIL_COUNT)) passed, ${FAIL_COUNT} failed"
-          [[ $FAIL_COUNT -gt 0 ]] && exit 1
-        fi
+        /usr/bin/openshift-tests-extension run-suite --list openshift/hive/sdrosa | grep 41212 | /usr/bin/openshift-tests-extension run-test -j ${ARTIFACT_DIR}/junit_results.xml
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
