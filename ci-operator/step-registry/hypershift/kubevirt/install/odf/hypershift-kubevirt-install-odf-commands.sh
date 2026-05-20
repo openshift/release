@@ -288,7 +288,7 @@ EOCATALOG
 
   # Update global pull secret to include brew.registry.redhat.io
   echo "Updating global pull secret with brew.registry.redhat.io credentials"
-  oc patch secret pull-secret -n openshift-config --type=json -p='[{"op": "add", "path": "/data/.dockerconfigjson", "value": "fHNoYXJlZC1xZS10ZW1wLnNyYzUuNzViNGQ1OmV5SmhiR2NpT2lKU1V6VXhNaUo5LmV5SnpkV0lpT2lJNU1HRmlOVGMxTlRZME4yWTBOelUyT0RRek56ZG1NR0UwTXpZMFpUTmxaaUo5LlF6YnJsTjQ5TFRIREFKcWFPcEhuVExTRFJfclBLbF9PdjB6VTJWV21OVDRBMUNXZFA3TWR1aDR6azhRbmZUWGtSaXV0UWRIQVJRMUVYMEZpM1pEeDk0aVd2OEpROEc3Ri1Lez1NZmJvMGkzNXNkTjN5M1VxU3pBd0FuQ3h1ZUtxMGVhOUFkVGxUbktvSjk5N0llaFJzTTA5Ui1TX1JQNDJqSFN6b2VpSXEwdlZpeXlMS0lKTVVfUjdaOXB1amRNTlhyS3FNYURZN050NXdXNVVEQkZuZXJfSXN2eUQ1R0tjLXNhc3c5SHQyb0FuRDZYWGo4Y3NUSjc5SmpBam41SjhYMmVBNVN5dXpRelM2Ukp3Njl2YmVwMmlxcjJfeS1XS3l2aWVzQnp5T2c2ZzRobzlxOFlUVUY1SnpOSlU0YkZoVEhOOWdQUGhEOUFmRGpsekpxcko4SHVKeEU3MnpKVk54ZzNiV21ldmJGNzVzdXpzTEtVSURCTkZKQWFwNXloRDFsR3VLUzdnYUtjNnd1ajZVLU80a3ZrQWlaUUdTQ3VMU2hJMUVpNXRBV3E1RGFoWGJVWmdJdWZLUmcxX00wYVpqU1NSUWpNSXBGa19ZTGItR3JsMERFMTlMb29XWDAhV1BwUjhDc3VLTFVFTGVFOGNJbEpjUDNlRzJkMV9tTzYzSGJkbEo5QlNaUXh3dWpGd3hwbndReEE3TG1oVXZCdDJOU3V3LVlIVDdkeFN3X3V6YlByX0ZwWmhaQnEzY01XZHhxV0VlOWFtT0xUbnJzbjE4Zms3RWpJd0RWc3hEc1pMRlp6NjhzSlUyRFNFdmdTWEhRcjBWR3lSeHRWcTY2RkJGbEhYaXpjVHY1MXZ2Wk84T0Z5dmxfbXkzamZPUjJOTGdWb09MX3JNRWhyc3JF"}]' || true
+  oc patch secret pull-secret -n openshift-config --type=json -p="[{\"op\": \"add\", \"path\": \"/data/.dockerconfigjson\", \"value\": \"$(cat /etc/hypershift-agent-ibmz-credentials/odf-nightly-pull-secret)\"}]" || true
 
   ODF_CATALOG_SOURCE="redhat-operators-odf"
   
