@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 releases:
@@ -46,6 +50,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: govulncheck
+  commands: GOTOOLCHAIN=auto GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck
+    ./...
+  container:
+    from: govulncheck
+  cron: 0 6 * * 1,4
+  reporter_config:
+    channel: '#tmp-network-edge-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':warning: *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
 zz_generated_metadata:
   branch: master
   org: openshift
