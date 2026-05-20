@@ -2,8 +2,8 @@
 
 # set -e causes the script to fail immediately if any command returns a non-zero exit code
 # set -x prints commands for debugging in Prow logs
-set -e
-set -x
+# Fail fast on command errors, unset vars, and pipeline failures
+set -euo pipefail
 
 echo "$(date) [INFO] Starting s390x connectivity test in Prow..."
 
