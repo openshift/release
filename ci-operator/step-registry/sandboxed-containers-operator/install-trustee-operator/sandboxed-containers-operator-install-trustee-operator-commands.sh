@@ -12,9 +12,18 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
 fi
 
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
+TRUSTEE_CATALOG_SOURCE_NAME=${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}
+TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
+
+# Legacy variables for backward compatibility (used when TRUSTEE_CATALOG_SOURCE_IMAGE is set)
 TRUSTEE_IMAGE_REPO=${TRUSTEE_IMAGE_REPO:-quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc}
 TRUSTEE_IMAGE_TAG=${TRUSTEE_IMAGE_TAG:-1.1.0-1776506656}
-echo ">>> Trustee operator image: ${TRUSTEE_IMAGE_REPO}:${TRUSTEE_IMAGE_TAG}"
+
+if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
+  echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
+else
+  echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (using existing catalog)"
+fi
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
@@ -69,6 +78,34 @@ function get_cluster_domain() {
   echo "${cluster_domain}"
 }
 
+function get_trustee_catalog_source_manifest() {
+  # Only output CatalogSource manifest if TRUSTEE_CATALOG_SOURCE_IMAGE is set
+  # and the catalog source doesn't already exist
+  if [[ -z "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
+    return 0
+  fi
+
+  if oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" &>/dev/null; then
+    echo ">>> CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} already exists, skipping creation"
+    return 0
+  fi
+
+  cat << 'CATALOG_EOF'
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER
+  namespace: openshift-marketplace
+spec:
+  displayName: Trustee Operator Catalog
+  sourceType: grpc
+  image: "TRUSTEE_CATALOG_SOURCE_IMAGE_PLACEHOLDER"
+  publisher: Confidential Containers Team
+---
+CATALOG_EOF
+}
+
 function get_trustee_operator_manifests() {
   cat << 'MANIFEST_EOF'
 ---
@@ -76,17 +113,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: TRUSTEE_NAMESPACE_PLACEHOLDER
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: trustee-operator-dev-catalog
-  namespace: openshift-marketplace
-spec:
-  displayName: Trustee Operator Dev Catalog
-  sourceType: grpc
-  image: "TRUSTEE_IMAGE_PLACEHOLDER"
-  publisher: Confidential Containers Team
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -156,7 +182,7 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: trustee-operator
-  source: trustee-operator-dev-catalog
+  source: TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER
   sourceNamespace: openshift-marketplace
 MANIFEST_EOF
 }
@@ -268,9 +294,16 @@ MANIFEST_EOF
 }
 
 function install_trustee_operator() {
+  # Apply CatalogSource if needed (only if TRUSTEE_CATALOG_SOURCE_IMAGE is set and catalog doesn't exist)
+  get_trustee_catalog_source_manifest | \
+    sed "s@TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_NAME}@g" | \
+    sed "s@TRUSTEE_CATALOG_SOURCE_IMAGE_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_IMAGE}@g" | \
+    oc apply -f - || true
+
+  # Apply operator manifests (Namespace, mirrors, OperatorGroup, Subscription)
   get_trustee_operator_manifests | \
     sed "s@TRUSTEE_NAMESPACE_PLACEHOLDER@${TRUSTEE_NAMESPACE}@g" | \
-    sed "s@TRUSTEE_IMAGE_PLACEHOLDER@${TRUSTEE_IMAGE_REPO}:${TRUSTEE_IMAGE_TAG}@g" | \
+    sed "s@TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_NAME}@g" | \
     oc apply -f -
 }
 
@@ -283,24 +316,29 @@ function wait_for_operator() {
   # 5. Deployment Available
 
   # Stage 1: Wait for CatalogSource to be READY (60s)
-  echo ">>> Waiting for CatalogSource to be READY..."
-  local catalog_ready=false
-  for i in {1..12}; do
-    local state=$(oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
-    if [[ "${state}" == "READY" ]]; then
-      echo ">>> CatalogSource is READY"
-      catalog_ready=true
-      break
-    fi
-    [[ ${i} -lt 12 ]] && sleep 5
-  done
+  # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
+  if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
+    echo ">>> Waiting for CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} to be READY..."
+    local catalog_ready=false
+    for i in {1..12}; do
+      local state=$(oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
+      if [[ "${state}" == "READY" ]]; then
+        echo ">>> CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} is READY"
+        catalog_ready=true
+        break
+      fi
+      [[ ${i} -lt 12 ]] && sleep 5
+    done
 
-  if [[ "${catalog_ready}" != "true" ]]; then
-    echo ">>> ERROR: CatalogSource not READY after 60s"
-    oc get catalogsource -n openshift-marketplace trustee-operator-dev-catalog -o yaml || true
-    oc get pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog || true
-    oc describe pods -n openshift-marketplace -l olm.catalogSource=trustee-operator-dev-catalog | tail -50 || true
-    return 1
+    if [[ "${catalog_ready}" != "true" ]]; then
+      echo ">>> ERROR: CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} not READY after 60s"
+      oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o yaml || true
+      oc get pods -n openshift-marketplace -l olm.catalogSource="${TRUSTEE_CATALOG_SOURCE_NAME}" || true
+      oc describe pods -n openshift-marketplace -l olm.catalogSource="${TRUSTEE_CATALOG_SOURCE_NAME}" | tail -50 || true
+      return 1
+    fi
+  else
+    echo ">>> Using existing CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME}, skipping readiness check"
   fi
 
   # Stage 2: Wait for Subscription to reference an InstallPlan (60s)
