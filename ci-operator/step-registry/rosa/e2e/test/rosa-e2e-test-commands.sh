@@ -14,7 +14,7 @@ log(){
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+  export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
 else
   log "No AWS credentials found in cluster profile"
 fi
@@ -43,7 +43,7 @@ OCM_TOKEN=$(ocm token)
 export OCM_TOKEN
 export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
-export AWS_REGION="${LEASED_RESOURCE}"
+export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
 
 # Try to get management cluster access via OCM API
 log "Attempting management cluster access..."
