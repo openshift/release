@@ -25,12 +25,24 @@ fi
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION="${REGION}"
 
-set +e
+ret=0
 
 echo "Deregistering Secure Boot AMI: ${AMI_ID}"
-aws ec2 deregister-image --image-id "${AMI_ID}"
+if ! aws ec2 deregister-image --image-id "${AMI_ID}"; then
+  echo "ERROR: Failed to deregister AMI ${AMI_ID}"
+  ret=1
+fi
 
 echo "Deleting copied snapshot: ${SNAPSHOT_ID}"
-aws ec2 delete-snapshot --snapshot-id "${SNAPSHOT_ID}"
+if ! aws ec2 delete-snapshot --snapshot-id "${SNAPSHOT_ID}"; then
+  echo "ERROR: Failed to delete snapshot ${SNAPSHOT_ID}"
+  ret=1
+fi
 
-echo "Secure Boot resource cleanup complete"
+if [[ "${ret}" -eq 0 ]]; then
+  echo "Secure Boot resource cleanup complete"
+else
+  echo "ERROR: Secure Boot resource cleanup finished with errors, resources may have leaked"
+fi
+
+exit ${ret}

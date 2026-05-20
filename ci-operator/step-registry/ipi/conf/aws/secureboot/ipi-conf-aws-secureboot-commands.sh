@@ -17,6 +17,26 @@ REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION="${REGION}"
 
+RESOURCES_FILE="${SHARED_DIR}/secureboot-resources.txt"
+echo "REGION=${REGION}" > "${RESOURCES_FILE}"
+
+cleanup_on_error() {
+  echo "ERROR: Secure Boot setup failed, cleaning up resources..."
+  if [[ -f "${RESOURCES_FILE}" ]]; then
+    source "${RESOURCES_FILE}"
+    if [[ -n "${AMI_ID:-}" ]]; then
+      echo "Deregistering AMI: ${AMI_ID}"
+      aws ec2 deregister-image --image-id "${AMI_ID}" 2>/dev/null || true
+    fi
+    if [[ -n "${SNAPSHOT_ID:-}" ]]; then
+      echo "Deleting snapshot: ${SNAPSHOT_ID}"
+      aws ec2 delete-snapshot --snapshot-id "${SNAPSHOT_ID}" 2>/dev/null || true
+    fi
+    rm -f "${RESOURCES_FILE}"
+  fi
+}
+trap cleanup_on_error ERR
+
 # Extract openshift-install from the release to get the correct RHCOS AMI
 REGISTRY_AUTH_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
 export REGISTRY_AUTH_FILE
@@ -43,6 +63,7 @@ NEW_SNAPSHOT_ID=$(aws ec2 copy-snapshot \
   --description "RHCOS snapshot copy for Secure Boot CI" \
   --query 'SnapshotId' --output text)
 echo "New snapshot: ${NEW_SNAPSHOT_ID}"
+echo "SNAPSHOT_ID=${NEW_SNAPSHOT_ID}" >> "${RESOURCES_FILE}"
 
 echo "Waiting for snapshot copy to complete..."
 aws ec2 wait snapshot-completed --snapshot-ids "${NEW_SNAPSHOT_ID}"
@@ -79,6 +100,7 @@ SB_AMI_ID=$(aws ec2 register-image \
   --query 'ImageId' --output text)
 $WAS_TRACING && set -x
 echo "Registered AMI: ${SB_AMI_ID}"
+echo "AMI_ID=${SB_AMI_ID}" >> "${RESOURCES_FILE}"
 
 rm -f "${SB_BLOB}"
 rm -rf "${EXTRACT_DIR}"
@@ -86,12 +108,6 @@ rm -rf "${EXTRACT_DIR}"
 echo "Waiting for AMI to become available..."
 aws ec2 wait image-available --image-ids "${SB_AMI_ID}"
 echo "AMI is available"
-
-cat > "${SHARED_DIR}/secureboot-resources.txt" <<EOF
-AMI_ID=${SB_AMI_ID}
-SNAPSHOT_ID=${NEW_SNAPSHOT_ID}
-REGION=${REGION}
-EOF
 
 export SB_AMI_ID
 yq-v4 eval -i '.compute[].platform.aws.amiID = env(SB_AMI_ID)' "${CONFIG}"
