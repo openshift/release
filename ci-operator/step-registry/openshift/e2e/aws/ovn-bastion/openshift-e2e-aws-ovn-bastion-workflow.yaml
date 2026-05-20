@@ -1,0 +1,25 @@
+workflow:
+  as: openshift-e2e-aws-ovn-bastion
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - chain: aws-provision-bastionhost
+    test:
+    - ref: aws-validate-bastionhost
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: gather
+    - ref: aws-deprovision-stacks
+    - ref: aws-deprovision-s3buckets
+    - ref: ipi-deprovision-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    The Openshift E2E OVN workflow with bastion host validation.
+    Provisions a bastion host, validates SSH access, then executes the common end-to-end test suite with the OVNKubernetes network plugin.

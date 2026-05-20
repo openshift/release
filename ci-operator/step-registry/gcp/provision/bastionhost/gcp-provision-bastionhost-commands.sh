@@ -42,33 +42,6 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
 fi
 
-if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
-  echo "Reading variables from ${SHARED_DIR}/xpn.json..."
-  NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
-  CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
-fi
-
-if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
-  NETWORK=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.network')
-  CONTROL_PLANE_SUBNET=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.controlPlaneSubnet')
-fi
-
-if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  echo "Could not find VPC network and control-plane subnet" && exit 1
-fi
-
-#####################################
-##############Initialize#############
-#####################################
-workdir=`mktemp -d`
-
-# Generally we do not update boot image for bastion host very often, we just use it as a jump
-# host, mirror registry, and proxy server, these services do not have frequent update.
-# So hard-code them here.
-IMAGE_NAME="fedora-coreos-41-20241122-3-0-gcp-x86-64"
-IMAGE_PROJECT="fedora-coreos-cloud"
-echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
-
 #####################################
 ###############Log In################
 #####################################
@@ -86,9 +59,9 @@ if [[ "${OSD_QE_PROJECT_AS_SERVICE_PROJECT}" == "yes" ]]; then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 else
-  GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+  GOOGLE_PROJECT_ID="$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")"
   export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
-  sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
+  sa_email=$(jq -r .client_email "${GCP_SHARED_CREDENTIALS_FILE}")
   if ! gcloud auth list | grep -E "\*\s+${sa_email}"
   then
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
@@ -99,7 +72,62 @@ fi
 REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 
-ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
+# Try to find network and subnet from BYO-VPC files first, then fall back to metadata.json
+if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
+  echo "Reading variables from ${SHARED_DIR}/xpn.json..."
+  NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
+  CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
+fi
+
+if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+  NETWORK=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.network')
+  CONTROL_PLANE_SUBNET=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.controlPlaneSubnet')
+fi
+
+# If BYO-VPC files not found, try metadata.json (standard IPI case)
+if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
+  if [[ ! -f "${SHARED_DIR}/metadata.json" ]]; then
+    echo "Could not find VPC network and control-plane subnet - no BYO-VPC files and no metadata.json found" && exit 1
+  fi
+
+  echo "Reading infra ID from metadata.json for standard IPI install..."
+  infra_id=$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")
+
+  # Derive network and subnet names from infraID (standard IPI pattern)
+  network_name="${infra_id}-network"
+  master_subnet_name="${infra_id}-master-subnet"
+
+  echo "Looking for network: ${network_name} and subnet: ${master_subnet_name}"
+
+  # Query GCP to verify the network exists and get its self-link
+  NETWORK=$(gcloud compute networks list --filter="name=${network_name}" --format="value(selfLink)" --limit=1)
+  if [[ -z "${NETWORK}" ]]; then
+    echo "ERROR: Could not find network ${network_name}" && exit 1
+  fi
+
+  # Query GCP to get the master subnet name in the region
+  CONTROL_PLANE_SUBNET=$(gcloud compute networks subnets list --filter="name=${master_subnet_name} AND region:${REGION}" --format="value(name)" --limit=1)
+  if [[ -z "${CONTROL_PLANE_SUBNET}" ]]; then
+    echo "ERROR: Could not find subnet ${master_subnet_name} in region ${REGION}" && exit 1
+  fi
+
+  echo "Found network: ${NETWORK}"
+  echo "Found control plane subnet: ${CONTROL_PLANE_SUBNET}"
+fi
+
+#####################################
+##############Initialize#############
+#####################################
+workdir=$(mktemp -d)
+
+# Generally we do not update boot image for bastion host very often, we just use it as a jump
+# host, mirror registry, and proxy server, these services do not have frequent update.
+# So hard-code them here.
+IMAGE_NAME="fedora-coreos-41-20241122-3-0-gcp-x86-64"
+IMAGE_PROJECT="fedora-coreos-cloud"
+echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
+
+ZONE_0=$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)
 MACHINE_TYPE="n2-standard-2"
 
 #####################################
@@ -136,8 +164,9 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
 else
   project_option=""
 fi
+# shellcheck disable=SC2086
 gcloud ${project_option} compute firewall-rules create "${bastion_name}-ingress-allow" \
-  --network ${NETWORK} \
+  --network "${NETWORK}" \
   --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:873 \
   --target-tags="${bastion_name}"
 
@@ -151,15 +180,15 @@ echo "${bastion_name}" >> "${SHARED_DIR}/gcp-instance-ids.txt"
 
 gcloud compute instances list --filter="name=${bastion_name}" \
   --zones "${ZONE_0}" --format json > "${workdir}/${bastion_name}.json"
-bastion_private_ip="$(jq -r '.[].networkInterfaces[0].networkIP' ${workdir}/${bastion_name}.json)"
-bastion_public_ip="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' ${workdir}/${bastion_name}.json)"
+bastion_private_ip="$(jq -r '.[].networkInterfaces[0].networkIP' "${workdir}/${bastion_name}.json")"
+bastion_public_ip="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' "${workdir}/${bastion_name}.json")"
 
-if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
+if [ "${bastion_public_ip}" == "" ] || [ "${bastion_private_ip}" == "" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
 fi
-echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
-echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
+echo "${bastion_public_ip}" > "${SHARED_DIR}/bastion_public_address"
+echo "${bastion_private_ip}" > "${SHARED_DIR}/bastion_private_address"
 echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 src_proxy_creds_file="/var/run/vault/proxy/proxy_creds"
@@ -176,7 +205,7 @@ echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
 ####Register mirror registry DNS#####
 #####################################
 if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
-  BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+  BASE_DOMAIN="$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")"
   BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 
   echo "Configuring public DNS for the mirror registry..."
