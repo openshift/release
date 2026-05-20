@@ -1,0 +1,32 @@
+workflow:
+  as: osac-project-cluster-tool-caas
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: baremetalds-devscripts-ibm
+      - ref: osac-project-cluster-tool-boot
+      - ref: osac-project-cluster-tool-caas-agents
+    test:
+      - ref: osac-project-cluster-tool-test
+    post:
+      - ref: osac-project-notify
+      - ref: osac-project-gather
+      - ref: osac-project-cluster-tool-destroy
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+      NOTIFY_LABEL: "E2E caas"
+      CLUSTER_TOOL_FLAVOR_IMAGE: "quay.io/rh-ee-ovishlit/cluster-flavors:caas-kustomize"
+      CLUSTER_TOOL_FLAVOR_NAME: "caas-kustomize"
+      E2E_KUSTOMIZE_OVERLAY: "caas-ci"
+      E2E_VM_TEMPLATE: ""
+      E2E_CLUSTER_TEMPLATE: "osac.templates.ocp_ci_small"
+      E2E_TEST_DIR: "tests/caas"
+  documentation: |-
+    Boots an OSAC cluster from a pre-built CaaS snapshot via cluster-tool,
+    runs the refresh script to fix domain-sensitive resources, sets up
+    agent infrastructure for HyperShift, then runs CaaS e2e tests.

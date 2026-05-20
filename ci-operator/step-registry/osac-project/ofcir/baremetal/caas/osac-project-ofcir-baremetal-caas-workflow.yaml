@@ -1,0 +1,27 @@
+workflow:
+  as: osac-project-ofcir-baremetal-caas
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - chain: assisted-common-pre
+      - ref: osac-project-installer
+      - ref: osac-project-cluster-tool-caas-agents
+    test:
+      - ref: osac-project-baremetal-test
+    post:
+      - ref: osac-project-notify
+      - ref: osac-project-gather
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_large_el9"
+      E2E_KUSTOMIZE_OVERLAY: "caas-ci"
+      CAAS_LIBVIRT_NETWORK: "default"
+      NOTIFY_LABEL: "Full Setup caas (kustomize)"
+  documentation: |-
+    Full OCP installation via assisted-installer, deploys OSAC with CaaS
+    configuration, sets up agent infrastructure, then runs CaaS e2e tests.

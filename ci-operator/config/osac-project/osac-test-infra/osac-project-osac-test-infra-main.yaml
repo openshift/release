@@ -67,12 +67,23 @@ tests:
   - intranet
   steps:
     workflow: osac-project-cluster-tool-vmaas
+- as: e2e-caas
+  capabilities:
+  - intranet
+  steps:
+    workflow: osac-project-cluster-tool-caas
 - as: e2e-vmaas-periodic
   capabilities:
   - intranet
   cron: 0 6,18 * * *
   steps:
     workflow: osac-project-cluster-tool-vmaas
+- as: e2e-caas-periodic
+  capabilities:
+  - intranet
+  cron: 0 6,18 * * *
+  steps:
+    workflow: osac-project-cluster-tool-caas
 - as: e2e-vmaas-full-setup-kustomize
   capabilities:
   - intranet
@@ -81,7 +92,7 @@ tests:
     cluster_profile: packet-osac
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
+        OLM_OPERATORS=lvm,mce,metallb
         NUM_MASTERS=1
         NUM_WORKERS=0
         MASTER_MEMORY=57344
@@ -90,6 +101,24 @@ tests:
         MASTER_CPU=24
         OPENSHIFT_VERSION=4.20
     workflow: osac-project-ofcir-baremetal
+- as: e2e-caas-full-setup-kustomize
+  capabilities:
+  - intranet
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: packet-osac
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=lvm,mce,metallb
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      TEST_SUITE: caas
+    workflow: osac-project-ofcir-baremetal-caas
 - as: e2e-vmaas-full-setup-helm
   capabilities:
   - intranet
@@ -98,7 +127,7 @@ tests:
     cluster_profile: packet-osac
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
+        OLM_OPERATORS=lvm,mce,metallb
         NUM_MASTERS=1
         NUM_WORKERS=0
         MASTER_MEMORY=57344
@@ -109,6 +138,27 @@ tests:
       DEPLOY_MODE: helm
       NOTIFY_LABEL: Full Setup vmaas (helm)
     workflow: osac-project-ofcir-baremetal
+- as: e2e-caas-full-setup-helm
+  capabilities:
+  - intranet
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: packet-osac
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=lvm,mce,metallb
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      DEPLOY_MODE: helm
+      VALUES_FILE: values/caas-ci.yaml
+      TEST_SUITE: caas
+      NOTIFY_LABEL: Full Setup caas (helm)
+    workflow: osac-project-ofcir-baremetal-caas
 zz_generated_metadata:
   branch: main
   org: osac-project

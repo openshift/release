@@ -1,0 +1,30 @@
+ref:
+  as: osac-project-cluster-tool-caas-agents
+  from: dev-scripts
+  dependencies:
+  - name: osac-installer
+    env: OSAC_INSTALLER_IMAGE
+  grace_period: 5m
+  timeout: 25m0s
+  commands: osac-project-cluster-tool-caas-agents-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  env:
+  - name: E2E_NAMESPACE
+    default: "osac-e2e-ci"
+    documentation: Namespace where OSAC is deployed
+  - name: CLUSTER_TOOL_FLAVOR_NAME
+    default: "caas-kustomize"
+    documentation: Name of the cluster-tool clone instance
+  - name: CAAS_LIBVIRT_NETWORK
+    default: ""
+    documentation: Libvirt network name for the agent VM. If empty, discovered from CLUSTER_TOOL_FLAVOR_NAME.
+  - name: CAAS_KUBECONFIG_PATH
+    default: ""
+    documentation: Path to kubeconfig on the remote host. If empty, derived from CLUSTER_TOOL_FLAVOR_NAME.
+  documentation: |-
+    Sets up CaaS agent infrastructure on the bare metal host.
+    Creates an InfraEnv, boots an agent VM via libvirt, and waits
+    for the agent to register and be approved.
