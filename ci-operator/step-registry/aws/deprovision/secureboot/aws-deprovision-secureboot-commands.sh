@@ -13,6 +13,15 @@ fi
 
 source "${RESOURCES_FILE}"
 
+missing=()
+[[ -z "${AMI_ID:-}" ]] && missing+=(AMI_ID)
+[[ -z "${SNAPSHOT_ID:-}" ]] && missing+=(SNAPSHOT_ID)
+[[ -z "${REGION:-}" ]] && missing+=(REGION)
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "ERROR: ${RESOURCES_FILE} is missing required variable(s): ${missing[*]}"
+  exit 1
+fi
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION="${REGION}"
 

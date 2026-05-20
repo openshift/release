@@ -94,7 +94,7 @@ REGION=${REGION}
 EOF
 
 export SB_AMI_ID
-yq-v4 eval -i '.compute[0].platform.aws.amiID = env(SB_AMI_ID)' "${CONFIG}"
+yq-v4 eval -i '.compute[].platform.aws.amiID = env(SB_AMI_ID)' "${CONFIG}"
 
 echo "install-config compute section:"
 yq-v4 '.compute' "${CONFIG}"
