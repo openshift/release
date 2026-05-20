@@ -40,10 +40,10 @@ cleanup_on_error() {
 trap cleanup_on_error ERR
 
 # Extract openshift-install from the release to get the correct RHCOS AMI
-REGISTRY_AUTH_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
-export REGISTRY_AUTH_FILE
 EXTRACT_DIR=$(mktemp -d)
-oc adm release extract --command=openshift-install "${RELEASE_IMAGE_LATEST}" --to="${EXTRACT_DIR}"
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${EXTRACT_DIR}/pull-secret"
+oc registry login --to "${EXTRACT_DIR}/pull-secret"
+oc adm release extract --registry-config "${EXTRACT_DIR}/pull-secret" --command=openshift-install "${RELEASE_IMAGE_LATEST}" --to="${EXTRACT_DIR}"
 
 RHCOS_AMI=$("${EXTRACT_DIR}/openshift-install" coreos print-stream-json \
   | jq -r --arg region "${REGION}" '.architectures.x86_64.images.aws.regions[$region].image')
