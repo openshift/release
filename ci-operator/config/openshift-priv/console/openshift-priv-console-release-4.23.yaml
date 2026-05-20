@@ -17,6 +17,29 @@ images:
   - dockerfile_path: Dockerfile.plugins.demo
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     to: console-plugin-demo
+  - dockerfile_literal: |
+      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      USER root
+      RUN dnf install -y \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      COPY . /go/src/github.com/openshift/console/
+      WORKDIR /go/src/github.com/openshift/console
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN cd frontend && node .yarn/releases/yarn-4.14.1.cjs install --immutable && \
+          npx playwright install chromium
+      RUN printf '%s\n' '#!/bin/sh' 'exec node /go/src/github.com/openshift/console/frontend/.yarn/releases/yarn-4.14.1.cjs "$@"' > /usr/local/bin/yarn && \
+          chmod +x /usr/local/bin/yarn
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/console/.
+    to: console-playwright-runner
 promotion:
   to:
   - additional_images:
@@ -48,6 +71,10 @@ resources:
     requests:
       cpu: "2"
       memory: 10Gi
+  console-playwright-runner:
+    requests:
+      cpu: "1"
+      memory: 12Gi
   frontend:
     requests:
       cpu: "2"
@@ -104,6 +131,24 @@ tests:
           cpu: "4"
           memory: 10Gi
       timeout: 6h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-playwright
+  optional: true
+  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        ./test-prow-playwright-e2e.sh
+      from: console-playwright-runner
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 2h0m0s
     workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.23

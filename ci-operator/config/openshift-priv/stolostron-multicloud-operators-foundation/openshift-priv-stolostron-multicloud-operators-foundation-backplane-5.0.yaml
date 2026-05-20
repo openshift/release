@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.24-linux:
+  stolostron_builder_go1.25-linux:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.25-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -98,14 +98,15 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
-        OCM_VERSION=main
-        REGISTRATION_OPERATOR_BRANCH=$OCM_VERSION
-        IMAGE_NAME=quay.io/stolostron/registration-operator:$OCM_VERSION
-        REGISTRATION_IMAGE=quay.io/stolostron/registration:$OCM_VERSION
-        WORK_IMAGE=quay.io/stolostron/work:$OCM_VERSION
-        PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
-        export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
-        export KUBECTL
+        OCM_BRANCH=backplane-5.0
+        REGISTRATION_OPERATOR_BRANCH=$OCM_BRANCH
+        OPERATOR_IMAGE_NAME=quay.io/stolostron/registration-operator:$OCM_BRANCH
+        REGISTRATION_IMAGE=quay.io/stolostron/registration:$OCM_BRANCH
+        WORK_IMAGE=quay.io/stolostron/work:$OCM_BRANCH
+        PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_BRANCH
+        ADDON_MANAGER_IMAGE=quay.io/stolostron/addon-manager:${OCM_BRANCH}
+        export KUBECTL REGISTRATION_OPERATOR_BRANCH OCM_BRANCH
+        export OPERATOR_IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE ADDON_MANAGER_IMAGE
         set -o pipefail
         make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
@@ -117,16 +118,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
-- as: pr-image-mirror
-  capabilities:
-  - arm64
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: multicloud-manager
-    env:
-      IMAGE_REPO: multicloud-manager
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: backplane-5.0
   org: openshift-priv
