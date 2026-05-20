@@ -604,6 +604,36 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: openstack-networking-generic-switch
+  cron: 40 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-networking-generic-switch
+      commands: |
+        rebasebot --source https://github.com/openstack/networking-generic-switch:master \
+                  --dest openshift/openstack-networking-generic-switch:main \
+                  --rebase openshift-metal3/openstack-networking-generic-switch:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: kubernetes-autoscaler
   cron: 20 13 * * Mon,Thu
   steps:
