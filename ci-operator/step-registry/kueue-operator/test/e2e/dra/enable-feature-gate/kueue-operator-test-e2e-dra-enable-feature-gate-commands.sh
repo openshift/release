@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 echo "========================================="
-echo "Enabling DRAExtendedResource feature gate"
+echo "Enabling DRAExtendedResource feature gate TBD: Partitionable Devices"
 echo "========================================="
 echo ""
 
