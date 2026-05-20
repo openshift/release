@@ -227,7 +227,7 @@ metadata:
   name: kbsres1
   namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
 type: Opaque
-stringData:
+data:
   key1: cmVzMXZhbDEK
 ---
 apiVersion: confidentialcontainers.org/v1alpha1
