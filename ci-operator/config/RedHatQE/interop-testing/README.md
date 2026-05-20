@@ -84,4 +84,4 @@ For detailed documentation on individual steps and configuration options, see th
 
 - OCP 4.20: `RedHatQE-interop-testing-master__gs-baremetal--ocp4.20--lp-hw.yaml`
     - `deploy-cluster`: ABI install on Goldman Sachs bare-metal (`abi-workflows-bm--bmc--cluster-health`); Gangway / manual trigger
-    - `net--localnet`: periodic
+    - `net--localnet` — full ABI workflow plus CNV localnet on Goldman Sachs bare metal; periodic.
