@@ -82,6 +82,6 @@ For detailed documentation on individual steps and configuration options, see th
 
 ### GS Bare-Metal Configurations
 
-- **OCP 4.20**: `RedHatQE-interop-testing-master__gs-baremetal--ocp4.20--lp-hw.yaml`
-    - **`deploy-cluster`**: ABI install on Goldman Sachs bare-metal (`abi-workflows-bm--bmc--cluster-health`); Gangway / manual trigger
-    - **`net--localnet`**: ABI install plus OpenShift Virtualization localnet tests (`gs-baremetal-localnet-test`); weekly Monday 06:00 UTC
+- OCP 4.20: `RedHatQE-interop-testing-master__gs-baremetal--ocp4.20--lp-hw.yaml`
+    - `deploy-cluster`: ABI install on Goldman Sachs bare-metal (`abi-workflows-bm--bmc--cluster-health`); Gangway / manual trigger
+    - `net--localnet`: periodic
