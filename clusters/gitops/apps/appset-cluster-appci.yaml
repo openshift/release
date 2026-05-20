@@ -9,18 +9,20 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-  - list:
-      elements:
-      - app_name: app-cluster-app.ci
-        cluster_name: app.ci
-        source_path: clusters/app.ci/
+  - git:
+      directories:
+      - path: clusters/app.ci/*
+      repoURL: https://github.com/openshift/release.git
+      revision: main
   template:
     metadata:
-      name: '{{.app_name}}'
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '{{.path.path}}'
+      name: 'app-cluster-app.ci-{{.path.basename}}'
       namespace: openshift-gitops
     spec:
       destination:
-        name: '{{.cluster_name}}'
+        name: app.ci
         namespace: openshift-gitops
       project: app-ci
       source:
@@ -28,7 +30,7 @@ spec:
           exclude: '{OWNERS,*.md}'
           include: '{*.yaml,*.yml}'
           recurse: true
-        path: '{{.source_path}}'
+        path: '{{.path.path}}'
         repoURL: https://github.com/openshift/release.git
         targetRevision: main
       syncPolicy:
