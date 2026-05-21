@@ -24,6 +24,55 @@ aws_validation() {
   export AWS_REGION
 }
 
+# Deletes all object versions and delete markers (paginated), removes remaining
+# objects, then removes the bucket. Returns the exit code of aws s3 rb.
+purge_and_delete_bucket() {
+  local bucket="${1}"
+  local key_marker="" version_marker=""
+  local page next_key
+  local rb_rc=0
+
+  echo "[INFO] **** Removing all object versions and delete markers from S3 bucket: ${bucket}..."
+  while true; do
+    if [[ -n "${key_marker}" ]]; then
+      page=$(aws s3api list-object-versions \
+        --bucket "${bucket}" \
+        --key-marker "${key_marker}" \
+        --version-id-marker "${version_marker}" \
+        --output json 2>/dev/null || echo '{}')
+    else
+      page=$(aws s3api list-object-versions \
+        --bucket "${bucket}" \
+        --output json 2>/dev/null || echo '{}')
+    fi
+
+    echo "${page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
+    while IFS= read -r row; do
+      local key version_id
+      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
+      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+      aws s3api delete-object \
+        --bucket "${bucket}" \
+        --key "${key}" \
+        --version-id "${version_id}" >/dev/null 2>&1 || true
+    done
+
+    next_key=$(echo "${page}" | jq -r '.NextKeyMarker // empty')
+    if [[ -z "${next_key}" ]]; then
+      break
+    fi
+    key_marker="${next_key}"
+    version_marker=$(echo "${page}" | jq -r '.NextVersionIdMarker // empty')
+  done
+
+  echo "[INFO] **** Removing any remaining objects from S3 bucket: ${bucket}..."
+  aws s3 rm "s3://${bucket}" --recursive 2>/dev/null || true
+
+  echo "[INFO] **** Removing S3 bucket: ${bucket}..."
+  aws s3 rb "s3://${bucket}" 2>/dev/null || rb_rc=$?
+  return "${rb_rc}"
+}
+
 echo "[INFO] AUTH Loading AWS credentials from vault..."
 aws_validation
 echo "[SUCCESS] !!!! AWS credentials loaded successfully"
@@ -54,46 +103,7 @@ if mapt aws openshift-snc destroy \
   --backed-url "s3://${DYNAMIC_BUCKET_NAME}"; then
   echo "[SUCCESS] !!!! Successfully destroyed OSSM Istio MAPT SNC: ${CORRELATE_MAPT}"
 
-  echo "[INFO] **** Removing all object versions and delete markers from S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
-  KEY_MARKER=""
-  VERSION_MARKER=""
-  while true; do
-    if [[ -n "${KEY_MARKER}" ]]; then
-      page=$(aws s3api list-object-versions \
-        --bucket "${DYNAMIC_BUCKET_NAME}" \
-        --key-marker "${KEY_MARKER}" \
-        --version-id-marker "${VERSION_MARKER}" \
-        --output json 2>/dev/null || echo '{}')
-    else
-      page=$(aws s3api list-object-versions \
-        --bucket "${DYNAMIC_BUCKET_NAME}" \
-        --output json 2>/dev/null || echo '{}')
-    fi
-
-    echo "${page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
-    while IFS= read -r row; do
-      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
-      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
-      aws s3api delete-object \
-        --bucket "${DYNAMIC_BUCKET_NAME}" \
-        --key "${key}" \
-        --version-id "${version_id}" >/dev/null 2>&1 || true
-    done
-
-    next_key=$(echo "${page}" | jq -r '.NextKeyMarker // empty')
-    if [[ -z "${next_key}" ]]; then
-      break
-    fi
-    KEY_MARKER="${next_key}"
-    VERSION_MARKER=$(echo "${page}" | jq -r '.NextVersionIdMarker // empty')
-  done
-  echo "[SUCCESS] !!!! All object versions and delete markers removed"
-
-  echo "[INFO] **** Removing any remaining objects from S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
-  aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
-
-  echo "[INFO] **** Removing S3 bucket: ${DYNAMIC_BUCKET_NAME}"
-  if aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}"; then
+  if purge_and_delete_bucket "${DYNAMIC_BUCKET_NAME}"; then
     echo "[SUCCESS] !!!! Successfully deleted S3 bucket: ${DYNAMIC_BUCKET_NAME}"
   else
     echo "[WARN] WARN Failed to delete S3 bucket: ${DYNAMIC_BUCKET_NAME}"
@@ -105,7 +115,11 @@ if mapt aws openshift-snc destroy \
   echo "[SUCCESS] !!!! OSSM Istio MAPT SNC cleanup completed successfully"
 else
   echo "[ERROR] ERROR MAPT SNC destroy failed"
-  echo "[WARN] WARN Skipping S3 bucket deletion due to MAPT destroy failure"
-  echo "[WARN] WARN Bucket ${DYNAMIC_BUCKET_NAME} may need manual cleanup"
+  echo "[WARN] WARN Attempting best-effort S3 bucket cleanup despite destroy failure..."
+  if purge_and_delete_bucket "${DYNAMIC_BUCKET_NAME}"; then
+    echo "[INFO] **** Best-effort bucket cleanup succeeded: ${DYNAMIC_BUCKET_NAME}"
+  else
+    echo "[WARN] WARN Best-effort bucket cleanup failed; bucket ${DYNAMIC_BUCKET_NAME} may need manual cleanup"
+  fi
   exit 1
 fi

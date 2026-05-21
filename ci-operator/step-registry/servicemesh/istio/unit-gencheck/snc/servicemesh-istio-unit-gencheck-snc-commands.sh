@@ -10,20 +10,28 @@ echo "[INFO] SETUP Setting up OSSM Istio unit and gencheck test execution in Ope
 
 echo "[INFO] READ Reading pod configuration from shared directory..."
 
-if [[ ! -f "${SHARED_DIR}/ossm-namespace" ]]; then
-  echo "[ERROR] ERROR Namespace file not found at ${SHARED_DIR}/ossm-namespace"
-  echo "[ERROR] ERROR Pod setup step may have failed or not run"
+if [[ -f "${SHARED_DIR}/ossm-namespace" ]]; then
+  NAMESPACE=$(cat "${SHARED_DIR}/ossm-namespace")
+elif [[ -n "${MAISTRA_NAMESPACE:-}" ]]; then
+  echo "[WARN] WARN Namespace file not found; falling back to MAISTRA_NAMESPACE=${MAISTRA_NAMESPACE}"
+  NAMESPACE="${MAISTRA_NAMESPACE}"
+  echo "${NAMESPACE}" > "${SHARED_DIR}/ossm-namespace"
+else
+  echo "[ERROR] ERROR Namespace file not found at ${SHARED_DIR}/ossm-namespace and MAISTRA_NAMESPACE is not set"
   exit 1
 fi
 
-if [[ ! -f "${SHARED_DIR}/ossm-pod-name" ]]; then
-  echo "[ERROR] ERROR Pod name file not found at ${SHARED_DIR}/ossm-pod-name"
-  echo "[ERROR] ERROR Pod setup step may have failed or not run"
+if [[ -f "${SHARED_DIR}/ossm-pod-name" ]]; then
+  POD_NAME=$(cat "${SHARED_DIR}/ossm-pod-name")
+elif [[ -n "${MAISTRA_SC_POD:-}" ]]; then
+  echo "[WARN] WARN Pod name file not found; falling back to MAISTRA_SC_POD=${MAISTRA_SC_POD}"
+  POD_NAME="${MAISTRA_SC_POD}"
+  echo "${POD_NAME}" > "${SHARED_DIR}/ossm-pod-name"
+else
+  echo "[ERROR] ERROR Pod name file not found at ${SHARED_DIR}/ossm-pod-name and MAISTRA_SC_POD is not set"
   exit 1
 fi
 
-NAMESPACE=$(cat "${SHARED_DIR}/ossm-namespace")
-POD_NAME=$(cat "${SHARED_DIR}/ossm-pod-name")
 CONTAINER_NAME="testpod"
 
 echo "[SUCCESS] !!!! Retrieved pod configuration:"
