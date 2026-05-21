@@ -1347,6 +1347,28 @@ tests:
     - chain: ipi-deprovision
     - ref: ipi-deprovision-aws-dedicated-hosts
     workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-dedicated-serial-techpreview-presubmit-test
+  optional: true
+  run_if_changed: ^ci-operator/config/openshift/release/openshift-release-main__nightly-4.22.yaml$
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      DEDICATED_HOST: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --run \[sig-network\]\[Feature:MultiNetworkPolicy\]
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-edge-zones-quota-slice
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    - ref: ipi-deprovision-aws-dedicated-hosts
+    workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
