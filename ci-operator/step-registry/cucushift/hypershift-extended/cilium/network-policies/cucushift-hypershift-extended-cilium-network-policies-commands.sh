@@ -13,8 +13,8 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
 fi
 
 OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
-if [ "$OCP_VERSION" != "4.22" ]; then
-    echo "OCP version ${OCP_VERSION} is not 4.22, skipping NetworkPolicy workarounds"
+if [[ "$OCP_VERSION" != "4.22" && "$OCP_VERSION" != "5.0" ]]; then
+    echo "OCP version ${OCP_VERSION}, skipping NetworkPolicy workarounds"
     exit 0
 fi
 
