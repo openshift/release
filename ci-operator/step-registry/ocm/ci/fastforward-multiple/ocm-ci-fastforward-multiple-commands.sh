@@ -543,6 +543,63 @@ create_tekton_files() {
 
     cd "$repo" || exit 1
 
+    # First check if files already exist on DEFAULT branch
+    log "INFO Checking if files already exist on ${default_branch}"
+    local all_versions_exist=true
+    for dest_version in ${dest_versions}; do
+      local dest_ver_compact
+      if [[ "${product}" == "globalhub" ]]; then
+        dest_ver_compact="${dest_version//./-}"
+      else
+        dest_ver_compact="${dest_version//./}"
+      fi
+
+      if ! compgen -G ".tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml" >/dev/null; then
+        all_versions_exist=false
+        log "INFO ${product_prefix}-${dest_ver_compact} files missing on ${default_branch}"
+        break
+      else
+        log "INFO ${product_prefix}-${dest_ver_compact} files already exist on ${default_branch}"
+      fi
+    done
+
+    if [[ "$all_versions_exist" == "true" ]]; then
+      log "INFO All requested versions already exist on ${default_branch}, nothing to do"
+
+      # Clean up stale PR branch if exists
+      local pr_branch="add-tekton-files-${dest_versions// /-}"
+      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
+        log "INFO Stale PR branch ${pr_branch} found, cleaning up"
+
+        # Close PR if exists
+        if command -v gh >/dev/null 2>&1; then
+          export GH_TOKEN="${token}"
+          local pr_num
+          pr_num=$(gh pr list --repo "${owner}/${repo}" --head "${pr_branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [[ -n "${pr_num}" ]]; then
+            log "INFO Closing obsolete PR #${pr_num}"
+            if gh pr close "${pr_num}" --repo "${owner}/${repo}" \
+              --comment "Closing - all Tekton files already merged to ${default_branch}" 2>&1; then
+              log "INFO Closed PR #${pr_num}"
+            else
+              log "WARNING Failed to close PR #${pr_num}"
+            fi
+          fi
+        fi
+
+        # Delete branch
+        log "INFO Deleting stale branch ${pr_branch}"
+        if git push origin --delete "${pr_branch}" 2>&1; then
+          log "INFO Deleted branch ${pr_branch}"
+        else
+          log "WARNING Failed to delete branch ${pr_branch}"
+        fi
+      fi
+
+      exit 0
+    fi
+
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
 
@@ -552,7 +609,8 @@ create_tekton_files() {
     if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
       branch_existed_on_remote=true
       log "INFO PR branch ${pr_branch} already exists on remote"
-      log "INFO Fetching and checking out existing branch"
+      log "INFO Resetting ${pr_branch} to ${default_branch} to avoid stale files"
+
       if ! git fetch origin "${pr_branch}" 2>&1; then
         log "ERROR Could not fetch ${pr_branch}"
         exit 1
@@ -562,21 +620,13 @@ create_tekton_files() {
         exit 1
       fi
 
-      # Check if HEAD commit has DCO sign-off, amend if missing
-      log "INFO Checking DCO sign-off on existing commit"
-      if ! git log -1 --pretty=%B | grep -q "^Signed-off-by:"; then
-        log "INFO Missing DCO sign-off, amending commit"
-        git config user.name "OpenShift CI Robot"
-        git config user.email "noreply@openshift.io"
-        if ! git commit --amend -s --no-edit 2>&1; then
-          log "WARNING Could not amend commit with DCO"
-        else
-          log "INFO Force pushing amended commit"
-          if ! git push --force 2>&1; then
-            log "WARNING Could not force push amended commit"
-          fi
-        fi
+      # Hard reset to default branch (removes stale files)
+      log "INFO Hard reset ${pr_branch} to origin/${default_branch}"
+      if ! git reset --hard "origin/${default_branch}" 2>&1; then
+        log "ERROR Could not reset to origin/${default_branch}"
+        exit 1
       fi
+
     else
       log "INFO Creating new PR branch ${pr_branch}"
       if ! git checkout -b "${pr_branch}" 2>&1; then
@@ -756,7 +806,19 @@ Generated from existing ${product_prefix}-${highest_version} templates."
 
       # Create PR if branch existed on remote (has commits) but no PR
       if [[ "$pr_exists" == "false" ]] && [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
-        log "INFO Creating PR for existing branch"
+        # Check if branch differs from default branch
+        log "INFO Checking if ${pr_branch} differs from ${default_branch}"
+        if ! git fetch origin "${default_branch}" 2>&1; then
+          log "WARNING Could not fetch ${default_branch}"
+          exit 0
+        fi
+
+        if git diff --quiet "origin/${default_branch}" HEAD; then
+          log "INFO Branch ${pr_branch} is identical to ${default_branch}, no PR needed"
+          exit 0
+        fi
+
+        log "INFO Creating PR for existing branch with changes"
 
         if ! gh pr create \
           --title "${pr_title}" \
