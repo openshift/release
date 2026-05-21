@@ -106,10 +106,15 @@ function PatchInstallCfgPullSecretMerged () {
         "${buildFarmPullCrd}" \
         "${CLUSTER_PROFILE_DIR}/pull-secret" \
         1> "${pullSecretMergedFile}"
-    yq -i eval \
-        --arg pullSecret "$(jq -c . "${pullSecretMergedFile}")" \
-        '.pullSecret = $pullSecret' \
-        "${installCfg}"
+    # mikefarah/yq v4 in baremetal-qe-base has no `--arg`; use yq→jq→yq like the scaffold above.
+    {
+        yq -p yaml -o json eval "${installCfg}" |
+        jq -c \
+            --arg pullSecret "$(jq -c . "${pullSecretMergedFile}")" \
+            '.pullSecret = $pullSecret' |
+        yq -p json -o yaml eval .
+    } 1> "${installCfg}.new"
+    mv -f "${installCfg}.new" "${installCfg}"
 
     true
 }
