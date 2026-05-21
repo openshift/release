@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 function cleanup() {
+  trap - EXIT ERR INT TERM
   set +o errexit
 
   echo "[INFO] **** Starting emergency cleanup for failed cluster creation..."
@@ -112,8 +113,8 @@ echo "[SUCCESS] !!!! S3 bucket created: ${DYNAMIC_BUCKET_NAME}"
 echo "${DYNAMIC_BUCKET_NAME}" > "${SHARED_DIR}/mapt-s3-bucket-name"
 echo "[INFO] SAVE Saved bucket name to ${SHARED_DIR}/mapt-s3-bucket-name for cleanup"
 
-# Trap TERM signal into cleanup to ensure MAPT infrastructure is destroyed on cancellation
-trap cleanup TERM
+# Trap EXIT/ERR/INT/TERM to ensure MAPT infrastructure is destroyed on failure or cancellation
+trap cleanup EXIT ERR INT TERM
 
 OCP_VERSION=${OCP_VERSION:-"4.20.0"}
 CPU=${CPU:-"8"}
@@ -126,6 +127,11 @@ echo "[INFO] START Creating OSSM Istio MAPT OpenShift SNC infrastructure for ${C
 echo "[INFO] LOC Using S3 state backend: s3://${DYNAMIC_BUCKET_NAME}"
 echo "[INFO] INFO SNC Configuration: OpenShift ${OCP_VERSION}, ${CPU} CPU, ${MEMORY}GB RAM, spot=${SPOT}"
 
+MAPT_SPOT_ARGS=()
+if [[ "${SPOT}" == "true" ]]; then
+  MAPT_SPOT_ARGS=(--spot --spot-increase-rate "${SPOT_INCREASE_RATE}")
+fi
+
 mapt aws openshift-snc create \
   --backed-url "s3://${DYNAMIC_BUCKET_NAME}" \
   --conn-details-output "${SHARED_DIR}" \
@@ -135,8 +141,7 @@ mapt aws openshift-snc create \
   --version "${OCP_VERSION}" \
   --cpus "${CPU}" \
   --memory "${MEMORY}" \
-  --spot \
-  --spot-increase-rate "${SPOT_INCREASE_RATE}"
+  "${MAPT_SPOT_ARGS[@]}"
 
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
   echo "[ERROR] ERROR kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
@@ -148,5 +153,7 @@ echo "[SUCCESS] !!!! OSSM Istio MAPT OpenShift SNC cluster created successfully"
 echo "[INFO] SAVE Saving kubeconfig location for test step..."
 echo "[INFO] FILE Kubeconfig available at: ${SHARED_DIR}/kubeconfig"
 
+# Clear trap on successful completion so cleanup does not run on normal exit
+trap - EXIT ERR INT TERM
 echo "[SUCCESS] !!!! MAPT OpenShift SNC cluster ready for testing"
 echo "[INFO] INFO Namespace and pod security setup will be handled by test step"
