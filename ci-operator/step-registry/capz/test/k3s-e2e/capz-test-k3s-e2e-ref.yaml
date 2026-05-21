@@ -1,0 +1,27 @@
+ref:
+  as: capz-test-k3s-e2e
+  from: src
+  commands: capz-test-k3s-e2e-commands.sh
+  nested_podman: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  env:
+  - name: K3S_VERSION
+    default: "v1.31.6+k3s1"
+    documentation: |-
+      k3s release version to install as the management cluster.
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  timeout: 3h
+  documentation: |-
+    Starts a k3s management cluster inside the test pod (via nested_podman
+    capabilities), deploys CAPI/CAPZ/ASO controllers, then runs the full
+    e2e test suite (Phases 01-08). No IPI cluster required — k3s provides
+    the management cluster, saving ~40 minutes of provisioning time.
+    Requires nested_podman for the SYS_ADMIN and NET_ADMIN capabilities
+    that k3s needs (cgroups, networking).
