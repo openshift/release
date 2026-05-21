@@ -381,10 +381,11 @@ function wait_for_operator() {
   # Stage 4: Wait for CSV to be Succeeded (60s)
   echo ">>> Waiting for CSV to be Succeeded..."
   local csv_succeeded=false
+  local csv_name=""
   for i in {1..12}; do
     local csv_phase=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
     if [[ "${csv_phase}" == "Succeeded" ]]; then
-      local csv_name=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+      csv_name=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
       echo ">>> CSV ${csv_name} is Succeeded"
       csv_succeeded=true
       break
@@ -397,6 +398,9 @@ function wait_for_operator() {
     oc get csv -n "${TRUSTEE_NAMESPACE}" -o yaml || true
     return 1
   fi
+
+  # Export CSV name for kbs-client version mapping
+  export TRUSTEE_CSV_NAME="${csv_name}"
 
   # Stage 5: Wait for Deployment to be Available (60s)
   echo ">>> Waiting for operator deployment to be Available..."
@@ -711,13 +715,62 @@ spec:
 MANIFEST_EOF
 }
 
+function map_trustee_to_kbs_client_version() {
+  local trustee_version="$1"
+
+  # Map trustee operator versions to compatible kbs-client versions
+  # Based on semantic versioning compatibility
+  case "${trustee_version}" in
+    1.1.*|1.1)
+      echo "v0.17.0"
+      ;;
+    1.11.*|1.11)
+      echo "v0.19.0"
+      ;;
+    *)
+      # Return empty string if no mapping exists
+      echo ""
+      ;;
+  esac
+}
+
 function get_kbs_client_tag() {
+  # Override: explicit KBS_CLIENT_TAG takes precedence
   if [[ -n "${KBS_CLIENT_TAG:-}" ]]; then
     echo ">>> kbs-client tag (from KBS_CLIENT_TAG): ${KBS_CLIENT_TAG}" >&2
     echo "${KBS_CLIENT_TAG}"
     return 0
   fi
 
+  # Try to determine from trustee operator CSV version
+  if [[ -n "${TRUSTEE_CSV_NAME:-}" ]]; then
+    # Extract version from CSV name (e.g., "trustee-operator.v1.10.0" -> "1.10.0")
+    local trustee_version
+    trustee_version=$(echo "${TRUSTEE_CSV_NAME}" | sed 's/^trustee-operator\.v//')
+
+    if [[ -n "${trustee_version}" ]]; then
+      # Try major.minor mapping first (e.g., "1.10.0" -> "1.10")
+      local trustee_minor="${trustee_version%.*}"
+      local mapped_tag
+      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_minor}")
+
+      if [[ -n "${mapped_tag}" ]]; then
+        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
+        echo "${mapped_tag}"
+        return 0
+      fi
+
+      # Try full version mapping if minor didn't match
+      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_version}")
+      if [[ -n "${mapped_tag}" ]]; then
+        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
+        echo "${mapped_tag}"
+        return 0
+      fi
+    fi
+  fi
+
+  # Fallback: Auto-discover latest semver tag from registry
   local latest_tag=""
   latest_tag=$(skopeo list-tags docker://quay.io/confidential-containers/kbs-client 2>/dev/null | \
     jq -r '.Tags[]' | \
@@ -726,13 +779,14 @@ function get_kbs_client_tag() {
     tail -1 || echo "")
 
   if [[ -n "${latest_tag}" ]]; then
-    echo ">>> kbs-client tag (auto-discovered): ${latest_tag}" >&2
+    echo ">>> kbs-client tag (auto-discovered latest semver): ${latest_tag}" >&2
     echo "${latest_tag}"
     return 0
   fi
 
-  echo ">>> WARN: Could not determine latest tag, using fallback: v0.19.0" >&2
-  echo "v0.19.0"
+  # Last resort fallback
+  echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.17.0" >&2
+  echo "v0.17.0"
 }
 
 function verify_trustee_connectivity() {
@@ -827,7 +881,8 @@ function verify_trustee_connectivity() {
 
   if [[ -n "${kbs_pod}" ]]; then
     local log_file="${ARTIFACT_DIR:-${SHARED_DIR}}/kbs-attestation-logs.txt"
-    oc logs "${kbs_pod}" -n "${TRUSTEE_NAMESPACE}" --since=5m > "${log_file}" 2>&1 || true
+    # Strip ANSI color codes from logs for cleaner output
+    oc logs "${kbs_pod}" -n "${TRUSTEE_NAMESPACE}" --since=5m 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "${log_file}" || true
 
     if [[ -n "${ARTIFACT_DIR}" && "${ARTIFACT_DIR}" != "${SHARED_DIR}" ]]; then
       cp "${log_file}" "${SHARED_DIR}/kbs-attestation-logs.txt" 2>/dev/null || true
