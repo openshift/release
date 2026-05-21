@@ -92,6 +92,28 @@ function UpdateCfg () {
     true
 }
 
+function PatchInstallCfgPullSecretMerged () {
+    typeset installCfg="${OCP__ABI__CLUSTER_DIR}/install-config.yaml"
+    typeset buildFarmPullCrd=/var/run/secrets/registry-pull--build-farms/.dockerconfigjson
+    typeset pullSecretMergedFile=/tmp/ocp--abi--pull-secret-merged.json
+
+    [ -r "${installCfg}" ]
+    [ -r "${buildFarmPullCrd}" ]
+    [ -r "${CLUSTER_PROFILE_DIR}/pull-secret" ]
+
+    # Build-farm first; profile second so profile auths override on key collision (Edo).
+    jq -cs '.[0].auths += .[1].auths | .[0]' \
+        "${buildFarmPullCrd}" \
+        "${CLUSTER_PROFILE_DIR}/pull-secret" \
+        1> "${pullSecretMergedFile}"
+    yq -i eval \
+        --arg pullSecret "$(jq -c . "${pullSecretMergedFile}")" \
+        '.pullSecret = $pullSecret' \
+        "${installCfg}"
+
+    true
+}
+
 
 # Create bare-minimum `install-config.yaml`.
 {
@@ -99,7 +121,15 @@ function UpdateCfg () {
     jq -c \
         --arg clsName "${OCP__ABI__BM__CLS_NAME}" \
         --arg baseDom "${OCP__ABI__BM__BASE_DOM}" \
-        --rawfile pullCrd <(set +x; cat "${CLUSTER_PROFILE_DIR}/pull-secret") \
+        --rawfile pullCrd <(
+            if [ -r /var/run/secrets/registry-pull--build-farms/.dockerconfigjson ]; then
+                jq -cs '.[0].auths += .[1].auths | .[0]' \
+                    "/var/run/secrets/registry-pull--build-farms/.dockerconfigjson" \
+                    "${CLUSTER_PROFILE_DIR}/pull-secret"
+            else
+                cat "${CLUSTER_PROFILE_DIR}/pull-secret"
+            fi
+        ) \
         --rawfile sshKey <(set +x; cat "${CLUSTER_PROFILE_DIR}/ssh-publickey") \
         '
             .baseDomain=$baseDom |
@@ -120,6 +150,10 @@ fileEOF
 
 # Enrich with OCP-version-aware defaults.
 openshift-install create install-config
+# `create install-config` may refresh `pullSecret`; re-merge build-farm auths for CI per-job release images.
+if [ -r /var/run/secrets/registry-pull--build-farms/.dockerconfigjson ]; then
+    PatchInstallCfgPullSecretMerged
+fi
 # Update for Bare Metal target.
 yq -i eval \
     '.platform={"baremetal": {}}' \

@@ -295,8 +295,7 @@ rm -f "${SHARED_DIR}/ocpClusterInf.tgz"
 
 # ISO Creation Phase.
 unset KUBECONFIG    # If set, the certificate inside it will be embedded to ISO, causing mismatch during `wait-for ...`.
-REGISTRY_AUTH_FILE=/var/run/secrets/registry-pull--build-farms/.dockerconfigjson \
-    openshift-install agent create image
+openshift-install agent create image
 isoFile="$(
     shopt -s nullglob
     echo "${OCP__ABI__CLUSTER_DIR}"/agent.*.iso
