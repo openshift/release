@@ -96,7 +96,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster kubevirt \
 
 oc apply -f /tmp/hc-manifests/cluster-agent.yaml
 
-oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
+oc wait --timeout=25m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
 
 # Install IBM Cloud CLI
