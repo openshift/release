@@ -20,14 +20,47 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
-export E2E_TYPE; E2E_TYPE="${E2E_TYPE:=csp}"
-if [[ "${E2E_TYPE}" == "miwi" ]]; then
-  export USE_WI="true"
-  export PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS; PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS=$(az rest --method GET --uri "/subscriptions/${AZURE_SUBSCRIPTION_ID}/providers/Microsoft.redhatopenshift/locations/${LOCATION}/platformworkloadidentityrolesets?api-version=2025-07-25" --query "value[*].properties")
-else
-  export USE_WI="false"
-fi
-export RESOURCEGROUP; RESOURCEGROUP="${NAMESPACE}-prow-${LOCATION}-${UNIQUE_HASH}-${E2E_TYPE}"
-export CLUSTER; CLUSTER="${RESOURCEGROUP}"
+export E2E_TYPE; E2E_TYPE="${E2E_TYPE:=both}"
 
-e2e.test -test.v --ginkgo.v --ginkgo.timeout 180m --ginkgo.flake-attempts=2 --ginkgo.no-color --ginkgo.label-filter=!smoke
+run_e2e() {
+  local type="$1"
+  export RESOURCEGROUP="${NAMESPACE}-prow-${LOCATION}-${UNIQUE_HASH}-${type}"
+  export CLUSTER="${RESOURCEGROUP}"
+  if [[ "${type}" == "miwi" ]]; then
+    export USE_WI="true"
+    export PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS; PLATFORM_WORKLOAD_IDENTITY_ROLE_SETS=$(az rest --method GET --uri "/subscriptions/${AZURE_SUBSCRIPTION_ID}/providers/Microsoft.redhatopenshift/locations/${LOCATION}/platformworkloadidentityrolesets?api-version=2025-07-25" --query "value[*].properties")
+  else
+    export USE_WI="false"
+  fi
+  e2e.test -test.v --ginkgo.v --ginkgo.timeout 180m --ginkgo.flake-attempts=2 --ginkgo.no-color --ginkgo.label-filter=!smoke
+}
+
+if [[ "${E2E_TYPE}" == "both" ]]; then
+  run_e2e miwi >"${ARTIFACT_DIR}/miwi.log" 2>&1 &
+  PID_MIWI=$!
+  run_e2e csp >"${ARTIFACT_DIR}/csp.log" 2>&1 &
+  PID_CSP=$!
+
+  RC_MIWI=0
+  RC_CSP=0
+  wait $PID_MIWI || RC_MIWI=$?
+  wait $PID_CSP || RC_CSP=$?
+
+  set +o xtrace
+  echo "=== miwi log ==="
+  cat "${ARTIFACT_DIR}/miwi.log"
+  echo "=== csp log ==="
+  cat "${ARTIFACT_DIR}/csp.log"
+
+  [[ $RC_MIWI -ne 0 ]] && echo "=== miwi run failed ===" >&2
+  [[ $RC_CSP -ne 0 ]] && echo "=== csp run failed ===" >&2
+
+  [[ $RC_MIWI -eq 0 && $RC_CSP -eq 0 ]]
+elif [[ "${E2E_TYPE}" == "miwi" ]]; then
+  run_e2e miwi
+elif [[ "${E2E_TYPE}" == "csp" ]]; then
+  run_e2e csp
+else
+  echo "Invalid E2E_TYPE: ${E2E_TYPE}" >&2
+  exit 1
+fi
