@@ -54,19 +54,49 @@ if mapt aws openshift-snc destroy \
   --backed-url "s3://${DYNAMIC_BUCKET_NAME}"; then
   echo "[SUCCESS] !!!! Successfully destroyed OSSM Istio MAPT SNC: ${CORRELATE_MAPT}"
 
-  echo "[INFO] **** Removing all objects from S3 bucket: ${DYNAMIC_BUCKET_NAME}"
-  if aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive; then
-    echo "[SUCCESS] !!!! All objects removed from bucket"
-
-    echo "[INFO] **** Removing S3 bucket: ${DYNAMIC_BUCKET_NAME}"
-    if aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}"; then
-      echo "[SUCCESS] !!!! Successfully deleted S3 bucket: ${DYNAMIC_BUCKET_NAME}"
+  echo "[INFO] **** Removing all object versions and delete markers from S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
+  KEY_MARKER=""
+  VERSION_MARKER=""
+  while true; do
+    if [[ -n "${KEY_MARKER}" ]]; then
+      page=$(aws s3api list-object-versions \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --key-marker "${KEY_MARKER}" \
+        --version-id-marker "${VERSION_MARKER}" \
+        --output json 2>/dev/null || echo '{}')
     else
-      echo "[WARN] WARN Failed to delete empty S3 bucket: ${DYNAMIC_BUCKET_NAME}"
-      exit 1
+      page=$(aws s3api list-object-versions \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --output json 2>/dev/null || echo '{}')
     fi
+
+    echo "${page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
+    while IFS= read -r row; do
+      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
+      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+      aws s3api delete-object \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --key "${key}" \
+        --version-id "${version_id}" >/dev/null 2>&1 || true
+    done
+
+    next_key=$(echo "${page}" | jq -r '.NextKeyMarker // empty')
+    if [[ -z "${next_key}" ]]; then
+      break
+    fi
+    KEY_MARKER="${next_key}"
+    VERSION_MARKER=$(echo "${page}" | jq -r '.NextVersionIdMarker // empty')
+  done
+  echo "[SUCCESS] !!!! All object versions and delete markers removed"
+
+  echo "[INFO] **** Removing any remaining objects from S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
+  aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
+
+  echo "[INFO] **** Removing S3 bucket: ${DYNAMIC_BUCKET_NAME}"
+  if aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}"; then
+    echo "[SUCCESS] !!!! Successfully deleted S3 bucket: ${DYNAMIC_BUCKET_NAME}"
   else
-    echo "[WARN] WARN Failed to remove objects from S3 bucket: ${DYNAMIC_BUCKET_NAME}"
+    echo "[WARN] WARN Failed to delete S3 bucket: ${DYNAMIC_BUCKET_NAME}"
     exit 1
   fi
 
