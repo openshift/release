@@ -1,0 +1,61 @@
+ref:
+  as: openshift-sankey-activity-classifier
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-sankey-activity-classifier-commands.sh
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: JIRA_API_TOKEN_PATH
+    default: "/var/run/jira-token/token"
+  - name: JIRA_USERNAME_PATH
+    default: "/var/run/jira-token/username"
+  - name: JIRA_URL
+    default: "https://redhat.atlassian.net"
+  - name: SANKEY_PROJECT_KEY
+    default: "ROSAENG"
+  - name: SANKEY_ISSUE_TYPE
+    default: "Epic"
+  - name: SANKEY_MAX_ISSUES
+    default: "2"
+  - name: SANKEY_DRY_RUN
+    default: "true"
+    documentation: |-
+      When true, classify issues but do not write Activity Type back
+      to Jira. Set to "false" to enable live updates.
+  - name: CLAUDE_MODEL
+    default: "claude-sonnet-4-6"
+  - name: CLASSIFIER_REPO
+    default: "https://github.com/tiwillia/tims-ambient-workflows.git"
+  - name: CLASSIFIER_BRANCH
+    default: "main"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: claude-payload-agent-jira-token
+    mount_path: /var/run/jira-token
+  timeout: 1h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Classifies untagged Jira issues into Sankey activity type categories
+    using Claude Code and mcp-atlassian. Clones and installs the
+    activity-type-classifier skill, then invokes it via slash command.
+    Collects artifacts (classifications.json, report.md, token usage).
+    Defaults to dry-run mode (SANKEY_DRY_RUN=true).
+
+    The periodic job cron schedule (0 9 1 1 *) is a placeholder that only
+    fires once a year. Until validated, trigger manually via Gangway.
