@@ -33,7 +33,7 @@ function cleanup() {
     aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
 
     aws s3api list-object-versions --bucket "${DYNAMIC_BUCKET_NAME}" --output json 2>/dev/null | \
-    jq -r '.Versions[]?, .DeleteMarkers[]? | `@base64`' | \
+    jq -r '.Versions[]?, .DeleteMarkers[]? | @base64' | \
     while IFS= read -r row; do
       key="$(echo "${row}" | base64 -d | jq -r '.Key')"
       version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
