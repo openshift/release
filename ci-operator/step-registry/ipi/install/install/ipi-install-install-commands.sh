@@ -656,7 +656,7 @@ aws|aws-arm64|aws-usgov|aws-eusc)
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
-    else
+    elif [[ -z "${AWS_CONFIG_FILE:-}" ]]; then
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     fi
     ;;
