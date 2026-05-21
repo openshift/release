@@ -1,0 +1,21 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+      RUN dnf install -y python3-pip && pip3 install yamllint
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: yaml-lint
+  commands: find . -name '*.yaml' -o -name '*.yml' | xargs yamllint -d relaxed
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: chai-bot-config
