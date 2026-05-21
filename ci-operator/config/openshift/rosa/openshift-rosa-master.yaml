@@ -59,6 +59,21 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: rosa-codecov-token
+- as: changelog-history
+  commands: |
+    unset GOFLAGS
+    export GITHUB_TOKEN=$(cat /tmp/github/oauth)
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "jq not found, installing..." >&2
+      dnf install -y jq || { echo "ERROR: failed to install jq" >&2; exit 1; }
+    fi
+    make changelog-pr
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/github
+    name: github-credentials-openshift-ci-robot-private-git-cloner
 zz_generated_metadata:
   branch: master
   org: openshift
