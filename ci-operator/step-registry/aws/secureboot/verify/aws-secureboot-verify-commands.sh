@@ -55,7 +55,7 @@ fi
 
 for node in ${WORKERS}; do
   echo "$(date -u --rfc-3339=seconds) - Checking ${node}..."
-  SB_STATE=$(oc debug --quiet "${node}" -- bash -c 'chroot /host mokutil --sb-state' 2>&1 || true)
+  SB_STATE=$(oc debug --quiet -n default "${node}" -- bash -c 'chroot /host mokutil --sb-state' 2>&1 || true)
   echo "  mokutil output: ${SB_STATE}"
   if echo "${SB_STATE}" | grep -q "SecureBoot enabled"; then
     echo "$(date -u --rfc-3339=seconds) - PASS: ${node} has Secure Boot enabled"
