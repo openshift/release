@@ -12,6 +12,11 @@ resources:
       cpu: 100m
       memory: 2Gi
 tests:
+- as: fmt
+  commands: make fmt && git diff --exit-code
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: generate
   commands: make manifests && git diff --exit-code
   container:
@@ -19,6 +24,11 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit
   commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: vet
+  commands: make vet
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
