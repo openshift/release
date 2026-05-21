@@ -32,8 +32,15 @@ function cleanup() {
     aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
 
     aws s3api list-object-versions --bucket "${DYNAMIC_BUCKET_NAME}" --output json 2>/dev/null | \
-    jq -r '.Versions[]?, .DeleteMarkers[]? | "aws s3api delete-object --bucket '${DYNAMIC_BUCKET_NAME}' --key \"" + .Key + "\" --version-id " + .VersionId' | \
-    head -100 | bash 2>/dev/null || true
+    jq -r '.Versions[]?, .DeleteMarkers[]? | `@base64`' | \
+    while IFS= read -r row; do
+      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
+      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+      aws s3api delete-object \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --key "${key}" \
+        --version-id "${version_id}" >/dev/null 2>&1 || true
+    done
 
     aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}" 2>/dev/null || echo "[WARN] WARN Bucket deletion failed or bucket already deleted"
 
