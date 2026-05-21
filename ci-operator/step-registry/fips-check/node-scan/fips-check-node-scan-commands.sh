@@ -27,7 +27,18 @@ function run_command() {
 TLS_SCANNER_NS="tls-scanner"
 TLS_SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL:-}"
 TLS_SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+TLS_SCANNER_NS_CREATED=false
 TLS_SCANNER_STARTED=false
+
+# Always clean up the TLS scanner namespace on exit, regardless of whether the
+# scanner pod became Ready or artifacts were collected.
+function cleanup_tls_scanner() {
+    if [[ "${TLS_SCANNER_NS_CREATED}" == "true" ]]; then
+        echo "[tls-scanner] Cleaning up namespace ${TLS_SCANNER_NS}..."
+        oc delete namespace "${TLS_SCANNER_NS}" --ignore-not-found --wait=false || true
+    fi
+}
+trap cleanup_tls_scanner EXIT
 
 function start_tls_scanner() {
     if [[ -z "${TLS_SCANNER_IMAGE}" ]]; then
@@ -39,17 +50,32 @@ function start_tls_scanner() {
     echo "[tls-scanner] Image: ${TLS_SCANNER_IMAGE}"
     mkdir -p "${TLS_SCANNER_ARTIFACT_DIR}"
 
-    # Create namespace
-    oc create namespace "${TLS_SCANNER_NS}" --dry-run=client -o yaml | oc apply -f -
+    # Create namespace (best-effort — failures here must not abort the step)
+    if oc create namespace "${TLS_SCANNER_NS}" --dry-run=client -o yaml | oc apply -f -; then
+        TLS_SCANNER_NS_CREATED=true
+    else
+        echo "[tls-scanner] WARNING: Failed to create namespace — skipping TLS scan."
+        return
+    fi
 
-    # Grant cluster-admin and privileged SCC
-    oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${TLS_SCANNER_NS}"
-    oc adm policy add-scc-to-user privileged -z default -n "${TLS_SCANNER_NS}"
+    # Grant cluster-admin and privileged SCC (best-effort)
+    if ! oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${TLS_SCANNER_NS}"; then
+        echo "[tls-scanner] WARNING: Failed to grant cluster-admin — skipping TLS scan."
+        return
+    fi
+    if ! oc adm policy add-scc-to-user privileged -z default -n "${TLS_SCANNER_NS}"; then
+        echo "[tls-scanner] WARNING: Failed to grant privileged SCC — skipping TLS scan."
+        return
+    fi
 
     # Wait for RBAC/SCC changes to propagate
     sleep 10
 
-    # Deploy the scanner pod
+    # Deploy the scanner pod.
+    # The pod keeps running indefinitely (tail -f /dev/null) after the scan
+    # finishes so that oc cp can always exec into it to collect artifacts.
+    # The collector signals completion by writing /results/collect.done, which
+    # terminates the wait loop and lets the container exit cleanly.
     cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Pod
@@ -77,8 +103,8 @@ spec:
       SCAN_EXIT_CODE=\${PIPESTATUS[0]}
       echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
       touch /results/scan.done
-      # Keep pod alive for artifact collection
-      sleep 120
+      # Keep pod alive until the collector copies artifacts and signals completion.
+      while [ ! -f /results/collect.done ]; do sleep 5; done
     resources:
       requests:
         cpu: "4"
@@ -114,8 +140,8 @@ function collect_tls_scanner_results() {
 
     echo "=== Collecting TLS Scanner Results ==="
 
-    # Wait for scan.done marker or pod exit
-    local max_wait=14400  # 4 hours
+    # Wait for scan.done marker or pod exit (up to 4 hours)
+    local max_wait=14400
     local elapsed=0
     while (( elapsed < max_wait )); do
         if oc exec pod/tls-scanner -n "${TLS_SCANNER_NS}" -- test -f /results/scan.done 2>/dev/null; then
@@ -132,7 +158,7 @@ function collect_tls_scanner_results() {
         elapsed=$((elapsed + 15))
     done
 
-    # Copy artifacts
+    # Copy artifacts (pod is still running, waiting for collect.done signal)
     oc cp "${TLS_SCANNER_NS}/tls-scanner:/results/." "${TLS_SCANNER_ARTIFACT_DIR}/" || echo "[tls-scanner] WARNING: Failed to copy some artifacts"
 
     if [[ -f "${TLS_SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
@@ -140,11 +166,13 @@ function collect_tls_scanner_results() {
         echo "[tls-scanner] JUnit results copied to ${ARTIFACT_DIR}/junit_tls_scan.xml"
     fi
 
+    # Signal the scanner pod that collection is complete so it can exit
+    oc exec pod/tls-scanner -n "${TLS_SCANNER_NS}" -- touch /results/collect.done 2>/dev/null || true
+
     echo "[tls-scanner] Artifacts saved to: ${TLS_SCANNER_ARTIFACT_DIR}"
     ls -la "${TLS_SCANNER_ARTIFACT_DIR}" || true
 
-    # Cleanup
-    oc delete namespace "${TLS_SCANNER_NS}" --ignore-not-found --wait=false || true
+    # Namespace cleanup is handled by the EXIT trap (cleanup_tls_scanner)
     echo "=== TLS Scanner Complete ==="
 }
 
