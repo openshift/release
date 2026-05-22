@@ -29,8 +29,9 @@ trap cleanup_k3s EXIT
 # ---- Install k3s ----
 echo "[k3s] Installing k3s ${K3S_VERSION}"
 K3S_URL="https://github.com/k3s-io/k3s/releases/download/$(echo "${K3S_VERSION}" | sed 's/+/%2B/')/k3s"
-curl -sLo /usr/local/bin/k3s "${K3S_URL}"
-chmod +x /usr/local/bin/k3s
+curl -sLo /tmp/k3s "${K3S_URL}"
+chmod +x /tmp/k3s
+export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
 # ---- Start k3s ----
