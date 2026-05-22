@@ -27,7 +27,10 @@ export IC_API_KEY
 
 # Run the clone
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
+#git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
+
+echo "Cloning provisioning repo: ${PROVISIONING_REPO} @ branch: ${PROVISIONING_BRANCH}"
+git clone --branch "${PROVISIONING_BRANCH}" "https://${PROVISIONING_REPO}.git"
 
 #Navigate to clone directory
 cd "ibmcloud-openshift-provisioning" || {
