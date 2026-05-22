@@ -6,6 +6,7 @@ set -o pipefail
 # ---- k3s configuration ----
 K3S_VERSION="${K3S_VERSION:-v1.31.6+k3s1}"
 K3S_KUBECONFIG="/tmp/k3s-kubeconfig"
+K3S_DATA_DIR="/tmp/k3s-data"
 
 # Pre-set USE_KUBECONFIG before sourcing env.sh to prevent it from
 # defaulting to the IPI kubeconfig (${SHARED_DIR}/kubeconfig) which
@@ -26,6 +27,14 @@ cleanup_k3s() {
 }
 trap cleanup_k3s EXIT
 
+# ---- Install dependencies for rootless k3s ----
+echo "[k3s] Installing rootless dependencies"
+if command -v dnf &>/dev/null; then
+  dnf install -y slirp4netns iptables 2>/dev/null || true
+elif command -v yum &>/dev/null; then
+  yum install -y slirp4netns iptables 2>/dev/null || true
+fi
+
 # ---- Install k3s ----
 echo "[k3s] Installing k3s ${K3S_VERSION}"
 K3S_URL="https://github.com/k3s-io/k3s/releases/download/$(echo "${K3S_VERSION}" | sed 's/+/%2B/')/k3s"
@@ -34,13 +43,16 @@ chmod +x /tmp/k3s
 export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
-# ---- Start k3s ----
-echo "[k3s] Starting k3s server"
+# ---- Start k3s in rootless mode ----
+# CI pods run as non-root; k3s requires --rootless in this case.
+echo "[k3s] Starting k3s server (rootless mode)"
 ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 
 k3s server \
+  --rootless \
   --disable=traefik \
   --snapshotter=native \
+  --data-dir="${K3S_DATA_DIR}" \
   --write-kubeconfig="${K3S_KUBECONFIG}" \
   --write-kubeconfig-mode=644 \
   --kubelet-arg="eviction-hard=imagefs.available<1%,nodefs.available<1%" \
@@ -51,6 +63,10 @@ K3S_PID=$!
 echo "[k3s] Waiting for k3s to be ready (PID: ${K3S_PID})"
 READY=false
 for i in $(seq 1 60); do
+  if [[ ! -d "/proc/${K3S_PID}" ]]; then
+    echo "[k3s] FATAL: k3s process died unexpectedly"
+    exit 1
+  fi
   if KUBECONFIG="${K3S_KUBECONFIG}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
     READY=true
     break
