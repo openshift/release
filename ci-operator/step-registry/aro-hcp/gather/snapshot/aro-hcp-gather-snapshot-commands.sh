@@ -4,12 +4,6 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Guard: only run if the subcommand exists in this build of the binary
-if ! test/aro-hcp-tests gather-snapshot --help &>/dev/null; then
-  echo "gather-snapshot subcommand not available in this binary, skipping."
-  exit 0
-fi
-
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
