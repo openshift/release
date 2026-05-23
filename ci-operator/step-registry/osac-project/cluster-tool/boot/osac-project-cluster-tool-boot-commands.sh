@@ -239,6 +239,7 @@ oc set env deployment/osac-operator-controller-manager \
 
 echo "AAP API token created and stored in secret osac-aap-api-token"
 PREPARE_AAP_EOF
+chmod +x /tmp/prepare-aap-patched.sh
 
 cat > /tmp/refresh-patched.sh << 'REFRESH_EOF'
 #!/usr/bin/env bash
@@ -441,6 +442,7 @@ echo "=== Refresh complete ==="
 echo "Cluster domain: ${CLUSTER_DOMAIN}"
 echo "Namespace: ${INSTALLER_NAMESPACE}"
 REFRESH_EOF
+chmod +x /tmp/refresh-patched.sh
 
 echo "=== Running refresh ==="
 podman run --authfile /root/pull-secret --rm --network=host \
