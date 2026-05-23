@@ -195,6 +195,9 @@ podman run --authfile /root/pull-secret --rm --network=host \
     "${INSTALLER_IMAGE}" \
     bash -c "${COMPONENT_OVERRIDE_CMD}${AAP_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
 
+echo "=== Waiting for AAP controller-task rollout to complete ==="
+oc rollout status deployment/osac-aap-controller-task -n "${NAMESPACE}" --timeout=300s
+
 echo "=== Boot + refresh complete ==="
 REMOTE_SCRIPT
 
