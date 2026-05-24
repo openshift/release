@@ -501,15 +501,36 @@ for pid in "${pids[@]}"; do wait "${pid}" || failed=1; done
 if (( failed )); then echo "ERROR: Fulfillment rollout failed after restart"; exit 1; fi
 ./scripts/prepare-tenant.sh
 
-########## BEGIN CHANGE: Phase 6 — wait for final AAP controller-task rollout ##########
-# The AAP operator triggers a final controller-task rollout after the gateway
-# finishes rolling (updates credentials.py with new gateway URL, changing the
-# checksum annotation). We waited for the gateway in Phase 3, so this final
-# rollout should have started during Phase 4/5 and be done or nearly done.
-echo "$(ts) [post] Waiting for final AAP controller-task rollout..."
+########## BEGIN CHANGE: Phase 6 — restart AAP operators for single-pass reconciliation ##########
+# The AAP operators (automation-controller-operator, aap-gateway-operator) trigger
+# cascading controller-task rollouts over ~6 minutes after route/config changes.
+# Each rollout kills the old pod's Redis sidecar, crashing in-flight AAP jobs.
+#
+# Fix: restart the operators AFTER all config changes are applied. When they
+# restart, they read the current state (routes already patched, kustomize applied,
+# credentials created) and reconcile to the final state in one pass.
+AAP_OPERATOR_NS="ansible-aap"
+echo "$(ts) [post] Restarting AAP operators for clean single-pass reconciliation..."
+echo "$(ts) [post] Pre-restart controller-task generation: $(oc get deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null)"
+for op in automation-controller-operator-controller-manager aap-gateway-operator-controller-manager; do
+    echo "$(ts) [post] Restarting ${op}..."
+    oc rollout restart "deployment/${op}" -n "${AAP_OPERATOR_NS}"
+done
+for op in automation-controller-operator-controller-manager aap-gateway-operator-controller-manager; do
+    oc rollout status "deployment/${op}" -n "${AAP_OPERATOR_NS}" --timeout=300s
+done
+echo "$(ts) [post] AAP operators restarted, waiting for reconciliation..."
+
+retry_until 300 10 '[[ "$(oc get automationcontroller osac-aap-controller -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Successful")].reason}'"'"' 2>/dev/null)" == "Successful" ]]' || {
+    echo "$(ts) WARNING: AutomationController did not reach Successful within 300s"
+}
+
 oc rollout status deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" --timeout=300s
-CONTROLLER_TASK_POD=$(oc get pods -n "${INSTALLER_NAMESPACE}" -l app.kubernetes.io/name=osac-aap-controller-task --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -1)
-echo "$(ts) [post] Controller-task pod: ${CONTROLLER_TASK_POD}"
+oc rollout status deployment/osac-aap-gateway -n "${INSTALLER_NAMESPACE}" --timeout=300s
+
+CONTROLLER_TASK_POD=$(oc get pods -n "${INSTALLER_NAMESPACE}" -l app.kubernetes.io/name=osac-aap-controller-task --field-selector=status.phase=Running --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -1)
+POST_GEN=$(oc get deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null)
+echo "$(ts) [post] Controller-task pod: ${CONTROLLER_TASK_POD} (generation: ${POST_GEN})"
 echo "$(ts) [post] Controller-task checksum annotations:"
 oc get pod "${CONTROLLER_TASK_POD}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.annotations}' 2>/dev/null | jq -r 'to_entries[] | select(.key | startswith("checksum-")) | "  \(.key): \(.value)"' 2>/dev/null || true
 echo "$(ts) [post] Time since kustomize apply: $(( SECONDS - KUSTOMIZE_APPLY_TIME ))s"
