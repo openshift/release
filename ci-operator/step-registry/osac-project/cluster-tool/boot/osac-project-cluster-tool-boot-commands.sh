@@ -15,7 +15,7 @@ echo "COMPONENT_IMAGE: ${COMPONENT_IMAGE:-<none>}"
 echo "COMPONENT_IMAGE_NAME: ${COMPONENT_IMAGE_NAME:-<none>}"
 echo "-------------------------------------------"
 
-CLONE_NAME="e2e"
+CLONE_NAME="osac-vmaas"
 
 # === Create ssh_config from ofcir-acquire output ===
 IP=$(cat "${SHARED_DIR}/server-ip")
