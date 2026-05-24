@@ -402,9 +402,22 @@ if (( failed )); then echo "ERROR: Failed to create fulfillment credentials"; ex
 
 echo "$(ts) [3/8] Applying kustomize overlay..."
 oc delete job -n "${INSTALLER_NAMESPACE}" --all --ignore-not-found
+
+########## BEGIN CHANGE: exclude AAP CR and bootstrap job from kustomize apply ##########
+# The AnsibleAutomationPlatform CR (aap.yaml) already exists on the cluster from the
+# snapshot with the correct spec. Re-applying it via oc apply -k touches its
+# resourceVersion, which triggers the AAP operator to start a fresh multi-pass
+# reconciliation — causing cascading controller-task rollouts that kill in-flight
+# AAP jobs. The CR spec hasn't changed, so skip it.
+# Also skip the bootstrap job (job.yaml) — it's unnecessary on snapshot boot and
+# races the operator reconciliation.
+sed -i '/aap\.yaml/d; /job\.yaml/d' base/osac-aap/config/base/kustomization.yaml
+echo "$(ts) [3/8] Excluded aap.yaml and job.yaml from kustomize apply"
+########## END CHANGE ##########
+
 oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 KUSTOMIZE_APPLY_TIME=${SECONDS}
-echo "$(ts) [3/8] Kustomize applied — AAP operator reconciliation clock started"
+echo "$(ts) [3/8] Kustomize applied (without AAP CR — no operator reconciliation triggered)"
 
 ########## BEGIN CHANGE: Phase 3 — all waits in parallel (including gateway) ##########
 
@@ -501,32 +514,12 @@ for pid in "${pids[@]}"; do wait "${pid}" || failed=1; done
 if (( failed )); then echo "ERROR: Fulfillment rollout failed after restart"; exit 1; fi
 ./scripts/prepare-tenant.sh
 
-########## BEGIN CHANGE: Phase 6 — restart AAP operators for single-pass reconciliation ##########
-# The AAP operators (automation-controller-operator, aap-gateway-operator) trigger
-# cascading controller-task rollouts over ~6 minutes after route/config changes.
-# Each rollout kills the old pod's Redis sidecar, crashing in-flight AAP jobs.
-#
-# Fix: restart the operators AFTER all config changes are applied. When they
-# restart, they read the current state (routes already patched, kustomize applied,
-# credentials created) and reconcile to the final state in one pass.
-AAP_OPERATOR_NS="ansible-aap"
-echo "$(ts) [post] Restarting AAP operators for clean single-pass reconciliation..."
-echo "$(ts) [post] Pre-restart controller-task generation: $(oc get deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null)"
-for op in automation-controller-operator-controller-manager aap-gateway-operator-controller-manager; do
-    echo "$(ts) [post] Restarting ${op}..."
-    oc rollout restart "deployment/${op}" -n "${AAP_OPERATOR_NS}"
-done
-for op in automation-controller-operator-controller-manager aap-gateway-operator-controller-manager; do
-    oc rollout status "deployment/${op}" -n "${AAP_OPERATOR_NS}" --timeout=300s
-done
-echo "$(ts) [post] AAP operators restarted, waiting for reconciliation..."
-
-retry_until 300 10 '[[ "$(oc get automationcontroller osac-aap-controller -n '"${INSTALLER_NAMESPACE}"' -o jsonpath='"'"'{.status.conditions[?(@.type=="Successful")].reason}'"'"' 2>/dev/null)" == "Successful" ]]' || {
-    echo "$(ts) WARNING: AutomationController did not reach Successful within 300s"
-}
-
+########## BEGIN CHANGE: Phase 6 — verify controller-task is stable ##########
+# Since we excluded aap.yaml from kustomize apply, the AAP operator should NOT
+# have triggered any new reconciliation. Verify that the controller-task deployment
+# hasn't changed since Phase 3.
+echo "$(ts) [post] Verifying AAP controller-task stability..."
 oc rollout status deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" --timeout=300s
-oc rollout status deployment/osac-aap-gateway -n "${INSTALLER_NAMESPACE}" --timeout=300s
 
 CONTROLLER_TASK_POD=$(oc get pods -n "${INSTALLER_NAMESPACE}" -l app.kubernetes.io/name=osac-aap-controller-task --field-selector=status.phase=Running --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -1)
 POST_GEN=$(oc get deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null)
