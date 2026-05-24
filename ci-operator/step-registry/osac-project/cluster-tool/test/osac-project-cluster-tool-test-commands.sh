@@ -11,7 +11,7 @@ echo "E2E_NAMESPACE: ${E2E_NAMESPACE}"
 echo "E2E_VM_TEMPLATE: ${E2E_VM_TEMPLATE}"
 echo "-------------------------------------------"
 
-CLONE_NAME="osac-vmaas"
+CLONE_NAME="vmaas-kustomize"
 KUBECONFIG_PATH="/root/.kube/${CLONE_NAME}.kubeconfig"
 REMOTE_RESULTS_DIR="/tmp/test-results"
 
@@ -23,7 +23,7 @@ function collect_artifacts() {
 
     echo "Collecting post-test diagnostics..."
     timeout -s 9 2m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s "${E2E_NAMESPACE}" <<'DIAG_EOF' 2>/dev/null || true
-export KUBECONFIG="/root/.kube/osac-vmaas.kubeconfig"
+export KUBECONFIG="/root/.kube/vmaas-kustomize.kubeconfig"
 NS="$1"
 echo "=== POST-TEST NODE RESOURCES ==="
 oc adm top nodes 2>/dev/null || true
