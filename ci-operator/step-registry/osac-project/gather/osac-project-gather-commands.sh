@@ -89,6 +89,42 @@ echo "=== Collecting AAP operator status ==="
 oc get ansibleautomationplatform -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-status.yaml" 2>&1 || true
 oc get automationcontroller -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/automationcontroller-status.yaml" 2>&1 || true
 
+echo "=== Collecting AAP job failure diagnostics ==="
+mkdir -p "${ARTIFACT_DIR}/aap-jobs"
+
+AAP_ROUTE=$(oc get route osac-aap -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || true)
+AAP_TOKEN=$(oc get secret osac-aap-api-token -n "${E2E_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)
+
+if [[ -n "${AAP_ROUTE}" && -n "${AAP_TOKEN}" ]]; then
+    AUTH="Authorization: Bearer ${AAP_TOKEN}"
+    BASE="https://${AAP_ROUTE}/api/controller/v2"
+
+    curl -sk -H "${AUTH}" "${BASE}/jobs/?status__in=error,failed&order_by=-finished&page_size=20" \
+        > "${ARTIFACT_DIR}/aap-jobs/failed-jobs.json" 2>&1 || true
+
+    for JOB_ID in $(jq -r '.results[].id' "${ARTIFACT_DIR}/aap-jobs/failed-jobs.json" 2>/dev/null | head -10); do
+        curl -sk -H "${AUTH}" "${BASE}/jobs/${JOB_ID}/" \
+            > "${ARTIFACT_DIR}/aap-jobs/job-${JOB_ID}-detail.json" 2>&1 || true
+        curl -sk -H "${AUTH}" "${BASE}/jobs/${JOB_ID}/stdout/?format=txt" \
+            > "${ARTIFACT_DIR}/aap-jobs/job-${JOB_ID}-stdout.txt" 2>&1 || true
+        curl -sk -H "${AUTH}" "${BASE}/jobs/${JOB_ID}/job_events/?order_by=-counter&page_size=30" \
+            > "${ARTIFACT_DIR}/aap-jobs/job-${JOB_ID}-events.json" 2>&1 || true
+    done
+
+    curl -sk -H "${AUTH}" "${BASE}/instance_groups/" \
+        > "${ARTIFACT_DIR}/aap-jobs/instance-groups.json" 2>&1 || true
+fi
+
+for POD in $(oc get pods -n "${E2E_NAMESPACE}" -l ansible_job --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null); do
+    oc get pod "${POD}" -n "${E2E_NAMESPACE}" -o json > "${ARTIFACT_DIR}/aap-jobs/pod-${POD}.json" 2>&1 || true
+    oc describe pod "${POD}" -n "${E2E_NAMESPACE}" > "${ARTIFACT_DIR}/aap-jobs/pod-${POD}-describe.txt" 2>&1 || true
+done
+
+echo "=== Collecting networking resource status ==="
+oc get virtualnetwork -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/virtualnetworks.yaml" 2>&1 || true
+oc get subnet -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subnets.yaml" 2>&1 || true
+oc get securitygroup -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/securitygroups.yaml" 2>&1 || true
+
 echo "Log collection complete"
 REMOTE_EOF
 
