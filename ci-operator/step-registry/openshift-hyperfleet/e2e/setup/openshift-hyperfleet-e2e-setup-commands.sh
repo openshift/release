@@ -46,8 +46,28 @@ export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
 export SENTINEL_IMAGE_TAG="${SENTINEL_IMAGE_TAG:-latest}"
 
-# copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
-cp -r /e2e/ /tmp/
+# Build E2E from a specific ref if requested (RC/release testing)
+E2E_REF="${E2E_REF:-}"
+if [ -n "$E2E_REF" ]; then
+  log "=== Building E2E from ref: ${E2E_REF} ==="
+  git clone --branch "$E2E_REF" --depth 1 \
+    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
+  cd /tmp/e2e-src
+  make build
+  cp bin/hyperfleet-e2e "${SHARED_DIR}/hyperfleet-e2e"
+  cp -r deploy-scripts "${SHARED_DIR}/deploy-scripts"
+  cp -r testdata "${SHARED_DIR}/testdata"
+  cp -r configs "${SHARED_DIR}/configs"
+  cd -
+  log "=== E2E build complete ==="
+  mkdir -p /tmp/e2e
+  cp -r "${SHARED_DIR}/deploy-scripts" /tmp/e2e/deploy-scripts
+  cp -r "${SHARED_DIR}/testdata" /tmp/e2e/testdata
+  cp -r "${SHARED_DIR}/configs" /tmp/e2e/configs
+else
+  cp -r /e2e/ /tmp/
+fi
+
 cd "/tmp/e2e/deploy-scripts/"
 cp .env.example .env
 source .env

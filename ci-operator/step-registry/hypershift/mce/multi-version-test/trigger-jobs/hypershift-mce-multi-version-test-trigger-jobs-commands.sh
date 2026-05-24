@@ -19,7 +19,7 @@ GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com
 declare -A mce_to_guest=(
     [2.8]="4.16 4.17 4.18"
     [2.9]="4.17 4.18 4.19"
-    [2.10]="4.18 4.19 4.20"
+    [2.10]="4.16 4.18 4.19 4.20"
     [2.11]="4.19 4.20 4.21"
     [2.17]="4.20 4.21 4.22"
 )

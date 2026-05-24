@@ -9,6 +9,9 @@ parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=Fa
 args = parser.parse_args()
 
 CONFIG = {
+    'aws-us-east-1-quota-slice': {
+        'us-east-1': 15,
+    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -298,7 +301,8 @@ CONFIG = {
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
     # BEGIN ARO-HCP E2E SLOT TYPES
-    'aro-hcp-dev-shard0-westus3-slot': {},
+    'aro-hcp-dev-shard0-centralus-slot': {},
+    'aro-hcp-dev-shard1-centralus-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
@@ -755,7 +759,9 @@ for i in range(150):
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
 for i in range(1):
-    CONFIG['aro-hcp-dev-shard0-westus3-slot']['aro-hcp-dev-shard0-westus3-slot-{i:0>2}'.format(i=i)] = 1
+    CONFIG['aro-hcp-dev-shard0-centralus-slot']['aro-hcp-dev-shard0-centralus-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(7):
+    CONFIG['aro-hcp-dev-shard1-centralus-slot']['aro-hcp-dev-shard1-centralus-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
@@ -777,10 +783,6 @@ CLUSTER_PROFILE_SETS_CONFIG = {
         'aws-4': {
             'install': 50,
             'quota': CONFIG['aws-4-quota-slice'],
-        },
-        'aws-5': {
-            'install': 50,
-            'quota': CONFIG['aws-5-quota-slice'],
         },
     },
     'openshift-org-azure': {
