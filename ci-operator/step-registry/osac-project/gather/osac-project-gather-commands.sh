@@ -125,6 +125,16 @@ oc get virtualnetwork -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/virtualne
 oc get subnet -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subnets.yaml" 2>&1 || true
 oc get securitygroup -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/securitygroups.yaml" 2>&1 || true
 
+echo "=== Dumping AAP controller configmap (settings.py) ==="
+SETTINGS_CM="osac-aap-controller-automationcontroller-configmap"
+oc get configmap "${SETTINGS_CM}" -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-controller-configmap.yaml" 2>&1 || true
+
+echo "=== Dumping AAP controller-task deployment annotations ==="
+oc get deployment osac-aap-controller-task -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.template.metadata.annotations}' 2>/dev/null | python3 -m json.tool > "${ARTIFACT_DIR}/aap-controller-task-annotations.json" 2>&1 || true
+
+echo "=== Dumping AAP controller-task replicasets (all generations) ==="
+oc get replicasets -n "${E2E_NAMESPACE}" -l app.kubernetes.io/name=osac-aap-controller-task -o custom-columns=NAME:.metadata.name,REPLICAS:.spec.replicas,READY:.status.readyReplicas,CREATED:.metadata.creationTimestamp > "${ARTIFACT_DIR}/aap-controller-task-replicasets.txt" 2>&1 || true
+
 echo "Log collection complete"
 REMOTE_EOF
 
