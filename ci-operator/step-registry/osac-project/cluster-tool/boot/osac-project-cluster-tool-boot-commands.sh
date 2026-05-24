@@ -489,6 +489,14 @@ echo "$(ts) Phase 3 complete — all rollouts done, AAP gateway stable"
 echo "$(ts) Deployment status after Phase 3:"
 oc get deployments -n "${INSTALLER_NAMESPACE}" -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,UPDATED:.status.updatedReplicas,AVAILABLE:.status.availableReplicas,GEN:.metadata.generation 2>/dev/null || true
 
+echo "$(ts) === CONFIGMAP SNAPSHOT 1 (after Phase 3, before prepare-aap) ==="
+SETTINGS_CM="osac-aap-controller-automationcontroller-configmap"
+echo "$(ts) Configmap hash: $(oc get configmap "${SETTINGS_CM}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.data}' 2>/dev/null | md5sum | awk '{print $1}')"
+echo "$(ts) Settings.py content (first 2000 chars):"
+oc get configmap "${SETTINGS_CM}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.data.settings}' 2>/dev/null | head -c 2000 || true
+echo ""
+echo "$(ts) Controller-task generation: $(oc get deployment/osac-aap-controller-task -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null)"
+
 ########## END CHANGE ##########
 
 # ── Phase 4: prepare-aap + prepare-fulfillment (sequential — fulfillment needs AAP token) ──
@@ -529,6 +537,11 @@ oc get pod "${CONTROLLER_TASK_POD}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.m
 echo "$(ts) [post] Time since kustomize apply: $(( SECONDS - KUSTOMIZE_APPLY_TIME ))s"
 echo "$(ts) [post] Deployment status:"
 oc get deployments -n "${INSTALLER_NAMESPACE}" -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,UPDATED:.status.updatedReplicas,GEN:.metadata.generation 2>/dev/null || true
+echo "$(ts) === CONFIGMAP SNAPSHOT 2 (after Phase 6, before tests) ==="
+echo "$(ts) Configmap hash: $(oc get configmap "${SETTINGS_CM}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.data}' 2>/dev/null | md5sum | awk '{print $1}')"
+echo "$(ts) Settings.py content (first 2000 chars):"
+oc get configmap "${SETTINGS_CM}" -n "${INSTALLER_NAMESPACE}" -o jsonpath='{.data.settings}' 2>/dev/null | head -c 2000 || true
+echo ""
 echo "$(ts) [post] AAP controller-task stable"
 ########## END CHANGE ##########
 
