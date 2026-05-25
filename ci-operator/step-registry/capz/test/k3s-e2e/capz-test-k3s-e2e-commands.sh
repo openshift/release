@@ -19,6 +19,7 @@ set -o xtrace
 # ---- Install podman (not present in the src image) ----
 if ! command -v podman &>/dev/null; then
   echo "[k3s] Installing podman"
+  chmod -R u+w /etc/yum.repos.art/ci/ 2>/dev/null || true
   dnf install -y podman
 fi
 
