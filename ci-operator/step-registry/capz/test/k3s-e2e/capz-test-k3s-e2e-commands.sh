@@ -16,6 +16,12 @@ export USE_KUBECONFIG="${K3S_KUBECONFIG}"
 source openshift-ci/capz-test-env.sh
 set -o xtrace
 
+# ---- Install podman (not present in the src image) ----
+if ! command -v podman &>/dev/null; then
+  echo "[k3s] Installing podman"
+  dnf install -y podman
+fi
+
 # ---- Cleanup on exit ----
 cleanup_k3s() {
   echo "[k3s] Stopping k3s container"
