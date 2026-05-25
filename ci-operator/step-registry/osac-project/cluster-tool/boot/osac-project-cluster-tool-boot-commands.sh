@@ -419,12 +419,31 @@ oc apply -k "overlays/${INSTALLER_KUSTOMIZE_OVERLAY}"
 KUSTOMIZE_APPLY_TIME=${SECONDS}
 echo "$(ts) [3/8] Kustomize applied (without AAP CR — no operator reconciliation triggered)"
 
-########## BEGIN CHANGE: Phase 3 — all waits in parallel (including gateway) ##########
+########## BEGIN CHANGE: Phase 3 — cert wait + restart + parallel waits ##########
+
+# After recert, cert-manager reissues TLS certificates with the new cluster CA.
+# Pods that start before certs are ready crash loading the CA file. Wait for all
+# certificates to be reissued, then restart fulfillment pods so they mount fresh
+# secrets with the new CA.
+echo "$(ts) [4/8] Waiting for TLS certificates and restarting pods..."
+pids_cert=()
+for cert in authorino fulfillment-controller fulfillment-grpc-server fulfillment-api \
+            fulfillment-rest-gateway fulfillment-database-client fulfillment-database-server \
+            osac-console-proxy; do
+    oc wait --for=condition=Ready "certificate.cert-manager.io/${cert}" -n "${INSTALLER_NAMESPACE}" --timeout=300s &
+    pids_cert+=($!)
+done
+failed=0
+for pid in "${pids_cert[@]}"; do wait "${pid}" || failed=1; done
+if (( failed )); then echo "ERROR: TLS certificates not ready"; exit 1; fi
+echo "$(ts) [4/8] TLS certificates ready, restarting fulfillment pods..."
+for deploy in fulfillment-controller fulfillment-grpc-server fulfillment-rest-gateway fulfillment-ingress-proxy; do
+    oc rollout restart "deploy/${deploy}" -n "${INSTALLER_NAMESPACE}"
+done
 
 echo "$(ts) Phase 3: Waiting for all rollouts + AAP config (parallel)..."
 
 wait_fulfillment_rollouts() {
-    echo "$(ts) [4/8] Waiting for fulfillment rollouts..."
     local pids=()
     for deploy in fulfillment-controller fulfillment-grpc-server fulfillment-rest-gateway fulfillment-ingress-proxy; do
         oc rollout status "deploy/${deploy}" -n "${INSTALLER_NAMESPACE}" --timeout=300s &
