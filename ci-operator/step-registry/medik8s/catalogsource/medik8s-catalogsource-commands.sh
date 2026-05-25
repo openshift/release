@@ -205,8 +205,8 @@ main() {
         fi
         CATALOG_IMAGE="$CATALOG_IMAGE_REF"
     else
-        if [[ ! "$OCP_VERSION" =~ ^[0-9]{3,4}$ ]]; then
-            echo "ERROR: OCP_VERSION must be a 3-4 digit string (e.g., '422' for OCP 4.22)"
+        if [[ ! "$OCP_VERSION" =~ ^[0-9]{2,4}$ ]]; then
+            echo "ERROR: OCP_VERSION must be a 2-4 digit string (e.g., '422' for OCP 4.22)"
             exit 1
         fi
         resolve_commit_sha
