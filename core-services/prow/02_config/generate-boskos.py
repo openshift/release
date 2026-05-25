@@ -815,6 +815,48 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     },
 }
 
+CLUSTER_PROFILE_SETS_IGNORE = {
+    # Do not dump the following cps. Useful when a new profile is about to be introduced
+    # and it is not fully defined yet.
+    'profiles': [],
+
+    # Do not enforce any Cluster Profile Set usage policy on these tests. The schema of
+    # this stanza is defined as follow:
+    #
+    #  'tests_allowlist': {
+    #    '${ORGANIZATION_REGEXP}/${REPOSITORY_REGEXP}' : {
+    #      '${BRANCH_REGEXP}': {
+    #        '${VARIANT_REGEXP}': [
+    #           '${TEST_REGEXP}'
+    #         ]
+    #      }
+    #    }
+    #  }
+    'tests_allowlist': {
+        'openshift(-priv)?/openshift-tests-private': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        },
+        'openshift(-priv)?/installer': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        },
+        'openshift/release': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        }
+    },
+}
+
 def cluster_profile_set_resources(clusterProfileSets):
     def profile_set_resource(profileSet, profileSetData):
         cps_resource = {
@@ -887,13 +929,18 @@ def generate_config():
         yaml.dump(config, f, default_flow_style=False)
 
 def print_cluster_profile_set_details():
-    # Do not dump the following cps. Useful when a new profile is about to be introduced
-    # and it is not fully defined yet.
-    ignore_list = []
-    cps = {}
+    ignored_cps = CLUSTER_PROFILE_SETS_IGNORE['profiles']
+    cps = {
+        'cluster_profile_sets': {},
+        'tests_allowlist': {},
+    }
+
     for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
-        if not cps_name in ignore_list:
-            cps[cps_name] = list(cps_data.keys())
+        if not cps_name in ignored_cps:
+            cps['cluster_profile_sets'][cps_name] = list(cps_data.keys())
+
+    cps['tests_allowlist'] = CLUSTER_PROFILE_SETS_IGNORE['tests_allowlist']
+
     print(json.dumps(cps, indent=2))
 
 if args.print_cps:
