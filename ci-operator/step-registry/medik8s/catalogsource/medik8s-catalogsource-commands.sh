@@ -137,11 +137,6 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: medik8s Catalog
-  grpcPodConfig:
-    extractContent:
-      cacheDir: /tmp/cache
-      catalogDir: /configs
-    memoryTarget: 30Mi
   image: ${CATALOG_IMAGE}
   publisher: medik8s QE
   sourceType: grpc
