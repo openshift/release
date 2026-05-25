@@ -15,7 +15,7 @@ echo "COMPONENT_IMAGE: ${COMPONENT_IMAGE:-<none>}"
 echo "COMPONENT_IMAGE_NAME: ${COMPONENT_IMAGE_NAME:-<none>}"
 echo "-------------------------------------------"
 
-CLONE_NAME="ci-test"
+CLONE_NAME="vmaas-kustomize"
 
 # === Create ssh_config from ofcir-acquire output ===
 IP=$(cat "${SHARED_DIR}/server-ip")
@@ -137,7 +137,7 @@ echo "=== Pulling OSAC vmaas flavor ==="
 python3 /usr/local/bin/cluster-tool pull "${FLAVOR_IMAGE}"
 
 echo "=== Booting cluster ==="
-python3 /usr/local/bin/cluster-tool boot --flavor osac-vmaas-pruned --name "${CLONE}"
+python3 /usr/local/bin/cluster-tool boot --flavor vmaas-kustomize --name "${CLONE}"
 
 systemctl restart dnsmasq
 
