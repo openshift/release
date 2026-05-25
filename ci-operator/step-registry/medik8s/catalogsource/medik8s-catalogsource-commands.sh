@@ -195,7 +195,10 @@ main() {
     if [[ "$CATALOG_MODE" == "direct" ]]; then
         if [[ -z "$CATALOG_IMAGE_REF" ]]; then
             echo "ERROR: CATALOG_IMAGE_REF is required when CATALOG_MODE=direct"
-            echo "Example: registry-proxy.engineering.redhat.com/rh-osbs/iib:1132469 or registry.redhat.io/redhat/redhat-operator-index:v4.22"
+            echo "Use cases: GA IIB validation, released operator testing, custom catalog images"
+            echo "Examples:"
+            echo "  GA IIB:           registry-proxy.engineering.redhat.com/rh-osbs/iib:1132469"
+            echo "  Red Hat catalog:  registry.redhat.io/redhat/redhat-operator-index:v4.22"
             exit 1
         fi
         CATALOG_IMAGE="$CATALOG_IMAGE_REF"
