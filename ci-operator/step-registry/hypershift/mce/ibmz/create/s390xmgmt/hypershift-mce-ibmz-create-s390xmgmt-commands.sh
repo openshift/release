@@ -12,7 +12,7 @@ export CLUSTER_ARCH
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+ssh_key_string=$(cat "ocp-addons/iop-private-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
 envsubst <<"EOF" >${tmp_ssh_key}
@@ -26,11 +26,11 @@ IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
 
 # Run the clone
-#GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
 #git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
 
 echo "Cloning provisioning repo: ${PROVISIONING_REPO} @ branch: ${PROVISIONING_BRANCH}"
-git clone --branch "${PROVISIONING_BRANCH}" "https://${PROVISIONING_REPO}.git"
+git clone --branch "${PROVISIONING_BRANCH}" "${PROVISIONING_REPO}"
 
 #Navigate to clone directory
 cd "ibmcloud-openshift-provisioning" || {
