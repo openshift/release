@@ -88,8 +88,6 @@ export PATH="${BIN_FOLDER}:${PATH}"
 # login for interop
 if [ -s "${KUBECONFIG}" ]; then
     oc whoami
-    cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
 else #login for ROSA & Hypershift platforms
     (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
 fi
