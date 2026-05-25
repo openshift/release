@@ -69,7 +69,7 @@ EOF
       AWS_SG_IDS: "${AWS_SG_IDS}"
       VXLAN_PORT: "9000"
       PODVM_INSTANCE_TYPE: "t3.medium"
-      PODVM_INSTANCE_TYPES: "t3.small,t3.medium,t3.large,t3.xlarge,g4dn.2xlarge,g5.2xlarge"
+      PODVM_INSTANCE_TYPES: "${PODVM_INSTANCE_TYPES}"
       PROXY_TIMEOUT: "30m"
 EOF
 }
