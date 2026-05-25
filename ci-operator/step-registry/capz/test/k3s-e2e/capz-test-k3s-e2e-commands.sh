@@ -43,6 +43,11 @@ chmod +x /tmp/k3s
 export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
+# ---- Prepare network and kernel settings ----
+# k3s requires ip_forward; enable it (needs NET_ADMIN from nested_podman).
+sysctl -w net.ipv4.ip_forward=1 2>/dev/null || echo "[k3s] WARNING: could not set ip_forward"
+sysctl -w net.ipv6.conf.all.forwarding=1 2>/dev/null || true
+
 # ---- Start k3s in rootless mode ----
 # CI pods run as non-root; k3s requires --rootless in this case.
 echo "[k3s] Starting k3s server (rootless mode)"
