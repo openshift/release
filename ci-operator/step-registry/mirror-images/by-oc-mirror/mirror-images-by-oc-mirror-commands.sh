@@ -103,13 +103,99 @@ KUBECONFIG="" oc registry login
 
 run_command "which oc"
 run_command "oc version --client"
+
+# Create combined pull secret early (needed to access private mirror for version detection)
+combined_pull_secret_tmp=$(mktemp)
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${combined_pull_secret_tmp}"
+
+# Extract the full OCP version from the target release (using combined pull secret to access mirror)
+ocp_full_version=$(oc adm release info --registry-config ${combined_pull_secret_tmp} ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
+echo "Target OCP version: ${ocp_full_version}"
+
+# Detect architecture for oc-mirror download
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
+# Determine which oc-mirror version to download
+# Nightly/CI/pre-release builds aren't published to mirror.openshift.com
+if [[ "${ocp_full_version}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+    ocp_minor_version="${BASH_REMATCH[1]}"
+    if [[ "${ocp_full_version}" =~ (nightly|ci|rc|ec) ]]; then
+        # For nightly/CI/RC/EC builds, try stable-X.Y channel, fall back to latest if it doesn't exist
+        # Check if stable channel exists (released versions only) with retry logic
+        stable_channel_url="https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable-${ocp_minor_version}/"
+        stable_exists=false
+        max_retries=3
+        retry_count=0
+        while [[ ${retry_count} -lt ${max_retries} ]]; do
+            if curl -sf --head --connect-timeout 10 "${stable_channel_url}" >/dev/null 2>&1; then
+                stable_exists=true
+                break
+            fi
+            ((retry_count++))
+            if [[ ${retry_count} -lt ${max_retries} ]]; then
+                echo "Stable channel probe attempt ${retry_count} failed, retrying..."
+                sleep 2
+            fi
+        done
+
+        if [[ "${stable_exists}" == "true" ]]; then
+            oc_mirror_version="stable-${ocp_minor_version}"
+            echo "Using oc-mirror from stable-${ocp_minor_version} channel (target is pre-release build)"
+        else
+            oc_mirror_version="latest"
+            echo "Using oc-mirror from latest channel (stable-${ocp_minor_version} not yet available)"
+        fi
+    else
+        # For what looks like GA releases, use exact version
+        oc_mirror_version="${ocp_full_version}"
+        echo "Using oc-mirror version ${ocp_full_version} (target is GA release)"
+    fi
+else
+    # Fallback to latest if version format is unexpected
+    oc_mirror_version="latest"
+    echo "Warning: Unexpected version format '${ocp_full_version}', using latest oc-mirror"
+fi
+
+# Download oc-mirror from mirror.openshift.com
+oc_mirror_download_dir=$(mktemp -d)
+pushd "${oc_mirror_download_dir}"
+echo "Downloading oc-mirror from https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/"
+# Download version-specific oc-mirror from mirror.openshift.com to match the payload version
+curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/oc-mirror.tar.gz"
+# When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
+# curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+#     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+
+# Verify the integrity of the downloaded tarball
+echo "Verifying oc-mirror.tar.gz integrity..."
+curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
+    "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/sha256sum.txt"
+grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
+    echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+    exit 1
+}
+echo "Checksum verification passed"
+
+tar -xzf oc-mirror.tar.gz
+chmod +x oc-mirror
+oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+popd
+
+run_command "'${oc_mirror_bin}' version --output=yaml"
+
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 
-# combine custom registry credential and default pull secret
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
+# Reuse the combined pull secret created earlier
+cp "${combined_pull_secret_tmp}" "${new_pull_secret}"
+rm -f "${combined_pull_secret_tmp}"
 oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
@@ -140,9 +226,6 @@ oc registry login --to "${new_pull_secret}"
 #        fi
 #    fi
 #done
-
-oc_mirror_bin="oc-mirror"
-run_command "'${oc_mirror_bin}' version --output=yaml"
 
 
 # set the imagesetconfigure
