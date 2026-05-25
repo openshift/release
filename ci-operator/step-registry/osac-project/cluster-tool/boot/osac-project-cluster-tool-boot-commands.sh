@@ -369,7 +369,7 @@ keycloak_sync() {
     if [[ -f prerequisites/keycloak/service/password-setup-job.yaml ]]; then
         oc delete job keycloak-set-passwords -n "${KEYCLOAK_NS}" --ignore-not-found
         oc apply -f prerequisites/keycloak/service/password-setup-job.yaml -n "${KEYCLOAK_NS}"
-        oc wait --for=condition=Complete job/keycloak-set-passwords -n "${KEYCLOAK_NS}" --timeout=120s
+        oc wait --for=condition=Complete job/keycloak-set-passwords -n "${KEYCLOAK_NS}" --timeout=300s
     fi
     echo "$(ts) [1/8] Keycloak sync complete"
 }
