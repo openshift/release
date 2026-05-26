@@ -840,11 +840,11 @@ Generated from existing ${product_prefix}-${highest_version} templates."
     log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
     git commit -s -m "Add Tekton files for versions: ${dest_versions}" 2>&1
 
-    # Push branch (use -u only if new branch)
+    # Push branch (use -u for new branch, --force-with-lease if we reset existing branch)
     log "INFO Pushing ${pr_branch} to origin"
-    if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
-      # Branch exists, just push
-      if ! git push 2>&1; then
+    if [[ "$branch_existed_on_remote" == "true" ]]; then
+      # Branch existed and we reset it, need force push
+      if ! git push --force-with-lease 2>&1; then
         log "ERROR Could not push ${pr_branch}"
         exit 1
       fi
