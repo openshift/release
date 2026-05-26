@@ -62,7 +62,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     trap '
-        typeset -i ec=$?
+        typeset -i ec=$?    # shellcheck disable=SC2154
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-tests.xml || true
         debug_on_exit "${ec}" "${start_time}"
