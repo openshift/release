@@ -6,6 +6,11 @@ declare OO_CHANNEL="${OO_CHANNEL:-candidate}"
 declare INSTALL_NAMESPACE="${INSTALL_NAMESPACE:-openshift-workload-availability}"
 declare OPERATORS="${OPERATORS:-}"
 
+# SHARED_DIR is a ci-operator shared workspace for passing artifacts between
+# workflow steps. This step reads the following files from it:
+#   - proxy-conf.sh : proxy environment settings (written by cluster provisioner)
+#   - catsrc_name   : CatalogSource name (written by the medik8s-catalogsource step)
+
 set_proxy() {
     [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
         echo "setting proxy"
@@ -95,6 +100,12 @@ EOF
 
 wait_for_csv() {
     local pkg="$1"
+
+    if ! oc get subscription "$pkg" -n "$INSTALL_NAMESPACE" -o name &>/dev/null; then
+        echo "ERROR: Subscription ${pkg} does not exist in ${INSTALL_NAMESPACE}"
+        return 1
+    fi
+
     echo "Waiting for CSV from subscription ${pkg}..."
 
     local csv=""
