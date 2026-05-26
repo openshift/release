@@ -9,16 +9,20 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
-CLAUDE_ANALYSIS_LOG="${WORKDIR}/claude-analysis.log"
+CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying report files to the artifact directory..."
-        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.log"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        # Sync report files: skip project/artifact/sos dirs, enter first-level subdirs only,
+        # copy html/json/txt/log files, ignore everything else, prune empty dirs
+        rsync -am --no-perms \
+            --exclude='lvm-operator/' --exclude='artifacts/' --exclude='sos*/' \
+            --include='/*/' --exclude='*/' \
+            --include='*.html' --include='*.json' --include='*.txt' --include='*.log' \
+            --exclude='*' \
+            "${WORKDIR}/" "${ARTIFACT_DIR}/"
     fi
 
     # Archive the full Claude session directory (including subagent logs) for debugging.
@@ -39,15 +43,15 @@ atexit_handler() {
     fi
 
     # Check if the Claude session completed successfully
-    if [ ! -f "${CLAUDE_ANALYSIS_LOG}" ]; then
-        echo "WARNING: Log file '${CLAUDE_ANALYSIS_LOG}' not found"
+    if [ ! -f "${CLAUDE_DOCTOR_LOG}" ]; then
+        echo "WARNING: Log file '${CLAUDE_DOCTOR_LOG}' not found"
         return 1
     fi
 
     local result_line
-    result_line="$(grep '"type":"result"' "${CLAUDE_ANALYSIS_LOG}" | tail -1 || true)"
+    result_line="$(grep '"type":"result"' "${CLAUDE_DOCTOR_LOG}" | tail -1 || true)"
     if [[ -z "${result_line}" ]]; then
-        echo "ERROR: No Claude result event found in '${CLAUDE_ANALYSIS_LOG}'"
+        echo "ERROR: No Claude result event found in '${CLAUDE_DOCTOR_LOG}'"
         return 1
     fi
     if ! echo "$result_line" | grep -q '"subtype":"success"' ||
@@ -108,5 +112,5 @@ timeout 3000 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_ANALYSIS_LOG}"
+    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}"
 echo "Analysis for LVMS CI jobs completed"
