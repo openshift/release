@@ -125,6 +125,95 @@ if ! oc wait --for=condition=Ready nodes --all --timeout=300s; then
 fi
 echo "All nodes are ready"
 
+echo "========== Disconnected Environment Verification =========="
+VERIFICATION_FAILED=false
+
+# 1. Verify bastion host is reachable via proxy
+echo "--- Check 1: Bastion host reachability ---"
+BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address" 2>/dev/null || true)
+if [[ -z "${BASTION_PUBLIC_ADDRESS}" ]]; then
+    echo "FAIL: bastion_public_address not found in SHARED_DIR"
+    VERIFICATION_FAILED=true
+else
+    echo "Bastion address: ${BASTION_PUBLIC_ADDRESS}"
+    MIRROR_REGISTRY_URL=$(cat "${SHARED_DIR}/mirror_registry_url" 2>/dev/null || true)
+    if [[ -n "${MIRROR_REGISTRY_URL}" ]]; then
+        # Verify mirror registry is responding on the bastion (port 5000)
+        if curl -sf --max-time 10 -o /dev/null -k "https://${MIRROR_REGISTRY_URL}/v2/"; then
+            echo "PASS: Mirror registry at ${MIRROR_REGISTRY_URL} is responding"
+        else
+            echo "FAIL: Mirror registry at ${MIRROR_REGISTRY_URL} is not responding"
+            VERIFICATION_FAILED=true
+        fi
+    else
+        echo "WARNING: mirror_registry_url not found, skipping mirror registry check"
+    fi
+fi
+
+# 2. Verify cluster API is reachable through proxy
+echo "--- Check 2: Cluster API reachability via proxy ---"
+if oc get --raw /healthz 2>/dev/null; then
+    echo "PASS: Cluster API is reachable (healthz returned ok)"
+else
+    echo "FAIL: Cluster API is not reachable through proxy"
+    VERIFICATION_FAILED=true
+fi
+
+# 3. Verify cluster nodes cannot reach the internet (network isolation)
+echo "--- Check 3: Cluster node internet isolation ---"
+NODE_NAME=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+if [[ -z "${NODE_NAME}" ]]; then
+    # Fall back to any node if no workers found
+    NODE_NAME=$(oc get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+fi
+
+if [[ -n "${NODE_NAME}" ]]; then
+    echo "Testing internet access from node: ${NODE_NAME}"
+    # The curl inside the debug pod runs on the node's network stack (no proxy).
+    # On a properly disconnected cluster, this MUST fail.
+    if oc debug "node/${NODE_NAME}" --quiet -- chroot /host \
+        curl -sf --max-time 10 -o /dev/null https://www.google.com 2>/dev/null; then
+        echo "FAIL: Node ${NODE_NAME} can reach the internet — cluster is NOT disconnected"
+        VERIFICATION_FAILED=true
+    else
+        echo "PASS: Node ${NODE_NAME} cannot reach the internet — cluster is properly disconnected"
+    fi
+else
+    echo "WARNING: Could not determine node name, skipping internet isolation check"
+fi
+
+# 4. Verify IDMS/ICSP mirror configuration is active
+echo "--- Check 4: Image mirror configuration ---"
+if oc get imagedigestmirrorset -o name 2>/dev/null | grep -q .; then
+    echo "PASS: ImageDigestMirrorSet (IDMS) resources found:"
+    oc get imagedigestmirrorset -o name
+elif oc get imagecontentsourcepolicy -o name 2>/dev/null | grep -q .; then
+    echo "PASS: ImageContentSourcePolicy (ICSP) resources found:"
+    oc get imagecontentsourcepolicy -o name
+else
+    echo "FAIL: No IDMS or ICSP resources found — image mirroring may not be configured"
+    VERIFICATION_FAILED=true
+fi
+
+# 5. Verify default catalog sources are disabled
+echo "--- Check 5: Default catalog sources disabled ---"
+DISABLE_STATUS=$(oc get operatorhub cluster -o jsonpath='{.spec.disableAllDefaultSources}' 2>/dev/null)
+if [[ "${DISABLE_STATUS}" == "true" ]]; then
+    echo "PASS: Default catalog sources are disabled (disableAllDefaultSources=true)"
+else
+    echo "FAIL: Default catalog sources are NOT disabled (disableAllDefaultSources=${DISABLE_STATUS:-unset})"
+    VERIFICATION_FAILED=true
+fi
+
+# Summary
+echo "--- Disconnected Environment Verification Summary ---"
+if [[ "${VERIFICATION_FAILED}" == "true" ]]; then
+    echo "WARNING: One or more disconnected environment checks failed. Review the output above."
+    echo "Continuing with test execution — failures may indicate environment misconfiguration."
+else
+    echo "All disconnected environment checks passed."
+fi
+
 echo "========== HTPasswd Identity Provider =========="
 # HTPasswd setup is opt-in via [debug] in the PR title — auth pod restarts add significant job time
 PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
