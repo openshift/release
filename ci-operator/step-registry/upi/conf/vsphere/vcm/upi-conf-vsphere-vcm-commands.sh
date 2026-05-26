@@ -367,13 +367,17 @@ VERSION=$(oc adm release info "${TESTING_RELEASE_IMAGE}" --output=json | jq -r '
 
 set -o errexit
 
-Z_VERSION=1000
+MAJOR_VERSION=1000
+Z_VERSION=0
+OCP_VERSION=100000
 
 if [ ! -z "${VERSION}" ]; then
+  MAJOR_VERSION=$(echo "${VERSION}" | cut -d'.' -f1)
   Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
-  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+  OCP_VERSION=$((MAJOR_VERSION * 100 + Z_VERSION))
+  echo "$(date -u --rfc-3339=seconds) - determined version is ${MAJOR_VERSION}.${Z_VERSION}"
 else
-  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+  echo "$(date -u --rfc-3339=seconds) - unable to determine version stream, assuming this is master"
 fi
 
 ${platform_required} && cat >>"${install_config}" <<EOF
@@ -416,7 +420,7 @@ if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
     fi
     if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
       echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-      if [ "${Z_VERSION}" -lt 14 ]; then
+      if [ "${OCP_VERSION}" -lt 414 ]; then
         echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
         cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${install_config}
       else
@@ -430,7 +434,7 @@ else
   echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
 fi
 
-if [ "${Z_VERSION}" -lt 13 ]; then
+if [ "${OCP_VERSION}" -lt 413 ]; then
   #vsphere_cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
   #datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
 ${platform_required} && cat >>"${install_config}" <<EOF
@@ -510,7 +514,7 @@ SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
 # Older versions of UPI image do not support changing coresPerSocket.  It is hard coded to 4 for CPS.  In these environments, We'll default to 4 cores.
 control_plane_cpu=$(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
 compute_cpu=$(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
-if [ "${Z_VERSION}" -lt 20 ]; then
+if [ "${OCP_VERSION}" -lt 420 ]; then
     echo "$(date -u --rfc-3339=seconds) - Detected legacy jobs.  Configuring CPU counts to 4 ..."
     control_plane_cpu=4
     compute_cpu=4
