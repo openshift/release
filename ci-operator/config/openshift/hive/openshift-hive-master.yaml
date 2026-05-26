@@ -28,7 +28,6 @@ images:
     to: hive
   - dockerfile_literal: |
       FROM src
-      RUN cd /go/src/github.com/openshift/hive && git fetch https://github.com/miyadav/hive.git addsuites && git checkout df8a9552
       RUN make -C test/ote build
       RUN dnf install -y gzip jq && dnf clean all
       RUN cp /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
@@ -323,7 +322,10 @@ tests:
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         export PLATFORM=aws
-        /usr/bin/openshift-tests-extension run-suite openshift/hive/sdrosa/41212 -j ${ARTIFACT_DIR}/junit_results.xml
+        export TEST_SHARD_INDEX=0
+        export TEST_TOTAL_SHARDS=2
+        export TEST_LIMIT=4
+        /usr/bin/openshift-tests-extension run-suite openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
@@ -368,7 +370,7 @@ tests:
         export PLATFORM=aws
         export TEST_SHARD_INDEX=1
         export TEST_TOTAL_SHARDS=2
-        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive/sdrosa -j ${ARTIFACT_DIR}/junit_results.xml || true
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml || true
         RESULT_JSON=$(ls ${ARTIFACT_DIR}/extension_test_result_*.json 2>/dev/null | head -1)
         if [[ -n "$RESULT_JSON" && -f "$RESULT_JSON" ]]; then
           jq -r '
