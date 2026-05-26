@@ -22,6 +22,10 @@ hyperfleet-credential-provider generate-kubeconfig \
   --cluster-name="$CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig" 
 
+# Resolve Gangway-overridable params (prefix is required for ci-operator to
+# inject overrides; bare names are used by downstream scripts and deploy-clm.sh).
+NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
+
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
@@ -40,14 +44,14 @@ export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
 # Export image parameters for the deployment
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export API_IMAGE_REPO="${API_IMAGE_REPO:-ci/hyperfleet-api}"
-export API_IMAGE_TAG="${API_IMAGE_TAG:-latest}"
+export API_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG:-latest}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
-export SENTINEL_IMAGE_TAG="${SENTINEL_IMAGE_TAG:-latest}"
+export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 
 # Build E2E from a specific ref if requested (RC/release testing)
-E2E_REF="${E2E_REF:-}"
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
 if [ -n "$E2E_REF" ]; then
   log "=== Building E2E from ref: ${E2E_REF} ==="
   git clone --branch "$E2E_REF" --depth 1 \
