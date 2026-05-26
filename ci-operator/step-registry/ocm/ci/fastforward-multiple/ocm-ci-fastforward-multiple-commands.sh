@@ -815,6 +815,12 @@ Generated from existing ${product_prefix}-${highest_version} templates."
 
         if git diff --quiet "origin/${default_branch}" HEAD; then
           log "INFO Branch ${pr_branch} is identical to ${default_branch}, no PR needed"
+          log "INFO Deleting orphaned branch ${pr_branch}"
+          if git push origin --delete "${pr_branch}" 2>&1; then
+            log "INFO Successfully deleted ${pr_branch}"
+          else
+            log "WARNING Could not delete ${pr_branch}"
+          fi
           exit 0
         fi
 
@@ -844,7 +850,7 @@ Generated from existing ${product_prefix}-${highest_version} templates."
     log "INFO Pushing ${pr_branch} to origin"
     if [[ "$branch_existed_on_remote" == "true" ]]; then
       # Branch existed and we reset it, need force push
-      if ! git push --force-with-lease 2>&1; then
+      if ! git push --force-with-lease origin "${pr_branch}" 2>&1; then
         log "ERROR Could not push ${pr_branch}"
         exit 1
       fi
