@@ -8,8 +8,8 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: fast
-      version: "4.20"
+      channel: stable
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -191,6 +191,40 @@ tests:
     test:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-disconnected-helm-nightly
+  cron: 0 3 31 12 *
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_IDMS: "yes"
+    post:
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-ocp-disconnected-operator-nightly
+  cron: 0 4 31 12 *
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_IDMS: "yes"
+    post:
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-operator-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: e2e-aks-helm-nightly
   cron: 50 3 * * TUE,THU,SAT,SUN
