@@ -15,6 +15,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
   manila-csi-driver-operator-test:
     name: 4.22-priv
     namespace: ocp-private
@@ -32,15 +36,14 @@ images:
   - to: hypershift-operator
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
-  - dockerfile_path: Dockerfile.e2e
-    to: hypershift-tests
 promotion:
   to:
   - excluded_images:
     - hypershift-operator
-    - hypershift-tests
     name: 4.22-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     candidate:
@@ -491,18 +494,6 @@ tests:
       GKE_REGION: us-central1
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e
-- always_run: false
-  as: e2e-v2-gke
-  capabilities:
-  - build-tmpfs
-  optional: true
-  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
-  steps:
-    cluster_profile: hypershift-gcp
-    env:
-      GKE_REGION: us-central1
-      GKE_RELEASE_CHANNEL: stable
-    workflow: hypershift-gcp-gke-e2e-v2
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv

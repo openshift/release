@@ -172,6 +172,46 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
+- always_run: false
+  as: test-e2e-ci-build-upstream-4-21
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - ref: kueue-operator-test-e2e-dra-enable-feature-gate
+    - ref: dra-example-driver-install
+    - as: e2e-kueue-upstream
+      cli: latest
+      commands: make e2e-upstream-test
+      env:
+      - default: singlecluster certmanager dra
+        name: E2E_TARGET_FOLDERS
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
 - as: test-e2e-4-18
   capabilities:
   - arm64
@@ -183,6 +223,13 @@ tests:
     timeout: 1h0m0s
     version: "4.18"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -196,6 +243,13 @@ tests:
   capabilities:
   - arm64
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -222,6 +276,13 @@ tests:
     timeout: 1h0m0s
     version: "4.19"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -233,6 +294,13 @@ tests:
     - chain: kueue-operator-test-e2e
 - as: test-e2e-4-20-fips
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -248,6 +316,13 @@ tests:
     workflow: ipi-aws
 - as: test-e2e-4-20-hypershift
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -268,6 +343,13 @@ tests:
     timeout: 1h0m0s
     version: "4.20"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -288,6 +370,13 @@ tests:
     timeout: 1h0m0s
     version: "4.20"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -308,6 +397,13 @@ tests:
     timeout: 1h0m0s
     version: "4.21"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -328,6 +424,67 @@ tests:
     timeout: 1h0m0s
     version: "4.21"
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+- as: test-e2e-downstream-4-22
+  capabilities:
+  - arm64
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream
+- as: test-e2e-upstream-4-22
+  capabilities:
+  - arm64
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -350,6 +507,13 @@ tests:
     version: "4.20"
   minimum_interval: 96h
   presubmit: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -372,6 +536,13 @@ tests:
     version: "4.21"
   minimum_interval: 96h
   presubmit: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -421,6 +592,13 @@ tests:
   capabilities:
   - arm64
   cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -474,6 +652,13 @@ tests:
   cron: '@daily'
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -481,7 +666,7 @@ tests:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: g4dn.xlarge
+      COMPUTE_NODE_TYPE: g4dn.12xlarge
       NVIDIA_DRA_DRIVER_VERSION: 25.12.0
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main

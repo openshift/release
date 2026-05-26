@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -69,7 +69,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build05
     context: ci/prow/omr-ocp416-images
     decorate: true
     decoration_config:
@@ -208,7 +208,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: quay-newui
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-quay-quay-tests-master-quay-newui-images
     rerun_command: /test quay-newui-images
@@ -334,7 +334,11 @@ presubmits:
     context: ci/prow/quay-upgrade-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.upgrade
     labels:
       ci-operator.openshift.io/variant: quay-upgrade
       ci.openshift.io/generator: prowgen
@@ -377,9 +381,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

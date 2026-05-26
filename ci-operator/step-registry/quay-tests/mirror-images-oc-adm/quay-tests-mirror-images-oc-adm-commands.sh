@@ -48,7 +48,7 @@ oc registry login
 registry_cred="cXVheTpwYXNzd29yZA=="
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
-mirror_options="--insecure=true"
+mirror_options="--insecure=true --max-per-registry=2"
 # check whether the oc command supports the --keep-manifest-list and add it to the args array.
 if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
     echo "Adding --keep-manifest-list to the mirror command."

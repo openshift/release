@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.24-linux:
+  stolostron_builder_go1.25-linux:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.25-linux
 binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
@@ -24,6 +24,8 @@ promotion:
   - disabled: true
     name: "2.15"
     namespace: stolostron
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -52,14 +54,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
-    env:
-      IMAGE_REPO: klusterlet-addon-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.15
   org: openshift-priv

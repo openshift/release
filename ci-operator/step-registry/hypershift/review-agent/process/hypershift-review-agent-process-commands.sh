@@ -737,6 +737,7 @@ INSTRUCTIONS:
   claude -p "$resolve_prompt" \
     --allowedTools "Bash Read Write Edit Grep Glob" \
     --max-turns 30 \
+    --effort max \
     --model "$CLAUDE_MODEL" \
     --verbose \
     --output-format stream-json \
@@ -1127,6 +1128,7 @@ ${SUBAGENT_PROMPT}"
       --system-prompt "$SKILL_CONTENT" \
       --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
       --max-turns 150 \
+      --effort max \
       --model "$CLAUDE_MODEL" \
       --verbose \
       --output-format stream-json \
@@ -1212,6 +1214,7 @@ Reproduce each failure, fix the code, and verify the fix passes."
       --system-prompt "$CI_FIX_SYSTEM" \
       --allowedTools "Bash Read Write Edit Grep Glob" \
       --max-turns 150 \
+      --effort max \
       --model "$CLAUDE_MODEL" \
       --verbose \
       --output-format stream-json \

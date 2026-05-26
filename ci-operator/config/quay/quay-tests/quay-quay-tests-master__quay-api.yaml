@@ -12,6 +12,9 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.18
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -29,6 +32,16 @@ resources:
 tests:
 - as: quay-e2e-tests-quay313-api-testing
   cron: 0 12 * * 6
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -114,10 +127,26 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:be7ba8a18c423975e3c840984e9f89bdb6f988996ca8e0ad6287f92301ad45c7
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4d329eb8c32ce91a9844fd18959f6076da0e41cb4020544d2537f86dc875ccd7
       QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-api-testing
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:91e8153ce3b59e493dbb16ebdda40fde02876ab0bbe01863b5ad841bfd4739f5
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-deploy-quay-aws-s3

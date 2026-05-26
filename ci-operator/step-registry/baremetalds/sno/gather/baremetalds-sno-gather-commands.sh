@@ -24,7 +24,7 @@ function getlogs() {
 trap getlogs EXIT
 
 echo "### Gathering logs..."
-timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 1h ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
 source /root/config
@@ -45,7 +45,7 @@ INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
 echo "Fetching SOS report from ${SINGLE_NODE_IP_ADDRESS}"
 ssh "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS} sudo mkdir /run/artifacts &&
 ssh "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS} \
-  sudo podman run -it --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
+  sudo podman run --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
       sos report --case-id "\$HOSTNAME" --batch \
         -o container_log,filesys,logs,networkmanager,podman,processor,sar \
         -k podman.all -k podman.logs \

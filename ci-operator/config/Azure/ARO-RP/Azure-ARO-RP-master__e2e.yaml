@@ -1,0 +1,109 @@
+base_images:
+  aro-classic-e2e:
+    name: aro-classic-ci-images
+    namespace: aro-classic
+    tag: aro-classic-e2e
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.25
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration-e2e-parallel-miwi
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-int
+    env:
+      E2E_TYPE: miwi
+      LOCATION: eastus
+    workflow: aro-classic-e2e
+- as: stage-e2e-parallel-miwi
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-stg
+    env:
+      E2E_TYPE: miwi
+      LOCATION: westus2
+    workflow: aro-classic-e2e
+- as: prod-e2e-parallel-miwi
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-prod
+    env:
+      E2E_TYPE: miwi
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- as: integration-e2e-parallel-csp
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-int
+    env:
+      E2E_TYPE: csp
+      LOCATION: eastus
+    workflow: aro-classic-e2e
+- as: stage-e2e-parallel-csp
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-stg
+    env:
+      E2E_TYPE: csp
+      LOCATION: westus2
+    workflow: aro-classic-e2e
+- as: prod-e2e-parallel-csp
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-prod
+    env:
+      E2E_TYPE: csp
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+- as: integration-e2e-parallel
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-int
+    env:
+      E2E_TYPE: both
+      LOCATION: eastus
+    workflow: aro-classic-e2e
+- as: stage-e2e-parallel
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-stg
+    env:
+      E2E_TYPE: both
+      LOCATION: westus2
+    workflow: aro-classic-e2e
+- as: prod-e2e-parallel
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    cluster_profile: aro-classic-prod
+    env:
+      E2E_TYPE: both
+      LOCATION: uksouth
+    workflow: aro-classic-e2e
+zz_generated_metadata:
+  branch: master
+  org: Azure
+  repo: ARO-RP
+  variant: e2e

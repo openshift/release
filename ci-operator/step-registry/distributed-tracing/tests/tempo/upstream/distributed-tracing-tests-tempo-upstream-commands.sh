@@ -35,6 +35,9 @@ fi
 # Unset environment variable which conflicts with Chainsaw
 unset NAMESPACE
 
+# Initialize a variable to keep track of errors
+any_errors=false
+
 # Execute Tempo e2e tests
 chainsaw test \
 --quiet \
@@ -49,4 +52,24 @@ tests/e2e-openshift-serverless \
 tests/e2e-openshift-ossm \
 tests/e2e-openshift-object-stores \
 tests/e2e-long-running \
-tests/operator-metrics
+tests/e2e-openshift-tshirt-sizes \
+tests/operator-metrics || any_errors=true
+
+# Execute TLS profile tests last: they patch the cluster-wide APIServer resource,
+# triggering node-level TLS reconciliation that would disrupt concurrently running tests.
+chainsaw test \
+--quiet \
+--config .chainsaw-openshift.yaml \
+--report-name "junit_tempo_e2e_tls_profile" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-openshift-tls-profile || any_errors=true
+
+# Check if any errors occurred
+if $any_errors; then
+  echo "Tests failed, check the logs for more details."
+  exit 1
+else
+  echo "All the tests passed."
+fi

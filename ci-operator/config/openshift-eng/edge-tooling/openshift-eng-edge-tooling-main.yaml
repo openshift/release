@@ -3,6 +3,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -10,78 +14,98 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_literal: |
-      FROM src
-      USER 0:0
-      RUN GH_TOKEN_VER=2.0.8 && GH_TOKEN_SHA=867d9ebf7dd18e67e2599f0f890f3f41b8673e88c4394a32a05476024c41ea0f && \
-          curl -sSL --connect-timeout 10 --max-time 120 --fail \
-            "https://github.com/Link-/gh-token/releases/download/v${GH_TOKEN_VER}/linux-amd64" \
-            -o /usr/local/bin/gh-token && \
-          echo "${GH_TOKEN_SHA}  /usr/local/bin/gh-token" | sha256sum -c - && \
-          chmod +x /usr/local/bin/gh-token
-      COPY . /opt/app-root/src/
-      WORKDIR /opt/app-root/src/
-    from: src
-    to: edge-tooling
-  - dockerfile_literal: |
-      FROM pipeline:claude-ai-helpers
-      USER 0:0
-      COPY gotoken/gh-token /usr/local/bin/gh-token
-      RUN chmod +x /usr/local/bin/gh-token
-      COPY repo/ /opt/app-root/src/edge-tooling
-      WORKDIR /opt/app-root/src/edge-tooling
+  - dockerfile_path: images/Containerfile.markdownlint
+    from: root
+    to: markdownlint-cli2
+  - dockerfile_path: images/Containerfile.ci
     from: claude-ai-helpers
-    inputs:
-      edge-tooling:
-        paths:
-        - destination_dir: gotoken
-          source_path: /usr/local/bin/gh-token
-      src:
-        paths:
-        - destination_dir: repo
-          source_path: /go/src/github.com/openshift-eng/edge-tooling/.
     to: edge-tooling-ai-helpers
+promotion:
+  to:
+  - additional_images:
+      edge-tooling-ai-helpers: edge-tooling-ai-helpers
+      markdownlint-cli2: markdownlint-cli2
+    excluded_images:
+    - '*'
+    namespace: ci
+    tag: latest
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |-
-  dnf -y module reset nodejs || true
-  dnf -y module enable nodejs:20
-  dnf -y install nodejs
-
-  npm install -g \
-  markdownlint@v0.40.0 \
-  markdownlint-cli2@v0.22.1 \
-  markdownlint-cli2-formatter-json \
-  markdownlint-cli2-formatter-pretty \
-  markdownlint-cli2-formatter-junit
 tests:
 - always_run: false
   as: markdownlint
-  commands: |
-    set +e
-    make lint-markdown
-    rc=$?
-    if [[ -n "${ARTIFACT_DIR:-}" && -f markdownlint-cli2-junit.xml ]]; then
-      cp -f markdownlint-cli2-junit.xml "${ARTIFACT_DIR}/"
-    fi
-    exit "${rc}"
+  commands: make lint-markdown
   container:
-    from: test-bin
+    clone: true
+    from: markdownlint-cli2
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
+- as: shellcheck
+  commands: make lint-shellcheck
+  container:
+    clone: true
+    from: shellcheck
+  run_if_changed: .sh$
+- always_run: false
+  as: skills-lint
+  commands: make lint-all-skills
+  container:
+    clone: true
+    from: root
+  run_if_changed: (SKILL\.md|^scripts/lint-skills\.py|^Makefile|^plugins/.*/skills/)
 - as: ocp-ci-monitor
-  cron: 0 9 * * *
+  cron: 0 7 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     workflow: openshift-edge-tooling-ci-monitor
+- as: microshift-ci-doctor
+  cron: 0 8,14 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |
+      :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/microshift-ci-doctor-report.html|View report> | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/analyze-ci-create-bugs-merged.txt|View bugs> | <{{.Status.URL}}|View logs> |
+  steps:
+    workflow: openshift-edge-tooling-microshift-ci-doctor
+- as: lvms-ci-doctor
+  cron: 0 17 * * 0
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |
+      :robot_face: *LVMS CI Doctor* ended with *{{.Status.State}}*.
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/lvms-ci-doctor/openshift-edge-tooling-lvms-ci-doctor/artifacts/lvm-operator-ci-doctor-report.html|View report> | <{{.Status.URL}}|View logs> |
+  steps:
+    workflow: openshift-edge-tooling-lvms-ci-doctor
 - as: pr-notifier
   cron: 0 7 * * 0-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   restrict_network_access: false
   steps:
     env:
       FORBIDDEN_LABELS: jira/invalid-bug
-      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling
+      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements,openshift/lvm-operator
       REQUIRED_LABELS: lgtm,approved,verified
     workflow: openshift-edge-tooling-gh-notifier
 zz_generated_metadata:

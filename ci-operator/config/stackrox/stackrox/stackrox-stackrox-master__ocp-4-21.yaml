@@ -55,15 +55,6 @@ tests:
       OCP_VERSION: ocp/candidate-4.21
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
-- always_run: false
-  as: sensor-integration-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/candidate-4.21
-      TEST_SUITE: ocp-sensor-integration-tests
-    workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: ui-e2e-tests
   optional: true
   run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)
@@ -112,6 +103,7 @@ tests:
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 7h0m0s
 - as: merge-qa-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -120,6 +112,7 @@ tests:
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-operator-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -127,6 +120,7 @@ tests:
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-scanner-v4-install-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -135,6 +129,7 @@ tests:
       TEST_SUITE: ocp-scanner-v4-install-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-ui-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -143,6 +138,7 @@ tests:
       TEST_SUITE: ocp-ui-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: merge-nongroovy-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:
@@ -150,7 +146,17 @@ tests:
       OCP_VERSION: ocp/candidate-4.21
       TEST_SUITE: ocp-nongroovy-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
+- as: merge-vm-scanning-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/candidate-4.21
+      TEST_SUITE: ocp-vm-scanning-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 7h0m0s
 - as: merge-compliance-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     env:

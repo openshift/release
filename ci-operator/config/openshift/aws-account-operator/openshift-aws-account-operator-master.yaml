@@ -4,6 +4,14 @@ images:
   items:
   - dockerfile_path: build/Dockerfile
     to: aws-account-operator
+  - dockerfile_literal: |
+      FROM src
+      RUN PREK_VERSION="$(tr -d '[:space:]' < .prek-version 2>/dev/null || true)" \
+        && PREK_VERSION="${PREK_VERSION:-v0.3.9}" \
+        && curl -fsSL "https://github.com/j178/prek/releases/download/${PREK_VERSION}/prek-x86_64-unknown-linux-gnu.tar.gz" \
+        | tar xzf - --strip-components=1 -C /usr/local/bin/ prek-x86_64-unknown-linux-gnu/prek
+    from: src
+    to: prek-runner
 resources:
   '*':
     limits:
@@ -47,6 +55,20 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: prek
+  commands: |
+    export PREK_HOME=/tmp/prek
+    cd /go/src/github.com/openshift/aws-account-operator
+    git init
+    git add -A
+    if [ -x hack/ci.sh ]; then
+      ./hack/ci.sh
+    else
+      prek run --all-files
+    fi
+  container:
+    from: prek-runner
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - always_run: false
   as: integration-test
   cluster_claim:
@@ -56,6 +78,7 @@ tests:
     product: ocp
     timeout: 15m0s
     version: "4.16"
+  max_concurrency: 1
   optional: true
   steps:
     test:

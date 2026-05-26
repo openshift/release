@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -275,8 +275,9 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl-part1
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part1
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -289,8 +290,9 @@ tests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-ocl-part2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part2
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -697,18 +699,38 @@ tests:
 - always_run: false
   as: e2e-aws-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure-ovn-multidisk-techpreview
