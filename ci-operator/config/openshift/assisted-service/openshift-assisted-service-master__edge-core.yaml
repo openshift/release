@@ -1,0 +1,254 @@
+base_images:
+  assisted-image-service:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: backplane-5.0
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  postgresql-15-c9s:
+    name: postgresql
+    namespace: ci
+    tag: postgresql-15-c9s
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: ci-images/Dockerfile.base
+    to: assisted-service-base
+  - dockerfile_path: ci-images/Dockerfile.unit-tests
+    from: assisted-service-base
+    to: assisted-service-unit-test
+  - dockerfile_path: ci-images/Dockerfile.lint
+    from: assisted-service-base
+    to: assisted-service-lint
+  - dockerfile_path: ci-images/Dockerfile.subsystem
+    from: assisted-service-base
+    to: assisted-service-subsystem
+  - dockerfile_path: ci-images/Dockerfile.code-generation
+    from: assisted-service-base
+    to: assisted-service-generate
+  - dockerfile_path: Dockerfile.assisted-service-build
+    to: assisted-service-build-base
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      assisted-service-build-base:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./
+          source_path: /go/src/github.com/openshift/assisted-service/.
+    to: assisted-service-build
+  - dockerfile_path: Dockerfile.assisted-service
+    to: assisted-service
+  - dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM coreos/stream9:9
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY . .
+    from: src
+    to: assisted-service-scripts
+  - dockerfile_literal: |
+      FROM coreos/stream9:9
+      RUN dnf install -y --skip-broken skopeo pip
+    from: src
+    to: assisted-service-publish-index
+operator:
+  bundles:
+  - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/assisted-service:latest
+    with: assisted-service
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
+    with: assisted-installer
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
+    with: assisted-installer-agent
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:latest
+    with: assisted-installer-controller
+  - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
+    with: assisted-image-service
+  - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
+    with: postgresql-15-c9s
+promotion:
+  to:
+  - name: backplane-5.0
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: publish-python-client
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-publish-python-client
+- as: mirror-nightly-image
+  cron: 0 20 * * *
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: operator-publish
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-publish
+- as: assisted-operator-catalog-publish
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
+- always_run: false
+  as: operator-publish-verify
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-publish
+- as: assisted-operator-catalog-publish-verify
+  run_if_changed: ^(deploy/olm-catalog/.*)$
+  steps:
+    env:
+      REGISTRY_BUNDLE_REPOSITORY_NAME: assisted-service-operator-bundle-test
+      REGISTRY_CATALOG_REPOSITORY_NAME: assisted-service-index-test
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    from: assisted-service-lint
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+- as: verify-generated-code
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: unit-test
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+- as: unit-test-postsubmit
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: subsystem-aws-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 22 * * 0-5
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-service
+  variant: edge-core
