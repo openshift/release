@@ -7,8 +7,7 @@ typeset -i start_time=${SECONDS}
 debug_on_exit() {
   local -i exit_code="${1:?MUST give the actual script Exit Status.}"; (($#)) && shift
   local -i start_time="${1:?MUST give the script start time.}"; (($#)) && shift
-  local -i end_time=$SECONDS
-  local -i execution_time=$((end_time - start_time))
+  local -i execution_time=$((SECONDS - start_time))
   local -i debug_threshold=720 # 12 minutes in seconds
   local hco_namespace=openshift-cnv
   local lockfile=/tmp/debug_marker
