@@ -28,27 +28,21 @@ ref:
       Pin to a specific dragonfly/rhwa-fbc commit SHA for reproducibility.
       If empty, the step resolves the latest commit from GIT_REF.
     default: ""
-  - name: MIRROR_OPERATORS
-    documentation: |-
-      Set to "true" for disconnected environments. When true, mirrors the
-      FBC catalog and all operator images to the CI mirror registry using
-      oc-mirror v2, then creates IDMS pointing to the mirror.
-    default: "false"
   - name: MEDIK8S_PACKAGES
     documentation: |-
       Comma-separated list of medik8s operator package names to mirror.
-      Only used when MIRROR_OPERATORS=true. Default includes all 6 RHWA operators.
+      Default includes all 6 RHWA operators.
     default: "fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation"
   - name: CATALOG_SOURCE_NAME
     documentation: The name of the CatalogSource to create.
     default: "medik8s-catalog"
   - name: IDMS_NAME
-    documentation: The name of the ImageDigestMirrorSet to create (disconnected mode only).
+    documentation: The name of the ImageDigestMirrorSet to create.
     default: "medik8s-disconnected"
   documentation: |-
-    Creates a CatalogSource for medik8s/RHWA operator testing, supporting both
-    connected and disconnected environments.
-    In connected mode (default): resolves FBC from Quay, no mirroring needed.
-    In disconnected mode (MIRROR_OPERATORS=true): mirrors catalog and operator
-    images to the CI mirror registry using oc-mirror v2 and creates IDMS.
+    Creates a CatalogSource for medik8s/RHWA operator testing in disconnected
+    environments. Mirrors the FBC catalog and operator images to the CI mirror
+    registry using oc-mirror v2, creates IDMS pointing to the mirror, and creates
+    a CatalogSource from the mirrored image.
+    For connected environments, use the medik8s-catalogsource step instead.
     Based on the proven file-integrity-konflux-catalogsource pattern.

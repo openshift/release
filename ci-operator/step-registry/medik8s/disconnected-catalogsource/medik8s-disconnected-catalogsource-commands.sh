@@ -13,8 +13,6 @@ declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare IDMS_NAME="${IDMS_NAME:-medik8s-disconnected}"
 declare OCP_VERSION="${OCP_VERSION:-}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
-declare FBC_SHA_PINNED="${FBC_COMMIT_SHA:+true}"
-declare MIRROR_OPERATORS="${MIRROR_OPERATORS:-false}"
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 
 run() {
@@ -61,7 +59,8 @@ check_mirror_registry() {
         export MIRROR_REGISTRY_HOST
         echo "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
     else
-        echo "ERROR: No mirror registry URL found. This step requires a disconnected cluster."
+        echo "ERROR: No mirror registry URL found at \${SHARED_DIR}/mirror_registry_url."
+        echo "This step requires a disconnected cluster with a mirror registry."
         exit 1
     fi
 }
@@ -89,7 +88,8 @@ configure_host_pull_secret() {
 
 install_oc_mirror() {
     echo "[$(timestamp)] Installing oc-mirror..."
-    curl -sSL -o /tmp/oc-mirror.tar.gz \
+    curl -sSLf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
+        -o /tmp/oc-mirror.tar.gz \
         "https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
     tar -xzf /tmp/oc-mirror.tar.gz -C /tmp && chmod +x /tmp/oc-mirror
     rm -f /tmp/oc-mirror.tar.gz
@@ -166,11 +166,13 @@ EOF
         --src-tls-verify=false \
         --log-level=info || {
         echo "ERROR: oc-mirror failed"
-        tar -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-debug.tar.gz" . 2>/dev/null || true
+        tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
+            -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-debug.tar.gz" . 2>/dev/null || true
         return 1
     }
 
-    tar -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-output.tar.gz" . 2>/dev/null || true
+    tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
+        -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-output.tar.gz" . 2>/dev/null || true
     echo "[$(timestamp)] Mirroring complete"
 }
 
@@ -233,18 +235,12 @@ EOF
 }
 
 create_catalogsource() {
-    local catalog_image
-
     local original_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
-    if [[ "$MIRROR_OPERATORS" == "true" ]]; then
-        local image_path
-        image_path=$(echo "$original_image" | sed 's|^quay.io/||')
-        catalog_image="${MIRROR_REGISTRY_HOST}/${image_path}"
-    else
-        catalog_image="$original_image"
-    fi
+    local image_path
+    image_path=$(echo "$original_image" | sed 's|^quay.io/||')
+    local catalog_image="${MIRROR_REGISTRY_HOST}/${image_path}"
 
-    echo "Creating CatalogSource ${CATALOG_SOURCE_NAME} with image: ${catalog_image}"
+    echo "Creating CatalogSource ${CATALOG_SOURCE_NAME} with mirrored image: ${catalog_image}"
 
     cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -253,7 +249,7 @@ metadata:
   name: ${CATALOG_SOURCE_NAME}
   namespace: openshift-marketplace
 spec:
-  displayName: medik8s Catalog
+  displayName: medik8s Catalog (disconnected)
   grpcPodConfig:
     extractContent:
       cacheDir: /tmp/cache
@@ -296,7 +292,7 @@ wait_for_catalogsource() {
 }
 
 main() {
-    echo "=== medik8s Disconnected CatalogSource Setup (mirror=${MIRROR_OPERATORS}) ==="
+    echo "=== medik8s Disconnected CatalogSource Setup ==="
     set_proxy
     run oc whoami
     run oc version -o yaml
@@ -306,28 +302,24 @@ main() {
         exit 1
     fi
 
+    export TMP_DIR=/tmp/mirror-operators
+    export XDG_RUNTIME_DIR="${TMP_DIR}/run"
+    mkdir -p "${XDG_RUNTIME_DIR}/containers"
+    cd "$TMP_DIR"
+
     resolve_commit_sha
-
-    if [[ "$MIRROR_OPERATORS" == "true" ]]; then
-        export TMP_DIR=/tmp/mirror-operators
-        export XDG_RUNTIME_DIR="${TMP_DIR}/run"
-        mkdir -p "${XDG_RUNTIME_DIR}/containers"
-        cd "$TMP_DIR"
-
-        check_mirror_registry
-        configure_host_pull_secret
-        install_oc_mirror
-        create_registries_conf
-        mirror_catalog_and_operators
-        create_idms_disconnected
-    fi
-
+    check_mirror_registry
+    configure_host_pull_secret
+    install_oc_mirror
+    create_registries_conf
+    mirror_catalog_and_operators
+    create_idms_disconnected
     ensure_marketplace
     create_catalogsource
     wait_for_catalogsource
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
-    echo "=== Done. CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
+    echo "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }
 main
