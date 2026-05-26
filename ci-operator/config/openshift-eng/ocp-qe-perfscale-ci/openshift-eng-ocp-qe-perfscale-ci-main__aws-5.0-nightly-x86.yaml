@@ -1,8 +1,54 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+
+      LABEL vendor="Red Hat Inc." maintainer="OCP QE Team"
+
+      RUN dnf install -y python3.11 python3.11-pip && ln -s /usr/bin/python3.11 /usr/bin/python && ln -s /usr/bin/pip3.11 /usr/bin/pip
+
+      RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux-amd64-rhel8.tar.gz | tar -xvzf -  &&\
+          mv kubectl /bin
+
+      RUN dnf update -y && dnf install -y gettext util-linux jq openssh-clients sshpass iputils nmap-ncat rsync procps-ng git gcc && \
+          python3.11 -m pip install --upgrade pip && python3.11 -m pip install virtualenv jq gsutil
+
+      # Allow gsutil to write its state under random UID (OpenShift-safe)
+      RUN mkdir -p /.gsutil && \
+          chgrp -R 0 /.gsutil && \
+          chmod -R g+rwX /.gsutil
+
+      # yq installation
+      RUN curl -sSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+          -o /usr/bin/yq && \
+          chmod +x /usr/bin/yq
+
+      # Remove capabilities from ping - resolve any symlinks to find actual binary
+      RUN PING_BIN=$(readlink -f /usr/bin/ping 2>/dev/null || echo /usr/bin/ping) && \
+          if [ -f "$PING_BIN" ] && [ ! -L "$PING_BIN" ]; then \
+              setcap -r "$PING_BIN" 2>&1 || echo "Warning: Could not remove capabilities from ping (may not be supported)"; \
+          fi
+
+      RUN curl -sSL $(curl -sSL https://api.github.com/repos/openshift/rosa/releases/latest | jq -r ".assets[] | select(.name == \"rosa_Linux_x86_64.tar.gz\") | .browser_download_url") | tar xvzf - &&\
+          mv rosa /bin && chmod 777 /bin/rosa
+
+      RUN curl -sSL $(curl -sSL https://api.github.com/repos/openshift-online/ocm-cli/releases/latest | jq -r ".assets[] | select(.name == \"ocm-linux-amd64\") | .browser_download_url") --output /bin/ocm && chmod 777 /bin/ocm
+
+      # Clone e2e-benchmarking at build time (fresh on every build, latest tag)
+      RUN REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking" && \
+          LATEST_TAG=$(git ls-remote --tags "$REPO_URL" | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1) && \
+          git clone "$REPO_URL" --branch "$LATEST_TAG" --depth 1 /e2e-benchmarking
+    to: ocp-qe-perfscale-ci
 releases:
   latest:
     candidate:
@@ -57,23 +103,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
       CDV2_ITERATION_MULTIPLIER: "15"
-      ENABLE_LAYER_3: "false"
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
-      IGNORE_JOB_ITERATIONS: "true"
       KB_FLAGS: --local-indexing
-      ND_CNI_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50
-        --churn-cycles=2
-      ND_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50 --churn-cycles=2
-      OUTPUT_FORMAT: JUNIT
-      RUN_ORION: deferred
-      UDN_ITERATION_MULTIPLIER: "12"
       VERSION: "5.0"
       ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-workers-scale
-    - chain: openshift-qe-control-plane
-    - chain: openshift-qe-orion-consolidated
+    - chain: openshift-qe-cluster-density-v2
     workflow: openshift-qe-installer-aws
 - as: control-plane-120nodes
   cron: 0 8 * * 1
