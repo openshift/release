@@ -135,6 +135,17 @@ Periodic tests can be separated from main configuration into dedicated `__period
 - `zz_generated_metadata` contains data extracted from the `__periodics.yaml` configuration during `make update`
 - Generated jobs go to separate `-periodics.yaml` files in `ci-operator/jobs/`
 
+### OpenShift Release Periodic Jobs (Nightly & CI)
+The main OpenShift periodic jobs that test nightly and CI payload streams are defined in `ci-operator/config/openshift/release/`. These are the top-level e2e and upgrade jobs that gate release payloads, distinct from per-component periodic jobs.
+
+Files follow the naming convention `openshift-release-main__<stream>-<version>.yaml`:
+- **Nightly stream**: `openshift-release-main__nightly-<version>.yaml` — e2e tests against nightly payloads
+- **CI stream**: `openshift-release-main__ci-<version>.yaml` — e2e tests against CI payloads
+- **Upgrade jobs**: `openshift-release-main__nightly-<version>-upgrade-from-stable-<prev>.yaml` — upgrade tests from prior stable releases
+- **Other variants**: OKD SCOS (`__okd-scos-<version>.yaml`), CNV (`__cnv-nightly-<version>.yaml`)
+
+The release controller configurations that define acceptance gates for these streams live in `core-services/release-controller/_releases/` (e.g., `release-ocp-5.0.json` for nightly, `release-ocp-5.0-ci.json` for CI).
+
 ## Key Workflows
 
 ### Modifying CI for a Repository
