@@ -64,6 +64,16 @@ tests:
   capabilities:
   - intranet
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#opp-discussion'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
@@ -120,11 +130,22 @@ tests:
   capabilities:
   - intranet
   cron: 0 0 1,15 * *
+  reporter_config:
+    channel: '#opp-discussion'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: vsphere-connected-2
     env:
       COMPUTE_NODE_REPLICAS: "6"
+      DISABLE_ENVIRONMENT_CHECKER: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com

@@ -54,6 +54,16 @@ spec:
         app: prow
         component: tot
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
         command:
@@ -71,7 +81,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: tot
-        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260504-92d6574a4
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260518-1704362c7
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config

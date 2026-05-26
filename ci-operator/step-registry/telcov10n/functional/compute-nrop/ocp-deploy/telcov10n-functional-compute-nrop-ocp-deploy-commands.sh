@@ -37,6 +37,7 @@ cd /eco-ci-cd
 
 echo "Clean old clusters"
 ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+    -e "cluster_name=${CLUSTER_NAME}" \
     -i ./inventories/ocp-deployment/build-inventory.py
 
 EXTRA_VARS="kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
@@ -46,7 +47,12 @@ EXTRA_VARS="${EXTRA_VARS} ocp_version_facts_release_type=${OCP_VERSION_RELEASE_T
 EXTRA_VARS="${EXTRA_VARS} ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}"
 EXTRA_VARS="${EXTRA_VARS} internal_registry=true"
 
+
 echo "Deploy SNO OCP for compute-nto testing"
+
+export ANSIBLE_FORKS=2
+export ANSIBLE_PIPELINING=true
+
 ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml \
     -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"

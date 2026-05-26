@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ship-hook
+  namespace: ci
+---
+# TODO: Replace this inline ConfigMap with config file fragments managed
+# directly in the repo (similar to how Prow plugin configs are split per-repo).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ship-hook-config
+  labels:
+    app: prow
+    component: ship-hook
+  namespace: ci
+data:
+  config.yaml: |
+    orgs:
+      openshift:
+        repos:
+          sippy:
+            plugins:
+            - name: ready-for-humans
+          origin:
+            plugins:
+            - name: ready-for-humans
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ship-hook
+  namespace: ci
+  labels:
+    app: prow
+    component: ship-hook
+spec:
+  selector:
+    app: prow
+    component: ship-hook
+  ports:
+  - name: main
+    port: 80
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ship-hook
+  labels:
+    app: prow
+    component: ship-hook
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  namespace: ci
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prow
+      component: ship-hook
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: ship-hook
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  component: ship-hook
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: ship-hook
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ship-hook_latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
+        args:
+        - --dry-run=false
+        - --log-level=debug
+        - --endpoint=/
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --config-path=/etc/ship-hook/config.yaml
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+        - name: http
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        - name: health
+          containerPort: 8081
+        volumeMounts:
+        - name: hmac
+          mountPath: /etc/webhook
+          readOnly: true
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: ship-hook-config
+          mountPath: /etc/ship-hook
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      serviceAccountName: ship-hook
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: ship-hook-config
+        configMap:
+          name: ship-hook-config
