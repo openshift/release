@@ -1,5 +1,5 @@
 #!/bin/bash
-set +x
+set -euo pipefail
 
 echo "========== Disconnected Proxy Configuration =========="
 # Source proxy configuration for network access in the disconnected environment.
