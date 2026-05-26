@@ -15,18 +15,33 @@ declare OCP_VERSION="${OCP_VERSION:-}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 
+log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
+
 run() {
-    echo "running: $*"
+    log "running: $*"
     "$@"
 }
 
-timestamp() {
-    date -u --rfc-3339=seconds
+collect_artifacts() {
+    log "Collecting debug artifacts..."
+    {
+        oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml 2>/dev/null \
+            > "${ARTIFACT_DIR}/catalogsource.yaml"
+        oc -n openshift-marketplace get pods -o wide 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-pods.txt"
+        oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml 2>/dev/null \
+            > "${ARTIFACT_DIR}/catalog-pod.yaml"
+        oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-events.txt"
+        oc get mcp 2>/dev/null \
+            > "${ARTIFACT_DIR}/machineconfigpools.txt"
+    } || true
 }
 
 set_proxy() {
+    # shellcheck disable=SC1090
     [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
-        echo "setting proxy"
+        log "setting proxy"
         source "${SHARED_DIR}/proxy-conf.sh"
     }
     return 0
@@ -34,39 +49,39 @@ set_proxy() {
 
 resolve_commit_sha() {
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
-        echo "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+        log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
         return 0
     fi
 
     local encoded_ref
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
 
-    echo "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
+    log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
     FBC_COMMIT_SHA=$(curl -sSf --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 10 --max-time 30 \
         "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) || true
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
-        echo "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API"
+        log "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API"
         exit 1
     fi
 
-    echo "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
 }
 
 check_mirror_registry() {
     if test -s "${SHARED_DIR}/mirror_registry_url"; then
         MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
         export MIRROR_REGISTRY_HOST
-        echo "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
+        log "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
     else
-        echo "ERROR: No mirror registry URL found at \${SHARED_DIR}/mirror_registry_url."
-        echo "This step requires a disconnected cluster with a mirror registry."
+        log "ERROR: No mirror registry URL found at \${SHARED_DIR}/mirror_registry_url."
+        log "This step requires a disconnected cluster with a mirror registry."
         exit 1
     fi
 }
 
 configure_host_pull_secret() {
-    echo "[$(timestamp)] Configuring pull secrets for mirror registry..."
+    log "Configuring pull secrets for mirror registry..."
 
     local redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
     local redhat_auth_user redhat_auth_password redhat_registry_auth
@@ -83,21 +98,21 @@ configure_host_pull_secret() {
         '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > "${XDG_RUNTIME_DIR}/containers/auth.json"
 
     cp "${XDG_RUNTIME_DIR}/containers/auth.json" "${SHARED_DIR}/containers-auth.json"
-    echo "[$(timestamp)] Pull secrets configured"
+    log "Pull secrets configured"
 }
 
 install_oc_mirror() {
-    echo "[$(timestamp)] Installing oc-mirror..."
+    log "Installing oc-mirror..."
     curl -sSLf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
         -o /tmp/oc-mirror.tar.gz \
         "https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
     tar -xzf /tmp/oc-mirror.tar.gz -C /tmp && chmod +x /tmp/oc-mirror
     rm -f /tmp/oc-mirror.tar.gz
-    echo "[$(timestamp)] oc-mirror installed"
+    log "oc-mirror installed"
 }
 
 create_registries_conf() {
-    echo "[$(timestamp)] Creating registries.conf from rhwa-fbc IDMS..."
+    log "Creating registries.conf from rhwa-fbc IDMS..."
 
     local idms_url="${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml"
     local idms_file="${TMP_DIR}/idms-source.yaml"
@@ -105,7 +120,7 @@ create_registries_conf() {
 
     curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
         "$idms_url" -o "$idms_file" || {
-        echo "ERROR: Failed to fetch IDMS from $idms_url"
+        log "ERROR: Failed to fetch IDMS from $idms_url"
         exit 1
     }
 
@@ -127,22 +142,27 @@ create_registries_conf() {
     export CONTAINERS_REGISTRIES_CONF="$registries_conf"
     local entry_count
     entry_count=$(grep -c "^\[\[registry\]\]" "$registries_conf")
-    echo "[$(timestamp)] registries.conf created with ${entry_count} mirror entries from IDMS"
+    log "registries.conf created with ${entry_count} mirror entries from IDMS"
 }
 
 mirror_catalog_and_operators() {
     local fbc_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
-    echo "[$(timestamp)] Mirroring FBC catalog and operator images..."
-    echo "  FBC image: ${fbc_image}"
-    echo "  Target: ${MIRROR_REGISTRY_HOST}"
+    log "Mirroring FBC catalog and operator images..."
+    log "  FBC image: ${fbc_image}"
+    log "  Target: ${MIRROR_REGISTRY_HOST}"
 
-    IFS=',' read -ra PACKAGES <<< "$MEDIK8S_PACKAGES"
+    IFS=',' read -ra RAW_PACKAGES <<< "$MEDIK8S_PACKAGES"
     local packages_yaml=""
-    for pkg in "${PACKAGES[@]}"; do
+    for pkg in "${RAW_PACKAGES[@]}"; do
         pkg="${pkg//[[:space:]]/}"
         [[ -z "$pkg" ]] && continue
         packages_yaml+="    - name: ${pkg}"$'\n'
     done
+
+    if [[ -z "$packages_yaml" ]]; then
+        log "ERROR: MEDIK8S_PACKAGES did not contain any valid package names"
+        exit 1
+    fi
 
     cat > "${TMP_DIR}/imageset-config.yaml" << EOF
 apiVersion: mirror.openshift.io/v2alpha1
@@ -154,7 +174,7 @@ mirror:
 ${packages_yaml}
 EOF
 
-    echo "[$(timestamp)] ImageSetConfiguration:"
+    log "ImageSetConfiguration:"
     cat "${TMP_DIR}/imageset-config.yaml"
 
     run env CONTAINERS_REGISTRIES_CONF="${CONTAINERS_REGISTRIES_CONF}" \
@@ -165,7 +185,7 @@ EOF
         --dest-tls-verify=false \
         --src-tls-verify=false \
         --log-level=info || {
-        echo "ERROR: oc-mirror failed"
+        log "ERROR: oc-mirror failed"
         tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
             -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-debug.tar.gz" . 2>/dev/null || true
         return 1
@@ -173,17 +193,51 @@ EOF
 
     tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
         -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-output.tar.gz" . 2>/dev/null || true
-    echo "[$(timestamp)] Mirroring complete"
+    log "Mirroring complete"
+}
+
+MCP_CONFIG_JSONPATH='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}'
+
+wait_for_mcp_rollout() {
+    local mcp_configs_before="$1"
+
+    log "Waiting for MachineConfigPool rollout..."
+    local mcp_changed=false
+    for i in $(seq 1 30); do
+        sleep 10
+        local mcp_configs_after
+        mcp_configs_after=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
+        if [[ -n "$mcp_configs_after" && "$mcp_configs_before" != "$mcp_configs_after" ]]; then
+            log "MCP rendered config changed:"
+            log "  before: $mcp_configs_before"
+            log "  after:  $mcp_configs_after"
+            mcp_changed=true
+            break
+        fi
+        log "  waiting for MCP config change (${i}/30)..."
+    done
+
+    if [[ "$mcp_changed" == "true" ]]; then
+        oc wait mcp --all --for=condition=Updated --timeout=20m || {
+            log "WARNING: MCP not fully updated after 20m, proceeding anyway"
+            run oc get mcp
+        }
+    else
+        log "WARNING: No MCP rendered config change detected after 5m — IDMS may not have triggered a rollout, proceeding"
+    fi
 }
 
 create_idms_disconnected() {
-    echo "[$(timestamp)] Creating IDMS for disconnected environment..."
+    log "Creating IDMS for disconnected environment..."
 
     local idms_file="${TMP_DIR}/idms-source.yaml"
     if [[ ! -f "$idms_file" ]]; then
-        echo "ERROR: IDMS source file not found at ${idms_file}"
+        log "ERROR: IDMS source file not found at ${idms_file}"
         exit 1
     fi
+
+    local mcp_configs_before
+    mcp_configs_before=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
 
     {
         echo "apiVersion: config.openshift.io/v1"
@@ -211,16 +265,11 @@ create_idms_disconnected() {
         echo "    - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/rhwa-tenant"
     } | oc apply -f -
 
-    echo "[$(timestamp)] Waiting for MachineConfigPool rollout..."
-    oc wait mcp --all --for=condition=Updating --timeout=5m || true
-    oc wait mcp --all --for=condition=Updated --timeout=20m || {
-        echo "WARNING: MCP not fully updated after 20m, proceeding anyway"
-        run oc get mcp
-    }
+    wait_for_mcp_rollout "$mcp_configs_before"
 }
 
 ensure_marketplace() {
-    echo "Ensuring openshift-marketplace namespace and labels..."
+    log "Ensuring openshift-marketplace namespace and labels..."
     cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
@@ -236,11 +285,10 @@ EOF
 
 create_catalogsource() {
     local original_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
-    local image_path
-    image_path=$(echo "$original_image" | sed 's|^quay.io/||')
+    local image_path="${original_image#quay.io/}"
     local catalog_image="${MIRROR_REGISTRY_HOST}/${image_path}"
 
-    echo "Creating CatalogSource ${CATALOG_SOURCE_NAME} with mirrored image: ${catalog_image}"
+    log "Creating CatalogSource ${CATALOG_SOURCE_NAME} with mirrored image: ${catalog_image}"
 
     cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -255,7 +303,7 @@ spec:
       cacheDir: /tmp/cache
       catalogDir: /configs
     memoryTarget: 30Mi
-  image: ${catalog_image}
+  image: "${catalog_image}"
   publisher: medik8s QE
   sourceType: grpc
   updateStrategy:
@@ -265,40 +313,41 @@ EOF
 }
 
 wait_for_catalogsource() {
-    echo "Waiting for CatalogSource ${CATALOG_SOURCE_NAME} to be READY..."
+    log "Waiting for CatalogSource ${CATALOG_SOURCE_NAME} to be READY..."
     local -i deadline=$(( SECONDS + 600 ))
     local status=""
 
     while (( SECONDS < deadline )); do
-        sleep 20
         status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" \
             -o=jsonpath="{.status.connectionState.lastObservedState}" 2>/dev/null || true)
-        echo "  $(( SECONDS ))s - status: ${status:-pending}"
+        log "  status: ${status:-pending}"
         [[ "$status" == "READY" ]] && {
-            echo "CatalogSource ${CATALOG_SOURCE_NAME} is READY"
+            log "CatalogSource ${CATALOG_SOURCE_NAME} is READY"
             return 0
         }
+        sleep 20
     done
 
-    echo "ERROR: CatalogSource not READY after 600s"
-    echo "--- Debug info ---"
+    log "ERROR: CatalogSource not READY after 600s"
+    log "--- Debug info ---"
     run oc get pods -o wide -n openshift-marketplace
     run oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml
     run oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml
-    echo "--- Marketplace events ---"
+    log "--- Marketplace events ---"
     oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
     run oc get mcp,node
     return 1
 }
 
 main() {
-    echo "=== medik8s Disconnected CatalogSource Setup ==="
+    log "=== medik8s Disconnected CatalogSource Setup ==="
+    trap 'collect_artifacts' EXIT
     set_proxy
     run oc whoami
     run oc version -o yaml
 
     if [[ ! "$OCP_VERSION" =~ ^[0-9]{3,4}$ ]]; then
-        echo "ERROR: OCP_VERSION must be a 3-4 digit string (e.g., '422' for OCP 4.22)"
+        log "ERROR: OCP_VERSION must be a 3-4 digit string (e.g., '422' for OCP 4.22)"
         exit 1
     fi
 
@@ -320,6 +369,6 @@ main() {
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/fbc_commit_sha"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
-    echo "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
+    log "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }
 main
