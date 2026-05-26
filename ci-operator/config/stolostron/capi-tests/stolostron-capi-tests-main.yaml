@@ -16,7 +16,9 @@ images:
       ARG CLUSTERCTL_VERSION=v1.12.3
       ARG CLUSTERCTL_SHA256=9b75287b15656a62ece65c8ad7491412cebfd30c78e085a9d61396a50df17349
       ARG OC_VERSION=latest
-      RUN dnf install -y go git make jq gettext libxml2 bc azure-cli && dnf clean all
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          printf '%s\n' '[azure-cli]' 'name=Azure CLI' 'baseurl=https://packages.microsoft.com/yumrepos/azure-cli' 'enabled=1' 'gpgcheck=1' 'gpgkey=https://packages.microsoft.com/keys/microsoft.asc' > /etc/yum.repos.d/azure-cli.repo && \
+          dnf install -y go git make jq gettext libxml2 bc azure-cli && dnf clean all
       RUN curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/oc.tar.gz && \
           tar xz -C /usr/local/bin -f /tmp/oc.tar.gz oc && chmod +x /usr/local/bin/oc && rm -f /tmp/oc.tar.gz
       RUN curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && chmod +x /usr/local/bin/kubectl
