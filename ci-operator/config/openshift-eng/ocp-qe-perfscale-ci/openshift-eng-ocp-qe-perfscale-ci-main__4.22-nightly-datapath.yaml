@@ -42,6 +42,7 @@ tests:
     - ref: openshift-qe-perfscale-ibm-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+  timeout: 8h0m0s
 - as: nutanix-data-path-9nodes
   capabilities:
   - sshd-bastion
@@ -77,18 +78,17 @@ tests:
     - ref: openshift-qe-perfscale-gcp-data-path-fw
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-- always_run: false
-  as: vsphere-data-path-9nodes
+- as: vsphere-data-path-9nodes
+  cron: 0 13 6,21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
     env:
-      SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "9"
     test:
     - chain: workers-scale
     - chain: openshift-qe-data-path-tests
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
+    workflow: ipi-vsphere
   timeout: 8h0m0s
 - as: azure-data-path-multi-9nodes
   cron: 0 3 2 * *
