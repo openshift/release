@@ -14,7 +14,7 @@ log(){
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+  export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
 else
   log "No AWS credentials found in cluster profile"
 fi
@@ -43,42 +43,56 @@ OCM_TOKEN=$(ocm token)
 export OCM_TOKEN
 export OCM_ENV="${OCM_LOGIN_ENV}"
 export CLUSTER_ID
-export AWS_REGION="${LEASED_RESOURCE}"
+export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
 
-# Set CLUSTER_TOPOLOGY so the test binary knows the cluster type without an extra OCM API call
-if [[ "${HOSTED_CP:-false}" == "true" ]]; then
-  export CLUSTER_TOPOLOGY="hcp"
-else
-  export CLUSTER_TOPOLOGY="classic"
-fi
-log "Cluster topology: ${CLUSTER_TOPOLOGY}"
-
-# Try to get MC access via backplane (HCP only)
-if [[ "${CLUSTER_TOPOLOGY}" == "hcp" ]]; then
-  log "Attempting MC access via backplane..."
-  if ocm backplane login "${CLUSTER_ID}" --manager 2>/dev/null; then
-    export MC_KUBECONFIG="${HOME}/.kube/config"
-    MC_SERVER=$(oc whoami --show-server 2>/dev/null || true)
-    if [[ "${MC_SERVER}" == *"backplane"* ]]; then
-      MANAGEMENT_CLUSTER_ID=$(echo "${MC_SERVER}" | sed 's|.*/cluster/||; s|/.*||')
-      export MANAGEMENT_CLUSTER_ID
-      log "MC access established: ${MANAGEMENT_CLUSTER_ID}"
+# Try to get management cluster access via OCM API
+log "Attempting management cluster access..."
+MC_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}"/hypershift 2>/dev/null | jq -r '.management_cluster // empty') || true
+if [[ -n "${MC_NAME}" ]]; then
+  log "Management cluster name: ${MC_NAME}"
+  MANAGEMENT_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name='${MC_NAME}'" --parameter size=1 2>/dev/null | jq -r '.items[0].id // empty')
+  if [[ -n "${MANAGEMENT_CLUSTER_ID}" ]]; then
+    MC_LISTENING=$(ocm get /api/clusters_mgmt/v1/clusters/"${MANAGEMENT_CLUSTER_ID}" 2>/dev/null | jq -r '.api.listening // empty')
+    if [[ "${MC_LISTENING}" == "external" ]]; then
+      log "Management cluster ${MANAGEMENT_CLUSTER_ID} API is external, fetching kubeconfig..."
+      MC_KUBECONFIG_FILE="${SHARED_DIR}/mc-kubeconfig"
+      set +x
+      ocm get /api/clusters_mgmt/v1/clusters/"${MANAGEMENT_CLUSTER_ID}"/credentials 2>/dev/null | jq -r '.kubeconfig' > "${MC_KUBECONFIG_FILE}"
+      set -x 2>/dev/null || true
+      if KUBECONFIG="${MC_KUBECONFIG_FILE}" oc whoami &>/dev/null; then
+        export MC_KUBECONFIG="${MC_KUBECONFIG_FILE}"
+        export MANAGEMENT_CLUSTER_ID
+        log "Management cluster access established: ${MANAGEMENT_CLUSTER_ID}"
+      else
+        log "WARNING: MC kubeconfig fetched but failed validation (oc whoami failed), skipping MC access"
+        rm -f "${MC_KUBECONFIG_FILE}"
+      fi
+    else
+      log "Management cluster ${MANAGEMENT_CLUSTER_ID} API is ${MC_LISTENING:-unknown}, skipping MC access"
     fi
+  else
+    log "Could not resolve management cluster ID for ${MC_NAME}"
   fi
+else
+  log "No management cluster found for cluster ${CLUSTER_ID} (not HCP or hypershift info unavailable)"
 fi
 
 # Run tests
-GINKGO_ARGS=(--ginkgo.junit-report="${ARTIFACT_DIR}/junit-rosa-e2e.xml" --ginkgo.v)
-if [[ -n "${LABEL_FILTER}" ]]; then
-  log "Label filter: ${LABEL_FILTER}"
-  GINKGO_ARGS+=(--ginkgo.label-filter="${LABEL_FILTER}")
+GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e.xml" "--ginkgo.v")
+log "LABEL_FILTER='${LABEL_FILTER:-}'"
+if [[ -n "${LABEL_FILTER:-}" ]]; then
+  GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
 fi
 
-if [[ -n "${EXCLUDE_CLUSTER_OPERATORS}" ]]; then
+if [[ -n "${CLUSTER_TOPOLOGY:-}" ]]; then
+  export CLUSTER_TOPOLOGY
+fi
+
+if [[ -n "${EXCLUDE_CLUSTER_OPERATORS:-}" ]]; then
   export EXCLUDE_CLUSTER_OPERATORS
 fi
 
-log "Running rosa-e2e tests..."
+log "Running rosa-e2e tests: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
 /usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"
 
 log "Tests complete. Results at ${ARTIFACT_DIR}/junit-rosa-e2e.xml"

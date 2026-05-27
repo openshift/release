@@ -74,10 +74,11 @@ When creating a new release branch (e.g., `release-1.11`):
 
 ### Slack Webhook
 
-1. Create a new Slack channel following the established naming scheme (see existing channels in the [Nightly Test Alerts Slack app](https://api.slack.com/apps/A08U4AP1YTY/incoming-webhooks) for reference).
+1. Create a new Slack channel named `#rhdh-e2e-alerts-X-Y` (e.g., `#rhdh-e2e-alerts-1-11` for `release-1.11`). See existing channels in the [Nightly Test Alerts Slack app](https://api.slack.com/apps/A08U4AP1YTY/incoming-webhooks) for reference.
 2. In the same Slack app, create a new incoming webhook for the newly created channel.
 3. Store the webhook URL in the vault as `SLACK_ALERTS_WEBHOOK_URL_X_Y` (e.g., `SLACK_ALERTS_WEBHOOK_URL_1_11` for `release-1.11`).
 4. The `redhat-developer-rhdh-send-alert` step automatically detects the release version from `JOB_NAME` and looks for the versioned webhook file at `/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL_X_Y`. If not found, it falls back to `/tmp/secrets/SLACK_ALERTS_WEBHOOK_URL`.
+5. Update the `reporter_config.channel` in the new release CI config YAML to use `#rhdh-e2e-alerts-X-Y` (e.g., `#rhdh-e2e-alerts-1-11`). This is the Prow-level Slack reporter — separate from the `send-alert` step — that fires on CI infrastructure errors and (for `auth-providers` and `upgrade` tests) on success/failure. The `main` branch uses `#rhdh-e2e-alerts`.
 
 ### Job Concurrency
 
