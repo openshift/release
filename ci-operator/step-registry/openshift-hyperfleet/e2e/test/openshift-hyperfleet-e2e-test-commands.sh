@@ -16,7 +16,7 @@ MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 cp -r /e2e/ /tmp/
 
 # Use ref-specific binary and resources if available (built by setup step)
-E2E_REF="${E2E_REF:-}"
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
 E2E_BIN="hyperfleet-e2e"
 TESTDATA="/e2e/testdata"
 if [ -n "$E2E_REF" ]; then
@@ -52,7 +52,7 @@ export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 
 # Export API chart parameters for tier2 tests
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"

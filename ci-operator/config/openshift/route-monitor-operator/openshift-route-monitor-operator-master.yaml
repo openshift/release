@@ -1,15 +1,30 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
-    to: unused
+    to: route-monitor-operator
+  - dockerfile_literal: |
+      FROM src
+      RUN cp -r deploy_pko /package
+    from: src
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+    from: src
+    to: operator-e2e
 releases:
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.12"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -55,6 +70,32 @@ tests:
   commands: make test
   container:
     from: src
+- as: rosa-sts-e2e
+  run_if_changed: ^(test/e2e/.*|pkg/.*|api/.*|cmd/.*|deploy/.*|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    workflow: rosa-operator-e2e-workflow
+- as: rosa-sts-e2e-postsubmit
+  postsubmit: true
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    workflow: rosa-operator-e2e-workflow
 zz_generated_metadata:
   branch: master
   org: openshift
