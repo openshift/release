@@ -30,12 +30,13 @@ trap cleanup_k3s EXIT
 # gives it root access and full control over sysctls/networking.
 echo "[k3s] Starting k3s ${K3S_VERSION} via podman (privileged)"
 
+K3S_IMAGE_TAG="${K3S_VERSION//+/-}"
 podman run -d --name "${K3S_CONTAINER}" \
   --privileged \
   --network=host \
   --cgroupns=host \
   -v /tmp:/tmp \
-  docker.io/rancher/k3s:"${K3S_VERSION}" \
+  docker.io/rancher/k3s:"${K3S_IMAGE_TAG}" \
   server \
   --disable=traefik \
   --snapshotter=native \
