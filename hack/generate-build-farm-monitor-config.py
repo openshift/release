@@ -19,7 +19,6 @@ CONSOLE_URLS = {
     "build09": "https://console-openshift-console.apps.build09.ci.devcluster.openshift.com",
     "build10": "https://console-openshift-console.apps.build10.ci.devcluster.openshift.com",
     "build11": "https://console-openshift-console.apps.build11.ci.devcluster.openshift.com",
-    "build12": "https://console-openshift-console.apps.build12.ci.devcluster.openshift.com",
 }
 
 BUILD_ORDER = [f"build{i:02d}" for i in range(1, 13)]

@@ -118,13 +118,17 @@ if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
   exit 1
 fi
 
-Z_VERSION=1000
+MAJOR_VERSION=1000
+Z_VERSION=0
+OCP_VERSION=100000
 
 if [ ! -z "${VERSION}" ]; then
+  MAJOR_VERSION=$(echo "${VERSION}" | cut -d'.' -f1)
   Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
-  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+  OCP_VERSION=$((MAJOR_VERSION * 100 + Z_VERSION))
+  echo "$(date -u --rfc-3339=seconds) - determined version is ${MAJOR_VERSION}.${Z_VERSION}"
 else
-  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+  echo "$(date -u --rfc-3339=seconds) - unable to determine version stream, assuming this is master"
 fi
 
 # Creating platform config for 4.12+
@@ -176,11 +180,11 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
   fi
 fi
 
-if [ ${Z_VERSION} -gt 9 ]; then
+if [ ${OCP_VERSION} -gt 409 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
   RESOURCE_POOL_DEF="resourcePool: ${vsphere_cluster}/Resources/ipi-ci-clusters"
 fi
-if [ ${Z_VERSION} -lt 11 ]; then
+if [ ${OCP_VERSION} -lt 411 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
@@ -225,7 +229,7 @@ compute:
   replicas: 0"
 fi
 
-if [ "${Z_VERSION}" -lt 13 ]; then
+if [ "${OCP_VERSION}" -lt 413 ]; then
   cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
   datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
   cat >>"${CONFIG}" <<EOF
@@ -272,7 +276,7 @@ networking:
   - cidr: "${machine_cidr}"
 EOF
 
-if [ ${Z_VERSION} -gt 9 ]; then
+if [ ${OCP_VERSION} -gt 409 ]; then
   PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-disable"
   CACHE_FORCE_DISABLE="false"
   if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
@@ -298,7 +302,7 @@ if [ ${Z_VERSION} -gt 9 ]; then
       fi
       if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-        if [ "${Z_VERSION}" -lt 14 ]; then
+        if [ "${OCP_VERSION}" -lt 414 ]; then
           echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
           cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
         else

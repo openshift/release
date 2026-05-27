@@ -262,8 +262,15 @@ echo -e "Available cluster versions:\n${versionList}"
 # If account-roles-create fell back to a different version, use it. This overrides
 # release:latest resolution so the cluster version matches the account roles.
 if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
-  OPENSHIFT_VERSION=$(cat "${SHARED_DIR}/openshift_version")
-  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step (fallback)"
+  FALLBACK_VERSION=$(cat "${SHARED_DIR}/openshift_version")
+  REQUESTED_MAJOR_MINOR=$(echo "${OPENSHIFT_VERSION}" | cut -d'.' -f1,2)
+  FALLBACK_MAJOR_MINOR=$(echo "${FALLBACK_VERSION}" | cut -d'.' -f1,2)
+  if [[ "${REQUESTED_MAJOR_MINOR}" =~ ^[0-9]+\.[0-9]+$ && "${REQUESTED_MAJOR_MINOR}" != "${FALLBACK_MAJOR_MINOR}" ]]; then
+    log "ERROR: Requested version ${OPENSHIFT_VERSION} but account-roles fell back to ${FALLBACK_VERSION}. Version ${OPENSHIFT_VERSION} may not be available for this cluster type."
+    exit 1
+  fi
+  OPENSHIFT_VERSION="${FALLBACK_VERSION}"
+  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
 fi
 
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
@@ -340,9 +347,11 @@ fi
 TAG_Author=${TAG_Author:-"periodic"}
 TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
 TAG_Job_Type=$JOB_TYPE
+TAG_Job_Name=$(echo "${JOB_SPEC}" | jq -r '.job // empty' || true)
+TAG_Job_Name=${TAG_Job_Name:-"unknown"}
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
-TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type},usage-job-name:${TAG_Job_Name}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi

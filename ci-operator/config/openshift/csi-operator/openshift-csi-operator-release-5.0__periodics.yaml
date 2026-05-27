@@ -161,6 +161,13 @@ resources:
 tests:
 - as: periodic-e2e-aws-efs-csi
   cron: 40 4 * * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -172,6 +179,13 @@ tests:
     workflow: openshift-e2e-aws-csi-efs
 - as: periodic-e2e-smb-csi
   cron: 2 10 * * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-azure
     dependencies:
@@ -185,11 +199,29 @@ tests:
     workflow: openshift-e2e-azure-csi-smb
 - as: periodic-e2e-azure-file-csi
   cron: 26 17 * * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-azure
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     workflow: openshift-e2e-azure-csi-file
+- as: periodic-e2e-aws-eusc-techpreview-csi
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws-eusc
+    env:
+      BASE_DOMAIN: ci-eusc.devcluster.openshift.com
+      COMPUTE_AMI: ami-0b78302f83217d149
+      CONTROL_PLANE_AMI: ami-0b78302f83217d149
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+    workflow: openshift-e2e-aws-csi
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

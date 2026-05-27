@@ -158,7 +158,7 @@ validate_required_vars() {
   for var in "${required_vars[@]}"; do
     if [[ -z "${!var}" ]]; then
       echo "ERROR: Required variable ${var} is not set"
-      exit 1
+      return 1
     fi
   done
 }
@@ -250,7 +250,7 @@ save_data_router_metadata() {
 
 main() {
   # Validate required variables before proceeding
-  validate_required_vars
+  validate_required_vars || return 1
 
   save_data_router_metadata
 
@@ -311,13 +311,13 @@ main() {
 
     # For periodic jobs, wait for completion and extract ReportPortal URL
     if [[ "$JOB_NAME" == *periodic-* ]]; then
-      local max_attempts=30
+      local poll_max_attempts=30
       local wait_seconds=2
       local DATA_ROUTER_REQUEST_OUTPUT=""
       local REPORTPORTAL_LAUNCH_URL=""
 
-      for ((i = 1; i <= max_attempts; i++)); do
-        echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
+      for ((i = 1; i <= poll_max_attempts; i++)); do
+        echo "Attempt ${i} of ${poll_max_attempts}: Checking Data Router request completion..."
 
         # Get DataRouter request information.
         DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
@@ -335,14 +335,14 @@ main() {
           save_status_data_router_failed false
           return 0
         else
-          echo "Attempt ${i} of ${max_attempts}: ReportPortal launch URL not ready yet."
-          if ((i < max_attempts)); then
+          echo "Attempt ${i} of ${poll_max_attempts}: ReportPortal launch URL not ready yet."
+          if ((i < poll_max_attempts)); then
             sleep "${wait_seconds}"
           fi
         fi
       done
 
-      echo "Warning: Could not retrieve ReportPortal launch URL after ${max_attempts} attempts"
+      echo "Warning: Could not retrieve ReportPortal launch URL after ${poll_max_attempts} attempts"
     fi
 }
 
