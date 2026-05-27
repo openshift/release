@@ -69,7 +69,7 @@ If **`scheduling`** dominates, follow [`build-farm-scheduling-pressure.md`](buil
 If **`hook-apps`** or **`ghproxy`** incidents coincide, check:
 
 ```bash
-oc --context "$CTX" get pods -n ci -l 'component in (hook,ghproxy)' -o wide
+oc --context "$CTX" get pods -n ci -l 'component in (hook-apps,ghproxy)' -o wide
 oc --context "$CTX" logs -n ci deploy/hook-apps --tail=150
 oc --context "$CTX" logs -n ci deploy/ghproxy --tail=150
 ```
