@@ -47,13 +47,13 @@ fi
 any_errors=false
 
 # Set the operator environment variables required for tests execution.
-OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator-system | grep "opentelemetry-operator" | awk '{print $1}')
+oc -n opentelemetry-operator-system patch csv $OTEL_CSV_NAME --type=json -p '[
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_TARGET_ALLOCATOR","value":"'"${TARGETALLOCATOR_IMG}"'"}},
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_OPERATOR_OPAMP_BRIDGE","value":"'"${OPERATOROPAMPBRIDGE_IMG}"'"}}
 ]'
 sleep 60
-if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+if oc -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
     echo "Operator deployment updated successfully, continuing script execution..."
 else
     echo "Operator deployment update failed, exiting with error."
@@ -98,13 +98,13 @@ tests/e2e-prometheuscr \
 tests/e2e-sidecar || any_errors=true
 
 # Set the operator environment variables for metadata filters tests.
-OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator-system | grep "opentelemetry-operator" | awk '{print $1}')
+oc -n opentelemetry-operator-system patch csv $OTEL_CSV_NAME --type=json -p '[
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"ANNOTATIONS_FILTER","value":".*filter.out,config.*.gke.io.*"}},
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"LABELS_FILTER","value":".*filter.out"}}
 ]'
 sleep 60
-if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+if oc -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
     echo "Operator deployment updated successfully for metadata filters, continuing script execution..."
 else
     echo "Operator deployment update for metadata filters failed, exiting with error."
@@ -121,8 +121,8 @@ chainsaw test \
 tests/e2e-metadata-filters || any_errors=true
 
 # Set the operator environment variables with instrumentation images for e2e-instrumentation tests.
-OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator-system | grep "opentelemetry-operator" | awk '{print $1}')
+oc -n opentelemetry-operator-system patch csv $OTEL_CSV_NAME --type=json -p '[
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_JAVA","value":"'"${INSTRUMENTATION_JAVA_IMG}"'"}},
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_NODEJS","value":"'"${INSTRUMENTATION_NODEJS_IMG}"'"}},
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_PYTHON","value":"'"${INSTRUMENTATION_PYTHON_IMG}"'"}},
@@ -130,7 +130,7 @@ oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_APACHE_HTTPD","value":"'"${INSTRUMENTATION_APACHE_HTTPD_IMG}"'"}}
 ]'
 sleep 60
-if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+if oc -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
     echo "Operator deployment updated successfully with instrumentation images, continuing script execution..."
 else
     echo "Operator deployment update with instrumentation images failed, exiting with error."
@@ -146,6 +146,15 @@ chainsaw test \
 --test-dir \
 tests/e2e-instrumentation \
 tests/e2e-multi-instrumentation || any_errors=true
+
+# Execute TLS profile tests
+chainsaw test \
+--quiet \
+--report-name "junit_otel_e2e_tls_profile" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-openshift-tls-profile || any_errors=true
 
 # Check if any errors occurred
 if $any_errors; then

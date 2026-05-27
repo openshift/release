@@ -78,6 +78,6 @@ HUB_KUBECONFIG="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig
 cd /eco-ci-cd
 
 echo "Running spoke cleanup for ${SPOKE_CLUSTER}"
-ansible-playbook playbooks/ran/spoke_cleanup.yml \
+ansible-playbook playbooks/ran/spoke-cleanup.yml \
   -i inventories/ocp-deployment/build-inventory.py \
   --extra-vars "hub_kubeconfig=${HUB_KUBECONFIG} spoke_cluster=${SPOKE_CLUSTER}"

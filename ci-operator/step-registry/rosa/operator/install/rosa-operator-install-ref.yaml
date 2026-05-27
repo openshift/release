@@ -1,0 +1,37 @@
+ref:
+  as: rosa-operator-install
+  from: rosa-aws-cli
+  grace_period: 5m
+  commands: rosa-operator-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 15m0s
+  dependencies:
+  - name: OPERATOR_IMAGE
+    env: OPERATOR_IMAGE
+  - name: OPERATOR_PKO_IMAGE
+    env: OPERATOR_PKO_IMAGE
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Short name of the operator (e.g. aws-vpce-operator).
+  - name: OPERATOR_NAMESPACE
+    default: ""
+    documentation: Namespace where the operator deploys. Defaults to openshift-<OPERATOR_NAME>. Must match what the PKO package templates use.
+  - name: OPERATOR_DEPLOYMENT_NAME
+    default: ""
+    documentation: Name of the deployment to wait on. Defaults to OPERATOR_NAME.
+  - name: OPERATOR_CRD_DIR
+    default: ""
+    documentation: Path to directory containing CRD manifests to pre-apply. Optional.
+  - name: OPERATOR_CRDS
+    default: ""
+    documentation: Comma-separated list of CRD names to delete before PKO install. Required when the operator's CRDs are pre-deployed via SSS and would block PKO adoption.
+  documentation: |-
+    Installs an operator via PKO ClusterPackage on the target cluster.
+    Removes any existing ClusterPackage, production namespace, and specified
+    CRDs to avoid PKO adoption conflicts on managed clusters. Creates the
+    test namespace, creates the ClusterPackage CR, and waits for the operator
+    deployment to be available. Safe on ephemeral clusters only.

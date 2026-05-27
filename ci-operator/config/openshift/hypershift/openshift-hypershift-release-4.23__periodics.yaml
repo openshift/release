@@ -157,6 +157,39 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-ccm
+  cron: '@monthly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      PUBLIC_ONLY: "true"
+      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|loadbalancer
+        NLB internal should be reachable with hairpinning traffic
+    workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-ccm-techpreview
+  cron: '@monthly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      PUBLIC_ONLY: "true"
+      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|loadbalancer
+        NLB internal should be reachable with hairpinning traffic
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
@@ -371,6 +404,16 @@ tests:
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-openstack-nested-conformance
+- as: e2e-v2-gke
+  capabilities:
+  - build-tmpfs
+  cron: 37 9,21 * * *
+  steps:
+    cluster_profile: hypershift-gcp
+    env:
+      GKE_REGION: us-central1
+      GKE_RELEASE_CHANNEL: stable
+    workflow: hypershift-gcp-gke-e2e-v2
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: appset-cluster-app-ci
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - git:
+      directories:
+      - path: clusters/app.ci/*
+      repoURL: https://github.com/openshift/release.git
+      revision: main
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '{{.path.path}}'
+      name: 'app-cluster-app.ci-{{.path.basename}}'
+      namespace: openshift-gitops
+    spec:
+      destination:
+        name: app.ci
+        namespace: openshift-gitops
+      project: app-ci
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: '{{.path.path}}'
+        repoURL: https://github.com/openshift/release.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true

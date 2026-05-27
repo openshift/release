@@ -116,7 +116,7 @@ echo "-----------------------------"
 if [[ "${DRY_RUN}" == "true" ]]; then
     echo "Dry-run complete — message NOT sent since this is not a periodic job."
 else
-    WEBHOOK_URL=$(cat /var/run/slack-webhook/ocp-ci-monitor)
+    WEBHOOK_URL=$(cat /var/run/slack-webhook/team-ocp-edge-notifications)
     PAYLOAD=$(jq -nc --arg text "${MESSAGE}" '{"text": $text}')
 
     curl -sf -X POST -H 'Content-type: application/json' \

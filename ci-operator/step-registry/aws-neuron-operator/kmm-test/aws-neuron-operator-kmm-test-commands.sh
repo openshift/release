@@ -46,7 +46,7 @@ echo "Running KMM tests with labels: ${ECO_TEST_LABELS}"
 TEST_EXIT_CODE=0
 
 ginkgo --label-filter="${ECO_TEST_LABELS}" \
-    --timeout=1h \
+    --timeout=80m \
     --v \
     --keep-going \
     --junit-report=junit_kmm_modules.xml \

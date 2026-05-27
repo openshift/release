@@ -12,7 +12,7 @@ GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
 TAG_NAME=""
 IMAGE_REPO=""
-IMAGE_REGISTRY=""
+IMAGE_REGISTRY="quay.io"
 QUAY_REPO=""
 export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
@@ -89,6 +89,24 @@ if ! oc wait --for=condition=Ready nodes --all --timeout=300s; then
 fi
 echo "All nodes are ready"
 
+echo "========== HTPasswd Identity Provider =========="
+# HTPasswd setup is opt-in via [debug] in the PR title — auth pod restarts add significant job time
+PR_TITLE=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].title // empty')
+if [[ "$JOB_TYPE" != "periodic" ]] && [[ "$PR_TITLE" != *"[debug]"* ]]; then
+    echo "Skipping HTPasswd identity provider setup. Add [debug] to PR title to enable."
+elif [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME ]] || [[ ! -f /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD ]]; then
+    echo "WARNING: EPHEMERAL_CLUSTER_ADMIN_* secrets not found, skipping HTPasswd identity provider setup"
+else
+    htpasswd -c -B -i users.htpasswd "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)" <<< "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_PASSWORD)"
+    oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n openshift-config
+    rm -f users.htpasswd
+    oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"name":"cluster_admin","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}'
+    oc wait --for=condition=Progressing=False clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Available=True clusteroperator/authentication --timeout=10m
+    oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
+    oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/EPHEMERAL_CLUSTER_ADMIN_USERNAME)"
+fi
+
 echo "========== Cluster Service Account and Token Management =========="
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
@@ -135,7 +153,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "$
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "TAG_NAME: $TAG_NAME"
-    IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    IMAGE_NAME="${IMAGE_REPO:-rhdh-community/rhdh}:${TAG_NAME}"
     echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
@@ -182,8 +200,9 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
     IMAGE_REPO="rhdh-community/rhdh"
-    IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
+    IMAGE_NAME="${IMAGE_REPO}:${TAG_NAME}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+        echo "Waiting for Docker image availability..."
         # Timeout configuration for waiting for Docker image availability
         MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
         POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
@@ -218,9 +237,7 @@ else
         echo "INFO: Skipping image availability check for non-quay.io registry: ${IMAGE_REGISTRY}"
     fi
 fi
-IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
 QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
-export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"

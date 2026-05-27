@@ -6,8 +6,97 @@ presubmits:
     - ^release-4\.23$
     - ^release-4\.23-
     cluster: build06
+    context: ci/prow/e2e-aws-nto-ext
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-node-tuning-operator-release-4.23-e2e-aws-nto-ext
+    optional: true
+    rerun_command: /test e2e-aws-nto-ext
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-nto-ext
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-nto-ext,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build06
     context: ci/prow/e2e-aws-operator
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -88,6 +177,10 @@ presubmits:
     cluster: build06
     context: ci/prow/e2e-aws-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -168,6 +261,10 @@ presubmits:
     cluster: build06
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -245,9 +342,13 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-gcp-pao
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
@@ -326,9 +427,13 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-gcp-pao-updating-profile
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
@@ -407,9 +512,13 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-gcp-pao-workloadhints
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
@@ -491,6 +600,10 @@ presubmits:
     cluster: build05
     context: ci/prow/e2e-hypershift
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -571,6 +684,10 @@ presubmits:
     cluster: build05
     context: ci/prow/e2e-hypershift-pao
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -651,6 +768,10 @@ presubmits:
     cluster: build05
     context: ci/prow/e2e-no-cluster
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -712,6 +833,10 @@ presubmits:
     cluster: build05
     context: ci/prow/e2e-pao-updating-profile-hypershift
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -789,9 +914,13 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-telco5g-cnftests
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       capability/intranet: intranet
       ci.openshift.io/generator: prowgen
@@ -872,6 +1001,10 @@ presubmits:
     cluster: build06
     context: ci/prow/e2e-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -952,6 +1085,10 @@ presubmits:
     cluster: build05
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1006,6 +1143,10 @@ presubmits:
     cluster: build05
     context: ci/prow/lint
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1067,6 +1208,10 @@ presubmits:
     cluster: build05
     context: ci/prow/unit
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1128,6 +1273,10 @@ presubmits:
     cluster: build05
     context: ci/prow/verify
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1189,6 +1338,10 @@ presubmits:
     cluster: build05
     context: ci/prow/verify-deps
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1267,6 +1420,10 @@ presubmits:
     cluster: build05
     context: ci/prow/vet
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel9
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

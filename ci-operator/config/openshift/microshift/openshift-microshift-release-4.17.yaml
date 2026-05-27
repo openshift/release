@@ -84,10 +84,24 @@ tests:
     workflow: openshift-microshift-rebase
 - as: rebase-on-nightlies
   cron: 0 4 * * 1,4
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     workflow: openshift-microshift-rebase
 - as: publish-release-notes
   cron: 35 3 10,28 * *
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     workflow: openshift-microshift-publish-release-notes
 - as: microshift-metal-tests
@@ -182,6 +196,13 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
 - as: clusterbot
   cron: 35 7 14,26 * *
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:

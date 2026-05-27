@@ -9,7 +9,9 @@ presubmits:
     context: ci/prow/4.18-ci-index
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.18"
       ci.openshift.io/generator: prowgen
@@ -67,7 +69,9 @@ presubmits:
     context: ci/prow/4.18-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.18"
       ci.openshift.io/generator: prowgen
@@ -125,7 +129,9 @@ presubmits:
     context: ci/prow/4.22-ci-index
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.22"
       ci.openshift.io/generator: prowgen
@@ -183,7 +189,9 @@ presubmits:
     context: ci/prow/4.22-e2e-test-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -269,7 +277,9 @@ presubmits:
     context: ci/prow/4.22-e2e-test-cli-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -355,7 +365,9 @@ presubmits:
     context: ci/prow/4.22-e2e-test-hcp-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -441,7 +453,9 @@ presubmits:
     context: ci/prow/4.22-e2e-test-kubevirt-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -527,7 +541,9 @@ presubmits:
     context: ci/prow/4.22-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "4.22"
       ci.openshift.io/generator: prowgen
@@ -577,6 +593,182 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.22-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^oadp-1\.6$
+    - ^oadp-1\.6-
+    cluster: build01
+    context: ci/prow/4.22-tls-pqc-readiness
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: "4.22"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.22-tls-pqc-readiness
+    optional: true
+    rerun_command: /test 4.22-tls-pqc-readiness
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=tls-pqc-readiness
+        - --variant=4.22
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-tls-pqc-readiness,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^oadp-1\.6$
+    - ^oadp-1\.6-
+    cluster: build01
+    context: ci/prow/4.22-tls13-adherence
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: "4.22"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-oadp-operator-oadp-1.6-4.22-tls13-adherence
+    optional: true
+    rerun_command: /test 4.22-tls13-adherence
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=tls13-adherence
+        - --variant=4.22
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-tls13-adherence,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^oadp-1\.6$
@@ -585,7 +777,9 @@ presubmits:
     context: ci/prow/5.0-ci-index
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "5.0"
       ci.openshift.io/generator: prowgen
@@ -643,7 +837,9 @@ presubmits:
     context: ci/prow/5.0-e2e-test-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -729,7 +925,9 @@ presubmits:
     context: ci/prow/5.0-e2e-test-cli-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -815,7 +1013,9 @@ presubmits:
     context: ci/prow/5.0-e2e-test-hcp-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -901,7 +1101,9 @@ presubmits:
     context: ci/prow/5.0-e2e-test-kubevirt-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -987,7 +1189,9 @@ presubmits:
     context: ci/prow/5.0-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     labels:
       ci-operator.openshift.io/variant: "5.0"
       ci.openshift.io/generator: prowgen
@@ -1041,11 +1245,12 @@ presubmits:
     branches:
     - ^oadp-1\.6$
     - ^oadp-1\.6-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -1101,7 +1306,8 @@ presubmits:
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

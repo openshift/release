@@ -22,6 +22,16 @@ test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: 24nodes-scale-scannerv4-test
   cron: 0 6 * * *
+  reporter_config:
+    channel: '#acs-perfscale'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-stackrox

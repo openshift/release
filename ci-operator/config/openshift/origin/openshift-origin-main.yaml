@@ -838,6 +838,40 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-ovn-dra-example
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --run \[Feature:DRA-Example\]
+      TEST_SUITE: all
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: dra-example-driver-install
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: tls-observed-config
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      TEST_SUITE: openshift/tls-observed-config
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: tls-observed-config-hypershift
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: openshift/tls-observed-config
+    workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: main
   org: openshift

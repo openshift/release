@@ -1,3 +1,8 @@
+base_images:
+  vault_kube_kms:
+    name: vault-kube-kms
+    namespace: control-plane_vault
+    tag: 0.0.1
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -133,6 +138,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
+    - chain: etcd-encryption-vault-setup
     - as: test
       cli: latest
       commands: |
@@ -142,6 +148,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms-ote
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-openshift-apiserver-operator/encryption-kms
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - as: verify-deps
   steps:
