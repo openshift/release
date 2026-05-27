@@ -21,11 +21,12 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
-pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+if [[ "${E2E_VERSION}" != "default" ]]; then
+    git clone "https://github.com/cloud-bulldozer/e2e-benchmarking" /tmp/e2e-benchmarking --branch "${E2E_VERSION}" --depth 1
+    pushd /tmp/e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+else
+    pushd /e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+fi
 export WORKLOAD=network-policy
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)

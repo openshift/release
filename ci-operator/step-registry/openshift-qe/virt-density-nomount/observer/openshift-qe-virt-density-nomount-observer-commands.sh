@@ -22,10 +22,12 @@ function vd_cleanup() {
 trap vd_cleanup EXIT SIGTERM SIGINT
 
 pushd /tmp
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
+if [[ "${E2E_VERSION}" != "default" ]]; then
+    git clone "https://github.com/cloud-bulldozer/e2e-benchmarking" /tmp/e2e-benchmarking --branch "${E2E_VERSION}" --depth 1
+    pushd /tmp/e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+else
+    pushd /e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+fi
 
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
@@ -43,7 +45,6 @@ if [[ $WAIT_FOR_NS == "true" ]]; then
   done
 fi
 
-pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=virt-density
 
 EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=false --vms-per-node=$VMS_PER_NODE --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS} --mounts=false"

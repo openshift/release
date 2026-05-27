@@ -17,7 +17,6 @@ fi
 
 oc config view
 oc projects
-pushd /tmp
 
 UUID=$(uuidgen)
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
@@ -53,11 +52,12 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
     fi
 fi
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
-pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+if [[ "${E2E_VERSION}" != "default" ]]; then
+    git clone "https://github.com/cloud-bulldozer/e2e-benchmarking" /tmp/e2e-benchmarking --branch "${E2E_VERSION}" --depth 1
+    pushd /tmp/e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+else
+    pushd /e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+fi
 export WORKLOAD=node-density
 EXTRA_FLAGS="${ND_EXTRA_FLAGS} ${KB_FLAGS} --gc-metrics=false --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 

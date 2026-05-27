@@ -15,17 +15,17 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-pushd /tmp
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
 # Clone the e2e repo
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
-pushd e2e-benchmarking/workloads/ingress-perf
+if [[ "${E2E_VERSION}" != "default" ]]; then
+    git clone "https://github.com/cloud-bulldozer/e2e-benchmarking" /tmp/e2e-benchmarking --branch "${E2E_VERSION}" --depth 1
+    pushd /tmp/e2e-benchmarking/workloads/ingress-perf
+else
+    pushd /e2e-benchmarking/workloads/ingress-perf
+fi
 
 # ES Configuration
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"

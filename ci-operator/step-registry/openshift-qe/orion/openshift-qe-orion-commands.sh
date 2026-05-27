@@ -5,27 +5,21 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-python --version
-pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
-
-if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+if [[ "${TAG}" != "latest" ]]; then
+    git clone -q --branch "${TAG}" "${ORION_REPO}" /tmp/orion --depth 1
+    pushd /tmp/orion
 else
-    LATEST_TAG=$TAG
+    pushd /orion
 fi
-git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
-pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
 if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
   git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
   git switch ${PULL_NUMBER}
+  pip install -q -r requirements.txt
+  pip install -q .
 fi
-
-pip install -q -r requirements.txt
 
 case "$ES_TYPE" in
   qe)
@@ -65,7 +59,6 @@ esac
 
 export ES_SERVER
 
-pip install -q .
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"

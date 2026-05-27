@@ -19,7 +19,6 @@ fi
 oc config view
 oc projects
 python --version
-pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
@@ -41,8 +40,12 @@ if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 else
-  git clone $REPO_URL $TAG_OPTION --depth 1
-  pushd e2e-benchmarking/workloads/network-perf-v2
+  if [[ "${E2E_VERSION}" != "default" ]]; then
+      git clone "https://github.com/cloud-bulldozer/e2e-benchmarking" /tmp/e2e-benchmarking --branch "${E2E_VERSION}" --depth 1
+      pushd /tmp/e2e-benchmarking/workloads/network-perf-v2
+  else
+      pushd /e2e-benchmarking/workloads/network-perf-v2
+  fi
   # Clean up resources from possible previous tests.
   oc delete ns netperf --wait=true --ignore-not-found=true
   # Only store the results from the full run versus the smoke test.
