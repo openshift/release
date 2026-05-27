@@ -390,6 +390,7 @@ tests:
         RESULT_JSON=$(ls ${ARTIFACT_DIR}/extension_test_result_*.json 2>/dev/null | head -1)
         if [[ -n "$RESULT_JSON" && -f "$RESULT_JSON" ]]; then
           jq -r '
+            (. // []) |
             def pass:
               .result == "passed" or
               ((.output // "") | contains("SUCCESS! -- 1 Passed"));
@@ -405,12 +406,13 @@ tests:
             "</testsuite>"
           ' "$RESULT_JSON" > "${ARTIFACT_DIR}/junit_results.xml"
           FAIL_COUNT=$(jq '
+            (. // []) |
             def pass:
               .result == "passed" or
               ((.output // "") | contains("SUCCESS! -- 1 Passed"));
             [.[] | select(pass | not)] | length
           ' "$RESULT_JSON")
-          TOTAL=$(jq length "$RESULT_JSON")
+          TOTAL=$(jq '(. // []) | length' "$RESULT_JSON")
           echo "Results: $((TOTAL - FAIL_COUNT)) passed, ${FAIL_COUNT} failed"
           [[ $FAIL_COUNT -gt 0 ]] && exit 1
         fi
@@ -484,6 +486,7 @@ tests:
         RESULT_JSON=$(ls ${ARTIFACT_DIR}/extension_test_result_*.json 2>/dev/null | head -1)
         if [[ -n "$RESULT_JSON" && -f "$RESULT_JSON" ]]; then
           jq -r '
+            (. // []) |
             def pass:
               .result == "passed" or
               ((.output // "") | contains("SUCCESS! -- 1 Passed"));
@@ -499,12 +502,13 @@ tests:
             "</testsuite>"
           ' "$RESULT_JSON" > "${ARTIFACT_DIR}/junit_results.xml"
           FAIL_COUNT=$(jq '
+            (. // []) |
             def pass:
               .result == "passed" or
               ((.output // "") | contains("SUCCESS! -- 1 Passed"));
             [.[] | select(pass | not)] | length
           ' "$RESULT_JSON")
-          TOTAL=$(jq length "$RESULT_JSON")
+          TOTAL=$(jq '(. // []) | length' "$RESULT_JSON")
           echo "Results: $((TOTAL - FAIL_COUNT)) passed, ${FAIL_COUNT} failed"
           [[ $FAIL_COUNT -gt 0 ]] && exit 1
         fi
