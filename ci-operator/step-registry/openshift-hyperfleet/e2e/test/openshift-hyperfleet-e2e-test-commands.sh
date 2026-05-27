@@ -15,24 +15,24 @@ MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 
 cp -r /e2e/ /tmp/
 
-# Use ref-specific binary and resources if available (built by setup step)
-E2E_REF="${E2E_REF:-}"
+# Clone and build from a specific ref if requested (RC/release testing)
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
 E2E_BIN="hyperfleet-e2e"
 TESTDATA="/e2e/testdata"
 if [ -n "$E2E_REF" ]; then
-  for required in hyperfleet-e2e testdata deploy-scripts configs; do
-    if [ ! -e "${SHARED_DIR}/${required}" ]; then
-      log "ERROR: E2E_REF=${E2E_REF} but ${SHARED_DIR}/${required} missing — setup step regressed"
-      exit 1
-    fi
-  done
-  E2E_BIN="${SHARED_DIR}/hyperfleet-e2e"
+  log "=== Building E2E from ref: ${E2E_REF} ==="
+  git clone --branch "$E2E_REF" --depth 1 \
+    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
+  cd /tmp/e2e-src
+  make build
+  E2E_BIN="/tmp/e2e-src/bin/hyperfleet-e2e"
   chmod +x "$E2E_BIN"
-  TESTDATA="${SHARED_DIR}/testdata"
+  TESTDATA="/tmp/e2e-src/testdata"
   rm -rf /tmp/e2e/deploy-scripts /tmp/e2e/configs
-  cp -r "${SHARED_DIR}/deploy-scripts" /tmp/e2e/deploy-scripts
-  cp -r "${SHARED_DIR}/configs" /tmp/e2e/configs
-  log "Using E2E artifacts from ref: ${E2E_REF}"
+  cp -r /tmp/e2e-src/deploy-scripts /tmp/e2e/deploy-scripts
+  cp -r /tmp/e2e-src/configs /tmp/e2e/configs
+  cd -
+  log "=== E2E build complete ==="
 fi
 
 cd "/tmp/e2e/deploy-scripts/"
@@ -52,7 +52,7 @@ export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 
 # Export API chart parameters for tier2 tests
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
