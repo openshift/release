@@ -95,7 +95,15 @@ COMPONENT_IMAGE="${7:-}"
 COMPONENT_IMAGE_NAME="${8:-}"
 NAMESPACE="${9:-osac-e2e-ci}"
 
+_timer() {
+    local elapsed=$(( $(date +%s) - $1 ))
+    printf "[TIMING] %s: %dm %ds\n" "$2" $((elapsed/60)) $((elapsed%60))
+}
+
+BOOT_TOTAL_START=$(date +%s)
+
 # --- Phase 1: cluster-tool setup ---
+SETUP_START=$(date +%s)
 echo "=== Downloading cluster-tool ==="
 curl -fsSL "https://raw.githubusercontent.com/omer-vishlitzky/cluster-tool/${COMMIT}/cluster-tool" \
     -o /usr/local/bin/cluster-tool
@@ -127,17 +135,22 @@ echo "DNS ready (standalone dnsmasq, upstream=${ORIG_DNS})"
 
 echo "=== Setting up server ==="
 python3 /usr/local/bin/cluster-tool connect ci --host local --data-path /home/cluster-tool
+_timer $SETUP_START "Setup (cluster-tool + DNS + server)"
 
 # --- Phase 2: pull + boot ---
 echo "=== Setting up container auth ==="
 mkdir -p /root/.config/containers
 cp /root/pull-secret /root/.config/containers/auth.json
 
+PULL_START=$(date +%s)
 echo "=== Pulling OSAC vmaas flavor ==="
 python3 /usr/local/bin/cluster-tool pull "${FLAVOR_IMAGE}"
+_timer $PULL_START "Pull flavor"
 
+CLUSTER_BOOT_START=$(date +%s)
 echo "=== Booting cluster ==="
 python3 /usr/local/bin/cluster-tool boot --flavor vmaas-kustomize --name "${CLONE}"
+_timer $CLUSTER_BOOT_START "Boot cluster"
 
 systemctl restart dnsmasq
 
@@ -183,6 +196,7 @@ if [[ -n "${AAP_SOURCE_SHA}" ]]; then
 fi
 
 # --- Phase 5: refresh ---
+REFRESH_START=$(date +%s)
 echo "=== Running refresh ==="
 podman run --authfile /root/pull-secret --rm --network=host \
     -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
@@ -194,8 +208,11 @@ podman run --authfile /root/pull-secret --rm --network=host \
     -e INSTALLER_NAMESPACE="${NAMESPACE}" \
     "${INSTALLER_IMAGE}" \
     bash -c "${COMPONENT_OVERRIDE_CMD}${AAP_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
+_timer $REFRESH_START "Refresh"
 
+echo ""
 echo "=== Boot + refresh complete ==="
+_timer $BOOT_TOTAL_START "Total (setup + pull + boot + refresh)"
 REMOTE_SCRIPT
 
 echo "Executing boot script on machine..."
