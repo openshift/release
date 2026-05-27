@@ -7,7 +7,13 @@ set -o errexit
 if [ -z ${MAPPING_FILE_PREFIX} ]; then >&2 echo "MAPPING_FILE_PREFIX is unset or empty" && exit 1; else echo "MAPPING_FILE_PREFIX is set to $MAPPING_FILE_PREFIX"; fi 
  
 dry_run="${dry_run:-true}" 
-cp ~/.docker/config.json /tmp/config.json 
+
+if [ -f /tmp/user/.docker/config.json ]; then
+    cp /tmp/user/.docker/config.json /tmp/config.json
+else
+    echo "WARN: /tmp/user/.docker/config.json has not been provided"
+fi
+
 oc registry login --to /tmp/config.json 
 
 # QCI proxy authenticates any SA that belongs to the build farm
