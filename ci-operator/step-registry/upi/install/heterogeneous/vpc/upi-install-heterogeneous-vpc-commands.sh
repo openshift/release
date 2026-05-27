@@ -164,7 +164,7 @@ function get_ready_nodes_count() {
 function setup_multi_arch_vpc_workspace(){
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME}" || true
-  curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/main.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
+  curl -sL "https://github.com/raja-0940/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/main.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
   tar -xf "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc.tar.gz
   mv ocp4-upi-compute-powervs-ibmcloud-main ocp4-multi-arch-vpc || true
   cd "${IBMCLOUD_HOME}"/ocp4-multi-arch-vpc || true
