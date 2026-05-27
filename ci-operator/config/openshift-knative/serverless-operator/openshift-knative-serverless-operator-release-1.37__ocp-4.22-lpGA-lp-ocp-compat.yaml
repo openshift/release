@@ -135,7 +135,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: cr-operator-e2e-aws
+  as: cr--operator-e2e--aws
   cron: 0 3,15 * * *
   reporter_config:
     channel: '#serverless-ci'
@@ -152,6 +152,7 @@ tests:
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--Serverless
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -168,13 +169,20 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: maschmid@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: SRVCOM
       OCP_VERSION: "4.22"
-      REPORTPORTAL_CMP: Serverless-lp-interop
       USER_TAGS: |
         scenario serverless
     test:
     - as: operator-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-e2e-with-kafka
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__operator-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -193,6 +201,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 8Gi
@@ -200,8 +209,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-serving-eventing-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-upstream-e2e-no-upgrade
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__knative-serving-eventing-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -220,6 +237,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 8Gi
@@ -227,8 +245,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-upstream-e2e-kafka-no-upgrade
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__knative-eventing-kafka-broker-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -247,6 +273,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 10Gi
@@ -255,7 +282,7 @@ tests:
           memory: 200Mi
     workflow: firewatch-ipi-aws-cr
 - always_run: false
-  as: aws-fips
+  as: operator-e2e--aws-fips
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#serverless-ci'
@@ -272,6 +299,7 @@ tests:
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--Serverless
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG: |
         {
@@ -289,13 +317,20 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: maschmid@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: SRVCOM
       OCP_VERSION: "4.22"
-      REPORTPORTAL_CMP: Serverless-lp-interop
       USER_TAGS: |
         scenario serverless
     test:
     - as: operator-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-e2e-with-kafka
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__operator-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -314,6 +349,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 8Gi
@@ -321,8 +357,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-serving-eventing-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-upstream-e2e-no-upgrade
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__knative-serving-eventing-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -341,6 +385,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 8Gi
@@ -348,8 +393,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
-      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        SKIP_SPOT_INSTANCES=true MAP_TESTS=true make test-upstream-e2e-kafka-no-upgrade
+      commands: |
+        set -euxo pipefail; shopt -s inherit_errexit
+        eval "$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+        trap 'LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" ExitTrap--PostProcessPrep junit--serverless-operator__knative-eventing-kafka-broker-e2e.xml' EXIT
+        GOPATH=/tmp/go \
+            PATH=$PATH:/tmp/go/bin \
+            SKIP_MESH_AUTH_POLICY_GENERATION=true \
+            SKIP_SPOT_INSTANCES=true \
+            MAP_TESTS=true \
+            make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -368,6 +421,7 @@ tests:
       - env: SERVERLESS_METADATA_WEBHOOK
         name: serverless-metadata-webhook
       from: serverless-source-image
+      grace_period: 10m0s
       resources:
         limits:
           memory: 10Gi
@@ -379,4 +433,4 @@ zz_generated_metadata:
   branch: release-1.37
   org: openshift-knative
   repo: serverless-operator
-  variant: ocp-4.22-lp-interop
+  variant: ocp-4.22-lpGA-lp-ocp-compat
