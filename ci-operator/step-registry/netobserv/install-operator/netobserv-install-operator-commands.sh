@@ -4,61 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 set -x
-update_flowcollector() {
-  FLOWCOLLECTOR=/tmp/flowcollector.yaml
-  cat <<EOF >$FLOWCOLLECTOR
-kind: FlowCollector
-apiVersion: flows.netobserv.io/v1beta2
-metadata:
-  name: cluster
-spec:
-  agent:
-    ebpf:
-      cacheActiveTimeout: 5s
-      cacheMaxFlows: 100000
-      features: []
-      sampling: 1
-    type: eBPF
-  consolePlugin:
-    logLevel: info
-    portNaming:
-      enable: true
-      portNames:
-        '3100': loki
-  deploymentModel: Direct
-  exporters: []
-  kafka:
-    address: kafka-cluster-kafka-bootstrap.netobserv
-    tls:
-      caCert:
-        certFile: ca.crt
-        name: kafka-cluster-cluster-ca-cert
-        type: secret
-      enable: false
-      userCert:
-        certFile: user.crt
-        certKey: user.key
-        name: flp-kafka
-        type: secret
-    topic: network-flows
-  loki:
-    enable: true
-    lokiStack:
-      name: loki
-    mode: Monolithic
-  namespace: netobserv
-  processor:
-    kafkaConsumerReplicas: 3
-    logLevel: info
-    logTypes: Flows
-    profilePort: 6060
-    resources:
-      limits:
-        memory: 800Mi
-      requests:
-        cpu: 100m
-        memory: 100Mi
-EOF
+
+install_jq() {
+  local jq_version
+  jq_version=$(curl -s https://api.github.com/repos/jqlang/jq/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+  curl -sSfL "https://github.com/jqlang/jq/releases/download/${jq_version}/jq-linux-amd64" -o /tmp/jq
+  chmod u+x /tmp/jq
+  export PATH=${PATH}:/tmp
 }
 
 deploy_catalog() {
@@ -120,21 +72,37 @@ patch_csv_images(){
   CSV=$(oc get csv -n openshift-netobserv-operator | grep -iE "net.*observ" | awk '{print $1}')
 
   # patch as Downstream to scrape metrics
-  oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/4/value", "value": "true"}]'
+  OVERRIDE_VAR="DOWNSTREAM_DEPLOYMENT"
+  ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
+
+  oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
 
   if [[ $PATCH_EBPFAGENT_IMAGE ]]; then
-    PATCH="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0/value\", \"value\": \"$PATCH_EBPFAGENT_IMAGE\"}]"
-      oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="$PATCH"
+    OVERRIDE_VAR="RELATED_IMAGE_EBPF_AGENT"
+    echo "====> Patching eBPF image"
+    ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
+    oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"$PATCH_EBPFAGENT_IMAGE\"}]"
   fi 
 
   if [[ $PATCH_FLOWLOGS_IMAGE ]]; then
-      PATCH="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/1/value\", \"value\": \"$PATCH_FLOWLOGS_IMAGE\"}]"
-      oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="$PATCH"
+    echo "====> Patching FLP image"
+    OVERRIDE_VAR="RELATED_IMAGE_FLOWLOGS_PIPELINE"
+    ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
+    oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"$PATCH_FLOWLOGS_IMAGE\"}]"
   fi
 
   if [[ $PATCH_CONSOLE_PLUGIN_IMAGE ]]; then
-      PATCH="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/2/value\", \"value\": \"$PATCH_CONSOLE_PLUGIN_IMAGE\"}]"
-      oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="$PATCH"
+    if [[ $OCP_VERSION -ge "416" && $OCP_VERSION -le "421" ]]; then
+      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF5"
+    elif [[ $OCP_VERSION -le "415" ]]; then
+      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF4"
+    else
+      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN"
+    fi
+    echo $OVERRIDE_VAR
+
+    ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
+    oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"$PATCH_CONSOLE_PLUGIN_IMAGE\"}]"
   fi
 
   if [[ $PATCH_OPERATOR_IMAGE ]]; then
@@ -154,13 +122,10 @@ fi
 NAMESPACE=netobserv
 oc new-project ${NAMESPACE} || true
 
-echo "====> Deploying 0-click Loki"
-oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/zero-click-loki/1-storage.yaml -n ${NAMESPACE}
-oc apply -f https://raw.githubusercontent.com/netobserv/documents/main/examples/zero-click-loki/2-loki.yaml -n ${NAMESPACE}
-
 sleep 30
 oc wait --timeout=180s --for=condition=ready pod -l olm.catalogSource=$CATALOG_NAME -n openshift-marketplace
 
+jq --version || install_jq 
 create_ns
 create_og
 subscribe

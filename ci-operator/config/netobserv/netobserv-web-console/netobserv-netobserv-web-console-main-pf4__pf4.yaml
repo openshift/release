@@ -21,26 +21,26 @@ build_root:
 images:
   items:
   - dockerfile_path: Dockerfile.front
-    to: local-front-build
+    to: local-front-build-pf4
   - dockerfile_path: Dockerfile
     from: ubi
     inputs:
-      local-front-build:
+      local-front-build-pf4:
         as:
         - localhost/local-front-build:latest
-    to: netobserv-web-console
+    to: netobserv-web-console-pf4
   - build_args:
     - name: BUILDSCRIPT
       value: :standalone
     dockerfile_path: Dockerfile.cypress
-    to: plugin-cypress-tests
+    to: plugin-cypress-tests-pf4
   - dockerfile_path: Dockerfile.e2e
-    to: e2e-integration-tests
+    to: e2e-integration-tests-pf4
 promotion:
   to:
   - excluded_images:
-    - plugin-cypress-tests
-    - local-front-build
+    - local-front-build-pf4
+    - plugin-cypress-tests-pf4
     namespace: netobserv
     tag: ci
 releases:
@@ -48,7 +48,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -56,7 +56,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  local-front-build:
+  local-front-build-pf4:
     limits:
       memory: 8Gi
     requests:
@@ -67,23 +67,24 @@ tests:
   commands: |
     ./cypress.sh
   container:
-    from: plugin-cypress-tests
+    from: plugin-cypress-tests-pf4
 - as: integration-tests
   optional: true
   steps:
     cluster_profile: aws-qe
     dependencies:
-      PATCH_CONSOLE_PLUGIN_IMAGE: pipeline:netobserv-web-console
+      PATCH_CONSOLE_PLUGIN_IMAGE: pipeline:netobserv-web-console-pf4
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       CYPRESS_NOO_CATALOG_SOURCE: upstream
       CYPRESS_SKIP_NOO_INSTALL: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "414"
     test:
     - ref: netobserv-install-operator
-    - ref: netobserv-frontend-tests
+    - ref: netobserv-frontend-tests-pf4
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
-  branch: main
+  branch: main-pf4
   org: netobserv
   repo: netobserv-web-console
+  variant: pf4
