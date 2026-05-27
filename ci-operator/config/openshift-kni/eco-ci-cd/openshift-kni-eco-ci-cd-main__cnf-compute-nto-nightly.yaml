@@ -1,0 +1,55 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-telcov10n-nto-tests-v2-t0-bm-4-22-nightly
+  capabilities:
+  - intranet
+  cron: 59 11 * * 0
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      CGROUP_VERSION: v2
+      CLUSTER_NAME: hlxcl15
+      CONTAINER_RUNTIME: crun
+      FEATURES: compute
+      HUGEPAGES_DEFAULT_SIZE: 1G
+      HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
+      LABELS: nto
+      OCP_VERSION_RELEASE_TYPE: nightly
+      RT_KERNEL: "true"
+      VERSION: "4.22"
+    test:
+    - ref: telcov10n-functional-cnf-compute-nto-eco-gotests
+    workflow: telcov10n-functional-cnf-compute-nto-ocp-setup
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-compute-nto-nightly
