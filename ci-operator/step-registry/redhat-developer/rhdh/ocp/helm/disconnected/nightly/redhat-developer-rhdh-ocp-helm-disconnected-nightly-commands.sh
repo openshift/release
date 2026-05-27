@@ -17,6 +17,62 @@ fi
 export DISCONNECTED="true"
 echo "DISCONNECTED=${DISCONNECTED}"
 
+echo "========== Mirror Registry Variables =========="
+# Read mirror registry connection details written by pre-phase steps.
+# These are needed by prepare-restricted-environment.sh to mirror RHDH
+# operator/operand images to the bastion mirror registry.
+export MIRROR_REGISTRY_URL
+MIRROR_REGISTRY_URL=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" 2>/dev/null || true)
+echo "MIRROR_REGISTRY_URL=${MIRROR_REGISTRY_URL}"
+
+export BASTION_PUBLIC_ADDRESS
+BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address" 2>/dev/null || true)
+echo "BASTION_PUBLIC_ADDRESS=${BASTION_PUBLIC_ADDRESS}"
+
+export BASTION_SSH_USER
+BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user" 2>/dev/null || true)
+echo "BASTION_SSH_USER=${BASTION_SSH_USER}"
+
+# Construct authenticated pull secret with mirror registry credentials.
+# The vault secret at /var/run/vault/mirror-registry/ contains:
+#   registry_creds     - plaintext user:password for the mirror registry
+#   client_ca.crt      - CA certificate for TLS verification
+#   registry_quay.json - quay.io credentials (for pulling source images)
+#   registry_redhat.json - registry.redhat.io credentials
+MIRROR_REGISTRY_CREDS_FILE="/var/run/vault/mirror-registry/registry_creds"
+MIRROR_REGISTRY_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
+
+if [[ -z "${MIRROR_REGISTRY_URL}" ]]; then
+    echo "ERROR: MIRROR_REGISTRY_URL is empty (${SHARED_DIR}/mirror_registry_url missing or empty)"
+    exit 1
+fi
+if [[ ! -f "${MIRROR_REGISTRY_CREDS_FILE}" ]]; then
+    echo "ERROR: Mirror registry credentials not found at ${MIRROR_REGISTRY_CREDS_FILE}"
+    exit 1
+fi
+if [[ ! -f "${MIRROR_REGISTRY_CA_FILE}" ]]; then
+    echo "ERROR: Mirror registry CA certificate not found at ${MIRROR_REGISTRY_CA_FILE}"
+    exit 1
+fi
+
+export MIRROR_REGISTRY_CA="${MIRROR_REGISTRY_CA_FILE}"
+echo "Mirror registry CA certificate: ${MIRROR_REGISTRY_CA}"
+
+export MIRROR_REGISTRY_PULL_SECRET="${SHARED_DIR}/mirror_registry_pull_secret.json"
+registry_cred=$(head -n 1 "${MIRROR_REGISTRY_CREDS_FILE}" | base64 -w 0)
+jq --argjson a "{\"${MIRROR_REGISTRY_URL}\": {\"auth\": \"$registry_cred\"}}" \
+    '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${MIRROR_REGISTRY_PULL_SECRET}"
+echo "Mirror registry pull secret created at ${MIRROR_REGISTRY_PULL_SECRET}"
+
+# Verify authenticated access to the mirror registry
+registry_user_pass=$(head -n 1 "${MIRROR_REGISTRY_CREDS_FILE}")
+if curl -sf --max-time 10 -o /dev/null --cacert "${MIRROR_REGISTRY_CA}" -u "${registry_user_pass}" "https://${MIRROR_REGISTRY_URL}/v2/"; then
+    echo "PASS: Mirror registry at ${MIRROR_REGISTRY_URL} is accessible with credentials"
+else
+    echo "FAIL: Mirror registry at ${MIRROR_REGISTRY_URL} is not accessible with credentials"
+    exit 1
+fi
+
 echo "========== Repository, Branch, and PR Variables =========="
 GITHUB_ORG_NAME="redhat-developer"
 echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
@@ -128,30 +184,8 @@ echo "All nodes are ready"
 echo "========== Disconnected Environment Verification =========="
 VERIFICATION_FAILED=false
 
-# 1. Verify bastion host is reachable via proxy
-echo "--- Check 1: Bastion host reachability ---"
-BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address" 2>/dev/null || true)
-if [[ -z "${BASTION_PUBLIC_ADDRESS}" ]]; then
-    echo "FAIL: bastion_public_address not found in SHARED_DIR"
-    VERIFICATION_FAILED=true
-else
-    echo "Bastion address: ${BASTION_PUBLIC_ADDRESS}"
-    MIRROR_REGISTRY_URL=$(cat "${SHARED_DIR}/mirror_registry_url" 2>/dev/null || true)
-    if [[ -n "${MIRROR_REGISTRY_URL}" ]]; then
-        # Verify mirror registry is responding on the bastion (port 5000)
-        if curl -sf --max-time 10 -o /dev/null -k "https://${MIRROR_REGISTRY_URL}/v2/"; then
-            echo "PASS: Mirror registry at ${MIRROR_REGISTRY_URL} is responding"
-        else
-            echo "FAIL: Mirror registry at ${MIRROR_REGISTRY_URL} is not responding"
-            VERIFICATION_FAILED=true
-        fi
-    else
-        echo "WARNING: mirror_registry_url not found, skipping mirror registry check"
-    fi
-fi
-
-# 2. Verify cluster API is reachable through proxy
-echo "--- Check 2: Cluster API reachability via proxy ---"
+# 1. Verify cluster API is reachable through proxy
+echo "--- Check 1: Cluster API reachability via proxy ---"
 if oc get --raw /healthz 2>/dev/null; then
     echo "PASS: Cluster API is reachable (healthz returned ok)"
 else
@@ -159,8 +193,8 @@ else
     VERIFICATION_FAILED=true
 fi
 
-# 3. Verify cluster nodes cannot reach the internet (network isolation)
-echo "--- Check 3: Cluster node internet isolation ---"
+# 2. Verify cluster nodes cannot reach the internet (network isolation)
+echo "--- Check 2: Cluster node internet isolation ---"
 NODE_NAME=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 if [[ -z "${NODE_NAME}" ]]; then
     # Fall back to any node if no workers found
@@ -182,21 +216,8 @@ else
     echo "WARNING: Could not determine node name, skipping internet isolation check"
 fi
 
-# 4. Verify IDMS/ICSP mirror configuration is active
-echo "--- Check 4: Image mirror configuration ---"
-if oc get imagedigestmirrorset -o name 2>/dev/null | grep -q .; then
-    echo "PASS: ImageDigestMirrorSet (IDMS) resources found:"
-    oc get imagedigestmirrorset -o name
-elif oc get imagecontentsourcepolicy -o name 2>/dev/null | grep -q .; then
-    echo "PASS: ImageContentSourcePolicy (ICSP) resources found:"
-    oc get imagecontentsourcepolicy -o name
-else
-    echo "FAIL: No IDMS or ICSP resources found — image mirroring may not be configured"
-    VERIFICATION_FAILED=true
-fi
-
-# 5. Verify default catalog sources are disabled
-echo "--- Check 5: Default catalog sources disabled ---"
+# 3. Verify default catalog sources are disabled
+echo "--- Check 3: Default catalog sources disabled ---"
 DISABLE_STATUS=$(oc get operatorhub cluster -o jsonpath='{.spec.disableAllDefaultSources}' 2>/dev/null)
 if [[ "${DISABLE_STATUS}" == "true" ]]; then
     echo "PASS: Default catalog sources are disabled (disableAllDefaultSources=true)"
@@ -208,8 +229,8 @@ fi
 # Summary
 echo "--- Disconnected Environment Verification Summary ---"
 if [[ "${VERIFICATION_FAILED}" == "true" ]]; then
-    echo "WARNING: One or more disconnected environment checks failed. Review the output above."
-    echo "Continuing with test execution — failures may indicate environment misconfiguration."
+    echo "ERROR: One or more disconnected environment checks failed. Review the output above."
+    exit 1
 else
     echo "All disconnected environment checks passed."
 fi
