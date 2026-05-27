@@ -106,6 +106,36 @@ echo "=== Collecting AAP operator status ==="
 oc get ansibleautomationplatform -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-status.yaml" 2>&1 || true
 oc get automationcontroller -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/automationcontroller-status.yaml" 2>&1 || true
 
+echo "=== Collecting AAP job stdout ==="
+mkdir -p "${ARTIFACT_DIR}/aap-jobs"
+AAP_ROUTE=$(oc get route osac-aap -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null)
+AAP_ADMIN_PW=$(oc get secret osac-aap-controller-admin-password -n "${E2E_NAMESPACE}" \
+    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)
+if [[ -n "${AAP_ROUTE}" && -n "${AAP_ADMIN_PW}" ]]; then
+    AAP_AUTH=(-sk -u "admin:${AAP_ADMIN_PW}")
+    page=1
+    while true; do
+        page_file="${ARTIFACT_DIR}/aap-jobs/jobs-page-${page}.json"
+        curl "${AAP_AUTH[@]}" \
+            "https://${AAP_ROUTE}/api/controller/v2/jobs/?page=${page}&page_size=50&order_by=id" \
+            > "${page_file}" 2>&1 || break
+        jq -e '.results' "${page_file}" &>/dev/null || break
+        for job_id in $(jq -r '.results[]?.id // empty' "${page_file}" 2>/dev/null); do
+            status=$(jq -r ".results[] | select(.id == ${job_id}) | .status // \"unknown\"" "${page_file}" 2>/dev/null)
+            name=$(jq -r ".results[] | select(.id == ${job_id}) | .name // \"unknown\"" "${page_file}" 2>/dev/null)
+            curl "${AAP_AUTH[@]}" \
+                "https://${AAP_ROUTE}/api/controller/v2/jobs/${job_id}/stdout/?format=txt" \
+                > "${ARTIFACT_DIR}/aap-jobs/job-${job_id}-${status}-${name}.txt" 2>&1 || true
+        done
+        next=$(jq -r '.next // empty' "${page_file}" 2>/dev/null)
+        [[ -z "${next}" || "${next}" == "null" ]] && break
+        page=$((page + 1))
+    done
+    echo "  Captured stdout for $(ls "${ARTIFACT_DIR}/aap-jobs"/job-*.txt 2>/dev/null | wc -l) AAP jobs"
+else
+    echo "  AAP route or admin password not found, skipping job stdout capture"
+fi
+
 echo "Log collection complete"
 REMOTE_EOF
 
