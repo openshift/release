@@ -1,12 +1,15 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
-
-#Install CSO
-CSO_CHANNEL="$CSO_CHANNEL"
-CSO_SOURCE="$CSO_SOURCE"
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__cso-qe-test__quay-tests-cso-qe-test.xml
+    ' EXIT
+fi
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -15,26 +18,24 @@ metadata:
   name: container-security-operator
   namespace: openshift-operators
 spec:
-  channel: $CSO_CHANNEL
+  channel: ${CSO_CHANNEL}
   installPlanApproval: Automatic
   name: container-security-operator
-  source: $CSO_SOURCE
+  source: ${CSO_SOURCE}
   sourceNamespace: openshift-marketplace
 EOF
 
-for _ in {1..60}; do
-    CSV=$(oc -n openshift-operators get sub container-security-operator -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n openshift-operators get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
+typeset -i waitIdx=0
+typeset csv=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
+    csv="$(oc -n openshift-operators get sub container-security-operator -o jsonpath='{.status.installedCSV}' || true)"
+    if [[ -n "${csv}" ]]; then
+        if [[ "$(oc -n openshift-operators get csv "${csv}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             break
         fi
     fi
-    echo "CSV is NOT ready $_ times"
     sleep 10
 done
-echo "Container Security Operator is deployed successfully"
-
 
 #execute sanity test
 ##create ns
@@ -46,11 +47,16 @@ metadata:
 EOF
 sleep 2
 
-##create a pull secret
-ROBOT_USERNAME=$(cat /var/run/quayio-pull-robot/username)
-ROBOT_PASSWORD=$(cat /var/run/quayio-pull-robot/password)
-oc -n test-cso create secret docker-registry cso-private --docker-server=quay.io --docker-username="${ROBOT_USERNAME}" --docker-password="${ROBOT_PASSWORD}"
-sleep 2
+set +x
+typeset robotUsername robotPassword
+robotUsername="$(cat /var/run/quayio-pull-robot/username)"
+robotPassword="$(cat /var/run/quayio-pull-robot/password)"
+set -x
+
+oc -n test-cso create secret docker-registry cso-private \
+    --docker-server=quay.io \
+    --docker-username="${robotUsername}" \
+    --docker-password="${robotPassword}"
 oc -n test-cso secrets link default cso-private --for=pull
 sleep 2
 
@@ -94,23 +100,21 @@ spec:
       maxSurge: 25%
 EOF
 
-for _ in {1..60}; do
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
     if [[ "$(oc -n test-cso get deployment nodejs-sample -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        echo "Test Pod is in ready status" >&2
         break
     fi
-    echo "Test Pod is NOT ready $_ times"
     sleep 15
 done
 
 ##check IMV
-for _ in {1..60}; do
-    IMV=$(oc -n test-cso get imagemanifestvuln sha256.14237f12c482dcca294e766fc57163d0c0adac43ae690d1328fdc578f4792b95 || true)
-    if [[ -n "$IMV" ]]; then
-        echo "$IMV"
+typeset imv=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
+    imv="$(oc -n test-cso get imagemanifestvuln sha256.14237f12c482dcca294e766fc57163d0c0adac43ae690d1328fdc578f4792b95 || true)"
+    if [[ -n "${imv}" ]]; then
         exit 0
     fi
-    echo "Can NOT get IMV $_ times"
     sleep 10
 done
-echo "QE Test for Container Security Operator is passed"
+
+true

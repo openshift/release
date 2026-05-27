@@ -1,13 +1,17 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__qbo-qe-test__quay-tests-qbo-qe-test.xml
+    ' EXIT
+fi
 
 #Install QBO
-QBO_CHANNEL="$QBO_CHANNEL"
-QBO_SOURCE="$QBO_SOURCE"
-
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -15,35 +19,38 @@ metadata:
   name: quay-bridge-operator
   namespace: openshift-operators
 spec:
-  channel: $QBO_CHANNEL
+  channel: ${QBO_CHANNEL}
   installPlanApproval: Automatic
   name: quay-bridge-operator
-  source: $QBO_SOURCE
+  source: ${QBO_SOURCE}
   sourceNamespace: openshift-marketplace
 EOF
 
-for _ in {1..60}; do
-    CSV=$(oc -n openshift-operators get sub quay-bridge-operator -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n openshift-operators get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
+typeset -i waitIdx=0
+typeset csv=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
+    csv="$(oc -n openshift-operators get sub quay-bridge-operator -o jsonpath='{.status.installedCSV}' || true)"
+    if [[ -n "${csv}" ]]; then
+        if [[ "$(oc -n openshift-operators get csv "${csv}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             break
         fi
     fi
-    echo "CSV is NOT ready $_ times"
     sleep 10
 done
-echo "Quay Bridge Operator is deployed successfully"
-
 
 #execute sanity test
 ##Creating OAuth application and token
-token=$(set +o pipefail; LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 40)
-quay_ns=$(oc get quayregistry --all-namespaces | tail -n1 | tr " " "\n" | head -n1)
-quay_registry=$(oc get quayregistry -n "$quay_ns" | tail -n1 | tr " " "\n" | head -n1)
-quay_app_pod=$(oc -n "$quay_ns" get pods -l quay-component=quay-app -o name | head -n1)
 
-oc -n "$quay_ns" rsh "$quay_app_pod" python <<EOF
+set +x
+typeset token quayNs quayRegistry quayAppPod
+token="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 40)"
+quayNs="$(oc get quayregistry --all-namespaces --no-headers | tail -n1 | awk '{print $1}')"
+quayRegistry="$(oc get quayregistry -n "${quayNs}" --no-headers | tail -n1 | awk '{print $1}')"
+quayAppPod="$(oc -n "${quayNs}" get pods -l quay-component=quay-app -o name | head -n1)"
+quayAppPod="${quayAppPod#pod/}"
+set -x
+
+oc -n "${quayNs}" rsh "${quayAppPod}" python <<EOF
 from app import app
 from data import model
 from data.database import configure
@@ -64,23 +71,28 @@ create_user_access_token(admin_user, operator_app.client_id, scope, access_token
 EOF
 
 ##Redeploy quay pod
-oc delete pods -n "$quay_ns" -l quay-component=quay-app
+oc delete pods -n "${quayNs}" -l quay-component=quay-app
 
-for _ in {1..60}; do
-    quay_pod_status=$(oc -n "$quay_ns" get pods -l quay-component=quay-app -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}')
-    if [ "$quay_pod_status" = "True" ]; then
-        printf "%s" "$token" >"$SHARED_DIR/quay-access-token"
-        echo "Quay is running" >&2
+typeset quayPodStatus=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
+    quayPodStatus="$(oc -n "${quayNs}" get pods -l quay-component=quay-app -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
+    if [[ "${quayPodStatus}" = "True" ]]; then
         break
     fi
-    echo "Quay Pod is NOT ready $_ times"
     sleep 10
 done
 
-##Create QuayIntegration CR
-oc create secret -n openshift-operators generic quay-integration --from-file=token="$SHARED_DIR/quay-access-token"
+set +x
+printf '%s' "${token}" >"${SHARED_DIR}/quay-access-token"
+set -x
 
-registryEndpoint="$(oc -n "$quay_ns" get quayregistry "$quay_registry" -o jsonpath='{.status.registryEndpoint}')"
+##Create QuayIntegration CR
+oc create secret -n openshift-operators generic quay-integration \
+    --from-file=token="${SHARED_DIR}/quay-access-token" \
+    --dry-run=client -o yaml | oc apply -f -
+
+typeset registryEndpoint registry
+registryEndpoint="$(oc -n "${quayNs}" get quayregistry "${quayRegistry}" -o jsonpath='{.status.registryEndpoint}')"
 registry="${registryEndpoint#https://}"
 
 cat <<EOF | oc apply -f -
@@ -93,16 +105,20 @@ spec:
   credentialsSecret:
     namespace: openshift-operators
     name: quay-integration
-  quayHostname: $registryEndpoint
+  quayHostname: ${registryEndpoint}
 EOF
 
 ##Add quay certificate to openshift
-quay_cert="$(oc get cm -n openshift-apiserver kube-root-ca.crt -o jsonpath='{.data.ca\.crt}')"
-printf "%s" "$quay_cert" >"$SHARED_DIR/quay.crt"
-oc create configmap registry-cas -n openshift-config --from-file=$registry="$SHARED_DIR/quay.crt"
-oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-cas"}}}' --type=merge
-sleep 10
-time oc wait mcp --for=condition=Updated --all --timeout=20m
+typeset quayCert=""
+quayCert="$(oc get cm -n openshift-apiserver kube-root-ca.crt -o jsonpath='{.data.ca\.crt}')"
+printf '%s' "${quayCert}" >"${SHARED_DIR}/quay.crt"
+oc create configmap registry-cas -n openshift-config \
+    --from-file="${registry}=${SHARED_DIR}/quay.crt" \
+    --dry-run=client -o yaml | oc apply -f -
+oc patch image.config.openshift.io/cluster \
+    --patch '{"spec":{"additionalTrustedCA":{"name":"registry-cas"}}}' \
+    --type=merge
+oc wait mcp --for=condition=Updated --all --timeout=20m
 
 ##create ns
 cat <<EOF | oc apply -f -
@@ -499,23 +515,22 @@ EOF
 
 oc project test-qbo
 oc new-app rails-postgresql-example
-for _ in {1..30}; do
-  build_status=$(oc -n test-qbo get build -l buildconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Complete"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}')
-  if [ "$build_status" = "True" ]; then
-    echo "Build image push to quay successfully"
+
+typeset buildStatus="" appStatus=""
+for ((waitIdx = 1; waitIdx <= 30; waitIdx++)); do
+  buildStatus="$(oc -n test-qbo get build -l buildconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Complete"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
+  if [[ "${buildStatus}" = "True" ]]; then
     break
   fi
-  echo "Build is NOT ready $_ times"
   sleep 60
 done
 
-for _ in {1..30}; do
-  app_status=$(oc -n test-qbo get pods -l deploymentconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}')
-  if [ "$app_status" = "True" ]; then
-    echo "App pod pull image from quay successfully"
+for ((waitIdx = 1; waitIdx <= 30; waitIdx++)); do
+  appStatus="$(oc -n test-qbo get pods -l deploymentconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
+  if [[ "${appStatus}" = "True" ]]; then
     break
   fi
-  echo "App pod is NOT ready $_ times"
   sleep 20
 done
-echo "QE Test for Quay Bridge Operator is passed"
+
+true

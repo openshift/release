@@ -1,36 +1,44 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        curl -fsSL \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml
+    ' EXIT
+fi
 
-function archive_pod_info() {
-  local ns="quay-enterprise"
-  echo "Archiving pod status and logs from namespace ${ns}..."
-  oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
-  oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
-  mkdir -p "${ARTIFACT_DIR}/pod_logs"
-  while read -r pod; do
-    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true)
-    for container in ${containers}; do
-      oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
-      oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
-    done
-  done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+ArchivePodInfo() {
+    typeset ns="quay-enterprise"
+    typeset pod="" container=""
+    oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
+    oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
+    mkdir -p "${ARTIFACT_DIR}/pod_logs"
+    while read -r pod; do
+        containers="$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' || true)"
+        for container in ${containers}; do
+            oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
+            oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
+        done
+    done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n')
+    true
 }
 
 #Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+set +x
+typeset quayUsername quayPassword quayEmail quayAwsAccessKey quayAwsSecretKey
+quayUsername="$(cat /var/run/quay-qe-quay-secret/username)"
+quayPassword="$(cat /var/run/quay-qe-quay-secret/password)"
+quayEmail="$(cat /var/run/quay-qe-quay-secret/email)"
+quayAwsAccessKey="$(cat /var/run/quay-qe-aws-secret/access_key)"
+quayAwsSecretKey="$(cat /var/run/quay-qe-aws-secret/secret_key)"
+set -x
 
 #Create AWS S3 Storage Bucket
-QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
-QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
-QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
-
-QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
-QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
+typeset quayAwsS3Bucket="quayprowci${RANDOM}"
 
 mkdir -p QUAY_AWS && cd QUAY_AWS
 cat >>variables.tf <<EOF
@@ -43,11 +51,12 @@ variable "aws_bucket" {
 }
 EOF
 
+set +x
 cat >>create_aws_bucket.tf <<EOF
 provider "aws" {
   region = "us-east-2"
-  access_key = "${QUAY_AWS_ACCESS_KEY}"
-  secret_key = "${QUAY_AWS_SECRET_KEY}"
+  access_key = "${quayAwsAccessKey}"
+  secret_key = "${quayAwsSecretKey}"
 }
 
 resource "aws_s3_bucket" "quayaws" {
@@ -69,16 +78,16 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
   acl    = "private"
 }
 EOF
+set -x
 
-echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
-export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
+export TF_VAR_aws_bucket="${quayAwsS3Bucket}"
 terraform init
 terraform apply -auto-approve || true
 
 #Share Terraform Var and Terraform Directory
-echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
+echo "${quayAwsS3Bucket}" > "${SHARED_DIR}/QUAY_AWS_S3_BUCKET"
 tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz ${SHARED_DIR}
+cp terraform.tgz "${SHARED_DIR}/"
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
@@ -99,8 +108,7 @@ spec:
   - quay-enterprise
 EOF
 
-SUB=$(
-  cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -109,40 +117,35 @@ metadata:
 spec:
   installPlanApproval: Automatic
   name: quay-operator
-  channel: $QUAY_OPERATOR_CHANNEL
-  source: $QUAY_OPERATOR_SOURCE
+  channel: ${QUAY_OPERATOR_CHANNEL}
+  source: ${QUAY_OPERATOR_SOURCE}
   sourceNamespace: openshift-marketplace
 EOF
-)
 
-echo "The Quay Operator subscription is $SUB"
-
-for _ in {1..60}; do
-  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
-  if [[ -n "$CSV" ]]; then
-    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-      echo "ClusterServiceVersion \"$CSV\" ready"
+typeset -i waitIdx=0
+typeset csv=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
+  csv="$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)"
+  if [[ -n "${csv}" ]]; then
+    if [[ "$(oc -n quay-enterprise get csv "${csv}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       break
     fi
   fi
   sleep 10
 done
-echo "Quay Operator is deployed successfully"
 
-echo "Waiting for QuayRegistry CRD to be available..."
-for _ in {1..30}; do
-  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
-    echo "QuayRegistry CRD is available"
+for ((waitIdx = 1; waitIdx <= 30; waitIdx++)); do
+  if oc get crd quayregistries.quay.redhat.com >/dev/null; then
     break
   fi
   sleep 5
 done
-if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
-  echo "Timed out waiting for QuayRegistry CRD" >&2
+if ! oc get crd quayregistries.quay.redhat.com >/dev/null; then
+  echo "Timed out waiting for QuayRegistry CRD" 1>&2
   exit 1
 fi
 
-#Deploy Quay, here disable monitoring component
+set +x
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
@@ -169,10 +172,10 @@ DISTRIBUTED_STORAGE_PREFERENCE:
 DISTRIBUTED_STORAGE_CONFIG:
   default:
     - S3Storage
-    - s3_bucket: $QUAY_AWS_S3_BUCKET
+    - s3_bucket: ${quayAwsS3Bucket}
       storage_path: /quay
-      s3_access_key: $QUAY_AWS_ACCESS_KEY
-      s3_secret_key: $QUAY_AWS_SECRET_KEY
+      s3_access_key: ${quayAwsAccessKey}
+      s3_secret_key: ${quayAwsSecretKey}
       host: s3.us-east-2.amazonaws.com
       s3_region: us-east-2
 FEATURE_ANONYMOUS_ACCESS: true
@@ -199,19 +202,16 @@ PULL_METRICS_REDIS:
         port: 6379
         db: 1
 EOF
+set -x
 
-# Merge caller-provided extra config if set
-if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
-	echo "Merging extra Quay config into defaults..."
-	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-		-o /tmp/yq && chmod +x /tmp/yq
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+if [[ -n "${QUAY_EXTRA_CONFIG}" ]]; then
+    echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+        -o /tmp/yq && chmod +x /tmp/yq
+    /tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
 fi
 
-oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
-
-echo "Creating Quay registry..." >&2
+oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret --dry-run=client -o yaml | oc apply -f -
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
@@ -239,19 +239,28 @@ spec:
     managed: true
 EOF
 
-for _ in {1..60}; do
+typeset quayRoute=""
+for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-    echo "Quay is in ready status" >&2
-    oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
-    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
-    archive_pod_info
+    oc -n quay-enterprise get quayregistries -o yaml >"${ARTIFACT_DIR}/quayregistries.yaml"
+    quayRoute="$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}')"
+    echo "${quayRoute}" > "${SHARED_DIR}/quayroute"
+    set +x
+    jq -cn \
+        --arg username "${quayUsername}" \
+        --arg password "${quayPassword}" \
+        --arg email "${quayEmail}" \
+        '{username: $username, password: $password, email: $email, access_token: true}' |
+    curl -fsSk -X POST "${quayRoute}/api/v1/user/initialize" \
+        --header 'Content-Type: application/json' \
+        --data @- |
+    jq -r '.access_token' | tr -d '\n' > "${SHARED_DIR}/quay_oauth2_token"
+    set -x
+    ArchivePodInfo
     exit 0
   fi
   sleep 15
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-archive_pod_info
+ArchivePodInfo
+echo "Timed out waiting for Quay to become ready after 15 mins" 1>&2
 exit 1
