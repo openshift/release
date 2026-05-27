@@ -158,6 +158,47 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+      - name: ship-status-mcp
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_mcp_latest
+        ports:
+        - containerPort: 8090
+          name: mcp
+          protocol: TCP
+        env:
+        - name: MCP_TRANSPORT
+          value: streamable-http
+        - name: MCP_HTTP_PORT
+          value: "8090"
+        - name: SHIP_STATUS_PUBLIC_API_URL
+          value: http://127.0.0.1:8080/api
+        - name: SHIP_STATUS_PROTECTED_API_URL
+          value: http://127.0.0.1:8443/api
+        - name: SHIP_STATUS_DASHBOARD_URL
+          value: http://127.0.0.1:8080/
+        - name: SHIP_STATUS_REQUEST_TIMEOUT
+          value: "10"
+        # Future write support: mount SA token and set SHIP_STATUS_AUTH_TOKEN_FILE
+        # to enable writes through the oauth-proxy on :8443.
+        # See: component-monitor --report-auth-token-file pattern.
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        readinessProbe:
+          tcpSocket:
+            port: 8090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 8090
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          failureThreshold: 3
       volumes:
         - name: release
           emptyDir: {}

@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.3.4"
+readonly POWERVC_TOOL_VERSION="v2.3.7"
 readonly YQ_VERSION="v4.53.2"
 
 # Global variables for cleanup

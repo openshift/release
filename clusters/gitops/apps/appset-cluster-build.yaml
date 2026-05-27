@@ -35,6 +35,8 @@ spec:
         name: build11
       - cluster: build12
         name: build12
+      - cluster: build13
+        name: build13
   template:
     metadata:
       name: 'app-cluster-{{.cluster}}'
@@ -43,6 +45,15 @@ spec:
       destination:
         name: '{{.name}}'
         namespace: openshift-gitops
+      ignoreDifferences:
+        - group: machine.openshift.io
+          kind: MachineSet
+          jqPathExpressions:
+            - .spec.template.spec.providerSpec.value.ami
+        - group: machine.openshift.io
+          kind: MachineSet
+          jqPathExpressions:
+            - .spec.template.spec.providerSpec.value.disks[]?.image
       project: build-clusters
       sources:
       - directory:
