@@ -13,6 +13,7 @@ log(){
 cluster_id=$(head -n 1 "${SHARED_DIR}/cluster-id")
 HOSTED_CP=${HOSTED_CP:-false}
 UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
+UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
 
@@ -77,32 +78,40 @@ function get_recommended_version_for_machinepool () {
   fi
 }
 
-# check_admin_gates function for ROSA
-function check_admin_gates() {
-    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
-    log -e "Admin ack required for these:\n$check_admin_gates"
-
-    ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
-    for item in ${ack_list}; do
-      # $ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.18-kube-1.32-api-removals-in-4.19":"true"}}' --type=merge
-      # https://access.redhat.com/articles/7112216
-      log "Patch Admin-acks configmap with ${item}: true"
-      oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
-    done
-}
-
 function upgrade_cluster_to () {
   major_version=$1
   recommended_version=""
   get_recommended_version_for_cluster $major_version
 
-  # Create upgrade scedule
   log "Upgrade the cluster $cluster_id to $recommended_version"
-  echo "rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH}"
+
+  # Before proceed the upgrade, we need to ack all the gates by --dry-run
+  # It may take 1-2 minutes for the acknowledgement to be propagated
+  # And we cannot patch the cm on the cluster
+  log "Acknowledging admin gates via dry-run upgrade"
+  rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} --dry-run || true
+
+  for attempt in 1 2; do
+    sleep 60
+    log "Checking gates for version $recommended_version (attempt $attempt/2)"
+    gate_count=$(rosa list gates -c $cluster_id --version $recommended_version -o json | jq 'length')
+    log "Active gates count: $gate_count"
+    if [[ "$gate_count" -eq 0 ]]; then
+      log "All admin gates cleared"
+      break
+    fi
+    if [[ "$attempt" -eq 2 ]]; then
+      log "error: Admin gates still present after dry-run acknowledgement"
+      rosa list gates -c $cluster_id --version $recommended_version
+      exit 1
+    fi
+  done
+
+  log "Scheduling cluster upgrade to $recommended_version"
   start_time=$(date +"%s")
   while true; do
     if (( $(date +"%s") - $start_time >= 7200 )); then
-      log "error: Timed out while waiting for the previous upgrade schedule to be removed."
+      log "error: Timed out while waiting to schedule upgrade."
       exit 1
     fi
 
@@ -119,17 +128,11 @@ function upgrade_cluster_to () {
         log "Waiting for the previous upgrade schedule to be removed."
         sleep 120
       fi
-    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then 
-      log "Admin Acknowledgements required."
-      set_proxy
-      check_admin_gates
-      unset_proxy
-      sleep 120
-      # ROSA Classic can take up to 2h to schedule, so attempts a re-try after clearing admin-gates.
-      # ROSA-HCP schedules instantly so breaking the loop after clearing admin-gates.
-      if [[ "$HOSTED_CP" == "true" ]]; then
-        break
-      fi
+    # The gate acknowledgement should be handled already, if we still hit the issue, exit directly
+    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then
+      log "error: Missing required acknowledgements to schedule upgrade"
+      log "$upgrade_info"
+      exit 1
     elif [[ "$upgrade_info" == *"Failed to schedule upgrade for cluster"* ]]; then
       log -e "$upgrade_info"
       log "Failed to schedule upgrade for cluster, so retry after a pause"
@@ -353,6 +356,11 @@ if [[ "$end_version_x" == "$current_version_x" ]]; then
   fi
 
   for y in $(seq $start_version_y $end_version_y); do
+    if [[ -n "${UPGRADE_CHANNEL}" && $y -ne $current_version_y ]]; then
+      log "Changing cluster channel to ${UPGRADE_CHANNEL} for Y-stream upgrade"
+      rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
+      sleep 60
+    fi
     upgrade_cluster_to "$start_version_x.$y"
     if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
       upgrade_machinepool_to "$start_version_x.$y"
@@ -360,6 +368,11 @@ if [[ "$end_version_x" == "$current_version_x" ]]; then
   done
 else
   # For X-Stream upgrade, only support X+1
+  if [[ -n "${UPGRADE_CHANNEL}" ]]; then
+    log "Changing cluster channel to ${UPGRADE_CHANNEL} for X-stream upgrade"
+    rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
+    sleep 60
+  fi
   upgrade_cluster_to $UPGRADED_TO_VERSION
   if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
     upgrade_machinepool_to "$start_version_x.$y"
