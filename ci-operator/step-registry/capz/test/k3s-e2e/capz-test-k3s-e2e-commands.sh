@@ -34,7 +34,6 @@ K3S_IMAGE_TAG="${K3S_VERSION//+/-}"
 podman run -d --name "${K3S_CONTAINER}" \
   --privileged \
   --network=host \
-  --cgroupns=host \
   -v /tmp:/tmp \
   -v /dev/null:/dev/kmsg \
   docker.io/rancher/k3s:"${K3S_IMAGE_TAG}" \
