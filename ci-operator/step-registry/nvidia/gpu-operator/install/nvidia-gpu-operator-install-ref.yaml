@@ -8,6 +8,24 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
+  env:
+  - name: MIG_STRATEGY
+    default: ""
+    documentation: |-
+      MIG strategy for STATIC MIG mode. Options: "single" or "mixed".
+      Leave empty to skip MIG configuration.
+      NOTE: Mutually exclusive with NVIDIA_DRA_DYNAMIC_MIG.
+  - name: NVIDIA_DRA_DYNAMIC_MIG
+    default: "false"
+    documentation: |-
+      Enable Dynamic MIG mode for DRA partitionable devices.
+      When "true", configures GPU Operator for dynamic MIG:
+        - devicePlugin.enabled = false
+        - mig.strategy = "none"
+        - migManager.enabled = false
+      This allows the DRA driver to manage MIG slices dynamically.
+      Reference: https://github.com/empovit/nvidia-dra-driver-verification/blob/main/dynamic-mig.md
+      NOTE: Mutually exclusive with MIG_STRATEGY.
   documentation: |-
     Installs the NVIDIA GPU Operator via OLM with CDI enabled for DRA support.
 
@@ -20,18 +38,32 @@ ref:
     6. Creates Subscription to gpu-operator-certified from certified-operators catalog
     7. Waits for the subscription CSV to be created (up to 10 minutes)
     8. Waits for CSV to reach Succeeded phase (up to 10 minutes)
-    9. Creates ClusterPolicy with CDI enabled and crio runtime configured
+    9. Creates ClusterPolicy with CDI enabled and optional MIG configuration
+       Relies on GPU Operator CSV defaults for driver and DTK configuration
+       GPU Operator v26.x has proper Driver Toolkit defaults built-in
     10. Waits for ClusterPolicy to become ready (up to 50 minutes for driver compilation)
-    11. Verifies GPU nodes are properly labeled (FAILS if none found)
-    12. Verifies CDI is enabled in the ClusterPolicy
+    11. Verifies CDI is enabled and driver is enabled in the ClusterPolicy
+    12. Verifies GPU nodes are labeled and driver DaemonSet is ready
+
+    Configuration:
+    - Driver installation: Uses CSV default (enabled in v26.x)
+    - Device plugin: Configurable (disabled for Dynamic MIG, enabled otherwise)
+    - Driver Toolkit: Uses CSV default (DTK enabled by default in v26.x)
+    - CDI: Explicitly enabled (required for DRA)
+    - Runtime: crio
+    - MIG: Two modes available:
+      * Static MIG: Set MIG_STRATEGY to "single" or "mixed"
+      * Dynamic MIG: Set NVIDIA_DRA_DYNAMIC_MIG to "true" (for DRA partitionable devices)
 
     Prerequisites:
-    - OpenShift cluster with GPU-enabled worker nodes (g2-standard-4 or similar)
-    - NFD Operator installed and GPU nodes labeled with nvidia.com/gpu.present=true
+    - OpenShift cluster with GPU-enabled worker nodes (a2-highgpu-1g or g4dn.xlarge)
+    - NFD Operator installed (required for GPU node detection and labeling)
     - certified-operators catalog source available in openshift-marketplace
+    - GPU nodes must be labeled with nvidia.com/gpu.present=true (done by NFD)
 
-    This step is REQUIRED before running NVIDIA DRA tests. CDI (Container Device Interface)
+    This step is REQUIRED before running NVIDIA GPU tests. CDI (Container Device Interface)
     must be enabled for Dynamic Resource Allocation to function.
 
-    Note: Driver compilation on G2 instances (4 vCPUs) takes 30-40 minutes.
-    The step will FAIL if GPU nodes are not labeled, indicating NFD or provisioning issues.
+    Note: Driver compilation takes 20-50 minutes depending on CPU cores:
+    - G2 instances (4 vCPUs): 30-40 minutes
+    - A2 instances (12 vCPUs): 20-25 minutes

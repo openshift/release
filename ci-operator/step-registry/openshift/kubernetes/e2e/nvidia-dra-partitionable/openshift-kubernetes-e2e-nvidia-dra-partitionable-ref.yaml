@@ -1,0 +1,30 @@
+ref:
+  as: openshift-kubernetes-e2e-nvidia-dra-partitionable
+  from: kubernetes-tests
+  commands: openshift-kubernetes-e2e-nvidia-dra-partitionable-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: DRA_TEST_FOCUS
+    default: "\\[FeatureGate:DRAPartitionableDevices\\]"
+    documentation: |-
+      Regex pattern for test focus. Examples:
+      - \[FeatureGate:DRAPartitionableDevices\] - Only partitionable devices tests
+      - \[FeatureGate:DRADeviceTaints\] - Only device taints tests
+      - \[FeatureGate:DynamicResourceAllocation\] - All DRA tests
+  documentation: |-
+    Runs upstream Kubernetes e2e tests for DRA Partitionable Devices from test/e2e/dra/.
+
+    This step:
+    - Verifies GPU nodes are present and labeled
+    - Verifies NVIDIA DRA driver is installed (DeviceClass exists)
+    - Verifies DRAPartitionableDevices feature gate is enabled
+    - Runs test-kubernetes-e2e.sh with specified focus pattern
+    - Collects test results to ARTIFACT_DIR
+
+    Prerequisites:
+    - GPU nodes must exist with nvidia.com/gpu.present=true label
+    - NVIDIA DRA driver must be installed (DeviceClass nvidia.com/gpu)
+    - DRAPartitionableDevices feature gate must be enabled

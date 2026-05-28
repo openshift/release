@@ -1,0 +1,49 @@
+workflow:
+  as: openshift-kubernetes-e2e-nvidia-dra-partitionable
+  documentation: |-
+    Tests upstream Kubernetes DRA Partitionable Devices functionality
+    with NVIDIA A100 GPUs (DynamicMIG-capable) on GCP.
+
+    This workflow provisions a GCP cluster with A100 GPU worker nodes and runs upstream
+    Kubernetes DRA Partitionable Devices e2e tests from test/e2e/dra/.
+
+    Architecture:
+    1. Provision GCP cluster with a2-highgpu-1g GPU worker nodes
+       - DRAPartitionableDevices feature gate enabled via install-config.yaml
+    2. Install NFD Operator (via OLM) - shared with openshift/origin
+    3. Install NVIDIA GPU Operator (via OLM with CDI, MIG, device plugin disabled) - shared with openshift/origin
+    4. Install NVIDIA DRA driver (via Helm) with DynamicMIG feature gate
+    5. Run upstream Kubernetes DRA Partitionable Devices e2e tests
+
+    GPU Instance: a2-highgpu-1g (1x A100 40GB)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: "${COMPUTE_NODE_TYPE}"
+      COMPUTE_NODE_REPLICAS: "${COMPUTE_NODE_REPLICAS}"
+      COMPUTE_ON_HOST_MAINTENANCE: "${COMPUTE_ON_HOST_MAINTENANCE}"
+      COMPUTE_ZONES: "${COMPUTE_ZONES}"
+      NVIDIA_DRA_DRIVER_VERSION: "${NVIDIA_DRA_DRIVER_VERSION}"
+      DRA_TEST_FOCUS: "${DRA_TEST_FOCUS}"
+    pre:
+    # 1. Provision GCP cluster with DRAPartitionableDevices feature gate and A100 GPU workers
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-confidential-computing
+    - chain: ipi-install
+
+    # 2. Install prerequisites (reusable NVIDIA components)
+    # MIG and device plugin configured during GPU operator install via env vars
+    - ref: nvidia-nfd-operator-install
+    - ref: nvidia-gpu-operator-install
+
+    # 3. Install NVIDIA DRA driver via Helm
+    - ref: nvidia-dra-driver-install
+
+    test:
+    # 4. Run upstream Kubernetes DRA Partitionable Devices e2e tests
+    - ref: openshift-kubernetes-e2e-nvidia-dra-partitionable
+
+    post:
+    - chain: gather-core-dump
+    - ref: nvidia-cleanup
+    - chain: ipi-gcp-post

@@ -10,6 +10,58 @@ echo "========================================="
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# ===================================================
+# MUST-GATHER COLLECTION (before cleanup)
+# Using the same scripts as the ecosystem team
+# ===================================================
+echo ""
+echo "Collecting NFD and GPU operator must-gather (ecosystem team's approach)..."
+echo ""
+
+# Create must-gather directories
+NFD_ARTIFACT_DIR="${ARTIFACT_DIR}/nfd-must-gather"
+GPU_ARTIFACT_DIR="${ARTIFACT_DIR}/gpu-must-gather"
+mkdir -p "${NFD_ARTIFACT_DIR}"
+mkdir -p "${GPU_ARTIFACT_DIR}"
+
+# Download and run NFD must-gather script (same as ecosystem team)
+NFD_RELEASE_BRANCH="${NFD_RELEASE_BRANCH:-release-4.22}"
+echo "Downloading NFD must-gather from ${NFD_RELEASE_BRANCH}..."
+if curl -sL "https://raw.githubusercontent.com/openshift/cluster-nfd-operator/refs/heads/${NFD_RELEASE_BRANCH}/must-gather/gather" -o /tmp/nfd-must-gather.sh; then
+  chmod +x /tmp/nfd-must-gather.sh
+  echo "Running NFD must-gather..."
+  /tmp/nfd-must-gather.sh "${NFD_ARTIFACT_DIR}" || echo "NFD must-gather failed, continuing..."
+else
+  echo "WARNING: Failed to download NFD must-gather script"
+fi
+
+# Download and run GPU operator must-gather script (same as ecosystem team)
+GPU_OPERATOR_VERSION="${GPU_OPERATOR_VERSION:-v25.10.1}"
+echo "Downloading GPU operator must-gather from ${GPU_OPERATOR_VERSION}..."
+if curl -sL "https://raw.githubusercontent.com/NVIDIA/gpu-operator/${GPU_OPERATOR_VERSION}/hack/must-gather.sh" -o /tmp/gpu-must-gather.sh; then
+  chmod +x /tmp/gpu-must-gather.sh
+  echo "Running GPU operator must-gather..."
+  /tmp/gpu-must-gather.sh -d "${GPU_ARTIFACT_DIR}" || echo "GPU must-gather failed, continuing..."
+else
+  echo "WARNING: Failed to download GPU operator must-gather script"
+fi
+
+# Also collect ClusterPolicy directly (critical for DTK debugging)
+echo "Collecting ClusterPolicy for easy reference..."
+oc get clusterpolicy -o yaml > "${ARTIFACT_DIR}/cluster_policy.yaml" 2>&1 || echo "No ClusterPolicy found" > "${ARTIFACT_DIR}/cluster_policy.yaml"
+
+echo ""
+echo "Must-gather collection complete."
+echo "Artifacts saved to:"
+echo "  - ${NFD_ARTIFACT_DIR}"
+echo "  - ${GPU_ARTIFACT_DIR}"
+echo "  - ${ARTIFACT_DIR}/cluster_policy.yaml (ClusterPolicy for quick reference)"
+echo ""
+
+# ===================================================
+# CLEANUP (after collecting diagnostics)
+# ===================================================
+
 # Function to check if command exists
 command_exists() {
   command -v "$1" >/dev/null 2>&1

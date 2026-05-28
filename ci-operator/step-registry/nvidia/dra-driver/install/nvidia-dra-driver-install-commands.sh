@@ -64,7 +64,10 @@ echo ""
 # Create namespace
 echo "Creating namespace ${NVIDIA_DRA_DRIVER_NAMESPACE}..."
 oc create namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" || true
-oc label namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
+oc label namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" \
+  openshift.io/cluster-monitoring=true \
+  pod-security.kubernetes.io/enforce=privileged \
+  --overwrite
 
 # Add privileged SCC for DRA driver service accounts (required for OpenShift)
 echo "Adding privileged SCC for DRA driver service accounts..."
@@ -102,13 +105,13 @@ helm install nvidia-dra-driver nvidia/nvidia-dra-driver-gpu \
   --namespace "${NVIDIA_DRA_DRIVER_NAMESPACE}" \
   --version "${NVIDIA_DRA_DRIVER_VERSION}" \
   --set nvidiaDriverRoot=/run/nvidia/driver \
+  --set resources.gpus.enabled=true \
   --set gpuResourcesEnabledOverride=true \
-  --set nfd.enabled=false \
-  --set gfd.enabled=false \
-  --set 'controller.tolerations[0].key=node-role.kubernetes.io/control-plane' \
+  --set resources.computeDomains.enabled=false \
+  --set 'controller.tolerations[0].key=node-role.kubernetes.io/master' \
   --set 'controller.tolerations[0].operator=Exists' \
   --set 'controller.tolerations[0].effect=NoSchedule' \
-  --set 'controller.tolerations[1].key=node-role.kubernetes.io/master' \
+  --set 'controller.tolerations[1].key=node-role.kubernetes.io/control-plane' \
   --set 'controller.tolerations[1].operator=Exists' \
   --set 'controller.tolerations[1].effect=NoSchedule' \
   ${FEATURE_GATE_ARGS} \
