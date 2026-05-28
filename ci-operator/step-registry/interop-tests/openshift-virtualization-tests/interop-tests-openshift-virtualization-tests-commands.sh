@@ -59,7 +59,10 @@ if [ "${MAP_TESTS}" = "true" ]; then
     # Merge original results into a single file and compress
     # Send modified file to shared dir for Data Router Reporter step (run here so EXIT stays debug_on_exit).
     eval "$(
-        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+                typeset -a _fURL=()
+                type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+                "${_fURL[@]}" \
+curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     # shellcheck disable=SC2154
     trap '
