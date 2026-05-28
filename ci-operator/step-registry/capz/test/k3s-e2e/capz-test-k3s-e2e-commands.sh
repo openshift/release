@@ -6,7 +6,7 @@ set -o pipefail
 # ---- k3s configuration ----
 K3S_VERSION="${K3S_VERSION:-v1.31.6+k3s1}"
 K3S_KUBECONFIG="/tmp/k3s-kubeconfig"
-K3S_CONTAINER="k3s-mgmt"
+K3S_DATA_DIR="/tmp/k3s-data"
 
 # Pre-set USE_KUBECONFIG before sourcing env.sh to prevent it from
 # defaulting to the IPI kubeconfig (${SHARED_DIR}/kubeconfig) which
@@ -17,44 +17,54 @@ source openshift-ci/capz-test-env.sh
 set -o xtrace
 
 # ---- Cleanup on exit ----
+K3S_PID=""
 cleanup_k3s() {
-  echo "[k3s] Stopping k3s container"
-  podman stop "${K3S_CONTAINER}" 2>/dev/null || true
-  podman rm -f "${K3S_CONTAINER}" 2>/dev/null || true
+  if [[ -n "${K3S_PID}" ]]; then
+    echo "[k3s] Stopping k3s (PID: ${K3S_PID})"
+    kill "${K3S_PID}" 2>/dev/null || true
+    wait "${K3S_PID}" 2>/dev/null || true
+  fi
 }
 trap cleanup_k3s EXIT
 
-# ---- Start k3s in a privileged podman container ----
-# CI pods run as non-root but nested_podman provides the capabilities
-# needed to run podman. Running k3s inside a privileged container
-# gives it root access and full control over sysctls/networking.
-echo "[k3s] Starting k3s ${K3S_VERSION} via podman (privileged)"
+# ---- Setup rootless runtime directories ----
+export XDG_RUNTIME_DIR="/tmp/run"
+mkdir -p "${XDG_RUNTIME_DIR}" "${K3S_DATA_DIR}"
 
-K3S_IMAGE_TAG="${K3S_VERSION//+/-}"
-podman run -d --name "${K3S_CONTAINER}" \
-  --privileged \
-  --network=host \
-  --userns=host \
-  -v /tmp:/tmp \
-  -v /dev/null:/dev/kmsg \
-  docker.io/rancher/k3s:"${K3S_IMAGE_TAG}" \
-  server \
+# ---- Install k3s binary ----
+echo "[k3s] Installing k3s ${K3S_VERSION}"
+K3S_URL="https://github.com/k3s-io/k3s/releases/download/$(echo "${K3S_VERSION}" | sed 's/+/%2B/')/k3s"
+curl -sLo /tmp/k3s "${K3S_URL}"
+chmod +x /tmp/k3s
+export PATH="/tmp:${PATH}"
+echo "[k3s] Installed: $(k3s --version)"
+
+# ---- Prepare /dev/kmsg ----
+ln -sf /dev/null /dev/kmsg 2>/dev/null || true
+
+# ---- Start k3s in rootless mode ----
+# rootlesskit (bundled in k3s) creates its own network namespace where
+# it can set ip_forward=1 and manage iptables, bypassing the CI pod's
+# read-only /proc/sys and user namespace restrictions.
+echo "[k3s] Starting k3s server (rootless mode)"
+
+k3s server \
+  --rootless \
   --disable=traefik \
   --snapshotter=native \
+  --data-dir="${K3S_DATA_DIR}" \
   --write-kubeconfig="${K3S_KUBECONFIG}" \
   --write-kubeconfig-mode=644 \
-  --kubelet-arg="feature-gates=KubeletInUserNamespace=true" \
-  --kubelet-arg="cgroups-per-qos=false" \
-  --kubelet-arg="enforce-node-allocatable=" \
   --kubelet-arg="eviction-hard=imagefs.available<1%,nodefs.available<1%" \
-  --kubelet-arg="eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%"
+  --kubelet-arg="eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%" \
+  &
+K3S_PID=$!
 
-echo "[k3s] Waiting for k3s to be ready"
+echo "[k3s] Waiting for k3s to be ready (PID: ${K3S_PID})"
 READY=false
 for i in $(seq 1 60); do
-  if ! podman ps --filter "name=${K3S_CONTAINER}" --format "{{.Status}}" 2>/dev/null | grep -q "Up"; then
-    echo "[k3s] FATAL: k3s container died unexpectedly"
-    podman logs "${K3S_CONTAINER}" 2>&1 | tail -20
+  if [[ ! -d "/proc/${K3S_PID}" ]]; then
+    echo "[k3s] FATAL: k3s process died unexpectedly"
     exit 1
   fi
   if KUBECONFIG="${K3S_KUBECONFIG}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
@@ -67,7 +77,6 @@ done
 
 if [ "${READY}" != true ]; then
   echo "[k3s] FATAL: k3s did not become ready within 300s"
-  podman logs "${K3S_CONTAINER}" 2>&1 | tail -50
   exit 1
 fi
 echo "[k3s] Server is ready"
