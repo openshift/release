@@ -41,8 +41,7 @@ echo "[k3s] Installed: $(k3s --version)"
 
 # ---- Install rootlesskit ----
 echo "[k3s] Installing rootlesskit"
-GOFLAGS='' go install github.com/rootless-containers/rootlesskit/v2/cmd/rootlesskit@latest
-export PATH="${GOBIN:-$(go env GOPATH)/bin}:${PATH}"
+GOFLAGS='' GOPATH=/tmp/go GOBIN=/tmp go install github.com/rootless-containers/rootlesskit/v2/cmd/rootlesskit@latest
 
 # ---- Prepare /dev/kmsg ----
 ln -sf /dev/null /dev/kmsg 2>/dev/null || true
@@ -98,8 +97,7 @@ export DEPLOY_CHARTS="true"
 export USE_K8S="false"
 
 # ---- Install gotestsum ----
-GOFLAGS='' go install gotest.tools/gotestsum@v1.13.0
-export PATH="${GOBIN:-$(go env GOPATH)/bin}:${PATH}"
+GOFLAGS='' GOPATH=/tmp/go GOBIN=/tmp go install gotest.tools/gotestsum@v1.13.0
 
 # ---- Run e2e test phases ----
 echo "[k3s] Running e2e test phases 01-08"
