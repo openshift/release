@@ -100,12 +100,6 @@ EOF
 
 wait_for_csv() {
     local pkg="$1"
-
-    if ! oc get subscription "$pkg" -n "$INSTALL_NAMESPACE" -o name &>/dev/null; then
-        echo "ERROR: Subscription ${pkg} does not exist in ${INSTALL_NAMESPACE}"
-        return 1
-    fi
-
     echo "Waiting for CSV from subscription ${pkg}..."
 
     local csv=""
@@ -178,6 +172,11 @@ main() {
     local failed=0
     for pkg in "${OPERATOR_LIST[@]}"; do
         pkg="${pkg//[[:space:]]/}"
+        if ! oc get subscription "$pkg" -n "$INSTALL_NAMESPACE" -o name &>/dev/null; then
+            echo "ERROR: Subscription ${pkg} does not exist in ${INSTALL_NAMESPACE}"
+            failed=1
+            continue
+        fi
         if ! wait_for_csv "$pkg"; then
             failed=1
         fi
