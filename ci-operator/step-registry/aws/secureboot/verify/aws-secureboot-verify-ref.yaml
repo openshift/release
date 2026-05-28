@@ -1,0 +1,22 @@
+ref:
+  as: aws-secureboot-verify
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: aws-secureboot-verify-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AWS_SECUREBOOT_ENABLED
+    default: ""
+    documentation: |-
+      Set to "true" to run Secure Boot verification. When empty
+      (the default), this step is a no-op.
+  documentation: |-
+    This step verifies that UEFI Secure Boot is active on all worker
+    nodes by running mokutil --sb-state via oc debug. It is a no-op
+    when AWS_SECUREBOOT_ENABLED is not "true".

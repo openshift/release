@@ -67,6 +67,16 @@ spec:
         app: slack-bot
     spec:
       serviceAccountName: slack-bot
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
         command:
@@ -119,7 +129,6 @@ spec:
         - --prow-job-config-path=/var/repo/release/ci-operator/jobs
         - --keywords-config-path=/etc/slack-bot-config/config.yaml
         - --helpdesk-alias=subteam^STSR51Q76
-        - --pager-duty-token-file=/etc/pagerduty/token
         ports:
         - name: main
           containerPort: 8888
@@ -143,9 +152,6 @@ spec:
         - name: slack-bot-config
           mountPath: /etc/slack-bot-config
           readOnly: true
-        - name: pagerduty
-          mountPath: /etc/pagerduty
-          readOnly: true
         resources:
           requests:
             memory: "1Gi"
@@ -168,6 +174,3 @@ spec:
       - name: slack-bot-config
         configMap:
           name: slack-bot-keyword-list
-      - name: pagerduty
-        secret:
-          secretName: pagerduty

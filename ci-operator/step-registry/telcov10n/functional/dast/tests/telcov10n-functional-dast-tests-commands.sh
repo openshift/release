@@ -5,11 +5,27 @@ set -o pipefail
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 unset NAMESPACE
 
+GCS_KEY_NAME="rapidast-sa-telco_key.json"
+GCS_KEY_ON_STEP="/var/run/telco-dast/rapidast-gcs/${GCS_KEY_NAME}"
+GCS_KEY_ON_POD="/var/run/secrets/gcs/${GCS_KEY_NAME}"
+
 # Setup
 oc new-project dast
 oc create serviceaccount rapidast -n dast
 oc adm policy add-cluster-role-to-user cluster-admin -z rapidast -n dast
 oc adm policy add-scc-to-user anyuid -z rapidast -n dast
+
+# Copy key from this step → Secret on the test cluster so RapidAST pods can mount it
+if [[ ! -r "${GCS_KEY_ON_STEP}" ]]; then
+  echo "ERROR: GCS key not found at ${GCS_KEY_ON_STEP} (check Vault sync)"
+  exit 1
+fi
+
+oc create secret generic rapidast-gcs-credentials --from-file="${GCS_KEY_NAME}=${GCS_KEY_ON_STEP}" -n dast
+
+# hostNetwork uses node DNS which can't resolve kubernetes.default.svc
+API_SERVER_URL="$(oc whoami --show-server)"
+echo "API server URL: ${API_SERVER_URL}"
 
 OVERALL_RC=0
 
@@ -28,9 +44,13 @@ data:
   rapidast-config.yaml: |
     config:
       configVersion: 6
+      googleCloudStorage:
+        keyFile: "${GCS_KEY_ON_POD}"
+        bucketName: secaut-bucket
+        directory: "telco"
     application:
       shortName: "${OPERATOR_NAME}"
-      url: "https://kubernetes.default.svc:443"
+      url: "${API_SERVER_URL}"
     general:
       authentication:
         type: "http_header"
@@ -43,7 +63,7 @@ data:
       zap:
         apiScan:
           apis:
-            apiUrl: "https://kubernetes.default.svc:443/${OPERATOR_API_PATH}"
+            apiUrl: "${API_SERVER_URL}/${OPERATOR_API_PATH}"
         passiveScan:
           disabledRules: "2,10015,10024,10027,10054,10096,10109,10112"
         activeScan:
@@ -60,6 +80,7 @@ metadata:
   namespace: dast
 spec:
   serviceAccountName: rapidast
+  hostNetwork: true
   restartPolicy: Never
   securityContext:
     runAsUser: 0
@@ -67,6 +88,9 @@ spec:
   - name: config
     configMap:
       name: rapidast-config-${OPERATOR_NAME}
+  - name: gcs-sa
+    secret:
+      secretName: rapidast-gcs-credentials
   containers:
   - name: rapidast
     image: quay.io/redhatproductsecurity/rapidast:latest
@@ -80,6 +104,9 @@ spec:
     volumeMounts:
     - name: config
       mountPath: /opt/rapidast/config
+    - name: gcs-sa
+      mountPath: /var/run/secrets/gcs
+      readOnly: true
 EOF
 
   # Wait for pod to be running

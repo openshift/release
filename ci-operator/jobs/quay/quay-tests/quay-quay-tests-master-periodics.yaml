@@ -8177,105 +8177,6 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
-  cron: 0 11 * * 5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: quay
-    repo: quay-tests
-  labels:
-    ci-operator.openshift.io/variant: quay-dast
-    ci.openshift.io/generator: prowgen
-    job-release: "4.17"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-dast-quay-dast-test-prod-quay-io
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-dast-test-prod-quay-io
-      - --variant=quay-dast
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -8286,23 +8187,12 @@ periodics:
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-dast
     ci.openshift.io/generator: prowgen
-    job-release: "4.17"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-dast-quay-dast-test-quay313
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-quay-dast-quay-dast-test-quay317
   spec:
     containers:
     - args:
@@ -8312,106 +8202,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-dast-test-quay313
-      - --variant=quay-dast
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: 0 10 * * 6
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: quay
-    repo: quay-tests
-  labels:
-    ci-operator.openshift.io/variant: quay-dast
-    ci.openshift.io/generator: prowgen
-    job-release: "4.17"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-dast-quay-dast-test-stage-quay-io
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-dast-test-stage-quay-io
+      - --target=quay-dast-test-quay317
       - --variant=quay-dast
       command:
       - ci-operator
@@ -8892,9 +8683,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay314-ocp416-newui
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay314-ocp421-newui
   spec:
     containers:
     - args:
@@ -8904,7 +8695,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay314-ocp416-newui
+      - --target=quay-e2e-tests-quay314-ocp421-newui
       - --variant=quay-newui
       command:
       - ci-operator
@@ -8983,9 +8774,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay314-ocp416-newui-p3
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay314-ocp421-newui-p3
   spec:
     containers:
     - args:
@@ -8995,7 +8786,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay314-ocp416-newui-p3
+      - --target=quay-e2e-tests-quay314-ocp421-newui-p3
       - --variant=quay-newui
       command:
       - ci-operator
@@ -9074,9 +8865,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay315-ocp416-newui-p1-p2
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay315-ocp421-newui-p1-p2
   spec:
     containers:
     - args:
@@ -9086,7 +8877,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-ocp416-newui-p1-p2
+      - --target=quay-e2e-tests-quay315-ocp421-newui-p1-p2
       - --variant=quay-newui
       command:
       - ci-operator
@@ -9165,9 +8956,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay315-ocp416-newui-p3
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay315-ocp421-newui-p3
   spec:
     containers:
     - args:
@@ -9177,7 +8968,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-ocp416-newui-p3
+      - --target=quay-e2e-tests-quay315-ocp421-newui-p3
       - --variant=quay-newui
       command:
       - ci-operator
@@ -9256,9 +9047,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay316-ocp416-newui-p1-p2
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay316-ocp421-newui-p1-p2
   spec:
     containers:
     - args:
@@ -9268,7 +9059,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay316-ocp416-newui-p1-p2
+      - --target=quay-e2e-tests-quay316-ocp421-newui-p1-p2
       - --variant=quay-newui
       command:
       - ci-operator
@@ -9347,9 +9138,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay316-ocp416-newui-p3
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay316-ocp421-newui-p3
   spec:
     containers:
     - args:
@@ -9359,7 +9150,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay316-ocp416-newui-p3
+      - --target=quay-e2e-tests-quay316-ocp421-newui-p3
       - --variant=quay-newui
       command:
       - ci-operator
@@ -9438,7 +9229,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay317-ocp416-newui-p1-p2
   spec:
@@ -9529,9 +9320,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-newui
     ci.openshift.io/generator: prowgen
-    job-release: "4.16"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay317-ocp416-newui-p3
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay317-ocp421-newui-p3
   spec:
     containers:
     - args:
@@ -9541,7 +9332,189 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay317-ocp416-newui-p3
+      - --target=quay-e2e-tests-quay317-ocp421-newui-p3
+      - --variant=quay-newui
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
+    ci-operator.openshift.io/variant: quay-newui
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay318-ocp421-newui-p1-p2
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-e2e-tests-quay318-ocp421-newui-p1-p2
+      - --variant=quay-newui
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
+    ci-operator.openshift.io/variant: quay-newui
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-quay-newui-quay-e2e-tests-quay318-ocp421-newui-p3
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-e2e-tests-quay318-ocp421-newui-p3
       - --variant=quay-newui
       command:
       - ci-operator
@@ -11489,6 +11462,182 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 0 6 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/variant: quay-sdl
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay317-konflux
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-sdl-check-images-vulnerabilities-quay317-konflux
+      - --variant=quay-sdl
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 0 0 6 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/variant: quay-sdl
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay318-konflux
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-sdl-check-images-vulnerabilities-quay318-konflux
+      - --variant=quay-sdl
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -11689,11 +11838,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -11762,9 +11917,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -11779,11 +11931,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -11852,9 +12010,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -11869,11 +12024,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -11942,9 +12103,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -11959,11 +12117,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -12032,9 +12196,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -12049,11 +12210,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -12122,9 +12289,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -12139,11 +12303,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -12212,9 +12382,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -12229,11 +12396,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -12302,9 +12475,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -12319,11 +12489,17 @@ periodics:
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
+    sparse_checkout_files:
+    - images/Dockerfile.upgrade
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
@@ -12392,9 +12568,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

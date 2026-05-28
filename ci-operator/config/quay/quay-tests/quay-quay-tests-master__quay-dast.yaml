@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.21"
     namespace: ocp
     tag: cli
   ubi_minimal:
@@ -11,12 +11,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.17
+    tag: rhel-9-release-golang-1.21-openshift-4.18
 images:
   items:
   - dockerfile_literal: |
-      FROM ubi_minimal
-      RUN microdnf install -y java-11-openjdk tar jq git openssl python3.11 python3-pip openssh-clients && \
+      FROM src
+      RUN yum install -y java-11-openjdk tar jq git openssl python3.11 python3-pip openssh-clients && \
           ln -sf /usr/bin/python3.11 /usr/bin/python3
       RUN curl -L https://github.com/zaproxy/zaproxy/releases/download/v2.17.0/ZAP_2.17.0_Linux.tar.gz > /tmp/ZAP_2.17.0_Linux.tar.gz
       RUN python3 -m ensurepip --upgrade
@@ -27,7 +27,7 @@ images:
         && chmod -R 777 ${HOME}
       ENV PATH $PATH:/usr/local/zap/ZAP_2.17.0
       ENV HOME="/tmp"
-    from: ubi_minimal
+    from: src
     to: quay-test-dast
 promotion:
   to:
@@ -42,7 +42,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -51,32 +51,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-dast-test-stage-quay-io
-  cron: 0 10 * * 6
-  steps:
-    env:
-      QUAY_ENV: STAGE_QUAY_IO
-    test:
-    - ref: quay-tests-test-quay-dast
-- as: quay-dast-test-prod-quay-io
-  cron: 0 11 * * 5
-  steps:
-    env:
-      QUAY_ENV: QUAY_IO
-    test:
-    - ref: quay-tests-test-quay-dast
-- as: quay-dast-test-quay313
+- as: quay-dast-test-quay317
   cron: 0 12 * * 5
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      ODF_OPERATOR_CHANNEL: stable-4.16
-      QUAY_ENV: QUAY
-      QUAY_OPERATOR_CHANNEL: stable-3.13
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.17
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4d329eb8c32ce91a9844fd18959f6076da0e41cb4020544d2537f86dc875ccd7
+      QBO_CHANNEL: stable-3.17
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     test:
-    - ref: quay-tests-deploy-quay-odf
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
     - ref: quay-tests-test-quay-dast
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:

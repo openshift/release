@@ -1,6 +1,6 @@
 # Build Farm Scheduling Pressure
 
-**Alerts:** `BuildFarmHighPendingPods`, `BuildFarmNodePressure` — **Slack:** `#ops-testplatform`. **Rules:** [`build-farm-scheduling-pressure_prometheusrule.yaml`](../../clusters/build-clusters/common_except_app.ci/openshift-monitoring/build-farm-scheduling-pressure_prometheusrule.yaml) (per build cluster). **Severity:** `warning`.
+**Alerts:** `BuildFarmHighPendingPods`, `BuildFarmNodePressure` — **Slack:** `#ops-testplatform`. **Rules:** [`build-farm-scheduling-pressure_prometheusrule.yaml`](../../clusters/build-clusters/build-shared/openshift-monitoring/build-farm-scheduling-pressure_prometheusrule.yaml) (per build cluster). **Severity:** `warning`.
 
 ## What the alerts mean
 
@@ -123,5 +123,5 @@ Plank/job-level view (on app.ci): [plank dashboard](https://ci-route-ci-grafana.
 
 ## Configuration
 
-- **PrometheusRule**: `clusters/build-clusters/common_except_app.ci/openshift-monitoring/build-farm-scheduling-pressure_prometheusrule.yaml` (applied to build clusters via gitops).
+- **PrometheusRule**: `clusters/build-clusters/build-shared/openshift-monitoring/build-farm-scheduling-pressure_prometheusrule.yaml` (applied to build clusters via gitops).
 - **Alert routing**: Build cluster Alertmanagers route these alert names to **#ops-testplatform**. In this repo, `alertmanager-main_secret_template.yaml` under `clusters/build-clusters/01_cluster/openshift-monitoring/` and `clusters/build-clusters/build02/openshift-monitoring/` include the route; other build clusters may use the same pattern from shared config.

@@ -7,7 +7,8 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
+binary_build_commands: unset GOFLAGS && make CONTROLLER_TOOLS_VERSION=v0.20.1 manager
+  && make CONTROLLER_TOOLS_VERSION=v0.20.1 targetallocator && make CONTROLLER_TOOLS_VERSION=v0.20.1
   operator-opamp-bridge
 build_root:
   image_stream_tag:
@@ -117,10 +118,10 @@ tests:
     - as: install
       cli: latest
       commands: |
-        oc create namespace opentelemetry-operator
-        oc label namespace opentelemetry-operator openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle

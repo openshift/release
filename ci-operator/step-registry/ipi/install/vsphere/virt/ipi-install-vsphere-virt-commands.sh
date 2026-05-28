@@ -13,7 +13,6 @@ fi
 VIRT_KUBECONFIG=/var/run/vault/vsphere-ibmcloud-config/vsphere-virt-kubeconfig
 CLUSTER_KUBECONFIG=${SHARED_DIR}/kubeconfig
 VM_NETWORK_PATCH=/var/run/vault/vsphere-ibmcloud-config/vm-network-patch.json
-INFRA_PATCH=$(cat /var/run/vault/vsphere-ibmcloud-config/vsphere-virt-infra-patch)
 
 VM_NAME="$(oc get infrastructure cluster -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.status.infrastructureName')-bm"
 VM_NAMESPACE="${NAMESPACE}"
@@ -34,20 +33,6 @@ function approve_csrs() {
         return 0
     fi
     sleep 15
-  done
-}
-
-# Add 'node.openshift.io/platform-type=vsphere' label to any node that is missing it.
-function label_vsphere_nodes() {
-  echo "$(date -u --rfc-3339=seconds) - Adding labels to vsphere nodes for builds that do not have upstream ccm changes..."
-  NODES=$(oc get nodes -o name --kubeconfig="${CLUSTER_KUBECONFIG}")
-  for node in ${NODES}; do
-    echo "$(date -u --rfc-3339=seconds) - Checking ${node}"
-    LABEL_FOUND=$(oc get ${node} -o json | jq -r '.metadata.labels | has("node.openshift.io/platform-type")')
-    if [ "${LABEL_FOUND}" == "false" ]; then
-      echo "$(date -u --rfc-3339=seconds) - Adding 'node.openshift.io/platform-type=vsphere' label"
-      oc label "${node}" "node.openshift.io/platform-type"=vsphere --kubeconfig="${CLUSTER_KUBECONFIG}"
-    fi
   done
 }
 
@@ -111,17 +96,10 @@ function patch_csi_driver_removed() {
   oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
 }
 
-# We are going to apply the 'node.openshift.io/platform-type=vsphere' label to all existing nodes as a workaround while waiting for upstream CCM changes
-# When upstream changes are merged downstream, the function will output that no nodes were updated.
-label_vsphere_nodes
-
 # Enable storage operator now that the labels are in place
 if [ "${ENABLE_HYBRID_STORAGE}" == "true" ]; then
   enable_storage_operator
 fi
-
-# Patch test cluster to have CIDR for non-vSphere node
-oc patch infrastructure cluster --type json -p "${INFRA_PATCH}" --kubeconfig=${CLUSTER_KUBECONFIG}
 
 # Generate YAML for creation VM
 echo "$(date -u --rfc-3339=seconds) - Generating ignition data"
@@ -149,8 +127,25 @@ oc create -f "${SHARED_DIR}/vm.yaml" --kubeconfig=${VIRT_KUBECONFIG}
 
 # Update VM to have CI network
 echo "$(date -u --rfc-3339=seconds) - Patching networking config into virtual machines"
+CLUSTER_NETWORK="$(oc get infrastructure cluster -o json --kubeconfig="${CLUSTER_KUBECONFIG}" | jq -r '.spec.platformSpec.vsphere.failureDomains[0].topology.networks[0]')"
+if [[ -z "${CLUSTER_NETWORK}" || "${CLUSTER_NETWORK}" == "null" ]]; then
+  echo "Failed to resolve CLUSTER_NETWORK from infrastructure topology"
+  exit 1
+fi
+
+# Normalize multi-tenant network names (ci-vlan-####-#) to single-tenant format (ci-vlan-####)
+# This is required because virt networks use single-tenant naming convention
+if [[ "${CLUSTER_NETWORK}" =~ ^(ci-vlan-[0-9]+)-[0-9]+$ ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Detected multi-tenant network: ${CLUSTER_NETWORK}"
+  CLUSTER_NETWORK="${BASH_REMATCH[1]}"
+  echo "$(date -u --rfc-3339=seconds) - Normalized to single-tenant format: ${CLUSTER_NETWORK}"
+else
+  echo "$(date -u --rfc-3339=seconds) - Using single-tenant network: ${CLUSTER_NETWORK}"
+fi
+
+export CLUSTER_NETWORK
 for (( i=0; i<${BM_COUNT}; i++ )); do
-  oc patch vm "${VM_NAME}-${i}" -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
+  envsubst < ${VM_NETWORK_PATCH} | oc patch vm "${VM_NAME}-${i}" -n "${VM_NAMESPACE}" --type=merge --patch-file /dev/stdin --kubeconfig="${VIRT_KUBECONFIG}"
 done
 
 # Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
@@ -172,12 +167,6 @@ approve_csrs
 # Remove provider taint
 for (( i=0; i<${BM_COUNT}; i++ )); do
   oc adm taint nodes "${VM_NAME}-${i}" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule- --kubeconfig="${CLUSTER_KUBECONFIG}"
-done
-
-# add custom taint to prevent e2e from running on it due to current networking limitations.  Metrics do not seem to work when making calls from BM to ingress for data, but
-# everything else seems fine.
-for (( i=0; i<${BM_COUNT}; i++ )); do
-  oc adm taint nodes "${VM_NAME}-${i}" vsphere.openshift.io/e2e=true:NoSchedule --kubeconfig="${CLUSTER_KUBECONFIG}"
 done
 
 # Wait for node to be ready to prevent any interruption during the e2e tests

@@ -1,3 +1,8 @@
+base_images:
+  vault_kube_kms:
+    name: vault-kube-kms
+    namespace: control-plane_vault
+    tag: 0.0.1
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -132,16 +137,10 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-openshift-apiserver-operator/encryption-kms
     test:
-    - as: test
-      cli: latest
-      commands: |
-        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - as: verify-deps
   steps:

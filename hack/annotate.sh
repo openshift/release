@@ -106,6 +106,10 @@ annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
 
+# OKD 5.y-stable release streams
+annotate "origin" "release-5-scos" "okd-scos-5.y-stable.json"
+annotate "origin" "release-5-scos-next" "okd-scos-5.y-next.json"
+
 # 4.y-stable release streams
 annotate "ocp" "release" "ocp-4.y-stable.json"
 annotate "ocp" "konflux-release" "ocp-4.y-konflux.json"

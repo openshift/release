@@ -86,6 +86,9 @@ chain:
     - name: ADDITIONAL_CA_BUNDLE_FILE
       default: ""
       documentation: "The additional ca bundle file name in the shared directory"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -183,6 +186,11 @@ chain:
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
+      fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/aws-load-balancer-health-probe-mode=ServiceNodePort)
       fi
       
       # Disabling Hosted Cluster capabilities

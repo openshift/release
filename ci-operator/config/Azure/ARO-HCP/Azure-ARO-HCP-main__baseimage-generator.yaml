@@ -23,6 +23,20 @@ resources:
     requests:
       cpu: "8"
       memory: 8Gi
+tests:
+- as: go-smoke-test
+  commands: |
+    set -euo pipefail
+    d=$(mktemp -d)
+    cd "$d"
+    go mod init smoke.example.com/nonroot
+    printf '%s\n' 'package main' 'func main() {}' > main.go
+    go build -o /dev/null .
+    go test .
+    echo "Go GOMODCACHE=$(go env GOMODCACHE) GOCACHE=$(go env GOCACHE) OK"
+  container:
+    from: aro-hcp-e2e-base-ci
+  run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.ci-operator\.yaml$)
 zz_generated_metadata:
   branch: main
   org: Azure
