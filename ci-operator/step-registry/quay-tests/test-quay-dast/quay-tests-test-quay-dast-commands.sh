@@ -3,6 +3,7 @@
 set -euo pipefail
 
 export KUBECTL="oc"
+ls -al
 cd quay-rapidast
 
 cp "${KUBECONFIG}" ./kubeconfig
