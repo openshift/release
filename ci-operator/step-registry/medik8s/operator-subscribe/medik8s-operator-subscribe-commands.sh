@@ -189,11 +189,19 @@ main() {
     ensure_namespace
     ensure_operatorgroup
 
-    IFS=',' read -ra OPERATOR_LIST <<< "$OPERATORS"
+    IFS=',' read -ra RAW_OPERATOR_LIST <<< "$OPERATORS"
+    OPERATOR_LIST=()
+    for pkg in "${RAW_OPERATOR_LIST[@]}"; do
+        pkg="${pkg//[[:space:]]/}"
+        [[ -n "$pkg" ]] && OPERATOR_LIST+=("$pkg")
+    done
+
+    if [[ ${#OPERATOR_LIST[@]} -eq 0 ]]; then
+        log "ERROR: OPERATORS did not contain any non-empty package names"
+        exit 1
+    fi
 
     for pkg in "${OPERATOR_LIST[@]}"; do
-        pkg="${pkg//[[:space:]]/}"
-        [[ -z "$pkg" ]] && continue
         log ""
         log "--- Installing operator: ${pkg} ---"
         wait_for_package_manifest "$pkg" || exit 1
@@ -202,8 +210,6 @@ main() {
 
     local failed=0
     for pkg in "${OPERATOR_LIST[@]}"; do
-        pkg="${pkg//[[:space:]]/}"
-        [[ -z "$pkg" ]] && continue
         if ! wait_for_subscription "$pkg"; then
             log "ERROR: Subscription ${pkg} does not exist in ${INSTALL_NAMESPACE}"
             failed=1

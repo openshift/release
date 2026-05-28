@@ -77,7 +77,8 @@ verify_fbc_image() {
     local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
     log "Verifying FBC image exists: $fbc_image"
 
-    if ! curl -sSf -o /dev/null "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
+    if ! curl -sSf -o /dev/null --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+        "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
         -H "Accept: application/vnd.oci.image.index.v1+json" 2>/dev/null; then
         if [[ "$FBC_SHA_PINNED" == "true" ]]; then
             log "ERROR: Pinned FBC image not found: ${fbc_image}"
@@ -89,7 +90,8 @@ verify_fbc_image() {
         log "Falling back to listing available tags..."
 
         local fallback_tag
-        fallback_tag=$(curl -sSf "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>/dev/null \
+        fallback_tag=$(curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>/dev/null \
             | jq -r '.tags[].name' \
             | grep -E '^[0-9a-f]{40}$' \
             | tail -1) || true
