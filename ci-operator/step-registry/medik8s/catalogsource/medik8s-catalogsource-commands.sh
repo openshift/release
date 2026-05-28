@@ -108,6 +108,37 @@ verify_fbc_image() {
     log "FBC image verified: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
 }
 
+MCP_CONFIG_JSONPATH='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}'
+
+wait_for_mcp_rollout() {
+    local mcp_configs_before="$1"
+
+    log "Waiting for MachineConfigPool rollout..."
+    local mcp_changed=false
+    for i in $(seq 1 30); do
+        sleep 10
+        local mcp_configs_after
+        mcp_configs_after=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
+        if [[ "$mcp_configs_before" != "$mcp_configs_after" ]]; then
+            log "MCP rendered config changed:"
+            log "  before: $mcp_configs_before"
+            log "  after:  $mcp_configs_after"
+            mcp_changed=true
+            break
+        fi
+        log "  waiting for MCP config change (${i}/30)..."
+    done
+
+    if [[ "$mcp_changed" == "true" ]]; then
+        oc wait mcp --all --for=condition=Updated --timeout=20m || {
+            log "WARNING: MCP not fully updated after 20m, proceeding anyway"
+            run oc get mcp
+        }
+    else
+        log "WARNING: No MCP rendered config change detected after 5m — IDMS may not have triggered a rollout, proceeding"
+    fi
+}
+
 apply_idms() {
     log "Fetching IDMS from rhwa-fbc commit ${FBC_COMMIT_SHA}..."
     local idms_url="${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml"
@@ -122,6 +153,9 @@ apply_idms() {
 
     yq-v4 -i ".metadata.name = \"${IDMS_NAME}\"" "$idms_file"
 
+    local mcp_configs_before
+    mcp_configs_before=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
+
     log "Applying IDMS..."
     oc apply -f "$idms_file" || {
         log "ERROR: Failed to apply IDMS"
@@ -129,12 +163,7 @@ apply_idms() {
     }
     cp "$idms_file" "${ARTIFACT_DIR}/idms.yaml" 2>/dev/null || true
 
-    log "IDMS ${IDMS_NAME} applied. Waiting for MachineConfigPool rollout..."
-    oc wait mcp --all --for=condition=Updating --timeout=5m || true
-    oc wait mcp --all --for=condition=Updated --timeout=20m || {
-        log "WARNING: MCP not fully updated after 20m, proceeding anyway"
-        run oc get mcp
-    }
+    wait_for_mcp_rollout "$mcp_configs_before"
 }
 
 ensure_marketplace() {
