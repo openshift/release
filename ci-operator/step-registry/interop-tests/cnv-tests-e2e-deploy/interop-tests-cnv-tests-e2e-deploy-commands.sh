@@ -6,6 +6,9 @@ set -euxo pipefail; shopt -s inherit_errexit
 # Send modified file to shared dir for Data Router Reporter step
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
         curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '

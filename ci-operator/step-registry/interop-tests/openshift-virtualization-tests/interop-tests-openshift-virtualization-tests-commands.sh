@@ -24,7 +24,7 @@ debug_on_exit() {
     echo "Exit Code: ${exit_code}"
     echo "--------------------------------------------------------------------------------"
     echo "Dump HCO CR and logs for debugging."
-    oc get -n "${hco_namespace}" "${HCO_KIND}" kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
+    oc get -n "${hco_namespace}" "${hcoKind}" kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
     oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
     echo "--------------------------------------------------------------------------------"
     echo "Run must-gather for additional debugging information."
@@ -81,6 +81,7 @@ typeset hcoSubscription=''
 typeset -i rc=0
 typeset -x junitResultsFile="${ARTIFACT_DIR}/junit_results.xml"
 typeset -x htmlResultsFile="${ARTIFACT_DIR}/report.html"
+typeset -x hcoKind='hyperconvergeds.v1beta1.hco.kubevirt.io'
 
 function setDefaultStorageClass() {
     local storageclass_name=$1
@@ -142,14 +143,14 @@ function retry() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
     local status="${1}"
-    retry 5 5 oc patch "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv \
+    retry 5 5 oc patch "${hcoKind}" kubevirt-hyperconverged -n openshift-cnv \
         --type=merge \
         -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
 
-    oc wait "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv  \
+    oc wait "${hcoKind}" kubevirt-hyperconverged -n openshift-cnv  \
     --for=condition='Available' \
     --timeout='5m'
 }
