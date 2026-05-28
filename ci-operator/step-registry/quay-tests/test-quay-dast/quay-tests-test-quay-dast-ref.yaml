@@ -1,10 +1,7 @@
 ref:
   as: quay-tests-test-quay-dast
   cli: latest
-  from_image:
-    name: quay-test-dast
-    namespace: ci
-    tag: latest
+  from: quay-test-dast
   commands: quay-tests-test-quay-dast-commands.sh
   resources:
         requests:
@@ -14,14 +11,17 @@ ref:
   grace_period: 15m0s
   documentation: |-
     Execute Quay DAST testing
+  env:
+  - name: QUAY_ENV
+    default: "QUAY"
+    documentation: Target Quay environment for DAST scanning
+  - name: QUAY_VERSION
+    default: ""
+    documentation: Quay version being tested
   credentials:
   - namespace: test-credentials
-    name: quay-qe-stagequayio-secret
-    mount_path: /var/run/quay-qe-stagequayio-secret
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
   - namespace: test-credentials
-    name: quay-qe-quayio-secret
-    mount_path: /var/run/quay-qe-quayio-secret
-  env:
-    - name: QUAY_ENV
-      documentation: Specify Quay DAST Testing ENV
-      default: "STAGE_QUAY_IO"
+    name: quay-qe-dast-gcs-secret
+    mount_path: /var/run/quay-qe-dast-gcs-secret
