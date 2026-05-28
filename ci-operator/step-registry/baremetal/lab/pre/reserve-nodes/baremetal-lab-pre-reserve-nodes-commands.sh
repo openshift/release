@@ -65,7 +65,7 @@ VENDOR="${9:-}"
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
 # shellcheck disable=SC2174
-mkdir -m 755 -p {/var/builds,/opt/dnsmasq/tftpboot,/opt/html}/${BUILD_ID}
+mkdir -m 755 -p {/var/builds,/opt/dnsmasq/tftpboot,/var/mnt/data-storage/html}/${BUILD_ID}
 mkdir -m 777 -p /opt/nfs/${BUILD_ID}
 touch /etc/hosts_pool_reserved
 mv /tmp/${BUILD_ID}.prow.env /var/builds/${BUILD_ID}/prow.env
