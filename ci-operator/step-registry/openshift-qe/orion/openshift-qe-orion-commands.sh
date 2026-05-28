@@ -2,27 +2,26 @@
 set -x
 
 classify_baseline_job() {
-    baseline_job_category=''
-
     if [[ -n "${ORION_BASELINE_JOB_TYPE:-}" ]]; then
-        baseline_job_category="override"
+        echo "override"
     elif [[ "${JOB_TYPE}" == "periodic" ]]; then
         if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
-            baseline_job_category="periodic_with_pull"
+            echo "periodic_with_pull"
         else
-            baseline_job_category="periodic"
+            echo "periodic"
         fi
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-        baseline_job_category="presubmit_pull"
+        echo "presubmit_pull"
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-        baseline_job_category="rehearse_with_pull"
+        echo "rehearse_with_pull"
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-        baseline_job_category="rehearse"
+        echo "rehearse"
     fi
 }
 
 resolve_baseline_job_type() {
-    case "$baseline_job_category" in
+    local baseline_category=$1
+    case "$baseline_category" in
         override)           echo "${ORION_BASELINE_JOB_TYPE}" ;;
         periodic_with_pull) echo "(periodic OR pull)" ;;
         periodic)           echo "periodic" ;;
@@ -33,7 +32,8 @@ resolve_baseline_job_type() {
 }
 
 resolve_pull_number() {
-    case "$baseline_job_category" in
+    local baseline_category=$1
+    case "$baseline_category" in
         periodic_with_pull|presubmit_pull|rehearse_with_pull)
             echo "(${PULL_NUMBER} OR 0)" ;;
         *)
@@ -226,9 +226,9 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
-classify_baseline_job
-job_type=$(resolve_baseline_job_type)
-pull_number=$(resolve_pull_number)
+baseline_category=$(classify_baseline_job)
+job_type=$(resolve_baseline_job_type "$baseline_category")
+pull_number=$(resolve_pull_number "$baseline_category")
 
 set +e
 set -o pipefail
