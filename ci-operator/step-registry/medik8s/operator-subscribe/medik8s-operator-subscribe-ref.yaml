@@ -1,0 +1,34 @@
+ref:
+  as: medik8s-operator-subscribe
+  from_image:
+    namespace: ocp
+    name: "4.17"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-operator-subscribe-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OPERATORS
+    documentation: |-
+      Comma-separated list of OLM package names to install.
+      Example: "fence-agents-remediation,storage-based-remediation"
+    default: ""
+  - name: CATALOG_SOURCE_NAME
+    documentation: |-
+      Name of the CatalogSource to subscribe from. Must already exist in openshift-marketplace.
+      Typically created by the medik8s-catalogsource step.
+    default: "medik8s-catalog"
+  - name: OO_CHANNEL
+    documentation: OLM subscription channel for operator installation.
+    default: "candidate"
+  - name: INSTALL_NAMESPACE
+    documentation: Namespace where operators will be installed.
+    default: "openshift-workload-availability"
+  documentation: |-
+    Installs medik8s/RHWA operators via OLM Subscription from an existing CatalogSource.
+    Creates the namespace, OperatorGroup, and Subscriptions, then waits for CSVs to reach Succeeded.
+    Designed to run after the medik8s-catalogsource step.
