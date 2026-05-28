@@ -293,13 +293,6 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
           ansible.builtin.command:
             cmd: >
               grep '^"\\[' "{{ raw_test_list_file }}"
-          register: test_list_with_registry
-          changed_when: false
-
-        - name: "fileter tests that need registry"
-          when: test_type == 'suite' or test_type == 'minimal'
-          ansible.builtin.shell: |
-            echo "{{ test_list_with_registry.stdout }}" | grep -v 'NoRegistryClusterInstall'
           register: test_list
           changed_when: false
 
