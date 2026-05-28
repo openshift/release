@@ -20,13 +20,22 @@ export XDG_CONFIG_HOME=/tmp/abi/.config # Used by `bw`.
 export XDG_CACHE_HOME=/tmp/abi/.cache   # Used by `openshift-install agent create image`.
 
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden--UploadAttachment.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden--UploadAttachment.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq chisel bw
 
 typeset ocpABIcfg="${CLUSTER_PROFILE_DIR}/${OCP__ABI__CFG_FN}"; [ -r "${ocpABIcfg}" ]
