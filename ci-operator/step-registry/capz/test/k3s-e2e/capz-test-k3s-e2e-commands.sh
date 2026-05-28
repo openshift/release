@@ -17,17 +17,17 @@ source openshift-ci/capz-test-env.sh
 set -o xtrace
 
 # ---- Cleanup on exit ----
-K3S_PID=""
+ROOTLESSKIT_PID=""
 cleanup_k3s() {
-  if [[ -n "${K3S_PID}" ]]; then
-    echo "[k3s] Stopping k3s (PID: ${K3S_PID})"
-    kill "${K3S_PID}" 2>/dev/null || true
-    wait "${K3S_PID}" 2>/dev/null || true
+  if [[ -n "${ROOTLESSKIT_PID}" ]]; then
+    echo "[k3s] Stopping rootlesskit (PID: ${ROOTLESSKIT_PID})"
+    kill "${ROOTLESSKIT_PID}" 2>/dev/null || true
+    wait "${ROOTLESSKIT_PID}" 2>/dev/null || true
   fi
 }
 trap cleanup_k3s EXIT
 
-# ---- Setup rootless runtime directories ----
+# ---- Setup runtime directories ----
 export XDG_RUNTIME_DIR="/tmp/run"
 mkdir -p "${XDG_RUNTIME_DIR}" "${K3S_DATA_DIR}"
 
@@ -39,32 +39,43 @@ chmod +x /tmp/k3s
 export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
+# ---- Install rootlesskit ----
+echo "[k3s] Installing rootlesskit"
+GOFLAGS='' go install github.com/rootless-containers/rootlesskit/v2/cmd/rootlesskit@latest
+export PATH="${GOBIN:-$(go env GOPATH)/bin}:${PATH}"
+
 # ---- Prepare /dev/kmsg ----
 ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 
-# ---- Start k3s in rootless mode ----
-# rootlesskit (bundled in k3s) creates its own network namespace where
-# it can set ip_forward=1 and manage iptables, bypassing the CI pod's
-# read-only /proc/sys and user namespace restrictions.
-echo "[k3s] Starting k3s server (rootless mode)"
+# ---- Start k3s inside rootlesskit namespace ----
+# rootlesskit creates a user namespace (UID 0 mapping) + network namespace
+# with slirp4netns connectivity. Inside that namespace:
+# - ip_forward can be set to 1 (own network namespace)
+# - iptables works (own network namespace with CAP_NET_ADMIN)
+# - k3s runs as regular server (no --rootless needed)
+echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
-k3s server \
-  --rootless \
-  --disable=traefik \
-  --snapshotter=native \
-  --data-dir="${K3S_DATA_DIR}" \
-  --write-kubeconfig="${K3S_KUBECONFIG}" \
-  --write-kubeconfig-mode=644 \
-  --kubelet-arg="eviction-hard=imagefs.available<1%,nodefs.available<1%" \
-  --kubelet-arg="eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%" \
-  &
-K3S_PID=$!
+rootlesskit --net=slirp4netns --state-dir=/tmp/rootlesskit \
+  --copy-up=/etc --copy-up=/run \
+  sh -c '
+    sysctl -w net.ipv4.ip_forward=1
+    ln -sf /dev/null /dev/kmsg 2>/dev/null || true
+    exec k3s server \
+      --disable=traefik \
+      --snapshotter=native \
+      --data-dir='"${K3S_DATA_DIR}"' \
+      --write-kubeconfig='"${K3S_KUBECONFIG}"' \
+      --write-kubeconfig-mode=644 \
+      --kubelet-arg="eviction-hard=imagefs.available<1%,nodefs.available<1%" \
+      --kubelet-arg="eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%"
+  ' &
+ROOTLESSKIT_PID=$!
 
-echo "[k3s] Waiting for k3s to be ready (PID: ${K3S_PID})"
+echo "[k3s] Waiting for k3s to be ready (PID: ${ROOTLESSKIT_PID})"
 READY=false
-for i in $(seq 1 60); do
-  if [[ ! -d "/proc/${K3S_PID}" ]]; then
-    echo "[k3s] FATAL: k3s process died unexpectedly"
+for i in $(seq 1 90); do
+  if [[ ! -d "/proc/${ROOTLESSKIT_PID}" ]]; then
+    echo "[k3s] FATAL: rootlesskit/k3s process died unexpectedly"
     exit 1
   fi
   if KUBECONFIG="${K3S_KUBECONFIG}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
@@ -76,7 +87,7 @@ for i in $(seq 1 60); do
 done
 
 if [ "${READY}" != true ]; then
-  echo "[k3s] FATAL: k3s did not become ready within 300s"
+  echo "[k3s] FATAL: k3s did not become ready within 450s"
   exit 1
 fi
 echo "[k3s] Server is ready"
