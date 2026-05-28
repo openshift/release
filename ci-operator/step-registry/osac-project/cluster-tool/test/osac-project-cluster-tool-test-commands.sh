@@ -46,7 +46,7 @@ TEST_IMAGE="$4"
 KUBECONFIG_PATH="$5"
 RESULTS_DIR="$6"
 MAKE_TARGET="$7"
-TEST="$8"
+TEST="${8:-}"
 
 mkdir -p "${RESULTS_DIR}"
 
