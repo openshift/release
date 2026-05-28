@@ -1,30 +1,44 @@
 #!/bin/bash
 set -x
 
-resolve_baseline_job_type() {
-    pull_number='0'
+classify_baseline_job() {
+    baseline_job_category=''
 
     if [[ -n "${ORION_BASELINE_JOB_TYPE:-}" ]]; then
-        echo "${ORION_BASELINE_JOB_TYPE}"
-        return
-    fi
-
-    if [[ "${JOB_TYPE}" == "periodic" ]]; then
+        baseline_job_category="override"
+    elif [[ "${JOB_TYPE}" == "periodic" ]]; then
         if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
-            pull_number="(${PULL_NUMBER} OR 0)"
-            echo "(periodic OR pull)"
+            baseline_job_category="periodic_with_pull"
         else
-            echo "periodic"
+            baseline_job_category="periodic"
         fi
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-        pull_number="(${PULL_NUMBER} OR 0)"
-        echo "(periodic OR pull)"
+        baseline_job_category="presubmit_pull"
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-        pull_number="(${PULL_NUMBER} OR 0)"
-        echo "(rehearse OR pull OR periodic)"
+        baseline_job_category="rehearse_with_pull"
     elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-        echo "(periodic OR rehearse)"
+        baseline_job_category="rehearse"
     fi
+}
+
+resolve_baseline_job_type() {
+    case "$baseline_job_category" in
+        override)           echo "${ORION_BASELINE_JOB_TYPE}" ;;
+        periodic_with_pull) echo "(periodic OR pull)" ;;
+        periodic)           echo "periodic" ;;
+        presubmit_pull)     echo "(periodic OR pull)" ;;
+        rehearse_with_pull) echo "(rehearse OR pull OR periodic)" ;;
+        rehearse)           echo "(periodic OR rehearse)" ;;
+    esac
+}
+
+resolve_pull_number() {
+    case "$baseline_job_category" in
+        periodic_with_pull|presubmit_pull|rehearse_with_pull)
+            echo "(${PULL_NUMBER} OR 0)" ;;
+        *)
+            echo "0" ;;
+    esac
 }
 
 if [ ${RUN_ORION} == false ]; then
@@ -212,7 +226,9 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
+classify_baseline_job
 job_type=$(resolve_baseline_job_type)
+pull_number=$(resolve_pull_number)
 
 set +e
 set -o pipefail
