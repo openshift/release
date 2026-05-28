@@ -1,4 +1,3 @@
-
 def get_kubeconfig_volume_mounts():
     return [
         {
@@ -7,21 +6,22 @@ def get_kubeconfig_volume_mounts():
             'readOnly': True
         }]
 
+
 def get_oc_volume_mounts():
     return [
         {
             'mountPath': '/tmp/home',
             'name': 'home',
-        },{
+        }, {
             'mountPath': '/tmp/git',
             'name': 'oc-cache',
-        },{
+        }, {
             'mountPath': '/tmp/home/.git-credentials',
             'name': 'git-credentials',
             'subPath': '.git-credentials'
-        },{
+        }, {
             'mountPath': '/tmp/pull-secret',
-            'name':'pull-secret'
+            'name': 'pull-secret'
         }
     ]
 
@@ -73,25 +73,26 @@ def get_kubeconfig_volumes(context, secret_name=None):
             }
         }]
 
+
 def get_oc_volumes():
     return [
         {
             'name': 'home',
             'emptyDir': {}
-        },{
+        }, {
             'name': 'oc-cache',
             'emptyDir': {}
-        },{
+        }, {
             'name': 'git-credentials',
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'release-controller-oc-git-credentials',
                 'items': [{
-                    'key': '.git-credentials',
+                    'key': 'git_url_with_credentials',
                     'path': '.git-credentials'
                 }]
             }
-        },{
+        }, {
             'name': 'pull-secret',
             'secret': {
                 'defaultMode': 420,
@@ -114,6 +115,7 @@ def get_rcapi_volumes(context, secret_name=None):
             }
         }
     ] + get_kubeconfig_volumes(context, secret_name) + get_oc_volumes()
+
 
 def get_rc_volumes(context):
     return [
