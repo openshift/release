@@ -1,6 +1,32 @@
 #!/bin/bash
 set -x
 
+resolve_baseline_job_type() {
+    pull_number='0'
+
+    if [[ -n "${ORION_BASELINE_JOB_TYPE:-}" ]]; then
+        echo "${ORION_BASELINE_JOB_TYPE}"
+        return
+    fi
+
+    if [[ "${JOB_TYPE}" == "periodic" ]]; then
+        if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
+            pull_number="(${PULL_NUMBER} OR 0)"
+            echo "(periodic OR pull)"
+        else
+            echo "periodic"
+        fi
+    elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        echo "(periodic OR pull)"
+    elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        echo "(rehearse OR pull OR periodic)"
+    elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
+        echo "(periodic OR rehearse)"
+    fi
+}
+
 if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
@@ -186,30 +212,7 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
-# pull_number input variable is required and
-# it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
-pull_number='0'
-if [[ -n "${ORION_JOB_TYPE:-}" ]]; then
-    job_type="${ORION_JOB_TYPE}"
-elif [[ "${JOB_TYPE}" == "periodic" ]]; then
-    if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
-        pull_number="(${PULL_NUMBER} OR 0)"
-        job_type="(periodic OR pull)"
-    else
-        job_type="periodic"
-    fi
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-    # Indicates a ci test triggered in PR against a pull request
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(periodic OR pull)"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-    # Indicates a rehearse job triggered from a PR
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(rehearse OR pull OR periodic)"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-    # Indicates a rehearsal in PR against openshift/release repo
-    job_type="(periodic OR rehearse)"
-fi
+job_type=$(resolve_baseline_job_type)
 
 set +e
 set -o pipefail
