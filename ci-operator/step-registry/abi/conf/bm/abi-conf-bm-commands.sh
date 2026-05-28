@@ -14,10 +14,16 @@ shopt -s inherit_errexit
 mkdir -p "${OCP__ABI__CLUSTER_DIR}"
 
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq
 
 typeset ocpABIcfg="${CLUSTER_PROFILE_DIR}/${OCP__ABI__CFG_FN}"; [ -r "${ocpABIcfg}" ]
