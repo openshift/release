@@ -23,18 +23,36 @@ declare -A ami_map=(
   [us-east-1,arm64,rhel-9.4]=ami-04e40399249acc576      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [us-east-1,x86_64,rhel-9.6]=ami-03f1d522d98841360     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [us-east-1,arm64,rhel-9.6]=ami-04db3c91a597912d6      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  # TODO: Update rhel-9.8 AMIs when available in AWS Marketplace
+  [us-east-1,x86_64,rhel-9.8]=ami-PLACEHOLDER            # RHEL-9.8 not yet available
+  [us-east-1,arm64,rhel-9.8]=ami-PLACEHOLDER              # RHEL-9.8 not yet available
+  # TODO: Update rhel-10.2 AMIs when available in AWS Marketplace
+  [us-east-1,x86_64,rhel-10.2]=ami-PLACEHOLDER           # RHEL-10.2 not yet available
+  [us-east-1,arm64,rhel-10.2]=ami-PLACEHOLDER             # RHEL-10.2 not yet available
   [us-west-2,x86_64,rhel-9.2]=ami-0828b5584587b20b2     # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.2]=ami-0fe01cf6276fcc8c5      # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.4]=ami-0afbb67255ef6e726     # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.4]=ami-0ff4bae26d5e7e36a      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.6]=ami-022daef1002763216     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.6]=ami-0b2dc437bf4878d14      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  # TODO: Update rhel-9.8 AMIs when available in AWS Marketplace
+  [us-west-2,x86_64,rhel-9.8]=ami-PLACEHOLDER            # RHEL-9.8 not yet available
+  [us-west-2,arm64,rhel-9.8]=ami-PLACEHOLDER              # RHEL-9.8 not yet available
+  # TODO: Update rhel-10.2 AMIs when available in AWS Marketplace
+  [us-west-2,x86_64,rhel-10.2]=ami-PLACEHOLDER           # RHEL-10.2 not yet available
+  [us-west-2,arm64,rhel-10.2]=ami-PLACEHOLDER             # RHEL-10.2 not yet available
   [eu-central-1,x86_64,rhel-9.2]=ami-02ad2ca65425af1c8  # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.2]=ami-0334bf2525c55070d   # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.4]=ami-0f7fa5d86c8e44172  # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.4]=ami-078e99bcb609a9931   # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.6]=ami-0066d4651999e27f1  # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.6]=ami-0f0cd53332525ff39   # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  # TODO: Update rhel-9.8 AMIs when available in AWS Marketplace
+  [eu-central-1,x86_64,rhel-9.8]=ami-PLACEHOLDER        # RHEL-9.8 not yet available
+  [eu-central-1,arm64,rhel-9.8]=ami-PLACEHOLDER          # RHEL-9.8 not yet available
+  # TODO: Update rhel-10.2 AMIs when available in AWS Marketplace
+  [eu-central-1,x86_64,rhel-10.2]=ami-PLACEHOLDER       # RHEL-10.2 not yet available
+  [eu-central-1,arm64,rhel-10.2]=ami-PLACEHOLDER         # RHEL-10.2 not yet available
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
