@@ -48,6 +48,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-operator-serial-ote
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/cli-manager-operator/operator/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: cli-manager-test-extension
+    workflow: ipi-aws
 - as: security
   optional: true
   skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
