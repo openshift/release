@@ -69,8 +69,8 @@ _json_get() {
 
 get_nameservers() {
     local DNS_DATA
-    local URL1="https://github.com/openshift/release/blob/main/clusters/build-clusters/common_managed/dns.yaml"
-    local URL='https://raw.githubusercontent.com/openshift/release/refs/heads/main/clusters/build-clusters/common_managed/dns.yaml'
+    local URL1="https://github.com/openshift/release/blob/main/clusters/build-clusters/build-shared/managed/dns.yaml"
+    local URL='https://raw.githubusercontent.com/openshift/release/refs/heads/main/clusters/build-clusters/build-shared/managed/dns.yaml'
 
     DNS_DATA="$(curl --fail -s -L "$URL")" || die "get_nameservers: cannot download $URL1"
 
@@ -89,7 +89,7 @@ get_nameservers() {
 
 resolve_name() {
     # No nslookup/dig is installed. Use python.
-    # DNS servers from https://github.com/openshift/release/blob/master/clusters/build-clusters/common_managed/dns.yaml
+    # DNS servers from https://github.com/openshift/release/blob/master/clusters/build-clusters/build-shared/managed/dns.yaml
     python3 -c 'import dns.resolver' 2>/dev/null || pip install dnspython &>/dev/null
     python3 -c 'if 1:
         import sys
