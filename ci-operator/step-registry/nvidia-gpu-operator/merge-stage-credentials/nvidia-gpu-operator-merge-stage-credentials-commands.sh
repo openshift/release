@@ -32,15 +32,27 @@ echo "Updating cluster pull secret..."
 oc set data secret/pull-secret -n openshift-config \
     --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
 
-echo "Waiting for MCP worker pool to propagate..."
-total=$(oc get mcp worker -o jsonpath='{.status.machineCount}')
+echo "Waiting for MCP worker pool to start updating..."
 COUNTER=0
-while [ $COUNTER -lt 600 ]; do
+while [ $COUNTER -lt 120 ]; do
     sleep 20
     COUNTER=$((COUNTER + 20))
-    updated=$(oc get mcp worker -o jsonpath='{.status.updatedMachineCount}')
-    echo "MCP rollout: ${updated}/${total} machines updated (${COUNTER}s elapsed)"
-    if [[ "${updated}" == "${total}" ]]; then
+    updating=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}')
+    echo "MCP Updating=${updating:-unknown} (${COUNTER}s elapsed)"
+    if [[ "${updating}" == "True" ]]; then
+        echo "MCP update in progress."
+        break
+    fi
+done
+
+echo "Waiting for MCP worker pool to finish updating..."
+COUNTER=0
+while [ $COUNTER -lt 420 ]; do
+    sleep 20
+    COUNTER=$((COUNTER + 20))
+    updated=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}')
+    echo "MCP Updated=${updated:-unknown} (${COUNTER}s elapsed)"
+    if [[ "${updated}" == "True" ]]; then
         echo "MCP rollout complete."
         exit 0
     fi
