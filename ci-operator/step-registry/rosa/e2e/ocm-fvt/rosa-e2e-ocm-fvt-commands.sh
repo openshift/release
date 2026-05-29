@@ -24,9 +24,12 @@ umask "${old_umask}"
 {
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
-  echo "ENABLE_JIRA_REPORTING=true"
   echo "JOB_LINK=${JOB_LINK}"
 } > "${podman_env_file}"
+
+if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
+  echo "ENABLE_JIRA_REPORTING=true" >> "${podman_env_file}"
+fi
 
 if [[ -n "${OCM_FVT_OCM_ENV:-}" ]]; then
   echo "OCM_ENV=${OCM_FVT_OCM_ENV}" >> "${podman_env_file}"
@@ -39,11 +42,15 @@ if [[ -n "${OCM_FVT_EXTRA_ENVS:-}" ]]; then
   done <<< "${OCM_FVT_EXTRA_ENVS}"
 fi
 
-env -i bash --norc --noprofile -c '
-  source /usr/local/cs-qe-credentials/ocm-tokens
-  source /usr/local/cs-qe-credentials/jira-cred
-  env | grep -v "^_="
-' >> "${podman_env_file}"
+cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
+if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
+  cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
+fi
+
+env -i bash --norc --noprofile -c "
+  ${cred_sources}
+  env | grep -v '^_='
+" >> "${podman_env_file}"
 
 podman_args=(
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson
@@ -59,8 +66,13 @@ fi
 
 podman_args+=(--rm)
 
-echo "Running ocmtest job: ${OCM_FVT_JOB_NAME}"
+ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
+if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
+  ocmtest_args+=(--reportJiraTicket)
+fi
+
+echo "Running ocmtest: ${ocmtest_args[*]}"
 podman run \
   "${podman_args[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
-  ocmtest test --service cms --job "${OCM_FVT_JOB_NAME}" --reportJiraTicket
+  ocmtest "${ocmtest_args[@]}"
