@@ -21,4 +21,6 @@ scripts/openshift-CI-kuttl-tests.sh
 make ginkgo
 ./bin/ginkgo -v --trace --timeout 210m --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel
 
+cp "openshift-gitops-parallel-e2e.xml" "${ARTIFACT_DIR}/openshift-gitops-parallel-e2e.xml"
+
 true
