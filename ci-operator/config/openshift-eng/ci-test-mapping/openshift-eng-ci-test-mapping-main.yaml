@@ -3,23 +3,30 @@ build_root:
     dockerfile_path: Dockerfile.buildroot
 resources:
   '*':
-    limits:
-      cpu: 100m
-      memory: 200Mi
     requests:
       cpu: 100m
       memory: 200Mi
+  root:
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 1Gi
+  src:
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 1Gi
 tests:
 - as: lint
-  commands: HOME=/tmp make lint
+  commands: GOMEMLIMIT=200000000 HOME=/tmp make lint
   container:
     from: src
 - as: mapping
-  commands: HOME=/tmp ./hack/ci-mapping.sh
+  commands: GOMEMLIMIT=200000000 HOME=/tmp ./hack/ci-mapping.sh
   container:
     from: src
 - as: unit
-  commands: HOME=/tmp ./hack/ci-test.sh
+  commands: GOMEMLIMIT=200000000 HOME=/tmp ./hack/ci-test.sh
   container:
     from: src
 zz_generated_metadata:

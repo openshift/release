@@ -57,7 +57,7 @@ echo -e "${HAPROXY}" >> "$HAPROXY_DIR/haproxy.cfg"
 echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
 echo "Create and start HAProxy container..."
-podman run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
+podman run --name "haproxy-$CLUSTER_NAME" -d --restart=always \
   -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg:Z" \
   -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf:Z" \
   --network none \

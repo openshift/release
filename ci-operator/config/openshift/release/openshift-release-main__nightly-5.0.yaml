@@ -87,6 +87,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "5.0"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "5.0"
     namespace: ocp
@@ -2167,6 +2171,7 @@ tests:
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
+  timeout: 4h0m0s
 - as: e2e-agent-ha5-dualstack-iso-no-registry-techpreview
   capabilities:
   - intranet
@@ -2180,6 +2185,7 @@ tests:
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
+  timeout: 4h0m0s
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
   - intranet
@@ -2640,6 +2646,15 @@ tests:
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
+    workflow: ipi-aws
+- as: tls-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-external-aws
   cron: '@weekly'
