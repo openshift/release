@@ -112,6 +112,11 @@ function wait_for_mcps_updating() {
       if wait_err=$(oc wait mcp "${mcp_name}" --for='condition=UPDATING=False' --timeout="${mcp_timeout}" 2>&1); then
         break
       fi
+      if echo "${wait_err}" | grep -q "timed out"; then
+        echo "ERROR: Timed out waiting for MachineConfigPool '${mcp_name}' to finish updating"
+        echo "${wait_err}"
+        return 1
+      fi
       attempt=$((attempt + 1))
       if [[ ${attempt} -ge ${max_retries} ]]; then
         echo "ERROR: MachineConfigPool '${mcp_name}' did not finish updating after ${max_retries} retries"
