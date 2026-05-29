@@ -21,18 +21,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export HOME="\${HOME:-/tmp}"
 if ! python3 -c 'import yaml' >/dev/null 2>&1; then
-    echo "PyYAML not found; installing..."
-    if command -v microdnf >/dev/null 2>&1; then
-        microdnf install -y python3-pyyaml
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y python3-pyyaml
-    elif python3 -m pip --version >/dev/null 2>&1; then
-        python3 -m pip install --disable-pip-version-check --no-cache-dir pyyaml
-    else
-        echo "ERROR: PyYAML is required and could not be installed (no microdnf, dnf, or pip)"
-        exit 1
+    echo "PyYAML not found; bootstrapping pip via ensurepip..."
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+        python3 -m ensurepip --upgrade --user
     fi
+    export PATH="\${HOME}/.local/bin:\${PATH}"
+    pip3 install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
 fi
 
 RELEASE_BRANCH="\${RELEASE_BRANCH:-}"
