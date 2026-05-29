@@ -14,19 +14,8 @@ if ! python3 -c 'import yaml' >/dev/null 2>&1; then
     pip3 install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
 fi
 
-RELEASE_BRANCH="${RELEASE_BRANCH:-}"
-if [[ -z "${RELEASE_BRANCH}" && -n "${JOB_SPEC:-}" ]]; then
-    RELEASE_BRANCH="$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // .extra_refs[0].base_ref // empty')"
-fi
-
-if [[ -z "${RELEASE_BRANCH}" ]]; then
-    echo "ERROR: RELEASE_BRANCH is required (set explicitly or via JOB_SPEC base_ref)"
-    exit 1
-fi
-
-echo "Validating ART manifests for branch ${RELEASE_BRANCH} in ${PWD}"
+echo "Validating ART manifests in ${PWD}"
 export ART_VALIDATE_REPO_ROOT="${PWD}"
-export ART_VALIDATE_RELEASE_BRANCH="${RELEASE_BRANCH}"
 python3 <<'PYVALIDATOR'
 #!/usr/bin/env python3
 """Validate operator image-references and art.yaml against the CSV before merge."""
@@ -34,7 +23,10 @@ python3 <<'PYVALIDATOR'
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,6 +38,13 @@ RH_REGISTRY = "registry.redhat.io"
 RELEASE_BRANCH_RE = re.compile(r"^release-(\d+)\.(\d+)$")
 ZSTREAM_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+")
 TEMPLATE_KEYS = ("MAJOR", "MINOR", "SUBMINOR", "RELEASE", "DATE_TIME", "FULL_VER")
+RELEASE_REPO_NAME = "release"
+
+
+@dataclass(frozen=True)
+class BranchCandidate:
+    source: str
+    branch: str
 
 
 @dataclass(frozen=True)
@@ -100,6 +99,112 @@ class Violation:
         if self.search:
             lines.append(f"  search: {self.search!r}")
         return "\n".join(lines)
+
+
+def is_release_branch(branch: str) -> bool:
+    return bool(RELEASE_BRANCH_RE.match(branch.strip()))
+
+
+def read_git_branch(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    branch = result.stdout.strip()
+    if branch in ("", "HEAD"):
+        return ""
+    return branch
+
+
+def resolve_release_branch(
+    explicit: str = "",
+    job_spec_json: str = "",
+    pull_base_ref: str = "",
+    git_branch: str = "",
+) -> tuple[str, str]:
+    """Resolve release-X.Y from CI metadata.
+
+    Only branches matching release-X.Y are accepted. Values such as main or master
+    are collected for diagnostics but never used. Raises ValueError when no valid
+    branch is found or when valid candidates disagree.
+    """
+    candidates: list[BranchCandidate] = []
+
+    def add(source: str, branch: Optional[str]) -> None:
+        if branch and branch.strip():
+            candidates.append(BranchCandidate(source=source, branch=branch.strip()))
+
+    add("RELEASE_BRANCH", explicit)
+
+    job_spec: Optional[dict] = None
+    if job_spec_json:
+        try:
+            job_spec = json.loads(job_spec_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"JOB_SPEC is not valid JSON: {exc}") from exc
+
+    add("PULL_BASE_REF", pull_base_ref)
+
+    if job_spec:
+        refs = job_spec.get("refs") or {}
+        refs_org = refs.get("org") or ""
+        refs_repo = refs.get("repo") or ""
+        refs_base = refs.get("base_ref") or ""
+        if refs_base and refs_repo != RELEASE_REPO_NAME:
+            add(f"JOB_SPEC refs ({refs_org}/{refs_repo})", refs_base)
+
+        for index, ref in enumerate(job_spec.get("extra_refs") or []):
+            ref_base = ref.get("base_ref") or ""
+            ref_org = ref.get("org") or ""
+            ref_repo = ref.get("repo") or ""
+            if ref_base:
+                add(f"JOB_SPEC extra_refs[{index}] ({ref_org}/{ref_repo})", ref_base)
+
+    add("git branch", git_branch)
+
+    valid = [candidate for candidate in candidates if is_release_branch(candidate.branch)]
+    if not valid:
+        observed = ", ".join(f"{c.source}={c.branch!r}" for c in candidates) or "(none)"
+        raise ValueError(
+            "Could not resolve a release-X.Y branch for registry and art.yaml rules. "
+            f"Observed candidates: {observed}. "
+            "Branches such as main/master are ignored intentionally."
+        )
+
+    explicit_valid = [c for c in valid if c.source == "RELEASE_BRANCH"]
+    if explicit_valid:
+        chosen = explicit_valid[0]
+        return chosen.branch, chosen.source
+
+    unique_branches = {candidate.branch for candidate in valid}
+    if len(unique_branches) > 1:
+        detail = ", ".join(f"{c.source}={c.branch!r}" for c in valid)
+        raise ValueError(
+            "Conflicting release-X.Y branch candidates: "
+            f"{detail}. Set RELEASE_BRANCH explicitly to override."
+        )
+
+    priority = (
+        "RELEASE_BRANCH",
+        "PULL_BASE_REF",
+        "JOB_SPEC refs (",
+        "JOB_SPEC extra_refs[",
+        "git branch",
+    )
+    for prefix in priority:
+        for candidate in valid:
+            if candidate.source == prefix or candidate.source.startswith(prefix):
+                return candidate.branch, candidate.source
+
+    chosen = valid[0]
+    return chosen.branch, chosen.source
 
 
 def expand_templates(value: str, templates: dict[str, str]) -> str:
@@ -480,8 +585,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument(
         "--release-branch",
-        required=True,
-        help="Target release branch (e.g. release-4.23, release-5.0)",
+        default="",
+        help=(
+            "Target release branch (e.g. release-4.23, release-5.0). "
+            "When unset, resolved from RELEASE_BRANCH, PULL_BASE_REF, JOB_SPEC, "
+            "then git branch (release-X.Y only)."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -495,11 +604,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"No image-references files found under {repo_root}; skipping validation.")
         return 0
 
-    violations = validate_repo(repo_root, args.release_branch)
+    try:
+        release_branch, branch_source = resolve_release_branch(
+            explicit=args.release_branch or os.environ.get("RELEASE_BRANCH", ""),
+            job_spec_json=os.environ.get("JOB_SPEC", ""),
+            pull_base_ref=os.environ.get("PULL_BASE_REF", ""),
+            git_branch=read_git_branch(repo_root),
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Using release branch {release_branch!r} (from {branch_source})")
+
+    violations = validate_repo(repo_root, release_branch)
     if not violations:
         print(
             f"Validated {len(image_refs_files)} image-references file(s) "
-            f"for {args.release_branch}."
+            f"for {release_branch}."
         )
         return 0
 
@@ -517,14 +639,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 if __name__ == "__main__":
     import os
     import sys
-    sys.exit(
-        main(
-            [
-                "--repo-root",
-                os.environ["ART_VALIDATE_REPO_ROOT"],
-                "--release-branch",
-                os.environ["ART_VALIDATE_RELEASE_BRANCH"],
-            ]
-        )
-    )
+
+    argv = ["--repo-root", os.environ["ART_VALIDATE_REPO_ROOT"]]
+    if os.environ.get("RELEASE_BRANCH"):
+        argv.extend(["--release-branch", os.environ["RELEASE_BRANCH"]])
+    sys.exit(main(argv))
 PYVALIDATOR

@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
-import tempfile
-import textwrap
-import unittest
-from pathlib import Path
-
 import importlib.util
+import json
 import sys
 import tempfile
 import textwrap
@@ -22,6 +18,7 @@ spec.loader.exec_module(validate_art_manifests)
 
 BranchVersion = validate_art_manifests.BranchVersion
 find_image_references_files = validate_art_manifests.find_image_references_files
+resolve_release_branch = validate_art_manifests.resolve_release_branch
 validate_repo = validate_art_manifests.validate_repo
 
 
@@ -280,6 +277,86 @@ class ValidateArtManifestsTest(unittest.TestCase):
         self.assertEqual(branch.major, 5)
         self.assertEqual(branch.minor, 0)
         self.assertEqual(branch.template_values()["FULL_VER"], "5.0.0-0")
+
+    def test_resolve_release_branch_from_pull_base_ref(self) -> None:
+        branch, source = resolve_release_branch(pull_base_ref="release-4.23")
+        self.assertEqual(branch, "release-4.23")
+        self.assertEqual(source, "PULL_BASE_REF")
+
+    def test_resolve_release_branch_ignores_main_in_job_spec(self) -> None:
+        job_spec = json.dumps(
+            {
+                "refs": {
+                    "org": "openshift",
+                    "repo": "release",
+                    "base_ref": "main",
+                },
+                "extra_refs": [
+                    {
+                        "org": "openshift",
+                        "repo": "local-storage-operator",
+                        "base_ref": "release-5.0",
+                    }
+                ],
+            }
+        )
+        branch, source = resolve_release_branch(job_spec_json=job_spec)
+        self.assertEqual(branch, "release-5.0")
+        self.assertIn("extra_refs", source)
+
+    def test_resolve_release_branch_skips_release_repo_refs(self) -> None:
+        job_spec = json.dumps(
+            {
+                "refs": {
+                    "org": "openshift",
+                    "repo": "release",
+                    "base_ref": "main",
+                },
+            }
+        )
+        with self.assertRaises(ValueError) as ctx:
+            resolve_release_branch(job_spec_json=job_spec)
+        self.assertIn("main/master are ignored", str(ctx.exception))
+
+    def test_resolve_release_branch_explicit_override(self) -> None:
+        job_spec = json.dumps(
+            {
+                "extra_refs": [
+                    {
+                        "org": "openshift",
+                        "repo": "local-storage-operator",
+                        "base_ref": "release-4.23",
+                    }
+                ],
+            }
+        )
+        branch, source = resolve_release_branch(
+            explicit="release-5.0",
+            job_spec_json=job_spec,
+        )
+        self.assertEqual(branch, "release-5.0")
+        self.assertEqual(source, "RELEASE_BRANCH")
+
+    def test_resolve_release_branch_conflict(self) -> None:
+        job_spec = json.dumps(
+            {
+                "extra_refs": [
+                    {
+                        "org": "openshift",
+                        "repo": "local-storage-operator",
+                        "base_ref": "release-4.23",
+                    },
+                    {
+                        "org": "openshift",
+                        "repo": "local-storage-operator",
+                        "base_ref": "release-5.0",
+                    },
+                ],
+            }
+        )
+        with self.assertRaises(ValueError) as ctx:
+            resolve_release_branch(job_spec_json=job_spec)
+        self.assertIn("Conflicting", str(ctx.exception))
 
 
 if __name__ == "__main__":
