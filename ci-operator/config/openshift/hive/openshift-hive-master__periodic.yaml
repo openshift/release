@@ -30,6 +30,15 @@ images:
     dockerfile_path: Dockerfile
     from: ubi9-minimal-entitled
     to: hive
+  - dockerfile_literal: |
+      FROM src
+      RUN make -C test/ote build
+      RUN dnf install -y gzip jq && dnf clean all
+      RUN cp /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
+      RUN gzip -f -k /usr/bin/openshift-tests-extension
+      WORKDIR /tmp
+    from: src
+    to: hive-tests
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 releases:
   latest:
@@ -330,6 +339,92 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-ote-sd-rosa
+  cron: 0 6 * * 6
+  reporter_config:
+    channel: '#team-hive-alert'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    - success
+    report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: deploy-hive
+      cli: latest
+      commands: |
+        IMG=$HIVE_IMAGE make deploy
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/credentials/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/credentials/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
+        export PULL_SECRET_FILE=/tmp/credentials/pull-secret/.dockerconfigjson
+        export CLUSTER_NAME=$(printf "hiveci-%x-0" $(date +%s))
+        export PLATFORM=aws
+        export TEST_TAG=HiveSDRosa
+        /usr/bin/openshift-tests-extension run-suite -c 1 openshift/hive -j ${ARTIFACT_DIR}/junit_results.xml || true
+        RESULT_JSON=$(ls ${ARTIFACT_DIR}/extension_test_result_*.json 2>/dev/null | head -1)
+        if [[ -n "$RESULT_JSON" && -f "$RESULT_JSON" ]]; then
+          jq -r '
+            (. // []) |
+            def pass:
+              .result == "passed" or
+              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<testsuite tests=\"\(length)\" failures=\"\([.[] | select(pass | not)] | length)\">",
+            (.[] |
+              if pass then
+                "<testcase name=\"\(.name | @html)\"/>"
+              else
+                "<testcase name=\"\(.name | @html)\"><failure><![CDATA[\((.error // "")[0:500])]]></failure></testcase>"
+              end
+            ),
+            "</testsuite>"
+          ' "$RESULT_JSON" > "${ARTIFACT_DIR}/junit_results.xml"
+          FAIL_COUNT=$(jq '
+            (. // []) |
+            def pass:
+              .result == "passed" or
+              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+            [.[] | select(pass | not)] | length
+          ' "$RESULT_JSON")
+          TOTAL=$(jq '(. // []) | length' "$RESULT_JSON")
+          echo "Results: $((TOTAL - FAIL_COUNT)) passed, ${FAIL_COUNT} failed"
+          [[ $FAIL_COUNT -gt 0 ]] && exit 1
+        fi
+      credentials:
+      - mount_path: /tmp/credentials/hiveci-aws-creds
+        name: hiveci-aws-creds
+        namespace: test-credentials
+      - mount_path: /tmp/credentials/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: hive-tests
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 7h30m0s
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
