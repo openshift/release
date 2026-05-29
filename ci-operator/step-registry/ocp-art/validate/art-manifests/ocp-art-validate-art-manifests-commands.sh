@@ -6,7 +6,16 @@ set -o pipefail
 
 if ! python3 -c 'import yaml' >/dev/null 2>&1; then
     echo "PyYAML not found; installing..."
-    python3 -m pip install --disable-pip-version-check --no-cache-dir pyyaml
+    if command -v microdnf >/dev/null 2>&1; then
+        microdnf install -y python3-pyyaml
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y python3-pyyaml
+    elif python3 -m pip --version >/dev/null 2>&1; then
+        python3 -m pip install --disable-pip-version-check --no-cache-dir pyyaml
+    else
+        echo "ERROR: PyYAML is required and could not be installed (no microdnf, dnf, or pip)"
+        exit 1
+    fi
 fi
 
 RELEASE_BRANCH="${RELEASE_BRANCH:-}"
