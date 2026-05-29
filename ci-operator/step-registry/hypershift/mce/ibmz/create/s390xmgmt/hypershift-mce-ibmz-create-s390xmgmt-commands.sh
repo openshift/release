@@ -12,7 +12,7 @@ export CLUSTER_ARCH
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key-addon-key")
+ssh_key_string=$(cat "/etc/ocp-addons/key/httpd-vsi-key-addon-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
 envsubst <<"EOF" >${tmp_ssh_key}
@@ -22,7 +22,7 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey-addon-key")
+IC_API_KEY=$(cat "/etc/ocp-addons/key/ibmcloud-apikey-addon-key")
 export IC_API_KEY
 
 # Run the clone (fork + deploy key from httpd-vsi-key-addon-key in hypershift-agent-ibmz-credentials)
