@@ -1,0 +1,25 @@
+ref:
+  as: openshift-pipelines-ginkgo-install
+  from: openshift-pipelines-ginkgo-runner
+  commands: openshift-pipelines-ginkgo-install-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  credentials:
+    - namespace: test-credentials
+      name: aws-osp-qe
+      mount_path: /var/run/openshift-pipelines/osp-ci-secrets
+  env:
+    - name: OLM_CHANNEL
+      default: latest
+      documentation: |-
+        OLM channel selected for the openshift-pipelines operator installation.
+    - name: INSTALL_TIMEOUT
+      default: "30m"
+      documentation: |-
+        Timeout for the Ginkgo install suite (e.g. 30m, 1h).
+  documentation: |-
+    Installs the OpenShift Pipelines operator via OLM using the Ginkgo-based
+    release-tests-ginkgo test suite (tests/olm/).
