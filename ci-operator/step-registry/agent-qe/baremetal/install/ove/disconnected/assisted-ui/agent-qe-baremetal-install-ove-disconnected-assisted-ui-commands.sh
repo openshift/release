@@ -37,8 +37,38 @@ cp "/tmp/kubeconfig" "${SHARED_DIR}/kubeconfig"
 cp "/tmp/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
 
 export KUBECONFIG=/tmp/kubeconfig
-echo "Forcing a 2.5-hour delay to allow other machines to join the bootstrap node."
-sleep 2.5h
 
-echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+# During bootstrap, the kube-apiserver serves a temporary certificate that lacks
+# the external API hostname SAN. TLS verification must be skipped until the
+# kube-apiserver-operator rotates the serving certificate.
+oc config set-cluster "$(oc config view -o jsonpath='{.clusters[0].name}')" \
+  --insecure-skip-tls-verify=true --kubeconfig=/tmp/kubeconfig
+
+API_URL=$(oc config view -o jsonpath='{.clusters[0].cluster.server}' --kubeconfig=/tmp/kubeconfig)
+
+echo "$(date -u --rfc-3339=seconds) - Waiting for API server at ${API_URL} to become reachable..."
+API_READY=false
+for i in $(seq 1 360); do
+  if oc get --raw /readyz &>/dev/null; then
+    echo "$(date -u --rfc-3339=seconds) - API server is reachable."
+    API_READY=true
+    break
+  fi
+  if (( i % 20 == 0 )); then
+    echo "$(date -u --rfc-3339=seconds) - Still waiting for API server... (attempt ${i}/360)"
+  fi
+  sleep 30
+done
+
+if [ "${API_READY}" = false ]; then
+  echo "ERROR: API server did not become reachable within 3 hours."
+  exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - Checking cluster installation progress by verifying all cluster operators are available and stable."
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=90m
+
+# Re-enable TLS verification for next steps
+oc config set-cluster "$(oc config view -o jsonpath='{.clusters[0].name}')" \
+  --insecure-skip-tls-verify=false --kubeconfig=/tmp/kubeconfig
+cp "/tmp/kubeconfig" "${SHARED_DIR}/kubeconfig"
