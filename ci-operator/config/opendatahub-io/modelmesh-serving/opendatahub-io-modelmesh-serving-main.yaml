@@ -11,28 +11,29 @@ build_root:
       && find /go -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty
       chmod g+xw\n"
 images:
-- build_args:
-  - name: TARGETOS
-    value: linux
-  - name: TARGETARCH
-    value: amd64
-  context_dir: .
-  dockerfile_path: Dockerfile.develop.ci
-  from: src
-  to: modelmesh-serving-develop
-- build_args:
-  - name: COMMIT_SHA
-    value: ci-sha
-  - name: IMAGE_VERSION
-    value: ci-test-img
-  context_dir: .
-  dockerfile_path: Dockerfile
-  from: ubi_minimal
-  inputs:
-    modelmesh-serving-develop:
-      as:
-      - ${DEV_IMAGE}
-  to: modelmesh-serving
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    context_dir: .
+    dockerfile_path: Dockerfile.develop.ci
+    from: src
+    to: modelmesh-serving-develop
+  - build_args:
+    - name: COMMIT_SHA
+      value: ci-sha
+    - name: IMAGE_VERSION
+      value: ci-test-img
+    context_dir: .
+    dockerfile_path: Dockerfile
+    from: ubi_minimal
+    inputs:
+      modelmesh-serving-develop:
+        as:
+        - ${DEV_IMAGE}
+    to: modelmesh-serving
 promotion:
   to:
   - namespace: opendatahub-io

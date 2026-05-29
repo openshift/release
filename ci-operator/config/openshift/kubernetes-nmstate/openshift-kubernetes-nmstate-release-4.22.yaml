@@ -10,21 +10,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile.openshift
-  to: kubernetes-nmstate-handler
-- dockerfile_path: build/Dockerfile.operator.openshift
-  to: kubernetes-nmstate-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-with-oc-and-kubectl
+  items:
+  - dockerfile_path: build/Dockerfile.openshift
+    to: kubernetes-nmstate-handler
+  - dockerfile_path: build/Dockerfile.operator.openshift
+    to: kubernetes-nmstate-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-with-oc-and-kubectl
 promotion:
   to:
   - disabled: true
@@ -54,7 +55,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -104,20 +105,6 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: kubernetes-nmstate-e2e-azure
-- as: e2e-handler-ovn-ipv4-nightly-periodic
-  capabilities:
-  - intranet
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-handler
 - as: verify-deps
   steps:
     env:

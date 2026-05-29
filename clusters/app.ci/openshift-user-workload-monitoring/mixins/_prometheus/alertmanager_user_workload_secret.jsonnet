@@ -2,7 +2,8 @@
   "kind": "Template",
   "apiVersion": "template.openshift.io/v1",
   "metadata": {
-    "name": "alertmanager-user-workload-secret"
+    "name": "alertmanager-user-workload-secret",
+    "namespace": "openshift"
   },
   "parameters": [
       {

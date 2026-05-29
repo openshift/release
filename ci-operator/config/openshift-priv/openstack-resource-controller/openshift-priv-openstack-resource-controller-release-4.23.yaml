@@ -12,8 +12,9 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/k-orc/openstack-resource-controller
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: openstack-resource-controller
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: openstack-resource-controller
 promotion:
   to:
   - name: 4.23-priv
@@ -60,8 +61,8 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
-- as: e2e-techpreview
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-openstack-capi-techpreview
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -73,7 +74,7 @@ tests:
         git clone https://github.com/openshift/cluster-api-provider-openstack --branch main --depth=1 $dir
         cd $dir
         test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
-        make -C openshift e2e
+        openshift/e2e-tests.sh
       from: src
       resources:
         requests:

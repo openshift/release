@@ -12,27 +12,25 @@ base_images:
     namespace: ocp
     tag: "8"
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: ubi
-  to: quay-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- dockerfile_literal: |
-    FROM quay.io/projectquay/quay:3.16.2
-  to: quay-app
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi
+    to: quay-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - dockerfile_literal: |
+      FROM quay.io/projectquay/quay:3.16.2
+    to: quay-app
 operator:
   bundles:
   - as: quay
@@ -71,11 +69,10 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
-      DEST_REPO: admin/quay:latest
-      SOURCE_IMAGE: quay.io/projectquay/quay:latest
+      SETUP_NOOBAA: "true"
     post:
     - ref: quay-gather
     - chain: ipi-aws-post
@@ -83,16 +80,14 @@ tests:
     - chain: ipi-aws-pre
     - ref: quay-install-odf-operator
     - ref: quay-install-operator-bundle
-    - ref: quay-install-quay
-    - ref: quay-create-admin-user
     test:
-    - ref: quay-test-mirror-image
+    - ref: quay-test-chainsaw
     workflow: ipi-aws
 - always_run: false
   as: e2e-upgrade
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
     post:

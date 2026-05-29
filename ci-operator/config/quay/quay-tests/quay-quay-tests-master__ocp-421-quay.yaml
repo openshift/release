@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 releases:
   latest:
     candidate:
@@ -61,8 +61,8 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
-- as: quay-acs-violations-check-quay316
-  cron: 0 20 24 * *
+- as: quay-acs-violations-check-quay317
+  cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -70,11 +70,11 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
-      ODF_OPERATOR_CHANNEL: stable-4.20
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:3b11114931866d68213ac0a554fce551619903bb76d0b71b1f4e74b497ae787f
-      QUAY_OPERATOR_CHANNEL: stable-3.16
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:bc002f7dff4f1c3973c26f34b4b7cf869cef3965d49469b1f06bd6b5416c13b4
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-      QUAY_VERSION: "3.16"
+      QUAY_VERSION: "3.17"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
@@ -84,21 +84,21 @@ tests:
     - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay316-ocp420-virtual-builder
+- as: quay-e2e-tests-quay317-ocp421-virtual-builder
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.8xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:bc002f7dff4f1c3973c26f34b4b7cf869cef3965d49469b1f06bd6b5416c13b4
       NEW_UI_TESTING_COVERAGE: builder
-      ODF_OPERATOR_CHANNEL: stable-4.20
-      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-16@sha256:854ff5453e5d2dacfe58018b222c606b88cc08af7bf3ddc82a6c03a735657dfa
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:3b11114931866d68213ac0a554fce551619903bb76d0b71b1f4e74b497ae787f
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-17@sha256:2ae4c57a765b6d314f2e336d4df2e2e33343cb7596f72fd70dfc9a3e0a2e13e4
       QUAY_OLD_UI_DISABLED: "true"
-      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-      QUAY_VERSION: "3.16"
+      QUAY_VERSION: "3.17"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf

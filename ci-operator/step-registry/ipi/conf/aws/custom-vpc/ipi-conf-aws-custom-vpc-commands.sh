@@ -5,6 +5,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -16,8 +23,6 @@ fi
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
-ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
 rm /tmp/pull-secret
 
 set -x
@@ -116,7 +121,7 @@ if [[ ${ADD_ZONES} == "yes" ]]; then
   patch_az $CONFIG $(yq-v4 e -o=json '.' "${az_file}" | jq -r '.|join(" ")')
 fi
 
-if ((ocp_major_version == 4 && ocp_minor_version <= 18)); then
+if version_le "${ocp_version}" "4.18"; then
   if private_cluster; then
     echo "This is a private cluster so use only private subnets from the VPC"
     patch_legcy_subnets "${CONFIG}" $(yq-v4 e -o=json '.' "${priv_subnets_file}" | jq -r '.|join(" ")')

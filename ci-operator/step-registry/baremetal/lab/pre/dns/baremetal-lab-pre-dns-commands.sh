@@ -14,7 +14,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-
+access_ip=$(<"${SHARED_DIR}"/access_ip)
 # shellcheck disable=SC1090
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 # shellcheck disable=SC2154
@@ -27,6 +27,7 @@ DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
 if [ "${ipv4_enabled:-}" == "true" ]; then
   DNS_FORWARD="${DNS_FORWARD}
+access.${CLUSTER_NAME} IN A ${access_ip}
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_int}

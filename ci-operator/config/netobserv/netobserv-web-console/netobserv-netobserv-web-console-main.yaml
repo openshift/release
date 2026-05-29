@@ -23,20 +23,21 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: Dockerfile.front
-  to: local-front-build
-- dockerfile_path: Dockerfile
-  from: ubi
-  inputs:
-    local-front-build:
-      as:
-      - localhost/local-front-build:latest
-  to: netobserv-web-console
-- build_args:
-  - name: BUILDSCRIPT
-    value: :standalone
-  dockerfile_path: Dockerfile.cypress
-  to: plugin-cypress-tests
+  items:
+  - dockerfile_path: Dockerfile.front
+    to: local-front-build
+  - dockerfile_path: Dockerfile
+    from: ubi
+    inputs:
+      local-front-build:
+        as:
+        - localhost/local-front-build:latest
+    to: netobserv-web-console
+  - build_args:
+    - name: BUILDSCRIPT
+      value: :standalone
+    dockerfile_path: Dockerfile.cypress
+    to: plugin-cypress-tests
 promotion:
   to:
   - namespace: netobserv

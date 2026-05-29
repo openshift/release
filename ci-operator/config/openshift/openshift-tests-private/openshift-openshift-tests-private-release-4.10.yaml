@@ -18,20 +18,21 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
 images:
-- dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.10
-  to: tests-private
-- dockerfile_literal: |
-    FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.10
-    RUN mkdir -p /go/src/github.com/openshift
-    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
-    WORKDIR /go/src/github.com/openshift/openshift-tests-private
-  inputs:
-    src:
-      as:
-      - src
-  to: tests-private-ui
+  items:
+  - dockerfile_path: images/Dockerfile.golang
+    from: ci_tests-private-base_4.10
+    to: tests-private
+  - dockerfile_literal: |
+      FROM src AS builder
+      FROM registry.ci.openshift.org/ci/tests-private-baseui:4.10
+      RUN mkdir -p /go/src/github.com/openshift
+      COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+      WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    inputs:
+      src:
+        as:
+        - src
+    to: tests-private-ui
 promotion:
   to:
   - excluded_images:
@@ -69,7 +70,7 @@ tests:
   optional: true
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: critical-test
       cli: latest

@@ -11,7 +11,7 @@ from util import (
     get_secrets_from_index,
     update_index_secret,
     validate_collection,
-    validate_secret_name,
+    validate_path,
 )
 
 
@@ -24,40 +24,34 @@ from util import (
     type=str,
     callback=validate_collection,
 )
-@click.option(
-    "-s",
-    "--secret",
-    required=True,
-    help="Name of the secret.",
-    type=str,
-    callback=validate_secret_name,
-)
-def delete(collection: str, secret: str):
-    """Delete a secret from the specified collection."""
+@click.argument("secret_path", required=True, callback=validate_path, metavar="SECRET_PATH")
+def delete(collection: str, secret_path: str):
+    """Delete a secret from the specified collection.
+
+    The SECRET_PATH should be in the format 'group/field' (e.g., 'aws/password').
+    """
 
     ensure_authentication()
     client = secretmanager.SecretManagerServiceClient()
 
     index_secrets = get_secrets_from_index(client, collection)
-
-    # Remove from index if present (if missing from index, don't fail)
-    if secret in index_secrets:
-        index_secrets.remove(secret)
+    secret_id_normalized = secret_path.replace("/", "__")
+    if secret_id_normalized in index_secrets:
+        index_secrets.remove(secret_id_normalized)
         update_index_secret(client, collection, index_secrets)
 
-    # Remove from GSM if present (don't fail if missing)
     try:
-        click.echo(f"Deleting secret '{secret}'...")
+        click.echo(f"Deleting secret '{secret_path}'...")
         client.delete_secret(
-            name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret))
+            name=client.secret_path(PROJECT_ID, get_secret_name(collection, secret_path))
         )
     except NotFound:
         raise click.ClickException(
-            f"Secret '{secret}' does not exist within the collection."
+            f"Secret '{secret_path}' does not exist within the collection."
         )
     except Exception as e:
         raise click.ClickException(
-            f"Failed to delete secret '{secret}': {e}. Please retry the delete operation."
+            f"Failed to delete secret '{secret_path}': {e}. Please retry the delete operation."
         )
 
-    click.echo(f"Secret '{secret}' successfully deleted.")
+    click.echo(f"Secret '{secret_path}' successfully deleted.")

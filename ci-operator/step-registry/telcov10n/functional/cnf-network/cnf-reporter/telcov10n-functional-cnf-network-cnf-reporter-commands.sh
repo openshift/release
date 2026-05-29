@@ -51,7 +51,7 @@ cp "${SHARED_DIR}"/junit_*.xml /tmp/junit/ 2>/dev/null
 echo "Upload reports"
 cd /eco-ci-cd
 # shellcheck disable=SC2154
-ansible-playbook ./playbooks/cnf/upload-report.yaml -i ./inventories/cnf/switch-config.yaml \
+ansible-playbook ./playbooks/upload-report.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig \
         reporter_template_name='${REPORTER_TEMPLATE_NAME}' processed_report_dir=/tmp/reports \
         junit_report_dir=/tmp/junit reports_directory=/tmp/upload"

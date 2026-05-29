@@ -7,12 +7,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-operator-controller
 images:
-- dockerfile_path: openshift/catalogd.Dockerfile
-  to: olm-catalogd
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/catalogd.Dockerfile
+    to: olm-catalogd
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
+  - dockerfile_path: openshift/registry.Dockerfile
+    to: e2e-test-registry
 promotion:
   to:
   - excluded_images:
@@ -75,7 +76,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: upstream-e2e
       cli: latest
@@ -93,7 +94,7 @@ tests:
   as: openshift-e2e-aws-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

@@ -63,10 +63,6 @@ if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
   N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
 fi
 
-RUN_UPGRADE_PARAM=""
-if [[ "${RUN_UPGRADE_TEST:-}" == "true" ]] && check_e2e_flag "upgrade.run-tests" ; then
-  RUN_UPGRADE_PARAM="--upgrade.run-tests --e2e.private-platform=AWS --e2e.ho-enable-ci-debug-output=true --e2e.hypershift-operator-latest-image=${CI_HYPERSHIFT_OPERATOR}"
-fi
 
 OAUTH_EXTERNAL_OIDC_PARAM=""
 if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
@@ -112,10 +108,9 @@ hack/ci-test-e2e.sh -test.v \
   ${N3_NP_VERSION_TEST_ARGS:-} \
   ${N4_NP_VERSION_TEST_ARGS:-} \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-  --e2e.aws-endpoint-access=PublicAndPrivate \
+  --e2e.aws-endpoint-access=Public \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
-  ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  ${RUN_UPGRADE_PARAM} &
+  ${OAUTH_EXTERNAL_OIDC_PARAM:-} &
 wait $!

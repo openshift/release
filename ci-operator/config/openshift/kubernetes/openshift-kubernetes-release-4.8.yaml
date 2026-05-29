@@ -35,26 +35,27 @@ build_root:
     tag: rhel-8-release-golang-1.16-openshift-4.8
 canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
-  to: hyperkube
-- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
-  to: kubernetes-tests
-- context_dir: openshift-hack/images/os/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
-  to: machine-os-content
-- context_dir: build/pause
-  dockerfile_path: Dockerfile.Rhel
-  from: base
-  to: pod
+  items:
+  - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+    from: base
+    to: hyperkube
+  - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+    from: tools
+    to: kubernetes-tests
+  - context_dir: openshift-hack/images/os/
+    from: base
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - fedora:29
+      machine-os-content-base:
+        as:
+        - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+    to: machine-os-content
+  - context_dir: build/pause
+    dockerfile_path: Dockerfile.Rhel
+    from: base
+    to: pod
 promotion:
   to:
   - additional_images:
@@ -195,7 +196,7 @@ tests:
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
@@ -203,7 +204,7 @@ tests:
     workflow: openshift-e2e-gcp
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-azure
   steps:
@@ -219,11 +220,11 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-jenkins
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-upgrade
   steps:
@@ -231,7 +232,7 @@ tests:
     workflow: openshift-upgrade-gcp
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: e2e-azure-upgrade
   steps:
@@ -239,18 +240,18 @@ tests:
     workflow: openshift-upgrade-azure
 - as: e2e-aws-downgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: e2e-vsphere
   steps:
@@ -260,7 +261,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -273,7 +274,7 @@ tests:
 - as: k8s-conformance
   cron: 10 23 2 11 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -285,7 +286,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-multitenant
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
   capabilities:
@@ -320,11 +321,11 @@ tests:
 - always_run: false
   as: configmap-scale
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-fips
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -338,13 +339,13 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-aws-csi-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi-migration
 zz_generated_metadata:
   branch: release-4.8

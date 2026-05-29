@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 declare vsphere_portgroup
 declare vsphere_bastion_portgroup
@@ -27,6 +33,7 @@ if [[ -z "${vsphere_bastion_portgroup:-}" ]]; then
   echo "Not defined vsphere_bastion_portgroup, bastion host will be provisioned in network defined as vsphere_portgroup..."
   vsphere_bastion_portgroup=${vsphere_portgroup}
 fi
+echo "$(date -u --rfc-3339=seconds) vsphere_bastion_portgroup: ${vsphere_bastion_portgroup:-}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null

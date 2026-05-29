@@ -3,10 +3,6 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -16,12 +12,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/aws-ebs-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: aws-ebs-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: aws-ebs-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: aws-ebs-csi-driver-operator-test
 promotion:
   to:
   - name: 4.13-priv
@@ -54,7 +51,7 @@ tests:
     from: src
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: hypershift-aws-e2e-external
   steps:

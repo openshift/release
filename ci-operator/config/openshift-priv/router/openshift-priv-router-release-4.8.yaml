@@ -14,16 +14,17 @@ build_root:
     tag: rhel-8-release-golang-1.16-openshift-4.8
 canonical_go_repository: github.com/openshift/router
 images:
-- dockerfile_path: images/router/base/Dockerfile.rhel
-  from: base
-  optional: true
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: haproxy-router-base
-  to: haproxy-router
-- dockerfile_path: images/router/f5/Dockerfile
-  from: haproxy-router-base
-  to: f5-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.rhel
+    from: base
+    optional: true
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
+    from: haproxy-router-base
+    to: haproxy-router
+  - dockerfile_path: images/router/f5/Dockerfile
+    from: haproxy-router-base
+    to: f5-router
 promotion:
   to:
   - name: 4.8-priv
@@ -82,7 +83,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router

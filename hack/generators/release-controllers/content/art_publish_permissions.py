@@ -111,6 +111,11 @@ in 3.11).''')
             },
             {
                 'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamimports'],
+                'verbs': ['create']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
                 'resources': ['imagestreamtags'],
                 'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
             }
@@ -167,6 +172,11 @@ in 3.11).''')
                 'apiGroups': ['image.openshift.io'],
                 'resources': ['imagestreams'],
                 'verbs': ['get', 'list', 'watch', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamimports'],
+                'verbs': ['create']
             },
             {
                 'apiGroups': ['image.openshift.io'],
@@ -305,6 +315,11 @@ in 3.11).''')
                         'apiGroups': ['image.openshift.io'],
                         'resources': ['imagestreams'],
                         'verbs': ['get', 'list', 'watch', 'update', 'patch']
+                    },
+                    {
+                        'apiGroups': ['image.openshift.io'],
+                        'resources': ['imagestreamimports'],
+                        'verbs': ['create']
                     },
                     {
                         'apiGroups': ['image.openshift.io'],

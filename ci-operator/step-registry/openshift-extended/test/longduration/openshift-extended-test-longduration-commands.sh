@@ -631,10 +631,10 @@ function check_case_selected {
     fi
 }
 function create_must-gather_dir_for_case {
-    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
+    MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|ocmirror"
     # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
 
-    if echo ${test_scenarios} | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
+    if echo "${test_scenarios}" | grep -qE "${MOUDLE_NEED_MUST_GATHER_PER_CASE}"; then
         mkdir -p "${ARTIFACT_DIR}/must-gather" || true
         if [ -d "${ARTIFACT_DIR}/must-gather" ]; then
             export QE_MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"

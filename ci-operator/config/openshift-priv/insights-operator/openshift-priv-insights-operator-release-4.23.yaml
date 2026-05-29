@@ -15,7 +15,8 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
-- to: insights-operator
+  items:
+  - to: insights-operator
 promotion:
   to:
   - name: 4.23-priv
@@ -256,6 +257,19 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      SCAN_NAMESPACE: openshift-insights
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - ref: tls-scanner-run
     workflow: ipi-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6

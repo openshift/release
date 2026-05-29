@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 if [[ ${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS} == "yes" ]]; then
   if [[ ! -f "${SHARED_DIR}/aws_minimal_permission_ccoctl" ]]; then
     echo "ERROR: AWS_CCOCTL_USE_MINIMAL_PERMISSIONS is enabled, but the credential file \"aws_minimal_permission_ccoctl\" is missing."
@@ -93,11 +100,9 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
 
   # x.y.z
   ocp_version=$(oc adm release info --registry-config "${dir}/pull-secret" ${TESTING_RELEASE_IMAGE} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
-  ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-  ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   echo "OCP version: ${ocp_version}"
-  
-  if (( ocp_minor_version <= 13 && ocp_major_version == 4 )); then
+
+  if version_le "${ocp_version}" "4.13"; then
     if ! grep "sts:AssumeRole" ${ingress_cr_file}; then
       echo "WARN: Adding sts:AssumeRole to ingress role"
       sed -i '/      - tag:GetResources/a\ \ \ \ \ \ - sts:AssumeRole' ${ingress_cr_file}

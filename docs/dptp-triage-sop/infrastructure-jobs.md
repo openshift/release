@@ -8,6 +8,7 @@
 6. [`periodic-check-gh-automation`](#periodic-check-gh-automation)
 7. [`periodic-openshift-release-private-org-sync`](#periodic-openshift-release-private-org-sync)
 8. [`periodic-ipi-deprovision-gcp`](#periodic-ipi-deprovision-gcp)
+9. [`periodic-trigger-mabc-images`](#periodic-trigger-mabc-images)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -374,3 +375,71 @@ It occurs rarely but when it does, the VPC network is typically the blocking res
    - If the subnets are empty (no instances), it's usually safe to delete them first
    - Delete any empty subnets, then delete the VPC network
 6. The next deprovision job run should complete successfully and clear the rest of the resources
+
+## `periodic-trigger-mabc-images`
+
+This job runs daily to rebuild multi-architecture (amd64 + arm64) container images used in CI infrastructure via
+MultiArchBuildConfig (MABC) resources. It executes `hack/manage_mabc_builds.sh` which deletes and recreates MABC
+resources, triggering new builds, then waits up to 1 hour for builds to complete and manifests to be pushed.
+
+#### Useful Links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-trigger-mabc-images)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+- [hack/manage_mabc_builds.sh](https://github.com/openshift/release/blob/master/hack/manage_mabc_builds.sh)
+- [MABC manifests](https://github.com/openshift/release/tree/master/clusters/build-clusters/multiarch_builds/supplemental-ci-images)
+- [multi-arch-builder-controller source](https://github.com/openshift/ci-tools/tree/main/cmd/multi-arch-builder-controller)
+
+### Job times out waiting for MABC to complete
+
+#### Symptom
+
+```
+error: timed out waiting for the condition on multiarchbuildconfigs/ci-tools-build-root
+```
+
+The job waits 1 hour for the MABC status to reach `state: success` but times out.
+
+#### Diagnosis
+
+Check the MABC resource status:
+
+```bash
+oc -n ci get mabc/ci-tools-build-root -o yaml
+```
+
+Look at the `status.state` field:
+- Empty or missing: MABC is still processing
+- `failure`: MABC completed but failed (check `status.conditions` for error details)
+- `success`: Should not timeout (check job logs for other issues)
+
+Check if individual builds completed:
+
+```bash
+oc -n ci get builds -l multiarchbuildconfigs.ci.openshift.io/name=ci-tools-build-root
+```
+
+Builds should show `STATUS: Complete` in 3-5 minutes. If builds are stuck or failed, check build logs:
+
+```bash
+oc -n ci logs build/ci-tools-build-root-amd64
+```
+
+Check the multi-arch-builder-controller logs:
+
+```bash
+oc --context build10 -n ci logs -l app=multi-arch-builder-controller --tail=200
+```
+
+Look for errors like:
+- `"Failed to push manifest"` - Controller failed to create the multi-arch manifest after builds completed
+- Network errors, timeouts, or other issues
+
+#### Resolution
+
+**If builds failed:** Investigate build logs for dependency issues, network timeouts, or compilation errors. May need to
+update the MABC manifest or retry if transient.
+
+**If builds succeeded but manifest push failed:** This is likely a controller bug. Check the error message in MABC
+`status.conditions` and file a bug against [openshift/ci-tools](https://github.com/openshift/ci-tools/issues) with the
+MABC status and controller logs.

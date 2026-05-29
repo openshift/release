@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -73,8 +86,6 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 	oc registry login --to /tmp/pull-secret
 	ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_INSTALL} -ojsonpath='{.metadata.version}' | cut -d. -f 1,2)
-	ocp_major_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $1}')
-	ocp_minor_version=$(echo "${ocp_version}" | awk --field-separator=. '{print $2}')
 	rm /tmp/pull-secret
 
 	# Do NOT change USER_POLICY_FILENAME
@@ -84,7 +95,7 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	USER_POLICY_FILE="${SHARED_DIR}/${USER_POLICY_FILENAME}"
 	PERMISION_LIST="${ARTIFACT_DIR}/permision_list.txt"
 
-	if ((ocp_major_version < 4 || (ocp_major_version == 4 && ocp_minor_version < 18))); then
+	if version_lt "${ocp_version}" "4.18"; then
 		# There is no installer support for generating permissions prior to 4.18, so we generate one ourselves
 
 		cat <<EOF >"${PERMISION_LIST}"
@@ -276,26 +287,26 @@ EOF
 		fi
 
 		# additional permisions for 4.11+
-		if ((ocp_minor_version >= 11 && ocp_major_version == 4)); then
+		if version_ge "${ocp_version}" "4.11"; then
 			# base
 			echo "ec2:DeletePlacementGroup" >>"${PERMISION_LIST}"
 			echo "s3:GetBucketPolicy" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.14+
-		if ((ocp_minor_version >= 14 && ocp_major_version == 4)); then
+		if version_ge "${ocp_version}" "4.14"; then
 			# base
 			echo "ec2:DescribeSecurityGroupRules" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.15+
-		if ((ocp_minor_version >= 15 && ocp_major_version == 4)); then
+		if version_ge "${ocp_version}" "4.15"; then
 			# base
 			echo "iam:TagInstanceProfile" >>"${PERMISION_LIST}"
 		fi
 
 		# additional permisions for 4.16+
-		if ((ocp_minor_version >= 16 && ocp_major_version == 4)); then
+		if version_ge "${ocp_version}" "4.16"; then
 			# base
 			echo "elasticloadbalancing:SetSecurityGroups" >>"${PERMISION_LIST}"
 			echo "s3:PutBucketPolicy" >>"${PERMISION_LIST}"

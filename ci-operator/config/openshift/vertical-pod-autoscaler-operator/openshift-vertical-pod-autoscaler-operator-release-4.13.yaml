@@ -6,11 +6,12 @@ base_images:
 build_root:
   from_repository: true
 images:
-- from: base
-  to: vertical-pod-autoscaler-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  from: base
-  to: vpa-operator-registry
+  items:
+  - from: base
+    to: vertical-pod-autoscaler-operator
+  - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+    from: base
+    to: vpa-operator-registry
 promotion:
   to:
   - name: "4.13"
@@ -66,7 +67,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -86,7 +87,7 @@ tests:
 - as: e2e-aws-olm
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

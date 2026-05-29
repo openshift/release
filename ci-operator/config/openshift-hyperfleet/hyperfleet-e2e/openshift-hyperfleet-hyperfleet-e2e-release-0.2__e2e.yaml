@@ -1,0 +1,61 @@
+base_images:
+  ci_hyperfleet-credential-provider_latest:
+    name: hyperfleet-credential-provider
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    inputs:
+      ci_hyperfleet-credential-provider_latest:
+        as:
+        - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
+    to: hyperfleet-e2e
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tier0-candidate
+  cron: 0 8 * * *
+  steps:
+    env:
+      ADAPTER_CHART_REF: release-0.2
+      ADAPTER_IMAGE_TAG: release-0.2
+      API_CHART_REF: release-0.2
+      API_IMAGE_TAG: release-0.2
+      CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier0
+      NAMESPACE_PREFIX: release
+      REGION: us-central1-a
+      SENTINEL_CHART_REF: release-0.2
+      SENTINEL_IMAGE_TAG: release-0.2
+    workflow: openshift-hyperfleet-e2e
+- as: tier1-candidate
+  cron: 30 8 * * *
+  steps:
+    env:
+      ADAPTER_CHART_REF: release-0.2
+      ADAPTER_IMAGE_TAG: release-0.2
+      API_CHART_REF: release-0.2
+      API_IMAGE_TAG: release-0.2
+      CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier1
+      NAMESPACE_PREFIX: release
+      REGION: us-central1-a
+      SENTINEL_CHART_REF: release-0.2
+      SENTINEL_IMAGE_TAG: release-0.2
+    workflow: openshift-hyperfleet-e2e
+zz_generated_metadata:
+  branch: release-0.2
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e
+  variant: e2e

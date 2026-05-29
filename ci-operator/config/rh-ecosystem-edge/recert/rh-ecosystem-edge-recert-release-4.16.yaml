@@ -41,10 +41,11 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.19-openshift-4.15
 images:
-- dockerfile_path: Dockerfile.prow
-  to: recert-check
-- dockerfile_path: Dockerfile
-  to: recert
+  items:
+  - dockerfile_path: Dockerfile.prow
+    to: recert-check
+  - dockerfile_path: Dockerfile
+    to: recert
 promotion:
   to:
   - namespace: edge-infrastructure
@@ -76,7 +77,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_SKIPS: Managed cluster should grow and decrease when scaling different
         machineSets simultaneously
@@ -88,7 +89,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-parallel
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/parallel
     observers:
@@ -98,7 +99,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       E2E_RUN_TAGS: '@level0'
       TEST_IMPORTANCE: LEVEL0
@@ -178,7 +179,7 @@ tests:
 - as: ibu-e2e-flow
   skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm

@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -97,8 +104,6 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -264,7 +269,7 @@ ${required_permissions}
 """
 
     # New permissions are instroduced when using CAPZ to provision IPI cluster
-    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && version_ge "${ocp_version}" "4.17"; then
         # routeTables relevant perssions can be removed once OCPBUGS-37663 is fixed.
         required_permissions="""
 \"Microsoft.Network/routeTables/read\",
@@ -374,7 +379,7 @@ ${required_permissions}
     fi
 
     # optional permissions when installing cluster in existing vnet
-    if [[ -n ${install_config_vnet} ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ -n ${install_config_vnet} ]] && version_ge "${ocp_version}" "4.17"; then
         required_permissions="""
 \"Microsoft.Network/virtualNetworks/checkIpAddressAvailability/read\",
 ${required_permissions}

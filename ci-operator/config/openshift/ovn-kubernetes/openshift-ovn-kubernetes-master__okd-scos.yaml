@@ -4,29 +4,27 @@ base_images:
     namespace: origin
     tag: base-stream9
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+  from_repository: true
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile.base
-  from: origin_scos-4.22_base-stream9
-  to: ovn-kubernetes-base
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes-microshift
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.base
+    from: origin_scos-4.22_base-stream9
+    to: ovn-kubernetes-base
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: scos-4.22
@@ -47,7 +45,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master

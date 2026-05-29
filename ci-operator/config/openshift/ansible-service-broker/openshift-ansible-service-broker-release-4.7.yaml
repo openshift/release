@@ -12,13 +12,14 @@ build_root:
   project_image:
     dockerfile_path: build/custom-ci-build-root.Dockerfile
 images:
-- context_dir: operator
-  dockerfile_path: build/Dockerfile
-  from: ansible_operator
-  to: ansible-service-broker-operator
-- dockerfile_path: build/Dockerfile-ubi
-  from: base
-  to: ansible-service-broker
+  items:
+  - context_dir: operator
+    dockerfile_path: build/Dockerfile
+    from: ansible_operator
+    to: ansible-service-broker-operator
+  - dockerfile_path: build/Dockerfile-ubi
+    from: base
+    to: ansible-service-broker
 promotion:
   to:
   - name: "4.7"
@@ -66,7 +67,7 @@ tests:
     from: test-bin
 - as: operator-molecule-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -81,7 +82,7 @@ tests:
     workflow: ipi-aws
 - as: operator-molecule-olm-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

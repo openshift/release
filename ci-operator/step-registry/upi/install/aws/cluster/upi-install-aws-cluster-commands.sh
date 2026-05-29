@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 teardown() {
     local exit_code=$?
 
@@ -147,8 +154,6 @@ fi
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 echo "OCP Version: ${ocp_version}"
 rm /tmp/pull-secret
 
@@ -176,6 +181,17 @@ rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f ${INSTALL_DIR}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -f ${INSTALL_DIR}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${INSTALL_DIR}/manifests/cluster-scheduler-02-config.yml
+
+# Copy manifests from SHARED_DIR to installer directory (required for features like OVN hybrid networking)
+echo "Copying manifests from SHARED_DIR to installer directory:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  echo "  Copying ${manifest}"
+  cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
 echo "Creating ignition configs"
 openshift-install --dir=${INSTALL_DIR} create ignition-configs &
@@ -406,7 +422,7 @@ add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf
 add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_bootstrap}"
 
 # For OCP <= 4.9, there is no BootstrapInstanceType param in UPI template
-if (( ocp_minor_version >= 10 && ocp_major_version >= 4 )); then
+if version_ge "${ocp_version}" "4.10"; then
   add_param_to_json BootstrapInstanceType "${BOOTSTRAP_INSTANCE_TYPE}" "${cf_params_bootstrap}"
 fi
 

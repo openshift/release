@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -198,9 +209,9 @@ fi
 
 # Check that specified identity should be attached on each node
 echo "-------------Check that identity is attached on each node-------------"
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 node_filter=""
-if (( ${ocp_minor_version} < 19 )); then
+if version_lt "${ocp_version}" "4.19"; then
     # No rhel worker is provisioned on 4.19+
     node_filter="node.openshift.io/os_id=rhcos,"
 fi
@@ -217,7 +228,7 @@ else
     check_machine_managedIdentity "master" "${expected_identity_id_master}" "${cluster_identity_name}"|| check_result=1
 
     #cpms feature is supported starting from 4.13 on Azure platform
-    if (( ${ocp_minor_version} > 12 )); then
+    if version_gt "${ocp_version}" "4.12"; then
         echo "-------------Check identity in controlplanemachineset spec-------------"
         cpms_identity=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.managedIdentity')
         echo "checking controlplanemachineset cluster..."

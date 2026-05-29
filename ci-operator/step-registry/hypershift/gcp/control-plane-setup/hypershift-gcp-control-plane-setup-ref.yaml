@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-gcp-control-plane-setup
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: hypershift-gcp-control-plane-setup-commands.sh
+  env:
+    - name: HYPERSHIFT_GCP_CI_PROJECT
+      default: ""
+      documentation: "GCP project ID for persistent HyperShift CI resources (ExternalDNS SA, DNS zone)"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  grace_period: 2m0s
+  documentation: |-
+    Configures the HyperShift control plane on GKE:
+
+    Operator PSC setup (steps 1-5):
+    1. Creates a GCP service account for the operator
+    2. Creates a custom IAM role with PSC permissions
+    3. Binds the role to the service account
+    4. Configures Workload Identity binding
+    5. Annotates the K8s ServiceAccount and restarts the operator
+
+    ExternalDNS WIF setup (step 6):
+    6. Creates cross-project WIF bindings, annotates K8s SA, restarts ExternalDNS
+
+    Must run AFTER hypershift-install (requires hypershift namespace and operator SA).
+    Reads control-plane-project-id from ${SHARED_DIR}.
+    Requires HYPERSHIFT_GCP_CI_PROJECT env var (set by workflow).

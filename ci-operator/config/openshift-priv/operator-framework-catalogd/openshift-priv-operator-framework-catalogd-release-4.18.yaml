@@ -7,12 +7,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-catalogd
 images:
-- dockerfile_path: openshift/Dockerfile
-  to: olm-catalogd
-- context_dir: testdata/catalogs
-  dockerfile_path: test-catalog.Dockerfile
-  from: src
-  to: test-catalog
+  items:
+  - dockerfile_path: openshift/Dockerfile
+    to: olm-catalogd
+  - context_dir: testdata/catalogs
+    dockerfile_path: test-catalog.Dockerfile
+    from: src
+    to: test-catalog
 promotion:
   to:
   - excluded_images:
@@ -60,7 +61,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: upstream-e2e
       commands: make -C openshift test-e2e

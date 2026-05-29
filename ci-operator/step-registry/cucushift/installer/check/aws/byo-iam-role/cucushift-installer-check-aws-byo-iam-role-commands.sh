@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -60,7 +67,7 @@ function has_shared_tags() {
 ret=0
 output=$(mktemp)
 
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 
 echo "-------------------------------------------------------------"
 echo "Roles used by cluster"
@@ -144,7 +151,7 @@ if [[ ${expected_control_plane_role} != "" ]]; then
   # check role tag
   # for 4.16 and above, shared tag is attached to BYO-Role, see https://github.com/openshift/installer/pull/8688
   # for 4.15 and below, no tag is attached to BYO-Role
-  if ((ocp_minor_version >= 16)); then
+  if version_ge "${ocp_version}" "4.16"; then
     if ! has_shared_tags ${control_plane_role_output}; then
       echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${control_plane_role}"
       ret=$((ret + 1))
@@ -190,7 +197,7 @@ if [[ ${expected_compute_role} != "" ]]; then
   # check role tag
   # for 4.16 and above, shared tag is attached to BYO-Role, see https://github.com/openshift/installer/pull/8688
   # for 4.15 and below, no tag is attached to BYO-Role
-  if ((ocp_minor_version >= 16)); then
+  if version_ge "${ocp_version}" "4.16"; then
     if ! has_shared_tags ${compute_role_output}; then
       echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${compute_role}"
       ret=$((ret + 1))

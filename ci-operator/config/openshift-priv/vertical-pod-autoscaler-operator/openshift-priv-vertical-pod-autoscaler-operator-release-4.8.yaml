@@ -10,11 +10,12 @@ build_root:
     tag: rhel-8-release-golang-1.15-openshift-4.8
 canonical_go_repository: github.com/openshift/vertical-pod-autoscaler-operator
 images:
-- from: base
-  to: vertical-pod-autoscaler-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  from: base
-  to: vpa-operator-registry
+  items:
+  - from: base
+    to: vertical-pod-autoscaler-operator
+  - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+    from: base
+    to: vpa-operator-registry
 promotion:
   to:
   - name: 4.8-priv
@@ -57,7 +58,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -76,7 +77,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-olm
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

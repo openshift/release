@@ -6,18 +6,19 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile.ocp
-  to: agent-installer-utils
-- dockerfile_literal: |
-    FROM src AS source
-    FROM scratch
-    COPY --from=source /go/src/github.com/openshift/agent-installer-utils/tools/iso_builder /src
-    WORKDIR /src
-  inputs:
-    src:
-      as:
-      - src
-  to: agent-iso-builder
+  items:
+  - dockerfile_path: images/Dockerfile.ocp
+    to: agent-installer-utils
+  - dockerfile_literal: |
+      FROM src AS source
+      FROM scratch
+      COPY --from=source /go/src/github.com/openshift/agent-installer-utils/tools/iso_builder /src
+      WORKDIR /src
+    inputs:
+      src:
+        as:
+        - src
+    to: agent-iso-builder
 promotion:
   to:
   - name: "5.0"

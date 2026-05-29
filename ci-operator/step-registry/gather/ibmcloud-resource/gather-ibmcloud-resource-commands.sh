@@ -219,11 +219,24 @@ ssh_instances() {
   local bastion_user="core"
   local ssh_key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
   local bastion_ip=""
+  local skipNode=""
+  local bootstrap="${1}"
   if [[ -f "${SHARED_DIR}/bastion_public_address" ]]; then
     bastion_ip="$(cat "${SHARED_DIR}/bastion_public_address")"
-  else
-    echo "No bastion_public_address found in ${SHARED_DIR}."
-    return 0
+    skipNode="bastion"
+    echo "Found bastion_public_address in ${SHARED_DIR}, use it for SSH connectivity"
+  elif [[ -n "${bootstrap}" ]]; then
+    echo "No bastion_public_address found in ${SHARED_DIR}. Try to find the bootstrap VM ${bootstrap} Floating IP..."
+    bastion_ip=$(ibmcloud is instance "${bootstrap}" --output JSON | jq -r .primary_network_interface.floating_ips[0].address)
+    skipNode="bootstrap"
+    if [[ -z "$bastion_ip" ]] || [[ "$bastion_ip" == "null" ]]; then
+        echo "ERROR: Failed to get bootstrap floating IP"
+        return 1
+    fi
+    echo "Found bootstrap VM Floating IP, use it for SSH connectivity"
+  else 
+    echo "No bastion_public_address found in ${SHARED_DIR} and no bootstrap VM found."
+    return 1
   fi
 
   if [[ ! -s "$ssh_key" ]]; then
@@ -231,7 +244,7 @@ ssh_instances() {
     return 1
   fi
 
-  if [ -s "${SHARED_DIR}/bastion_ssh_user" ]; then
+  if [[ "$skipNode" == "bastion" ]] && [[ -s "${SHARED_DIR}/bastion_ssh_user" ]]; then
     bastion_user="$(< "${SHARED_DIR}/bastion_ssh_user" )"
   fi
   # Ensure the key is added to the agent for forwarding
@@ -250,7 +263,10 @@ ssh_instances() {
     echo "No instances found in the resource group."
     return 0
   fi
+  
   local ssh_args=(-i "${ssh_key}" -o StrictHostKeyChecking=no -o)
+  # Add Jump Host if bastion exists
+  local proxy_args="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${bastion_ip}"
   for entry in $instances; do
     local node_name node_ip status
     node_name=$(echo "$entry" | cut -d'|' -f1)
@@ -262,24 +278,20 @@ ssh_instances() {
       continue
     fi
 
-    if [[ "$node_name" == *bastion ]]; then
-      printf "%-35s | %-15s | [SKIP - bastion node]\n" "$node_name" "$node_ip"
+    if [[ "$node_name" == *"${skipNode}" ]]; then
+      printf "%-35s | %-15s | [SKIP]\n" "$node_name" "$node_ip"
       continue
     fi
        
-    set +e
-    # Add Jump Host if bastion exists
-    if [[ -n "$bastion_ip" ]]; then
-        proxy_args="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${bastion_ip}"
-        if ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
-          printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
-          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
-          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
-          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
-        else
-          printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
-        fi        
-    fi
+    set +e          
+    if ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
+        printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
+        ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
+        ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
+        ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+    else
+        printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
+    fi   
     set -e
     
   done | tee "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
@@ -287,6 +299,8 @@ ssh_instances() {
 }
 
 ibmcloud_login
+"${IBMCLOUD_CLI}" account show -q
+"${IBMCLOUD_CLI}" plugin list -q
 
 ##in order to avoid "runtime error: invalid memory address or nil pointer dereference in 'ibmcloud is images -q'"
 if [ -f ${SHARED_DIR}/metadata.json ]; then
@@ -310,10 +324,13 @@ fi
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
 
-if [[ ! -f "${SHARED_DIR}/console.url" ]]; then
-    ssh_instances
+instances=$(ibmcloud is instances -q)
+bootstrapInfo=$(echo "${instances}" | grep "bootstrap" | grep "${CLUSTER_FILTER}" || echo "")
+echo "Bootstrap info of ${CLUSTER_FILTER}: $bootstrapInfo"
+if [[ -f "${SHARED_DIR}/console.url" ]] && [[ -z ${bootstrapInfo} ]]; then
+    echo "install succeed, and no bootstrap vm, skipping SSH connectivity check."
 else
-    echo "install succeed, skipping SSH connectivity check."
+    ssh_instances "$(echo "${bootstrapInfo}"| awk '{print $2}')"
 fi
 
 echo "==== IBM Cloud resource gathering completed. ========="
