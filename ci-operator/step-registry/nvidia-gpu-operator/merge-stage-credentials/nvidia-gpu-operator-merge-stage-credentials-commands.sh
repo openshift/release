@@ -23,10 +23,10 @@ set +x
 stage_auth_user=$(jq -r '.user' "${STAGE_REGISTRY_PATH}")
 stage_auth_password=$(jq -r '.password' "${STAGE_REGISTRY_PATH}")
 stage_registry_auth=$(echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0)
-$WAS_TRACING && set -x
 
 jq --argjson stage "{\"registry.stage.redhat.io\": {\"auth\": \"${stage_registry_auth}\"}}" \
    '.auths |= . + $stage' /tmp/.dockerconfigjson > /tmp/new-dockerconfigjson
+$WAS_TRACING && set -x
 
 echo "Updating cluster pull secret..."
 oc set data secret/pull-secret -n openshift-config \
