@@ -320,7 +320,7 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 
 registry_host=$(head -n 1 ${SHARED_DIR}/mirror_registry_url)
-token_refresh_repo=${registry_host}/yunjiang/cap-token-refresh
+token_refresh_repo=${registry_host}/openshift-install/cap-token-refresh
 cat <<EOF > ${SHARED_DIR}/manifest_cap-token-cronjob.yaml
 apiVersion: batch/v1beta1
 kind: CronJob
