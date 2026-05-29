@@ -44,14 +44,27 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle /tmp
 
-echo "Check if crc-bundle-${PULL_NUMBER} bucket" exists
-if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "gs://crc-bundle-${PULL_NUMBER}" \
-       --format="value(name)" > /dev/null 2>&1; then
-  echo "Bucket 'gs://crc-bundle-${PULL_NUMBER}' already exists. No action needed."
+BUCKET="gs://crc-bundle-${PULL_NUMBER}"
+echo "Check if ${BUCKET} bucket exists"
+if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "${BUCKET}" \
+    --quiet \
+    --project="${GOOGLE_PROJECT_ID}" >/dev/null 2>&1; then
+  echo "Bucket '${BUCKET}' already exists. No action needed."
 else
   echo "create crc-bundle-${PULL_NUMBER} bucket"
-  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets create "gs://crc-bundle-${PULL_NUMBER}" \
-      --project "${GOOGLE_PROJECT_ID}"
+  if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets create "${BUCKET}" \
+      --quiet \
+      --project="${GOOGLE_PROJECT_ID}"; then
+    # Bucket may already exist (e.g. created by a parallel job) even if describe failed.
+    if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "${BUCKET}" \
+        --quiet \
+        --project="${GOOGLE_PROJECT_ID}" >/dev/null 2>&1; then
+      echo "Bucket '${BUCKET}' already exists. No action needed."
+    else
+      echo "Failed to create bucket '${BUCKET}'"
+      exit 1
+    fi
+  fi
 fi
 
 echo "Upload the bundle to gcp crc-bundle bucket"
