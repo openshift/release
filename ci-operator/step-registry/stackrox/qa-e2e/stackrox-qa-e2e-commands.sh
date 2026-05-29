@@ -2,7 +2,7 @@
 
 set -o errexit
 set -o nounset
-set -o pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
 # Map results by setting identifier prefix in tests suites names for reporting tools
 # Merge original results into a single file and compress
