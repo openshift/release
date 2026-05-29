@@ -261,43 +261,9 @@ Resources:
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Bastion Host Security Group for ipv4
+      GroupDescription: Bastion Host Security Group for ipv4 - permissive for macvlan testing
       SecurityGroupIngress:
-      - IpProtocol: icmp
-        FromPort: -1
-        ToPort: -1
-        CidrIp: !Ref VpcCidr
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 873
-        ToPort: 873
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 3128
-        ToPort: 3129
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 5000
-        ToPort: 5000
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 6001
-        ToPort: 6002
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 9095
-        ToPort: 9095
+      - IpProtocol: -1
         CidrIp: 0.0.0.0/0
       VpcId: !Ref VpcId
   BastionSecurityGroupIpv6:
