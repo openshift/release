@@ -22,6 +22,7 @@ declare -A CONFIGS=(
     [build09]='RedHat_Internal_SSO ; default ; https://api.build09.ci.devcluster.openshift.com:6443'
     [build10]='RedHat_Internal_SSO ; default ; https://api.build10.ci.devcluster.openshift.com:6443'
     [build11]='RedHat_Internal_SSO ; default ; https://api.build11.ci.devcluster.openshift.com:6443'
+    [build12]='RedHat_Internal_SSO ; default ; https://api.build12.ci.devcluster.openshift.com:6443'
     [core-ci]='RedHat_Internal_SSO ; default ; https://api.master.ci.devcluster.openshift.com:6443'
     [vsphere02]='RedHat_Internal_SSO ; default ; https://api.build02.vmc.ci.openshift.org:6443'
     [hosted-mgmt]='RedHat_Internal_SSO ; default ; https://api.hosted-mgmt.ci.devcluster.openshift.com:6443'
@@ -43,7 +44,7 @@ if [[ $# -eq 0 ]] ; then
 else
     for cluster in $@ ; do
         case $cluster in
-            app.ci|build01|build02|build03|build04|build05|build06|build07|build08|build09|build10|build11|vsphere02|hosted-mgmt)
+            app.ci|build01|build02|build03|build04|build05|build06|build07|build08|build09|build10|build11|build12|vsphere02|hosted-mgmt)
                 get_token "$cluster" "${CONFIGS[$cluster]}"
                 ;;
             *)
