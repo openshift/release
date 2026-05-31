@@ -7,12 +7,14 @@ declare GITLAB_API="https://gitlab.cee.redhat.com/api/v4"
 declare GITLAB_RAW="https://gitlab.cee.redhat.com/dragonfly/rhwa-fbc/-/raw"
 declare FBC_IMAGE_REPO="quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc"
 declare FBC_IMAGE_PREFIX="rhwa-fbc"
+declare QUAY_REPO_PATH="redhat-user-workloads/rhwa-tenant/rhwa-fbc"
 declare GIT_REF="${GIT_REF:-main}"
 
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare IDMS_NAME="${IDMS_NAME:-medik8s-disconnected}"
 declare OCP_VERSION="${OCP_VERSION:-}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
+declare FBC_SHA_PINNED="${FBC_COMMIT_SHA:+true}"
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 
 log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
@@ -66,6 +68,42 @@ resolve_commit_sha() {
     fi
 
     log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+}
+
+verify_fbc_image() {
+    local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
+    local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+    log "Verifying FBC image exists: $fbc_image"
+
+    if ! curl -sSf -o /dev/null --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+        "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
+        -H "Accept: application/vnd.oci.image.index.v1+json" 2>/dev/null; then
+        if [[ "$FBC_SHA_PINNED" == "true" ]]; then
+            log "ERROR: Pinned FBC image not found: ${fbc_image}"
+            log "The explicitly provided FBC_COMMIT_SHA does not have a corresponding image on Quay"
+            exit 1
+        fi
+
+        log "WARNING: FBC image not found for commit ${FBC_COMMIT_SHA}"
+        log "Falling back to listing available tags..."
+
+        local fallback_tag
+        fallback_tag=$(curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>/dev/null \
+            | jq -r '.tags[].name' \
+            | grep -E '^[0-9a-f]{40}$' \
+            | tail -1) || true
+
+        if [[ -n "$fallback_tag" ]]; then
+            log "Using fallback tag (arbitrary valid commit): $fallback_tag"
+            FBC_COMMIT_SHA="$fallback_tag"
+        else
+            log "ERROR: No valid FBC image tags found"
+            exit 1
+        fi
+    fi
+
+    log "FBC image verified: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
 }
 
 check_mirror_registry() {
@@ -357,6 +395,7 @@ main() {
     cd "$TMP_DIR"
 
     resolve_commit_sha
+    verify_fbc_image
     check_mirror_registry
     configure_host_pull_secret
     install_oc_mirror
