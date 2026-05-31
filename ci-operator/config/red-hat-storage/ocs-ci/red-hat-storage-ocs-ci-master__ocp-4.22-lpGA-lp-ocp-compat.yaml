@@ -24,23 +24,14 @@ resources:
       cpu: 200m
       memory: 200Mi
 tests:
-- as: cr-odf-aws
+- as: cr--odf--aws
   cron: 0 3,15 * * *
-  reporter_config:
-    channel: '#odf-ocp-ci-results'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--ODF
       FIREWATCH_CONFIG: |
         {
         "failure_rules":
@@ -62,7 +53,6 @@ tests:
         [
             {"name": "odf-operator", "install_namespace": "openshift-storage", "channel": "stable-4.21", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
         ]
-      REPORTPORTAL_CMP: ODF-lp-interop
       USER_TAGS: |
         scenario odf
       ZONES_COUNT: "3"
@@ -72,23 +62,14 @@ tests:
     - ref: odf-apply-storage-cluster
     - ref: interop-tests-ocs-tests
     workflow: firewatch-ipi-aws-cr
-- as: odf-aws-fips
+- as: aws-fips
   cron: 0 23 31 2 *
-  reporter_config:
-    channel: '#odf-ocp-ci-results'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--ODF
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG: |
         {
@@ -111,7 +92,6 @@ tests:
         [
             {"name": "odf-operator", "install_namespace": "openshift-storage", "channel": "stable-4.21","target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
         ]
-      REPORTPORTAL_CMP: ODF-lp-interop
       USER_TAGS: |
         scenario odf
       ZONES_COUNT: "3"
@@ -125,4 +105,4 @@ zz_generated_metadata:
   branch: master
   org: red-hat-storage
   repo: ocs-ci
-  variant: ocp-4.22-lp-interop
+  variant: ocp-4.22-lpGA-lp-ocp-compat

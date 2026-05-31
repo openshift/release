@@ -1,8 +1,7 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euxo pipefail
+shopt -s inherit_errexit
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
@@ -16,9 +15,8 @@ OCS_VERSION=$(
     ' | cut -d. -f1,2
 ) || true
 if [[ -z "${OCS_VERSION}" ]]; then
-    echo "ERROR: OCS_VERSION not set or CSV lookup failed."
-    echo "Available CSVs in openshift-storage:"
-    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || echo "  (namespace may not exist)"
+    # ERROR: OCS_VERSION not set or CSV lookup failed; list openshift-storage CSVs after failure (namespace may be missing).
+    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || true
     exit 1
 fi
 
@@ -32,39 +30,27 @@ export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
 # Function to clean up folders
 cleanup() {
-    echo "Cleaning up..."
-    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -fvr "${CLUSTER_PATH}/auth"
+    # Tear down local auth copy created for run-ci.
+    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
-# Set trap to catch EXIT and run cleanup on any exit code
-trap cleanup EXIT SIGINT
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
+if [ "${MAP_TESTS}" = "true" ]; then
+    # Avoid conflicts with the older versioned yq from the image:
+    # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
+    eval "$(
+        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    trap '
+        cleanup
         mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            export REPORTPORTAL_CMP
-            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
-    fi
-}
+        printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
+        PATH="/tmp/bin:${PATH}"
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+    ' EXIT
+else
+    trap 'cleanup' EXIT
+fi
 
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
@@ -85,8 +71,13 @@ mkdir -p "${BIN_FOLDER}"
 
 export PATH="${BIN_FOLDER}:${PATH}"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+if [ -s "${KUBECONFIG}" ]; then
+    oc whoami
+    cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
+    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+else #login for ROSA & Hypershift platforms
+    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+fi
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
@@ -125,7 +116,6 @@ if [[ "${DISABLE_ENVIRONMENT_CHECKER}" == "true" ]]; then
     EXTRA_ARGS="--disable-environment-checker"
 fi
 
-set -x
 START_TIME=$(date "+%s")
 
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
@@ -140,25 +130,12 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   ${EXTRA_ARGS} \
   || /bin/true
 
-
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
-set +x
-
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
-
-# Send junit file to shared dir for Data Router Reporter step
-cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
-    echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
-    sleep 7200
+    # ERROR: tests finished too quickly (DIFF_TIME sec <= 1800)
     exit 1
-else
-    echo "Finished in: ${DIFF_TIME} sec"
 fi
 
 #
@@ -167,3 +144,5 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
+
+true
