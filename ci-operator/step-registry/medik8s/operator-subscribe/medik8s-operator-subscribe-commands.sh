@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu -o pipefail
-source "${SHARED_DIR}/medik8s-lib.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/medik8s-lib.sh" || { echo "ERROR: medik8s-lib.sh not found. Did you include medik8s-lib ref before this step?" >&2; exit 1; }
 
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare OO_CHANNEL="${OO_CHANNEL:-candidate}"

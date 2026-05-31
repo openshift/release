@@ -24,11 +24,10 @@ run() {
 
 set_proxy() {
     # shellcheck disable=SC1090
-    [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
+    if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
         log "setting proxy"
         source "${SHARED_DIR}/proxy-conf.sh"
-    }
-    return 0
+    fi
 }
 
 resolve_commit_sha() {
@@ -57,16 +56,20 @@ verify_fbc_image() {
     local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
     log "Verifying FBC image exists: $fbc_image"
 
-    if ! curl -sSf -o /dev/null --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+    local manifest_status
+    manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+        --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
         "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
-        -H "Accept: application/vnd.oci.image.index.v1+json" 2>/dev/null; then
+        -H "Accept: application/vnd.oci.image.index.v1+json" 2>/dev/null || true)
+
+    if [[ "$manifest_status" == "404" ]]; then
         if [[ "$FBC_SHA_PINNED" == "true" ]]; then
             log "ERROR: Pinned FBC image not found: ${fbc_image}"
             log "The explicitly provided FBC_COMMIT_SHA does not have a corresponding image on Quay"
             exit 1
         fi
 
-        log "WARNING: FBC image not found for commit ${FBC_COMMIT_SHA}"
+        log "WARNING: FBC image not found for commit ${FBC_COMMIT_SHA} (HTTP 404)"
         log "Falling back to listing available tags..."
 
         local fallback_tag
@@ -83,6 +86,9 @@ verify_fbc_image() {
             log "ERROR: No valid FBC image tags found"
             exit 1
         fi
+    elif [[ "$manifest_status" != "200" ]]; then
+        log "ERROR: Failed to verify FBC image manifest (HTTP ${manifest_status})"
+        exit 1
     fi
 
     log "FBC image verified: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
@@ -155,6 +161,14 @@ wait_for_catalogsource() {
     run oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml
     log "--- Marketplace events ---"
     oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+
+    local node_name
+    node_name=$(oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" \
+        -o=jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
+    if [[ -n "$node_name" ]]; then
+        run oc debug "node/$node_name" -- chroot /host podman pull --authfile /var/lib/kubelet/config.json "${CATALOG_IMAGE}" || true
+    fi
+
     run oc get mcp,node
     return 1
 }
