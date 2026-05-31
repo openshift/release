@@ -37,12 +37,15 @@ spec:
     resources: {}
 EOF
 
-# Need to allow some time before checking if the StorageCluster is deployed
-sleep 60
+# Wait for the object to exist in the API before checking its status
+echo "⏳ Waiting for StorageCluster object to appear..."
+until oc get storagecluster/ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" &>/dev/null; do
+  sleep 5
+done
 
 echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='20m'
 
 echo "Remove is-default-class annotation from all the storage classes"
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
