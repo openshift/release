@@ -15,6 +15,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: metallb-frr
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -98,6 +102,207 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
+- always_run: false
+  as: tls-scanner
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    env:
+      SCAN_NAMESPACE: openshift-metallb-operator,openshift-frr-k8s
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        make operator-sdk
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy
+      cli: latest
+      commands: |
+        cat <<EOF | oc apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: MetalLB
+        metadata:
+          name: metallb
+          namespace: openshift-metallb-operator
+        EOF
+        echo "Waiting for MetalLB controller deployment to be available..."
+        oc wait --for=create -n openshift-metallb-operator deployment/controller --timeout=5m
+        oc wait --for=condition=Available -n openshift-metallb-operator deployment/controller --timeout=5m
+        echo "Waiting for MetalLB speaker daemonset to be available..."
+        oc wait --for=create -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        oc rollout status -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        echo "Waiting for openshift-frr-k8s namespace..."
+        oc wait --for=create namespace/openshift-frr-k8s --timeout=5m
+        echo "Waiting for frr-k8s-statuscleaner deployment to be available..."
+        oc wait --for=create -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        oc wait --for=condition=Available -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        echo "Waiting for frr-k8s daemonset to be available..."
+        oc wait --for=create -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        oc rollout status -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        echo "All MetalLB components deployed."
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: generic-claim
+- always_run: false
+  as: tls-pqc-readiness
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-metallb-operator,openshift-frr-k8s
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        make operator-sdk
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy
+      cli: latest
+      commands: |
+        cat <<EOF | oc apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: MetalLB
+        metadata:
+          name: metallb
+          namespace: openshift-metallb-operator
+        EOF
+        echo "Waiting for MetalLB controller deployment to be available..."
+        oc wait --for=create -n openshift-metallb-operator deployment/controller --timeout=5m
+        oc wait --for=condition=Available -n openshift-metallb-operator deployment/controller --timeout=5m
+        echo "Waiting for MetalLB speaker daemonset to be available..."
+        oc wait --for=create -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        oc rollout status -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        echo "Waiting for openshift-frr-k8s namespace..."
+        oc wait --for=create namespace/openshift-frr-k8s --timeout=5m
+        echo "Waiting for frr-k8s-statuscleaner deployment to be available..."
+        oc wait --for=create -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        oc wait --for=condition=Available -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        echo "Waiting for frr-k8s daemonset to be available..."
+        oc wait --for=create -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        oc rollout status -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        echo "All MetalLB components deployed."
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: generic-claim
+- always_run: false
+  as: tls13-adherence
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    env:
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: openshift-metallb-operator,openshift-frr-k8s
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        make operator-sdk
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy
+      cli: latest
+      commands: |
+        cat <<EOF | oc apply -f -
+        apiVersion: metallb.io/v1beta1
+        kind: MetalLB
+        metadata:
+          name: metallb
+          namespace: openshift-metallb-operator
+        EOF
+        echo "Waiting for MetalLB controller deployment to be available..."
+        oc wait --for=create -n openshift-metallb-operator deployment/controller --timeout=5m
+        oc wait --for=condition=Available -n openshift-metallb-operator deployment/controller --timeout=5m
+        echo "Waiting for MetalLB speaker daemonset to be available..."
+        oc wait --for=create -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        oc rollout status -n openshift-metallb-operator daemonset/speaker --timeout=5m
+        echo "Waiting for openshift-frr-k8s namespace..."
+        oc wait --for=create namespace/openshift-frr-k8s --timeout=5m
+        echo "Waiting for frr-k8s-statuscleaner deployment to be available..."
+        oc wait --for=create -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        oc wait --for=condition=Available -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        echo "Waiting for frr-k8s daemonset to be available..."
+        oc wait --for=create -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        oc rollout status -n openshift-frr-k8s daemonset/frr-k8s --timeout=5m
+        echo "All MetalLB components deployed."
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: generic-claim
 - as: metallb-e2e-metal
   capabilities:
