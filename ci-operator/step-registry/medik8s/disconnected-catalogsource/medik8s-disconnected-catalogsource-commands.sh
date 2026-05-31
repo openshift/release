@@ -406,7 +406,7 @@ main() {
     create_catalogsource
     wait_for_catalogsource
 
-    echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/fbc_commit_sha"
+    echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
     log "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }
