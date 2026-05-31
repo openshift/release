@@ -127,6 +127,7 @@ elif [[ -n "${WINDOWS_IMAGE:-}" ]]; then
   case "${WINDOWS_IMAGE}" in
     windows_server_2022) [[ -n "${WINDOWS_SERVER_2022_URL:-}" ]] && export WINDOWS_URL="${WINDOWS_SERVER_2022_URL}" ;;
     windows_server_2025) [[ -n "${WINDOWS_SERVER_2025_URL:-}" ]] && export WINDOWS_URL="${WINDOWS_SERVER_2025_URL}" ;;
+    windows_server_mssql_2025) [[ -n "${WINDOWS_SERVER_MSSQL_2025_URL:-}" ]] && export WINDOWS_URL="${WINDOWS_SERVER_MSSQL_2025_URL}" ;;
   esac
 fi
 
