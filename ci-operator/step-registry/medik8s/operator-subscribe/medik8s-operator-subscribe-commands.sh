@@ -1,17 +1,11 @@
 #!/bin/bash
 set -eu -o pipefail
+source "${SHARED_DIR}/medik8s-lib.sh"
 
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare OO_CHANNEL="${OO_CHANNEL:-candidate}"
 declare INSTALL_NAMESPACE="${INSTALL_NAMESPACE:-openshift-workload-availability}"
 declare OPERATORS="${OPERATORS:-}"
-
-# SHARED_DIR is a ci-operator shared workspace for passing artifacts between
-# workflow steps. This step reads the following files from it:
-#   - proxy-conf.sh : proxy environment settings (written by cluster provisioner)
-#   - catsrc_name   : CatalogSource name (written by the medik8s-catalogsource step)
-
-log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
@@ -27,15 +21,6 @@ collect_artifacts() {
         oc get events -n "$INSTALL_NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null \
             > "${ARTIFACT_DIR}/namespace-events.txt"
     } || true
-}
-
-set_proxy() {
-    # shellcheck disable=SC1090
-    [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
-        log "setting proxy"
-        source "${SHARED_DIR}/proxy-conf.sh"
-    }
-    return 0
 }
 
 ensure_namespace() {
