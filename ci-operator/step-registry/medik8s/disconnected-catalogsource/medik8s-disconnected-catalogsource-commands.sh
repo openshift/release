@@ -298,9 +298,11 @@ create_idms_disconnected() {
                 mirror_path=""
             }
         ' "$idms_file"
-        echo "  - source: quay.io/redhat-user-workloads/rhwa-tenant"
+        local fbc_parent="${FBC_IMAGE_REPO%/*}"
+        local fbc_parent_path="${fbc_parent#quay.io/}"
+        echo "  - source: ${fbc_parent}"
         echo "    mirrors:"
-        echo "    - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/rhwa-tenant"
+        echo "    - ${MIRROR_REGISTRY_HOST}/${fbc_parent_path}"
     } | oc apply -f -
 
     wait_for_mcp_rollout "$mcp_configs_before"
