@@ -135,7 +135,6 @@ configure_host_pull_secret() {
     jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" \
         '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > "${XDG_RUNTIME_DIR}/containers/auth.json"
 
-    cp "${XDG_RUNTIME_DIR}/containers/auth.json" "${SHARED_DIR}/containers-auth.json"
     log "Pull secrets configured"
 }
 
@@ -360,7 +359,7 @@ wait_for_catalogsource() {
     while (( SECONDS < deadline )); do
         status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" \
             -o=jsonpath="{.status.connectionState.lastObservedState}" 2>/dev/null || true)
-        log "  status: ${status:-pending}"
+        log "  $(( SECONDS ))s - status: ${status:-pending}"
         [[ "$status" == "READY" ]] && {
             log "CatalogSource ${CATALOG_SOURCE_NAME} is READY"
             return 0
@@ -375,6 +374,16 @@ wait_for_catalogsource() {
     run oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml
     log "--- Marketplace events ---"
     oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+
+    local node_name
+    node_name=$(oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" \
+        -o=jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
+    if [[ -n "$node_name" ]]; then
+        local catalog_image="${MIRROR_REGISTRY_HOST}/${FBC_IMAGE_REPO#quay.io/}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
+        log "Attempting node-side pull diagnostic on ${node_name}..."
+        run oc debug "node/$node_name" -- chroot /host podman pull --authfile /var/lib/kubelet/config.json "${catalog_image}" || true
+    fi
+
     run oc get mcp,node
     return 1
 }
