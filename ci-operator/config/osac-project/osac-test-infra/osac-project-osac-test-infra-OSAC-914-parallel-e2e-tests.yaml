@@ -1,0 +1,46 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: osac-test-infra
+  - dockerfile_literal: FROM scratch
+    to: component-image
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-vmaas-parallel
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    env:
+      MAKE_TARGET: test-vmaas-parallel
+    workflow: osac-project-cluster-tool-vmaas
+zz_generated_metadata:
+  branch: OSAC-914/parallel-e2e-tests
+  org: osac-project
+  repo: osac-test-infra
