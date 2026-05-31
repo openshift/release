@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# RHEL golang builder images set GOTOOLCHAIN=local; allow toolchain download.
+export GOTOOLCHAIN=auto
+
 set -o nounset
 set -o errexit
 set -o pipefail
