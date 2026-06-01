@@ -200,12 +200,15 @@ copy_reports() {
 }
 trap copy_reports EXIT TERM INT
 
-# Install the must-gather plugin for analyzing must-gather archives
-echo "Installing must-gather plugin..."
-claude plugin install must-gather@ai-helpers
-echo "must-gather plugin installed."
+# Remove any pre-configured plugins/settings so Claude starts clean
+rm -f /home/claude/.claude/settings.json
 
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+# Install the payload-agent plugin (bundles all required skills and plugins)
+echo "Installing payload-agent plugin..."
+claude plugin install payload-agent@ai-helpers:v1.0.0
+echo "payload-agent plugin installed."
+
+ALLOWED_TOOLS="Agent Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
 
