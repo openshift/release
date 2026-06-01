@@ -49,7 +49,9 @@ ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 # with slirp4netns connectivity. Inside that namespace:
 # - ip_forward can be set to 1 (own network namespace)
 # - iptables works (own network namespace with CAP_NET_ADMIN)
-# - k3s runs as regular server (no --rootless needed)
+# - k3s --rootless detects the userns, skips its own rootlesskit,
+#   and configures containerd with disable_cgroup=true when cgroup
+#   delegation is unavailable (prevents runc cgroup mkdir failures)
 echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
 rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlesskit-state \
@@ -57,7 +59,7 @@ rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlessk
   sh -c '
     echo 1 > /proc/sys/net/ipv4/ip_forward
     ln -sf /dev/null /dev/kmsg 2>/dev/null || true
-    exec k3s server \
+    exec k3s server --rootless \
       --disable=traefik \
       --snapshotter=native \
       --data-dir='"${K3S_DATA_DIR}"' \
