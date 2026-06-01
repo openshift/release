@@ -28,6 +28,8 @@ GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
 OVERLAY_BRANCH=""
 REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
+CATALOG_INDEX_IMAGE=""
+PLAYWRIGHT_VERSION=""
 
 # ── Gangway API Overrides ────────────────────────────────────────────────────
 
@@ -46,6 +48,14 @@ fi
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}" ]]; then
     REHEARSE_PR_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
     echo "Override applied: REHEARSE_PR_NUMBER=${REHEARSE_PR_NUMBER}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CATALOG_INDEX_IMAGE}" ]]; then
+    CATALOG_INDEX_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_CATALOG_INDEX_IMAGE}"
+    echo "Override applied: CATALOG_INDEX_IMAGE=${CATALOG_INDEX_IMAGE}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_VERSION}" ]]; then
+    PLAYWRIGHT_VERSION="${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_VERSION}"
+    echo "Override applied: PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION}"
 fi
 
 # ── Environment ──────────────────────────────────────────────────────────────
@@ -90,7 +100,7 @@ if [[ "$JOB_MODE" == "pr-check" ]]; then
     export GIT_PR_NUMBER
 fi
 
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME JOB_MODE
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME JOB_MODE CATALOG_INDEX_IMAGE PLAYWRIGHT_VERSION
 echo "Repository: ${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}"
 echo "Branch: ${RELEASE_BRANCH_NAME}, Mode: ${JOB_MODE}, PR: ${GIT_PR_NUMBER:-none}"
 

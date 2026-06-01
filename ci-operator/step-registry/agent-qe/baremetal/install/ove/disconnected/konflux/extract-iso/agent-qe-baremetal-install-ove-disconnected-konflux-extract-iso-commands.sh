@@ -30,4 +30,4 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 echo "Konflux snapshot ID: ${SNAPSHOT}"
 
-timeout -s 9 2h ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" sh extract_ove_iso.sh "${SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 2h ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" extract_ove_iso.sh "${SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
