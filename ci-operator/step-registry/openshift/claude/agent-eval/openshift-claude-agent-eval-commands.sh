@@ -27,7 +27,7 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # Install dependencies
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
-pip install --quiet mlflow 2>&1 | tail -1
+pip install --quiet 'mlflow==3.12.0' 2>&1 | tail -1
 echo "mlflow installed."
 
 # Start local MLflow server in background
@@ -50,7 +50,11 @@ done
 # -----------------------------------------------------------------------
 # Run optional setup script (e.g. extract snapshots, populate fixtures)
 # -----------------------------------------------------------------------
-if [[ -n "${EVAL_SETUP_SCRIPT}" ]] && [[ -f "${EVAL_SETUP_SCRIPT}" ]]; then
+if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
+    if [[ ! -f "${EVAL_SETUP_SCRIPT}" ]]; then
+        echo "ERROR: EVAL_SETUP_SCRIPT not found: ${EVAL_SETUP_SCRIPT}"
+        exit 1
+    fi
     echo ""
     echo "=== Running setup script: ${EVAL_SETUP_SCRIPT} ==="
     bash "${EVAL_SETUP_SCRIPT}"
