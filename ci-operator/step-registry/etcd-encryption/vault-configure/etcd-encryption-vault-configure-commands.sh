@@ -65,12 +65,24 @@ ROLE_ID=$(oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
 SECRET_ID=$(oc exec vault-0 -n "${VAULT_NAMESPACE}" -- \
   env VAULT_TOKEN="${ROOT_TOKEN}" vault write -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
 
-# Create vault-credentials secret
+# Read route host from SHARED_DIR (set by vault-install step)
+VAULT_ROUTE_HOST=""
+if [[ -f "${SHARED_DIR}/vault-route-host" ]]; then
+  VAULT_ROUTE_HOST=$(cat "${SHARED_DIR}/vault-route-host")
+fi
+
+# Create vault-credentials secret with route address for KMS plugin
 echo "Creating vault-credentials secret..."
+VAULT_ADDR="https://vault.${VAULT_NAMESPACE}.svc:8200"
+if [[ -n "${VAULT_ROUTE_HOST}" ]]; then
+  VAULT_ADDR="https://${VAULT_ROUTE_HOST}"
+fi
+
 oc create secret generic vault-credentials \
   --from-literal=role-id="${ROLE_ID}" \
   --from-literal=secret-id="${SECRET_ID}" \
   --from-literal=root-token="${ROOT_TOKEN}" \
+  --from-literal=vault-address="${VAULT_ADDR}" \
   -n "${VAULT_NAMESPACE}"
 
 echo "Vault credentials saved to vault-credentials secret"
@@ -81,8 +93,7 @@ echo "Vault Configuration Complete"
 echo "========================================="
 echo ""
 echo "Summary:"
-echo "  - Vault Service: vault.${VAULT_NAMESPACE}.svc:8200"
+echo "  - Vault Address: ${VAULT_ADDR}"
 echo "  - Credentials Secret: vault-credentials (namespace: ${VAULT_NAMESPACE})"
 echo "  - Transit Key: ${VAULT_KMS_KEY_NAME}"
-echo "  - ROLE_ID: ${ROLE_ID}"
 echo ""

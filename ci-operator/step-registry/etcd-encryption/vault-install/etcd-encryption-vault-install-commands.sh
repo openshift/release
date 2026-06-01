@@ -52,6 +52,34 @@ helm repo update
 
 echo ""
 
+# Create a passthrough Route first so we can include its hostname in the TLS SANs.
+# kube-apiserver uses hostNetwork:true, so it cannot resolve cluster-internal DNS
+# (vault.vault-kms.svc). A Route gives us an externally resolvable address.
+echo "Creating passthrough Route for Vault..."
+cat <<ROUTE_EOF | oc apply -f -
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vault
+  namespace: ${VAULT_NAMESPACE}
+spec:
+  port:
+    targetPort: 8200
+  tls:
+    termination: passthrough
+  to:
+    kind: Service
+    name: vault
+    weight: 100
+ROUTE_EOF
+
+VAULT_ROUTE_HOST=$(oc get route vault -n "${VAULT_NAMESPACE}" -o jsonpath='{.spec.host}')
+if [[ -z "${VAULT_ROUTE_HOST}" ]]; then
+  echo "ERROR: Failed to get route hostname"
+  exit 1
+fi
+echo "  Route hostname: ${VAULT_ROUTE_HOST}"
+
 # Install Vault via Helm with dev mode and TLS enabled
 echo "Installing Vault Enterprise v${VAULT_VERSION} in dev mode with TLS..."
 helm upgrade --install vault hashicorp/vault \
@@ -68,7 +96,7 @@ helm upgrade --install vault hashicorp/vault \
   --set 'server.extraEnvironmentVars.VAULT_CACERT=/var/run/tls/vault-ca.pem' \
   --set "server.enterpriseLicense.secretName=${VAULT_LICENSE_SECRET_NAME}" \
   --set "server.enterpriseLicense.secretKey=license" \
-  --set "server.extraArgs=-dev-tls -dev-tls-cert-dir=/var/run/tls -dev-tls-san=vault -dev-tls-san=vault.${VAULT_NAMESPACE}.svc" \
+  --set "server.extraArgs=-dev-tls -dev-tls-cert-dir=/var/run/tls -dev-tls-san=vault -dev-tls-san=vault.${VAULT_NAMESPACE}.svc -dev-tls-san=${VAULT_ROUTE_HOST}" \
   --set 'server.volumes[0].name=tls' \
   --set-json 'server.volumes[0].emptyDir={}' \
   --set 'server.volumeMounts[0].name=tls' \
@@ -99,6 +127,10 @@ echo "  ✓ ConfigMap vault-ca-bundle created/updated"
 # Clean up temporary CA file
 rm -f "${CA_CERT_TMP}"
 
+# Store route host in SHARED_DIR for subsequent steps and tests
+echo "${VAULT_ROUTE_HOST}" > "${SHARED_DIR}/vault-route-host"
+echo "Route host saved to SHARED_DIR/vault-route-host"
+
 echo ""
 echo "========================================="
 echo "Vault Enterprise Installation Complete"
@@ -107,12 +139,17 @@ echo ""
 echo "Summary:"
 echo "  - Namespace: ${VAULT_NAMESPACE}"
 echo "  - Version: ${VAULT_VERSION}"
-echo "  - Service: https://vault.${VAULT_NAMESPACE}.svc:8200"
+echo "  - Internal Service: https://vault.${VAULT_NAMESPACE}.svc:8200"
+echo "  - External Route: https://${VAULT_ROUTE_HOST}"
 echo "  - Pod: vault-0 (Ready)"
 echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
+echo "  - TLS SANs: vault, vault.${VAULT_NAMESPACE}.svc, ${VAULT_ROUTE_HOST}"
 echo "  - TLS CA: /var/run/tls/vault-ca.pem (inside pod)"
 echo "  - Enterprise License: Configured"
 echo "  - CA ConfigMap: vault-ca-bundle (openshift-config namespace)"
+echo ""
+echo "Note: kube-apiserver uses hostNetwork:true and cannot resolve internal DNS."
+echo "Use the Route address (https://${VAULT_ROUTE_HOST}) for KMS plugin config."
 echo ""
 echo "Next step: Run etcd-encryption-vault-configure to configure Vault for KMS"
 echo ""
