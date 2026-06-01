@@ -23,13 +23,15 @@ cleanup_kind() {
 trap cleanup_kind EXIT
 
 # ---- Fix subuid/subgid range for kind node images ----
-# The nested-podman entrypoint sets subuid/subgid starting at UID+1 (1001)
-# with only 64535 IDs. Kind's node image contains files owned by GID 65534
-# (nobody), which maps to subordinate GID 66534 — outside that range.
-# Widen to 65536 IDs so the full UID/GID space is covered.
+# The nested-podman entrypoint sets subuid/subgid as user:1001:64535,
+# which only covers container UIDs up to 64535. Kind's node image has
+# files with GID 65534 (nobody) which can't be mapped in that range.
+# The pod's user namespace limits host UIDs to 0-65535, so we can't
+# extend past 65535. Instead, start subordinate IDs at 1 — podman
+# splits the mapping around UID 1000 (our user) automatically.
 USER_NAME=$(whoami)
-echo "${USER_NAME}:1001:65536" > /etc/subuid
-echo "${USER_NAME}:1001:65536" > /etc/subgid
+echo "${USER_NAME}:1:65535" > /etc/subuid
+echo "${USER_NAME}:1:65535" > /etc/subgid
 
 # ---- Configure podman for kind compatibility ----
 # Kind requires private UTS namespace (to set hostname in node containers)
@@ -41,10 +43,6 @@ cat > "${HOME}/.config/containers/containers.conf" <<EOF
 utsns = "private"
 cgroups = "enabled"
 EOF
-
-# Reset podman storage so it picks up the new subuid/subgid range
-# without triggering newuidmap (which is denied in this security context).
-podman system reset --force 2>/dev/null || true
 
 # ---- Install kind ----
 echo "[kind] Installing kind ${KIND_VERSION}"
