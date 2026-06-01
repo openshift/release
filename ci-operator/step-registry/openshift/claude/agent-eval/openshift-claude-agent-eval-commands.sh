@@ -65,6 +65,7 @@ fi
 # -----------------------------------------------------------------------
 echo ""
 echo "=== Installing plugins ==="
+claude plugin marketplace add opendatahub-io/skills-registry
 claude plugin install agent-eval-harness@opendatahub-skills
 echo "agent-eval-harness plugin installed."
 
