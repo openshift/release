@@ -221,8 +221,6 @@ timeout 3600 claude \
     -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DIR}/${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
-PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
-
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
 NUDGE_EXIT=0
@@ -245,14 +243,19 @@ SANITIZED_TAG=$(echo "${PAYLOAD_TAG}" | tr '.' '-')
 VALIDATE_YAML=$(find /home/claude/.claude -name "validate.py" -path "*/payload-results-yaml/*" 2>/dev/null | head -1)
 VALIDATE_JSON=$(find /home/claude/.claude -name "validate.py" -path "*/payload-autodl-json/*" 2>/dev/null | head -1)
 
+if [[ -z "${VALIDATE_YAML}" || -z "${VALIDATE_JSON}" ]]; then
+    echo "ERROR: validation scripts not found in the ai-helpers plugin installation."
+    exit 1
+fi
+
 for attempt in 1 2 3; do
     YAML_OK=false
     JSON_OK=false
 
-    if python3 "${VALIDATE_YAML}" "payload-results-${SANITIZED_TAG}.yaml" 2>/dev/null; then
+    if python3 "${VALIDATE_YAML}" "payload-results-${SANITIZED_TAG}.yaml"; then
         YAML_OK=true
     fi
-    if python3 "${VALIDATE_JSON}" "payload-analysis-${SANITIZED_TAG}-autodl.json" 2>/dev/null; then
+    if python3 "${VALIDATE_JSON}" "payload-analysis-${SANITIZED_TAG}-autodl.json"; then
         JSON_OK=true
     fi
 
@@ -262,8 +265,9 @@ for attempt in 1 2 3; do
     fi
 
     if [[ "${attempt}" -eq 3 ]]; then
-        echo "Warning: Structured outputs still invalid after 3 attempts."
-        break
+        echo "ERROR: Structured outputs still invalid after 3 attempts."
+        PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
+        exit 1
     fi
 
     MISSING=""
@@ -280,6 +284,8 @@ for attempt in 1 2 3; do
         -p "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
         --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
 done
+
+PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
 
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
@@ -328,6 +334,9 @@ else
 fi
 
 PHASE_COUNT=3
+if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    PHASE_COUNT=$((PHASE_COUNT + 1))
+fi
 TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
