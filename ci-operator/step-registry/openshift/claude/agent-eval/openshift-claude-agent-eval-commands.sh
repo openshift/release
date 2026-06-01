@@ -28,12 +28,13 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
 python3 -m pip install --quiet 'mlflow==3.12.0' 2>&1 | tail -1
+export PATH="$HOME/.local/bin:$PATH"
 echo "mlflow installed."
 
 # Start local MLflow server in background
 echo "Starting local MLflow server on port ${MLFLOW_PORT}..."
 export MLFLOW_TRACKING_URI="http://127.0.0.1:${MLFLOW_PORT}"
-python3 -m mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
+mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
 MLFLOW_PID=$!
 
 for i in $(seq 1 30); do
@@ -129,6 +130,8 @@ fi
 # -----------------------------------------------------------------------
 echo ""
 echo "=== Installing plugins ==="
+mkdir -p ~/.ssh
+ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
 claude plugin marketplace add opendatahub-io/skills-registry
 claude plugin install agent-eval-harness@opendatahub-skills
 echo "agent-eval-harness plugin installed."
