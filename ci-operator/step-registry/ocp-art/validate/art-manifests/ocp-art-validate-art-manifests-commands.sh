@@ -38,7 +38,11 @@ RH_REGISTRY = "registry.redhat.io"
 RELEASE_BRANCH_RE = re.compile(r"^release-(\d+)\.(\d+)$")
 ZSTREAM_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+")
 TEMPLATE_KEYS = ("MAJOR", "MINOR", "SUBMINOR", "RELEASE", "DATE_TIME", "FULL_VER")
+TEMPLATE_PLACEHOLDER_RE = re.compile(
+    r"\{(" + "|".join(TEMPLATE_KEYS) + r")\}"
+)
 RELEASE_REPO_NAME = "release"
+IGNORED_BRANCHES = frozenset({"main", "master"})
 REPORT_WIDTH = 72
 
 RULE_GUIDE: dict[str, dict[str, str]] = {
@@ -84,6 +88,26 @@ RULE_GUIDE: dict[str, dict[str, str]] = {
 class BranchCandidate:
     source: str
     branch: str
+
+
+@dataclass(frozen=True)
+class BranchContext:
+    """Resolved branch metadata for validation."""
+
+    repo_branch: str
+    repo_branch_source: str
+    ocp_branch_name: Optional[str] = None
+    ocp_branch_source: Optional[str] = None
+
+    @property
+    def ocp_branch(self) -> Optional["BranchVersion"]:
+        if self.ocp_branch_name is None:
+            return None
+        return BranchVersion.from_release_branch(self.ocp_branch_name)
+
+    @property
+    def runs_ocp_checks(self) -> bool:
+        return self.ocp_branch is not None
 
 
 @dataclass(frozen=True)
@@ -211,6 +235,22 @@ def is_release_branch(branch: str) -> bool:
     return bool(RELEASE_BRANCH_RE.match(branch.strip()))
 
 
+def is_ocp_release_branch(branch: str) -> bool:
+    """True for OpenShift release branches (release-4.y, release-5.y), not product branches like release-0.9."""
+    version = BranchVersion.from_release_branch(branch)
+    if version is None:
+        return False
+    return version.major >= 4
+
+
+def is_ignored_branch(branch: str) -> bool:
+    return branch.strip().lower() in IGNORED_BRANCHES
+
+
+def contains_template_placeholders(value: str) -> bool:
+    return bool(TEMPLATE_PLACEHOLDER_RE.search(value))
+
+
 def read_git_branch(repo_root: Path) -> str:
     try:
         result = subprocess.run(
@@ -229,18 +269,12 @@ def read_git_branch(repo_root: Path) -> str:
     return branch
 
 
-def resolve_release_branch(
+def collect_branch_candidates(
     explicit: str = "",
     job_spec_json: str = "",
     pull_base_ref: str = "",
     git_branch: str = "",
-) -> tuple[str, str]:
-    """Resolve release-X.Y from CI metadata.
-
-    Only branches matching release-X.Y are accepted. Values such as main or master
-    are collected for diagnostics but never used. Raises ValueError when no valid
-    branch is found or when valid candidates disagree.
-    """
+) -> list[BranchCandidate]:
     candidates: list[BranchCandidate] = []
 
     def add(source: str, branch: Optional[str]) -> None:
@@ -274,43 +308,108 @@ def resolve_release_branch(
                 add(f"JOB_SPEC extra_refs[{index}] ({ref_org}/{ref_repo})", ref_base)
 
     add("git branch", git_branch)
+    return candidates
 
-    valid = [candidate for candidate in candidates if is_release_branch(candidate.branch)]
-    if not valid:
-        observed = ", ".join(f"{c.source}={c.branch!r}" for c in candidates) or "(none)"
-        raise ValueError(
-            "Could not resolve a release-X.Y branch for registry and art.yaml rules. "
-            f"Observed candidates: {observed}. "
-            "Branches such as main/master are ignored intentionally."
-        )
 
-    explicit_valid = [c for c in valid if c.source == "RELEASE_BRANCH"]
-    if explicit_valid:
-        chosen = explicit_valid[0]
-        return chosen.branch, chosen.source
+def choose_branch_candidate(
+    candidates: Iterable[BranchCandidate],
+    *,
+    predicate,
+    explicit_source: str = "RELEASE_BRANCH",
+) -> Optional[BranchCandidate]:
+    candidate_list = list(candidates)
+    explicit_matches = [c for c in candidate_list if c.source == explicit_source and predicate(c.branch)]
+    if explicit_matches:
+        return explicit_matches[0]
 
-    unique_branches = {candidate.branch for candidate in valid}
+    matching = [c for c in candidate_list if predicate(c.branch)]
+    if not matching:
+        return None
+
+    unique_branches = {candidate.branch for candidate in matching}
     if len(unique_branches) > 1:
-        detail = ", ".join(f"{c.source}={c.branch!r}" for c in valid)
-        raise ValueError(
-            "Conflicting release-X.Y branch candidates: "
-            f"{detail}. Set RELEASE_BRANCH explicitly to override."
-        )
+        detail = ", ".join(f"{c.source}={c.branch!r}" for c in matching)
+        raise ValueError(f"Conflicting branch candidates: {detail}")
 
     priority = (
-        "RELEASE_BRANCH",
+        explicit_source,
         "PULL_BASE_REF",
         "JOB_SPEC refs (",
         "JOB_SPEC extra_refs[",
         "git branch",
     )
     for prefix in priority:
-        for candidate in valid:
+        for candidate in matching:
             if candidate.source == prefix or candidate.source.startswith(prefix):
-                return candidate.branch, candidate.source
+                return candidate
 
-    chosen = valid[0]
-    return chosen.branch, chosen.source
+    return matching[0]
+
+
+def resolve_branch_context(
+    explicit: str = "",
+    job_spec_json: str = "",
+    pull_base_ref: str = "",
+    git_branch: str = "",
+) -> BranchContext:
+    """Resolve repo branch for reporting and optional OCP release-X.Y for R2/templates."""
+    candidates = collect_branch_candidates(
+        explicit=explicit,
+        job_spec_json=job_spec_json,
+        pull_base_ref=pull_base_ref,
+        git_branch=git_branch,
+    )
+
+    repo_candidate = choose_branch_candidate(
+        candidates,
+        predicate=lambda branch: not is_ignored_branch(branch),
+    )
+    if repo_candidate is None:
+        repo_candidate = choose_branch_candidate(candidates, predicate=lambda _branch: True)
+    if repo_candidate is None:
+        raise ValueError("Could not resolve a branch name from CI metadata or git.")
+
+    ocp_candidate = choose_branch_candidate(
+        candidates,
+        predicate=is_ocp_release_branch,
+    )
+
+    return BranchContext(
+        repo_branch=repo_candidate.branch,
+        repo_branch_source=repo_candidate.source,
+        ocp_branch_name=ocp_candidate.branch if ocp_candidate else None,
+        ocp_branch_source=ocp_candidate.source if ocp_candidate else None,
+    )
+
+
+def resolve_release_branch(
+    explicit: str = "",
+    job_spec_json: str = "",
+    pull_base_ref: str = "",
+    git_branch: str = "",
+) -> tuple[str, str]:
+    """Resolve release-X.Y from CI metadata (OCP operators only).
+
+    Raises ValueError when no OCP release branch is found or when candidates disagree.
+    """
+    candidates = collect_branch_candidates(
+        explicit=explicit,
+        job_spec_json=job_spec_json,
+        pull_base_ref=pull_base_ref,
+        git_branch=git_branch,
+    )
+    ocp_candidate = choose_branch_candidate(
+        candidates,
+        predicate=is_ocp_release_branch,
+    )
+    if ocp_candidate is None:
+        observed = ", ".join(f"{c.source}={c.branch!r}" for c in candidates) or "(none)"
+        raise ValueError(
+            "Could not resolve a release-X.Y branch for OCP-specific rules. "
+            f"Observed candidates: {observed}. "
+            "Branches such as main/master are ignored for OCP detection."
+        )
+    return ocp_candidate.branch, ocp_candidate.source
 
 
 def expand_templates(value: str, templates: dict[str, str]) -> str:
@@ -493,22 +592,25 @@ def validate_r2_branch_registry_rules(
 def validate_r3_art_yaml(
     violations: list[Violation],
     art_yaml_path: Path,
-    branch: BranchVersion,
+    ocp_branch: Optional[BranchVersion] = None,
 ) -> None:
-    templates = branch.template_values()
+    templates = ocp_branch.template_values() if ocp_branch is not None else {}
     manifests_base = art_yaml_path.parent
 
     with art_yaml_path.open(encoding="utf-8") as handle:
         art_yaml_str = handle.read()
 
+    parse_source = art_yaml_str
+    if ocp_branch is not None and contains_template_placeholders(art_yaml_str):
+        parse_source = expand_templates(art_yaml_str, templates)
+
     try:
-        expanded = expand_templates(art_yaml_str, templates)
-        art_yaml_data = yaml.safe_load(expanded)
-    except (yaml.YAMLError, ValueError) as exc:
+        art_yaml_data = yaml.safe_load(parse_source)
+    except yaml.YAMLError as exc:
         violations.append(
             Violation(
                 rule="R3",
-                message=f"art.yaml could not be parsed after template expansion: {exc}",
+                message=f"art.yaml could not be parsed: {exc}",
                 art_yaml_path=art_yaml_path,
             )
         )
@@ -518,7 +620,7 @@ def validate_r3_art_yaml(
         violations.append(
             Violation(
                 rule="R3",
-                message="art.yaml did not parse to a mapping after template expansion",
+                message="art.yaml did not parse to a mapping",
                 art_yaml_path=art_yaml_path,
             )
         )
@@ -661,7 +763,26 @@ def validate_r3_art_yaml(
                 )
                 continue
 
-            expanded_search = expand_templates(search, templates)
+            if contains_template_placeholders(search) and ocp_branch is None:
+                violations.append(
+                    Violation(
+                        rule="R3",
+                        message=(
+                            "art.yaml search uses OCP version placeholders but no release-X.Y "
+                            "branch was detected; cannot validate this search string"
+                        ),
+                        art_yaml_path=art_yaml_path,
+                        target_file=target_path,
+                        search=search,
+                    )
+                )
+                continue
+
+            expanded_search = (
+                expand_templates(search, templates)
+                if contains_template_placeholders(search)
+                else search
+            )
             if expanded_search not in target_content:
                 violations.append(
                     Violation(
@@ -677,13 +798,13 @@ def validate_r3_art_yaml(
                 )
 
 
-def validate_repo(repo_root: Path, release_branch: str) -> list[Violation]:
+def validate_repo(repo_root: Path, branch_context: BranchContext) -> list[Violation]:
     violations: list[Violation] = []
     image_refs_files = find_image_references_files(repo_root)
     if not image_refs_files:
         return violations
 
-    branch = BranchVersion.from_release_branch(release_branch)
+    ocp_branch = branch_context.ocp_branch
     validated_art_yaml: set[Path] = set()
 
     for image_refs_path in image_refs_files:
@@ -724,24 +845,12 @@ def validate_repo(repo_root: Path, release_branch: str) -> list[Violation]:
         csv_content = csv_path.read_text(encoding="utf-8")
         validate_r1_pullspec_in_csv(violations, image_refs_path, csv_path, tags, csv_content)
 
-        if branch is not None:
-            validate_r2_branch_registry_rules(violations, image_refs_path, tags, branch)
+        if ocp_branch is not None:
+            validate_r2_branch_registry_rules(violations, image_refs_path, tags, ocp_branch)
 
         art_yaml_path = find_art_yaml(image_refs_path)
         if art_yaml_path is not None and art_yaml_path not in validated_art_yaml:
-            if branch is None:
-                violations.append(
-                    Violation(
-                        rule="R3",
-                        message=(
-                            f"art.yaml found but release branch {release_branch!r} is not "
-                            "release-X.Y; cannot expand templates for validation"
-                        ),
-                        art_yaml_path=art_yaml_path,
-                    )
-                )
-            else:
-                validate_r3_art_yaml(violations, art_yaml_path, branch)
+            validate_r3_art_yaml(violations, art_yaml_path, ocp_branch)
             validated_art_yaml.add(art_yaml_path)
 
     return violations
@@ -759,9 +868,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--release-branch",
         default="",
         help=(
-            "Target release branch (e.g. release-4.23, release-5.0). "
-            "When unset, resolved from RELEASE_BRANCH, PULL_BASE_REF, JOB_SPEC, "
-            "then git branch (release-X.Y only)."
+            "Optional OCP release branch (release-X.Y) for R2 and templated art.yaml rules. "
+            "When unset, OCP rules run only if release-X.Y is detected from CI metadata "
+            "or git. R1 and literal art.yaml checks always run."
         ),
     )
     args = parser.parse_args(argv)
@@ -777,7 +886,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     try:
-        release_branch, branch_source = resolve_release_branch(
+        branch_context = resolve_branch_context(
             explicit=args.release_branch or os.environ.get("RELEASE_BRANCH", ""),
             job_spec_json=os.environ.get("JOB_SPEC", ""),
             pull_base_ref=os.environ.get("PULL_BASE_REF", ""),
@@ -787,17 +896,32 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    print(f"Checking operator manifests for {release_branch} (branch from {branch_source})")
+    rules = "R1, R3"
+    if branch_context.runs_ocp_checks:
+        rules = "R1, R2, R3"
+    print(
+        f"Checking operator manifests for {branch_context.repo_branch} "
+        f"(branch from {branch_context.repo_branch_source}; rules: {rules})"
+    )
+    if branch_context.runs_ocp_checks:
+        assert branch_context.ocp_branch_name is not None
+        assert branch_context.ocp_branch_source is not None
+        print(
+            f"OCP release branch {branch_context.ocp_branch_name} "
+            f"(from {branch_context.ocp_branch_source}) enables R2 and templated art.yaml checks"
+        )
+    else:
+        print("No release-X.Y branch detected; skipping OCP-specific R2 checks")
 
-    violations = validate_repo(repo_root, release_branch)
+    violations = validate_repo(repo_root, branch_context)
     if not violations:
         print(
             f"PASSED: {len(image_refs_files)} image-references file(s) look good "
-            f"for {release_branch}."
+            f"for {branch_context.repo_branch}."
         )
         return 0
 
-    print(format_failure_report(violations, release_branch, repo_root), file=sys.stderr)
+    print(format_failure_report(violations, branch_context.repo_branch, repo_root), file=sys.stderr)
     return 1
 
 if __name__ == "__main__":

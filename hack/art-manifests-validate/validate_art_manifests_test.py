@@ -7,6 +7,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from typing import Optional
 
 STEP_DIR = Path(__file__).resolve().parent
 VALIDATOR_PATH = STEP_DIR / "validate_art_manifests.py"
@@ -17,10 +18,27 @@ sys.modules["validate_art_manifests"] = validate_art_manifests
 spec.loader.exec_module(validate_art_manifests)
 
 BranchVersion = validate_art_manifests.BranchVersion
+BranchContext = validate_art_manifests.BranchContext
 find_image_references_files = validate_art_manifests.find_image_references_files
 resolve_release_branch = validate_art_manifests.resolve_release_branch
+resolve_branch_context = validate_art_manifests.resolve_branch_context
 validate_repo = validate_art_manifests.validate_repo
 format_failure_report = validate_art_manifests.format_failure_report
+
+
+def branch_context(
+    repo_branch: str,
+    *,
+    ocp_branch_name: Optional[str] = None,
+    repo_branch_source: str = "test",
+    ocp_branch_source: Optional[str] = None,
+) -> BranchContext:
+    return BranchContext(
+        repo_branch=repo_branch,
+        repo_branch_source=repo_branch_source,
+        ocp_branch_name=ocp_branch_name,
+        ocp_branch_source=ocp_branch_source,
+    )
 
 
 def write_fixture(path: Path, content: str) -> None:
@@ -286,6 +304,47 @@ def build_fixture_tree(base: Path) -> None:
         """,
     )
 
+    write_fixture(
+        base / "pass-layered/manifests/art.yaml",
+        """
+        updates:
+          - file: stable/operator.clusterserviceversion.yaml
+            update_list:
+            - search: "displayName: Example Operator"
+              replace: "displayName: Layered Operator"
+        """,
+    )
+    write_fixture(
+        base / "pass-layered/manifests/stable/image-references",
+        """
+        ---
+        kind: ImageStream
+        apiVersion: image.openshift.io/v1
+        spec:
+          tags:
+          - name: operator
+            from:
+              kind: DockerImage
+              name: quay.io/example/operator:oadp-1.6
+        """,
+    )
+    write_fixture(
+        base / "pass-layered/manifests/stable/operator.clusterserviceversion.yaml",
+        """
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        metadata:
+          name: operator.v1.6.0
+          annotations:
+            operators.openshift.io/must-gather-image: registry.redhat.io/openshift4/ose-mustgather-rhel9:v4.22.0
+        spec:
+          displayName: Example Operator
+          relatedImages:
+          - name: operator
+            image: quay.io/example/operator:oadp-1.6
+        """,
+    )
+
 
 REPO_ROOT = STEP_DIR.parent.parent
 COMMANDS_PATH = (
@@ -318,47 +377,74 @@ class ValidateArtManifestsTest(unittest.TestCase):
 
     def test_skip_when_no_image_references(self) -> None:
         repo = self.fixtures / "no-image-references"
-        self.assertEqual(validate_repo(repo, "release-4.23"), [])
+        self.assertEqual(validate_repo(repo, branch_context("release-4.23", ocp_branch_name="release-4.23")), [])
         self.assertEqual(find_image_references_files(repo), [])
 
     def test_pass_minimal_quay_pullspecs(self) -> None:
         repo = self.fixtures / "pass-quay"
-        self.assertEqual(validate_repo(repo, "release-4.23"), [])
+        self.assertEqual(
+            validate_repo(repo, branch_context("release-4.23", ocp_branch_name="release-4.23")),
+            [],
+        )
 
     def test_fail_r1_orphan_pullspec(self) -> None:
         repo = self.fixtures / "fail-r1-orphan"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0].rule, "R1")
         self.assertIn("orphan.example.com/image:tag", violations[0].pullspec or "")
 
     def test_fail_r2_wrong_namespace_on_release_5(self) -> None:
         repo = self.fixtures / "fail-r2-namespace"
-        violations = validate_repo(repo, "release-5.0")
+        violations = validate_repo(
+            repo, branch_context("release-5.0", ocp_branch_name="release-5.0")
+        )
         rules = {violation.rule for violation in violations}
         self.assertIn("R2", rules)
         self.assertTrue(any("openshift5" in violation.message for violation in violations))
 
     def test_pass_r2_zstream_tag_on_release_4_23(self) -> None:
         repo = self.fixtures / "pass-r2-zstream"
-        self.assertEqual(validate_repo(repo, "release-4.23"), [])
+        self.assertEqual(
+            validate_repo(repo, branch_context("release-4.23", ocp_branch_name="release-4.23")),
+            [],
+        )
 
     def test_fail_r2_invalid_tag_on_release_4_23(self) -> None:
         repo = self.fixtures / "fail-r2-invalid-tag"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         r2 = [violation for violation in violations if violation.rule == "R2"]
         self.assertEqual(len(r2), 1)
         self.assertIn("z-stream tag", r2[0].message)
 
     def test_fail_r3_missing_search(self) -> None:
         repo = self.fixtures / "fail-r3-search"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0].rule, "R3")
 
     def test_pass_r3_empty_replace_allowed(self) -> None:
         repo = self.fixtures / "pass-r3-empty-replace"
-        self.assertEqual(validate_repo(repo, "release-4.23"), [])
+        self.assertEqual(
+            validate_repo(repo, branch_context("release-4.23", ocp_branch_name="release-4.23")),
+            [],
+        )
+
+    def test_layered_branch_runs_r1_r3_skips_r2(self) -> None:
+        repo = self.fixtures / "pass-layered"
+        violations = validate_repo(repo, branch_context("oadp-1.6"))
+        self.assertEqual(violations, [])
+
+    def test_layered_branch_skips_r2_even_with_rh_pullspec_in_csv(self) -> None:
+        repo = self.fixtures / "pass-layered"
+        violations = validate_repo(repo, branch_context("release-0.9"))
+        self.assertFalse(any(violation.rule == "R2" for violation in violations))
 
     def test_branch_version_parsing(self) -> None:
         branch = BranchVersion.from_release_branch("release-5.0")
@@ -406,7 +492,55 @@ class ValidateArtManifestsTest(unittest.TestCase):
         )
         with self.assertRaises(ValueError) as ctx:
             resolve_release_branch(job_spec_json=job_spec)
-        self.assertIn("main/master are ignored", str(ctx.exception))
+        self.assertIn("main/master are ignored for OCP detection", str(ctx.exception))
+
+    def test_resolve_branch_context_layered_product(self) -> None:
+        job_spec = json.dumps(
+            {
+                "refs": {
+                    "org": "openshift",
+                    "repo": "release",
+                    "base_ref": "main",
+                },
+                "extra_refs": [
+                    {
+                        "org": "migtools",
+                        "repo": "mta-operator",
+                        "base_ref": "release-0.9",
+                    }
+                ],
+            }
+        )
+        context = resolve_branch_context(job_spec_json=job_spec)
+        self.assertEqual(context.repo_branch, "release-0.9")
+        self.assertIsNone(context.ocp_branch_name)
+        self.assertFalse(context.runs_ocp_checks)
+
+    def test_release_0_9_is_not_ocp_branch(self) -> None:
+        self.assertFalse(validate_art_manifests.is_ocp_release_branch("release-0.9"))
+        self.assertTrue(validate_art_manifests.is_ocp_release_branch("release-4.23"))
+
+    def test_resolve_branch_context_ocp_from_extra_refs(self) -> None:
+        job_spec = json.dumps(
+            {
+                "refs": {
+                    "org": "openshift",
+                    "repo": "release",
+                    "base_ref": "main",
+                },
+                "extra_refs": [
+                    {
+                        "org": "openshift",
+                        "repo": "local-storage-operator",
+                        "base_ref": "release-5.0",
+                    }
+                ],
+            }
+        )
+        context = resolve_branch_context(job_spec_json=job_spec)
+        self.assertEqual(context.repo_branch, "release-5.0")
+        self.assertEqual(context.ocp_branch_name, "release-5.0")
+        self.assertTrue(context.runs_ocp_checks)
 
     def test_resolve_release_branch_explicit_override(self) -> None:
         job_spec = json.dumps(
@@ -450,14 +584,18 @@ class ValidateArtManifestsTest(unittest.TestCase):
 
     def test_fail_malformed_image_references(self) -> None:
         repo = self.fixtures / "fail-malformed-image-references"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         self.assertEqual(len(violations), 1)
         self.assertEqual(violations[0].rule, "R1")
         self.assertIn("not a valid image-references file", violations[0].message)
 
     def test_fail_nonmapping_art_yaml(self) -> None:
         repo = self.fixtures / "fail-nonmapping-artyaml"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         self.assertTrue(any(violation.rule == "R3" for violation in violations))
         self.assertTrue(
             any("did not parse to a mapping" in violation.message for violation in violations)
@@ -465,7 +603,9 @@ class ValidateArtManifestsTest(unittest.TestCase):
 
     def test_failure_report_is_grouped_and_readable(self) -> None:
         repo = self.fixtures / "fail-r3-search"
-        violations = validate_repo(repo, "release-4.23")
+        violations = validate_repo(
+            repo, branch_context("release-4.23", ocp_branch_name="release-4.23")
+        )
         report = format_failure_report(violations, "release-4.23", repo)
         self.assertIn("ART manifest check FAILED", report)
         self.assertIn("R3:", report)

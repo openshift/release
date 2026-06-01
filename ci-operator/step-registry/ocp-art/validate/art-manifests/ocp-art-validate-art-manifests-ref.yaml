@@ -6,15 +6,15 @@ ref:
   - name: RELEASE_BRANCH
     default: ""
     documentation: |-
-      Target release branch for registry/tag rules (e.g. release-4.23, release-5.0).
-      When unset, derived from JOB_SPEC refs.base_ref.
+      Optional OCP release branch (release-4.y or release-5.y) for R2 and templated art.yaml.
+      When unset, OCP rules run only if such a branch is detected from CI metadata or git.
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
   documentation: |-
-    Validates operator image-references pullspecs against the ClusterServiceVersion and
-    checks branch-aware registry.redhat.io namespace/tag rules (:latest, :X.Y, or :x.y.z)
-    plus art.yaml search strings. Failures print a grouped report (R1/R2/R3).
-    This catches silent Doozer no-ops before rebase/CVP/Conforma. Repos without
-    image-references are skipped.
+    Validates operator image-references pullspecs against the ClusterServiceVersion (R1)
+    and art.yaml search strings (R3). When a release-4.y or release-5.y branch is detected,
+    also checks registry.redhat.io namespace/tag rules (R2) and OCP template placeholders
+    in art.yaml. Layered product branches (oadp-1.6, release-0.9, etc.) run R1 and R3 only.
+    Failures print a grouped report. Repos without image-references are skipped.
