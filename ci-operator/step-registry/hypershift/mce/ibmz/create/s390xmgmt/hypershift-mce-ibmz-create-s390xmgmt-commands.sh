@@ -22,7 +22,7 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-IC_API_KEY=$(cat "/etc/ocp-addons/key/ibmcloud-apikey-addon-key")
+IC_API_KEY=$(cat "${OCP_ADDONS_CREDENTIALS}/ibmcloud-apikey-addon-key")
 export IC_API_KEY
 
 # Run the clone (fork + deploy key from httpd-vsi-key-addon-key in hypershift-agent-ibmz-credentials)
