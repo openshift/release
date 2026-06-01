@@ -27,7 +27,7 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # Install dependencies
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
-pip install --quiet 'mlflow==3.12.0' 2>&1 | tail -1
+python3 -m pip install --quiet 'mlflow==3.12.0' 2>&1 | tail -1
 echo "mlflow installed."
 
 # Start local MLflow server in background
