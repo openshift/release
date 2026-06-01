@@ -13,12 +13,19 @@ resources:
       memory: 2Gi
 tests:
 - as: generate
-  commands: make manifests && git diff --exit-code
+  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make manifests && git
+    diff --exit-code
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: api-lint
+  commands: GOFLAGS="-mod=mod" GOMODCACHE=/tmp/gomodcache GOLANGCI_LINT_CACHE=/tmp/.cache
+    make api-lint
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit
-  commands: make test
+  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
