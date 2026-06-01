@@ -39,9 +39,7 @@ chmod +x /tmp/k3s
 export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
-# ---- Install rootlesskit ----
-echo "[k3s] Installing rootlesskit"
-GOFLAGS='' GOPATH=/tmp/go GOBIN=/tmp GOCACHE=/tmp/go-cache go install github.com/rootless-containers/rootlesskit/v2/cmd/rootlesskit@latest
+# rootlesskit is pre-installed in the nested-podman-k3s image
 
 # ---- Prepare /dev/kmsg ----
 ln -sf /dev/null /dev/kmsg 2>/dev/null || true
@@ -55,9 +53,9 @@ ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
 rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlesskit-state \
-  --copy-up=/etc --copy-up=/run --copy-up=/var/lib \
+  --copy-up=/etc --copy-up=/run --copy-up=/var/lib --copy-up=/var/log --copy-up=/usr/libexec \
   sh -c '
-    sysctl -w net.ipv4.ip_forward=1
+    echo 1 > /proc/sys/net/ipv4/ip_forward
     ln -sf /dev/null /dev/kmsg 2>/dev/null || true
     exec k3s server \
       --disable=traefik \
@@ -96,9 +94,6 @@ KUBECONFIG="${K3S_KUBECONFIG}" kubectl get nodes
 # ---- Configure test suite to use k3s ----
 export DEPLOY_CHARTS="true"
 export USE_K8S="false"
-
-# ---- Install gotestsum ----
-GOFLAGS='' GOPATH=/tmp/go GOBIN=/tmp GOCACHE=/tmp/go-cache go install gotest.tools/gotestsum@v1.13.0
 
 # ---- Run e2e test phases ----
 echo "[k3s] Running e2e test phases 01-08"
