@@ -40,6 +40,15 @@ export MLFLOW_TRACKING_URI="http://127.0.0.1:${MLFLOW_PORT}"
 mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
 MLFLOW_PID=$!
 
+# Register cleanup trap immediately so early exits don't leave mlflow running
+cleanup_mlflow() {
+    if [[ -n "${MLFLOW_PID:-}" ]]; then
+        pkill -f "mlflow.server" 2>/dev/null || true
+        kill "${MLFLOW_PID}" 2>/dev/null || true
+    fi
+}
+trap cleanup_mlflow EXIT TERM INT
+
 for i in $(seq 1 30); do
     if curl -sf "http://127.0.0.1:${MLFLOW_PORT}/health" >/dev/null 2>&1; then
         echo "MLflow server ready (PID ${MLFLOW_PID})."
@@ -55,15 +64,6 @@ for i in $(seq 1 30); do
     fi
     sleep 1
 done
-
-# Register cleanup trap immediately so early exits don't leave mlflow running
-cleanup_mlflow() {
-    if [[ -n "${MLFLOW_PID:-}" ]]; then
-        pkill -f "mlflow.server" 2>/dev/null || true
-        kill "${MLFLOW_PID}" 2>/dev/null || true
-    fi
-}
-trap cleanup_mlflow EXIT TERM INT
 
 # -----------------------------------------------------------------------
 # Verify eval config exists
