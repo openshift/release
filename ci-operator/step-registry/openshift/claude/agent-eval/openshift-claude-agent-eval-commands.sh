@@ -7,7 +7,6 @@
 #
 # Optional env:
 #   EVAL_MODEL        -- model for the skill under test (default: claude-sonnet-4-6)
-#   EVAL_JUDGE_MODEL  -- model for LLM judges (default: claude-sonnet-4-6)
 #   EVAL_BASELINE     -- run-id of a previous run to compare against
 #   EVAL_EXTRA_ARGS   -- additional args passed to /eval-run
 #   EVAL_SETUP_SCRIPT -- script to run before eval (e.g. snapshot extraction)
@@ -25,7 +24,6 @@ cd /opt/ai-helpers
 
 echo "Config: ${EVAL_CONFIG}"
 echo "Skill model: ${EVAL_MODEL}"
-echo "Judge model: ${EVAL_JUDGE_MODEL}"
 
 # -----------------------------------------------------------------------
 # Install dependencies
