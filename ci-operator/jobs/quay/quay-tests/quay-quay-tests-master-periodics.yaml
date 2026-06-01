@@ -192,7 +192,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -207,7 +207,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-4.22-quay-lpGA-lp-ocp-compat-cr--quay--e2e-tests-aws
+  name: periodic-ci-quay-quay-tests-master-ocp-4.22-quay-lpGA-lp-ocp-compat-aws-fips
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -217,7 +228,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=cr--quay--e2e-tests-aws
+      - --target=aws-fips
       - --variant=ocp-4.22-quay-lpGA-lp-ocp-compat
       command:
       - ci-operator
@@ -282,7 +293,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
-  cron: 0 23 31 2 *
+  cron: 0 3,15 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -297,18 +308,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-4.22-quay-lpGA-lp-ocp-compat-quay--aws-fips
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-ocp-4.22-quay-lpGA-lp-ocp-compat-cr--quay--e2e-tests-aws
   spec:
     containers:
     - args:
@@ -318,7 +318,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay--aws-fips
+      - --target=cr--quay--e2e-tests-aws
       - --variant=ocp-4.22-quay-lpGA-lp-ocp-compat
       command:
       - ci-operator
