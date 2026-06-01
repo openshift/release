@@ -80,7 +80,7 @@ fi
 if [[ -d /secret ]]; then
   for key in base_domain elasticsearch elasticsearch_port lso_disk_id worker_disk_ids \
              redis threads_limit lso_node worker_disk_prefix scale_nodes windows_url \
-             winmssql_url windows_server_2022_url windows_server_2025_url \
+             winmssql_url windows_server_2022_url windows_server_2025_url windows_server_mssql_2025_url \
              pin_node0 pin_node1 pin_node2 bastion_address; do
     upper_key=$(echo "$key" | tr '[:lower:]' '[:upper:]')
     if [[ -s "/secret/${key}" ]] && [[ -z "${!upper_key:-}" ]]; then
