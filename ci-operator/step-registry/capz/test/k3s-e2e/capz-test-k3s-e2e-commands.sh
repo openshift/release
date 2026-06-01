@@ -64,6 +64,8 @@ rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlessk
       --write-kubeconfig='"${K3S_KUBECONFIG}"' \
       --write-kubeconfig-mode=644 \
       --kubelet-arg="feature-gates=KubeletInUserNamespace=true" \
+      --kubelet-arg="cgroups-per-qos=false" \
+      --kubelet-arg="enforce-node-allocatable=" \
       --kubelet-arg="eviction-hard=imagefs.available<1%,nodefs.available<1%" \
       --kubelet-arg="eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%"
   ' &
