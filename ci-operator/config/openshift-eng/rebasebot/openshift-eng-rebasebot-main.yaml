@@ -24,6 +24,10 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: rebasebot
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     limits:
@@ -42,6 +46,35 @@ tests:
         rebasebot --source https://github.com/kubernetes-sigs/apiserver-network-proxy:master \
                   --dest openshift/apiserver-network-proxy:main \
                   --rebase openshift/apiserver-network-proxy:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-app-id 3706026 \
+                  --github-cloner-id 3706026 \
+                  --git-username hypershift-rebase-bot \
+                  --git-email hypershift-rebase-bot@redhat.com \
+                  --bot-emails hypershift-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: hypershift-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+- as: azure-kubernetes-kms
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: azure-kubernetes-kms
+      commands: |
+        rebasebot --source https://github.com/Azure/kubernetes-kms:master \
+                  --dest openshift/azure-kubernetes-kms:main \
+                  --rebase openshift/azure-kubernetes-kms:rebase-bot-main \
                   --update-go-modules \
                   --github-app-key /secrets/rebasebot/hypershift-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/hypershift-rebase-bot-key \

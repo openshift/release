@@ -36,7 +36,8 @@ cp "${SHARED_DIR}/${UNCONFIGURED_AGENT_IGNITION_FILENAME}" "${INSTALL_DIR}/"
 
 ### Copy the CoreOS image from the auxiliary host
 echo -e "\nCopying the CoreOS ISO image from the bastion host..."
-scp -r "${SSHOPTS[@]}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}" "${INSTALL_DIR}/"
+DATA_STORAGE="/var/mnt/data-storage"
+scp -r "${SSHOPTS[@]}" "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}" "${INSTALL_DIR}/"
 
 ### Create unconfigured ISO image
 echo -e "\nCreating unconfigured image..."
@@ -46,4 +47,4 @@ coreos-installer iso ignition embed -f -i "${INSTALL_DIR}/${UNCONFIGURED_AGENT_I
 ### Copy the unconfigured image to the auxiliary host, it will be used in other steps
 echo -e "\nCopying the unconfigured ISO image into the bastion host..."
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}" \
-  "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}"
+  "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}"

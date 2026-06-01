@@ -863,16 +863,8 @@ periodics:
     containers:
     - args:
       - --config=core-services/prow/02_config/_release-bumper.yaml
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
       image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
       imagePullPolicy: IfNotPresent
       name: autobump
@@ -881,12 +873,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: github-app-credentials
+        name: token
         readOnly: true
     volumes:
-    - name: github-app-credentials
+    - name: token
       secret:
-        secretName: openshift-prow-github-app
+        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: 0 22 * * 3
@@ -906,16 +898,8 @@ periodics:
     containers:
     - args:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
       image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
       imagePullPolicy: IfNotPresent
       name: autobump
@@ -924,12 +908,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: github-app-credentials
+        name: token
         readOnly: true
     volumes:
-    - name: github-app-credentials
+    - name: token
       secret:
-        secretName: openshift-prow-github-app
+        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: 0 */4 * * 1-5
@@ -1842,6 +1826,8 @@ periodics:
       - --bw-allow-unused=dptp/gitops-cluster-build09
       - --bw-allow-unused=dptp/gitops-cluster-build10
       - --bw-allow-unused=dptp/gitops-cluster-build11
+      - --bw-allow-unused=dptp/gitops-cluster-build12
+      - --bw-allow-unused=dptp/gitops-cluster-build13
       - --bw-allow-unused=dptp/gitops-cluster-core-ci
       - --bw-allow-unused=dptp/gitops-cluster-hosted-mgmt
       - --bw-allow-unused=dptp/gitops-cluster-app.ci

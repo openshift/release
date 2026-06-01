@@ -156,6 +156,9 @@ CONFIG = {
     'aws-rhdh-performance-quota-slice': {
         'eu-west-1': 10
     },
+    'aws-rhdh-disconnected-quota-slice': {
+        'us-east-2': 5
+    },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
@@ -302,6 +305,7 @@ CONFIG = {
     'aro-hcp-test-msi-containers-prod': {},
     # BEGIN ARO-HCP E2E SLOT TYPES
     'aro-hcp-dev-shard0-centralus-slot': {},
+    'aro-hcp-dev-shard1-canadacentral-slot': {},
     'aro-hcp-dev-shard1-centralus-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -758,9 +762,11 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(1):
+for i in range(15):
     CONFIG['aro-hcp-dev-shard0-centralus-slot']['aro-hcp-dev-shard0-centralus-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(7):
+for i in range(1):
+    CONFIG['aro-hcp-dev-shard1-canadacentral-slot']['aro-hcp-dev-shard1-canadacentral-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(6):
     CONFIG['aro-hcp-dev-shard1-centralus-slot']['aro-hcp-dev-shard1-centralus-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
