@@ -10,6 +10,11 @@ if [ "${MAP_TESTS}" = "true" ]; then
     ' EXIT
 fi
 
+CONSOLE_URL="$(set +x; cat "${SHARED_DIR}/console.url")"
+export CONSOLE_URL
+OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+export OCP_API_URL
+
 typeset ocpCredUsr=''
 typeset ocpCredPsw=''
 
