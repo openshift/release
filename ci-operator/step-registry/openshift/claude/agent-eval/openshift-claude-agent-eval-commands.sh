@@ -74,7 +74,8 @@ if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
     fi
     echo ""
     echo "=== Running setup script: ${EVAL_SETUP_SCRIPT} ==="
-    export EVAL_SNAPSHOT_DIR=$(bash "${EVAL_SETUP_SCRIPT}")
+    EVAL_SNAPSHOT_DIR=$(bash "${EVAL_SETUP_SCRIPT}")
+    export EVAL_SNAPSHOT_DIR
     echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
 fi
 
