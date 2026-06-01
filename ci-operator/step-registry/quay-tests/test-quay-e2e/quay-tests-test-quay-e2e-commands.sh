@@ -16,7 +16,9 @@ CopyArtifacts() {
 
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        curl -fsSL \
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
         CopyArtifacts
@@ -49,28 +51,32 @@ npm install || true
 
 # Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
 if [ "${QUAY_PROXY}" = "true" ]; then
-    HTTPS_PROXY="$(cat "${SHARED_DIR}/proxy_public_url")"
-    export HTTPS_PROXY
-    HTTP_PROXY="$(cat "${SHARED_DIR}/proxy_public_url")"
-    export HTTP_PROXY
+    ( set +x
+        export HTTPS_PROXY="$(tr -d '\n' < "${SHARED_DIR}/proxy_public_url")"
+        export HTTP_PROXY="${HTTPS_PROXY}"
+    true )
 fi
 
-#Trigget Quay E2E Testing
-set +x
-typeset quayRoute quayHostname
-quayRoute="$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}')" || true
-quayHostname="${quayRoute#*//}"
-
-if [ "$(printf '%s\n%s' "${quayVersionThreshold}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${quayVersionThreshold}" ]; then
-    export CYPRESS_QUAY_ENDPOINT="${quayHostname}"
-    export CYPRESS_QUAY_ENDPOINT_PROTOCOL="https"
-    export CYPRESS_QUAY_PROJECT="quay-enterprise"
-    export CYPRESS_OLD_UI_DISABLED=true
-else
-    export CYPRESS_QUAY_ENDPOINT="${quayHostname}"
-    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
-fi
-set -x
+# Trigger Quay E2E testing
+( set +x
+    quayHostname="$(
+        oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' 2>/dev/null |
+        sed -e 's|^[^/]*//||'
+    )"
+    if [[ -z "${quayHostname}" ]]; then
+        echo 'Quay registry endpoint not found.' 1>&2
+        exit 1
+    fi
+    if [ "$(printf '%s\n%s' "${quayVersionThreshold}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${quayVersionThreshold}" ]; then
+        export CYPRESS_QUAY_ENDPOINT="${quayHostname}"
+        export CYPRESS_QUAY_ENDPOINT_PROTOCOL="https"
+        export CYPRESS_QUAY_PROJECT="quay-enterprise"
+        export CYPRESS_OLD_UI_DISABLED=true
+    else
+        export CYPRESS_QUAY_ENDPOINT="${quayHostname}"
+        export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
+    fi
+true )
 
 NO_COLOR=1 npm run smoke || true
 

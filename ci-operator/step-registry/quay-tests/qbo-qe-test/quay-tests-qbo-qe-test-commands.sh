@@ -3,16 +3,20 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        curl -fsSL \
-https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--quay-tests__qbo-qe-test__quay-tests-qbo-qe-test.xml
     ' EXIT
 fi
 
-#Install QBO
-cat <<EOF | oc apply -f -
+# Install QBO
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -38,19 +42,33 @@ for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
     sleep 10
 done
 
-#execute sanity test
-##Creating OAuth application and token
+# Execute sanity test
+## Creating OAuth application and token
 
-set +x
-typeset token quayNs quayRegistry quayAppPod
-token="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 40)"
-quayNs="$(oc get quayregistry --all-namespaces --no-headers | tail -n1 | awk '{print $1}')"
-quayRegistry="$(oc get quayregistry -n "${quayNs}" --no-headers | tail -n1 | awk '{print $1}')"
-quayAppPod="$(oc -n "${quayNs}" get pods -l quay-component=quay-app -o name | head -n1)"
-quayAppPod="${quayAppPod#pod/}"
-set -x
+( set +x
+    tr -dc A-Za-z0-9 </dev/urandom | head -c 40 | tr -d '\n' > "${SHARED_DIR}/quay-access-token"
+    true
+)
 
-oc -n "${quayNs}" rsh "${quayAppPod}" python <<EOF
+read -r quayNs registryEndpoint < <(
+    oc get quayregistry --all-namespaces -o json |
+    jq -er '.items[-1] | "\(.metadata.namespace) \(.status.registryEndpoint // empty)"'
+) || { echo 'No QuayRegistry found.' 1>&2; exit 1; }
+if [[ -z "${registryEndpoint}" ]]; then
+    echo 'QuayRegistry has no registryEndpoint yet.' 1>&2
+    exit 1
+fi
+
+[[ -n "$(
+    oc -n "${quayNs}" get pods -l quay-component=quay-app \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
+)" ]] || { echo 'No quay-app pod found.' 1>&2; exit 1; }
+
+( set +x
+    oc -n "${quayNs}" rsh "$(
+        oc -n "${quayNs}" get pods -l quay-component=quay-app \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null
+    )" python <<EOF
 from app import app
 from data import model
 from data.database import configure
@@ -67,35 +85,28 @@ configure(app.config)
 admin_user = model.user.create_user("admin", "p@ssw0rd", "admin@localhost.local", auto_verify=True)
 operator_org = model.organization.create_organization("quay-bridge-operator", "quay-bridge-operator@localhost.local", admin_user)
 operator_app = model.oauth.create_application(operator_org.id, "quay-bridge-operator", "", "")
-create_user_access_token(admin_user, operator_app.client_id, scope, access_token="$token")
+create_user_access_token(admin_user, operator_app.client_id, scope, access_token="$(tr -d '\n' < "${SHARED_DIR}/quay-access-token")")
 EOF
+    true
+)
 
-##Redeploy quay pod
+## Redeploy quay pod
 oc delete pods -n "${quayNs}" -l quay-component=quay-app
 
-typeset quayPodStatus=""
+typeset -i waitIdx=0
 for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
-    quayPodStatus="$(oc -n "${quayNs}" get pods -l quay-component=quay-app -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
-    if [[ "${quayPodStatus}" = "True" ]]; then
-        break
-    fi
+    [[ "$(oc -n "${quayNs}" get pods -l quay-component=quay-app -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)" == "True" ]] && break
     sleep 10
 done
 
-set +x
-printf '%s' "${token}" >"${SHARED_DIR}/quay-access-token"
-set -x
-
-##Create QuayIntegration CR
+## Create QuayIntegration CR
 oc create secret -n openshift-operators generic quay-integration \
     --from-file=token="${SHARED_DIR}/quay-access-token" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml --save-config | oc apply -f -
 
-typeset registryEndpoint registry
-registryEndpoint="$(oc -n "${quayNs}" get quayregistry "${quayRegistry}" -o jsonpath='{.status.registryEndpoint}')"
-registry="${registryEndpoint#https://}"
-
-cat <<EOF | oc apply -f -
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayIntegration
 metadata:
@@ -108,33 +119,30 @@ spec:
   quayHostname: ${registryEndpoint}
 EOF
 
-##Add quay certificate to openshift
-typeset quayCert=""
-quayCert="$(oc get cm -n openshift-apiserver kube-root-ca.crt -o jsonpath='{.data.ca\.crt}')"
-printf '%s' "${quayCert}" >"${SHARED_DIR}/quay.crt"
+## Add quay certificate to openshift
+oc get cm -n openshift-apiserver kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' >"${SHARED_DIR}/quay.crt"
 oc create configmap registry-cas -n openshift-config \
-    --from-file="${registry}=${SHARED_DIR}/quay.crt" \
-    --dry-run=client -o yaml | oc apply -f -
+    --from-file="${registryEndpoint#https://}=${SHARED_DIR}/quay.crt" \
+    --dry-run=client -o yaml --save-config | oc apply -f -
 oc patch image.config.openshift.io/cluster \
     --patch '{"spec":{"additionalTrustedCA":{"name":"registry-cas"}}}' \
     --type=merge
 oc wait mcp --for=condition=Updated --all --timeout=20m
 
-##create ns
-cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: test-qbo
-EOF
+typeset testNs='test-qbo'
 
-##Create an app from template
-cat <<EOF | oc apply -f -
+oc create namespace "${testNs}" --dry-run=client -o yaml --save-config | oc apply -f -
+oc wait "namespace/${testNs}" --for=jsonpath='{.status.phase}'=Active --timeout=2m 1>/dev/null
+
+## Create an app from template
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<EOF | oc apply -f -
 kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
   name: rails-postgresql-example
-  namespace: test-qbo
+  namespace: ${testNs}
   annotations:
     openshift.io/display-name: Rails + PostgreSQL (Ephemeral)
     description: |-
@@ -513,24 +521,17 @@ parameters:
   value: ''
 EOF
 
-oc project test-qbo
+oc project "${testNs}"
 oc new-app rails-postgresql-example
 
-typeset buildStatus="" appStatus=""
 for ((waitIdx = 1; waitIdx <= 30; waitIdx++)); do
-  buildStatus="$(oc -n test-qbo get build -l buildconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Complete"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
-  if [[ "${buildStatus}" = "True" ]]; then
-    break
-  fi
-  sleep 60
+    [[ "$(oc -n "${testNs}" get build -l buildconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Complete"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)" == "True" ]] && break
+    sleep 60
 done
 
 for ((waitIdx = 1; waitIdx <= 30; waitIdx++)); do
-  appStatus="$(oc -n test-qbo get pods -l deploymentconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)"
-  if [[ "${appStatus}" = "True" ]]; then
-    break
-  fi
-  sleep 20
+    [[ "$(oc -n "${testNs}" get pods -l deploymentconfig=rails-postgresql-example -o go-template='{{$x := ""}}{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{if or (eq $x "") (eq .status "False")}}{{$x = .status}}{{end}}{{end}}{{end}}{{end}}{{or $x "False"}}' || true)" == "True" ]] && break
+    sleep 20
 done
 
 true

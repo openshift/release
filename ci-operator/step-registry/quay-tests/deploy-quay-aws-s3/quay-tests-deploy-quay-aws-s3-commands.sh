@@ -3,7 +3,9 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        curl -fsSL \
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
@@ -27,16 +29,6 @@ ArchivePodInfo() {
     true
 }
 
-#Get the credentials and Email of new Quay User
-set +x
-typeset quayUsername quayPassword quayEmail quayAwsAccessKey quayAwsSecretKey
-quayUsername="$(cat /var/run/quay-qe-quay-secret/username)"
-quayPassword="$(cat /var/run/quay-qe-quay-secret/password)"
-quayEmail="$(cat /var/run/quay-qe-quay-secret/email)"
-quayAwsAccessKey="$(cat /var/run/quay-qe-aws-secret/access_key)"
-quayAwsSecretKey="$(cat /var/run/quay-qe-aws-secret/secret_key)"
-set -x
-
 #Create AWS S3 Storage Bucket
 typeset quayAwsS3Bucket="quayprowci${RANDOM}"
 
@@ -51,12 +43,12 @@ variable "aws_bucket" {
 }
 EOF
 
-set +x
+( set +x
 cat >>create_aws_bucket.tf <<EOF
 provider "aws" {
   region = "us-east-2"
-  access_key = "${quayAwsAccessKey}"
-  secret_key = "${quayAwsSecretKey}"
+  access_key = "$(tr -d '\n' < /var/run/quay-qe-aws-secret/access_key)"
+  secret_key = "$(tr -d '\n' < /var/run/quay-qe-aws-secret/secret_key)"
 }
 
 resource "aws_s3_bucket" "quayaws" {
@@ -78,7 +70,7 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
   acl    = "private"
 }
 EOF
-set -x
+true )
 
 export TF_VAR_aws_bucket="${quayAwsS3Bucket}"
 terraform init
@@ -145,7 +137,7 @@ if ! oc get crd quayregistries.quay.redhat.com >/dev/null; then
   exit 1
 fi
 
-set +x
+( set +x
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
@@ -174,8 +166,8 @@ DISTRIBUTED_STORAGE_CONFIG:
     - S3Storage
     - s3_bucket: ${quayAwsS3Bucket}
       storage_path: /quay
-      s3_access_key: ${quayAwsAccessKey}
-      s3_secret_key: ${quayAwsSecretKey}
+      s3_access_key: $(tr -d '\n' < /var/run/quay-qe-aws-secret/access_key)
+      s3_secret_key: $(tr -d '\n' < /var/run/quay-qe-aws-secret/secret_key)
       host: s3.us-east-2.amazonaws.com
       s3_region: us-east-2
 FEATURE_ANONYMOUS_ACCESS: true
@@ -202,7 +194,7 @@ PULL_METRICS_REDIS:
         port: 6379
         db: 1
 EOF
-set -x
+true )
 
 if [[ -n "${QUAY_EXTRA_CONFIG}" ]]; then
     echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -211,7 +203,7 @@ if [[ -n "${QUAY_EXTRA_CONFIG}" ]]; then
     /tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
 fi
 
-oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret --dry-run=client -o yaml | oc apply -f -
+oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret --dry-run=client -o yaml --save-config | oc apply -f -
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
@@ -245,17 +237,23 @@ for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
     oc -n quay-enterprise get quayregistries -o yaml >"${ARTIFACT_DIR}/quayregistries.yaml"
     quayRoute="$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}')"
     echo "${quayRoute}" > "${SHARED_DIR}/quayroute"
-    set +x
-    jq -cn \
-        --arg username "${quayUsername}" \
-        --arg password "${quayPassword}" \
-        --arg email "${quayEmail}" \
-        '{username: $username, password: $password, email: $email, access_token: true}' |
-    curl -fsSk -X POST "${quayRoute}/api/v1/user/initialize" \
-        --header 'Content-Type: application/json' \
-        --data @- |
-    jq -r '.access_token' | tr -d '\n' > "${SHARED_DIR}/quay_oauth2_token"
-    set -x
+    ( set +x
+        jq -cn \
+            --rawfile username /var/run/quay-qe-quay-secret/username \
+            --rawfile password /var/run/quay-qe-quay-secret/password \
+            --rawfile email /var/run/quay-qe-quay-secret/email \
+            '{
+                username: ($username | rtrimstr("\n")),
+                password: ($password | rtrimstr("\n")),
+                email: ($email | rtrimstr("\n")),
+                access_token: true
+            }' |
+        curl -fsSk -X POST "${quayRoute}/api/v1/user/initialize" \
+            --header 'Content-Type: application/json' \
+            --data @- |
+        jq -r '.access_token' | tr -d '\n' > "${SHARED_DIR}/quay_oauth2_token"
+        true
+    )
     ArchivePodInfo
     exit 0
   fi

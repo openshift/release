@@ -1,17 +1,23 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset testNs='test-cso'
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        curl -fsSL \
-https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--quay-tests__cso-qe-test__quay-tests-cso-qe-test.xml
     ' EXIT
 fi
 
-cat <<EOF | oc apply -f -
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -37,36 +43,26 @@ for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
     sleep 10
 done
 
-#execute sanity test
-##create ns
-cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: test-cso
-EOF
-sleep 2
+oc create namespace "${testNs}" --dry-run=client -o yaml --save-config | oc apply -f -
+oc wait "namespace/${testNs}" --for=jsonpath='{.status.phase}'=Active --timeout=2m 1>/dev/null
 
-set +x
-typeset robotUsername robotPassword
-robotUsername="$(cat /var/run/quayio-pull-robot/username)"
-robotPassword="$(cat /var/run/quayio-pull-robot/password)"
-set -x
+( set +x
+    oc -n test-cso create secret docker-registry cso-private \
+        --docker-server=quay.io \
+        --docker-username="$(cat /var/run/quayio-pull-robot/username)" \
+        --docker-password="$(cat /var/run/quayio-pull-robot/password)"
+true )
 
-oc -n test-cso create secret docker-registry cso-private \
-    --docker-server=quay.io \
-    --docker-username="${robotUsername}" \
-    --docker-password="${robotPassword}"
-oc -n test-cso secrets link default cso-private --for=pull
-sleep 2
+oc -n "${testNs}" secrets link default cso-private --for=pull 1>/dev/null
 
-##deploy pod by deployment
-cat <<EOF | oc apply -f -
-kind: Deployment
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<EOF | oc apply -f -
 apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nodejs-sample
-  namespace: test-cso
+  namespace: ${testNs}
   labels:
     app: nodejs-sample
 spec:
@@ -100,12 +96,7 @@ spec:
       maxSurge: 25%
 EOF
 
-for ((waitIdx = 1; waitIdx <= 60; waitIdx++)); do
-    if [[ "$(oc -n test-cso get deployment nodejs-sample -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        break
-    fi
-    sleep 15
-done
+oc -n "${testNs}" wait deployment/nodejs-sample --for=condition=Available=True --timeout=900s 1>/dev/null
 
 ##check IMV
 typeset imv=""
