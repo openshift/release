@@ -38,6 +38,11 @@ images:
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
     to: hypershift-cli
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.23
+      RUN dnf search 'python*-setuptools-wheel'
+      RUN dnf install -y python3.12
+    to: python-check
 promotion:
   to:
   - excluded_images:
@@ -130,6 +135,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: python-check
+  commands: python3.12 --version
+  container:
+    from: python-check
 - always_run: false
   as: agentic-qe-aws
   optional: true
