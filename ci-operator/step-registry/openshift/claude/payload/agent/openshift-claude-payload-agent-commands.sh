@@ -28,22 +28,6 @@ else
     echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
 fi
 
-JIRA_API_TOKEN=""
-if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
-    JIRA_API_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
-    echo "Jira API token loaded."
-else
-    echo "Warning: Jira API token not found at ${JIRA_API_TOKEN_PATH}. Jira operations will not be available."
-fi
-
-JIRA_USERNAME=""
-if [ -f "${JIRA_USERNAME_PATH}" ]; then
-    JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
-    echo "Jira username loaded."
-else
-    echo "Warning: Jira username not found at ${JIRA_USERNAME_PATH}. Jira operations will not be available."
-fi
-
 # Install gcloud CLI for GCS artifact access (no root required)
 echo "Installing gcloud CLI..."
 curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
@@ -63,7 +47,6 @@ PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PA
 
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
-echo "Automatic reverts enabled: ${ENABLE_PAYLOAD_REVERT}"
 
 # Poll until blocking jobs finish OR the payload reaches a terminal state.
 # The release controller can report jobs as Pending even after they complete
@@ -180,6 +163,20 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
+# Create payload snapshot deterministically (no tokens spent)
+echo ""
+echo "=== Creating payload snapshot ==="
+SNAPSHOT_SCRIPT=$(find /home/claude/.claude -name "payload_snapshot.py" -path "*/payload-snapshot/*" 2>/dev/null | head -1)
+if [[ -z "${SNAPSHOT_SCRIPT}" ]]; then
+    echo "ERROR: payload_snapshot.py not found. Is the ai-helpers plugin installed?"
+    exit 1
+fi
+SNAPSHOT_DIR="${WORKDIR}/snapshot"
+PHASE_SNAPSHOT_START=$(date +%s)
+python3 "${SNAPSHOT_SCRIPT}" "${PAYLOAD_TAG}" --output-dir "${SNAPSHOT_DIR}"
+PHASE_SNAPSHOT_DURATION=$(( $(date +%s) - PHASE_SNAPSHOT_START ))
+echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s at ${SNAPSHOT_DIR}/${PAYLOAD_TAG}"
+
 # Ensure reports and session logs are copied to artifacts even if the script exits early
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
@@ -209,7 +206,9 @@ ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
 
-**CRITICAL**: You have many ci, must-gather, and jira skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation. A subagent that does not load a skill will produce shallow, unreliable analysis."
+**CRITICAL**: You have many ci and must-gather skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation. A subagent that does not load a skill will produce shallow, unreliable analysis.
+
+After completing your analysis, you MUST use the Skill tool to invoke ci:payload-results-yaml and ci:payload-autodl-json to generate the structured output files. NEVER write these files directly — the skills enforce the canonical schema."
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
@@ -219,7 +218,7 @@ timeout 3600 claude \
     --output-format stream-json \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
+    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DIR}/${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
@@ -241,74 +240,56 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
-# Optionally stage reverts for high-confidence candidates
-PHASE_REVERT_START=$(date +%s)
-REVERT_EXIT=0
-if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
-    if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-        echo "Warning: Automatic reverts enabled but no GitHub token is available. Skipping reverts."
-    elif ls "${WORKDIR}"/payload-results-*.yaml 1>/dev/null 2>&1; then
-        echo ""
-        echo "=== Staging reverts for high-confidence candidates ==="
+# Validate structured output files, retry up to 3 times if missing/invalid
+SANITIZED_TAG=$(echo "${PAYLOAD_TAG}" | tr '.' '-')
+for attempt in 1 2 3; do
+    YAML_OK=false
+    JSON_OK=false
 
-        # Configure Jira MCP server for creating TRT issues
-        REVERT_ALLOWED_TOOLS="${ALLOWED_TOOLS}"
-        if [[ -n "${JIRA_API_TOKEN}" ]] && [[ -n "${JIRA_USERNAME}" ]]; then
-            echo "Configuring Jira MCP server..."
-            set +x
-            claude mcp add \
-                -e JIRA_URL="${JIRA_URL}" \
-                -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
-                -e JIRA_USERNAME="${JIRA_USERNAME}" \
-                --transport stdio \
-                jira -- uvx mcp-atlassian@0.21.0
-            echo "Jira MCP server configured."
-            REVERT_ALLOWED_TOOLS="${REVERT_ALLOWED_TOOLS} mcp__jira__*"
-        else
-            echo "Warning: Jira API token or username not available. TRT issues will not be created."
-        fi
-
-        timeout 3600 claude \
-            --model "${CLAUDE_MODEL}" \
-            --continue \
-            --allowedTools "${REVERT_ALLOWED_TOOLS}" \
-            --output-format stream-json \
-            --max-turns 50 \
-            -p "/ci:payload-revert ${PAYLOAD_TAG}" \
-            --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-revert.log" || REVERT_EXIT=$?
-
-    else
-        echo "Warning: No payload results YAML found. Skipping reverts."
+    if python3 -c "import yaml; yaml.safe_load(open('payload-results-${SANITIZED_TAG}.yaml'))" 2>/dev/null; then
+        YAML_OK=true
     fi
-else
-    echo "Automatic reverts not enabled. Skipping revert stage."
-fi
-PHASE_REVERT_DURATION=$(( $(date +%s) - PHASE_REVERT_START ))
+    if python3 -c "import json; json.load(open('payload-analysis-${SANITIZED_TAG}-autodl.json'))" 2>/dev/null; then
+        JSON_OK=true
+    fi
+
+    if $YAML_OK && $JSON_OK; then
+        echo "Structured outputs validated (attempt ${attempt})."
+        break
+    fi
+
+    if [[ "${attempt}" -eq 3 ]]; then
+        echo "Warning: Structured outputs still invalid after 3 attempts."
+        break
+    fi
+
+    MISSING=""
+    if ! $YAML_OK; then MISSING="ci:payload-results-yaml"; fi
+    if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
+    echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
+
+    timeout 600 claude \
+        --model "${CLAUDE_MODEL}" \
+        --continue \
+        --allowedTools "${ALLOWED_TOOLS}" \
+        --output-format stream-json \
+        --max-turns 10 \
+        -p "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
+        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
+done
 
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
 PHASE_PREFIX="[sig-claude]"
 TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
-TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION + PHASE_REVERT_DURATION ))
+TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_SNAPSHOT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
 
 PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
+  <testcase name=\"${PHASE_PREFIX} Phase: snapshot\" time=\"${PHASE_SNAPSHOT_DURATION}\"/>
   <testcase name=\"${PHASE_PREFIX} Phase: analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 
 TIMEOUT_CASES=""
 FAILURE_COUNT=0
-
-if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
-    if [[ "${REVERT_EXIT}" -ne 0 ]]; then
-        FAILURE_COUNT=$(( FAILURE_COUNT + 1 ))
-        PHASE_CASES="${PHASE_CASES}
-  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\">
-    <failure message=\"Payload revert failed with exit code ${REVERT_EXIT}\">Claude payload revert exited with code ${REVERT_EXIT}.</failure>
-  </testcase>"
-    else
-        PHASE_CASES="${PHASE_CASES}
-  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\"/>"
-    fi
-fi
 TIMEOUT_TEST_COUNT=0
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
@@ -343,10 +324,7 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
-PHASE_COUNT=2
-if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
-    PHASE_COUNT=3
-fi
+PHASE_COUNT=3
 TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -379,7 +357,7 @@ SUMMARY=$(claude \
     --continue \
     --output-format text \
     --max-turns 5 \
-    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If any revert PRs were opened, include their URLs as links for Slack. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
+    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     2>/dev/null) || SUMMARY=""
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then
