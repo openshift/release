@@ -1,20 +1,14 @@
 #!/bin/bash
+set -euo pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
-
-start_time=$SECONDS
-
-# This trap will be executed when the script exits for any reason (successful, error, or signal).
-trap 'debug_on_exit' EXIT
+typeset -i start_time=${SECONDS}
 
 # shellcheck disable=SC2329
 debug_on_exit() {
-  local exit_code=$?
-  local end_time=$SECONDS
-  local execution_time=$((end_time - start_time))
-  local debug_threshold=720 # 12 minutes in seconds
+  local -i exit_code="${1:?MUST give the actual script Exit Status.}"; (($#)) && shift
+  local -i start_time="${1:?MUST give the script start time.}"; (($#)) && shift
+  local -i execution_time=$((SECONDS - start_time))
+  local -i debug_threshold=720 # 12 minutes in seconds
   local hco_namespace=openshift-cnv
   local lockfile=/tmp/debug_marker
   set +e
@@ -30,7 +24,7 @@ debug_on_exit() {
     echo "Exit Code: ${exit_code}"
     echo "--------------------------------------------------------------------------------"
     echo "Dump HCO CR and logs for debugging."
-    oc get -n "${hco_namespace}" "${HCO_KIND}" kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
+    oc get -n "${hco_namespace}" "${hcoKind}" kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
     oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
     echo "--------------------------------------------------------------------------------"
     echo "Run must-gather for additional debugging information."
@@ -40,9 +34,9 @@ debug_on_exit() {
 
     # Use file flag so loop can be interrupted by removing the file
     touch "${lockfile}"
-    attempts=120
-    attempt_count=0
-    sleep_time=120
+    local -i attempts=120
+    local -i attempt_count=0
+    local -i sleep_time=120
     set +x
     while [[ -f "${lockfile}" ]]; do
         sleep "${sleep_time}"
@@ -58,6 +52,36 @@ debug_on_exit() {
   # exit with the original exit code.
   exit "${exit_code}"
 }
+
+# This trap will be executed when the script exits for any reason (successful, error, or signal).
+if [ "${MAP_TESTS}" = "true" ]; then
+    # Map results by setting identifier prefix in tests suites names for reporting tools
+    # Merge original results into a single file and compress
+    # Send modified file to shared dir for Data Router Reporter step (run here so EXIT stays debug_on_exit).
+    eval "$(
+                typeset -a _fURL=()
+                type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+                "${_fURL[@]}" \
+curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    # shellcheck disable=SC2154
+    trap '
+        typeset -i ec=$?
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-tests.xml || true
+        debug_on_exit "${ec}" "${start_time}"
+    ' EXIT
+else
+    trap 'debug_on_exit "$?" "${start_time}"' EXIT
+fi
+
+typeset binFolder=''
+typeset ocUrl=''
+typeset hcoSubscription=''
+typeset -i rc=0
+typeset -x junitResultsFile="${ARTIFACT_DIR}/junit_results.xml"
+typeset -x htmlResultsFile="${ARTIFACT_DIR}/report.html"
+typeset -x hcoKind='hyperconvergeds.v1beta1.hco.kubevirt.io'
 
 function setDefaultStorageClass() {
     local storageclass_name=$1
@@ -75,7 +99,6 @@ function getMustGatherImage() {
             | .spec.relatedImages[]
             | select(.name | contains("must-gather"))
             | .image'
-
 }
 
 # shellcheck disable=SC2329
@@ -95,20 +118,18 @@ function runMustGather() {
 }
 
 function retry() {
-    local max_retries=$1; shift
-    local delay=$1; shift
-    local count=0
+    local -i max_retries=$1; shift
+    local -i delay=$1; shift
+    local -i count=0
 
     until "$@"; do
-        exit_code=$?
+        local -i exit_code=$?
         count=$((count + 1))
-        # shellcheck disable=SC2086
-        if [ $count -lt $max_retries ]; then
-            echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
-            # shellcheck disable=SC2086
-            sleep $delay
+        if [ "${count}" -lt "${max_retries}" ]; then
+            # Command failed. Attempt ${count}/${max_retries}.
+            sleep "${delay}"
         else
-            echo "Command failed after $max_retries attempts."
+            # Command failed after $max_retries attempts.
             return $exit_code
         fi
     done
@@ -122,14 +143,14 @@ function retry() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
     local status="${1}"
-    retry 5 5 oc patch "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv \
+    retry 5 5 oc patch "${hcoKind}" kubevirt-hyperconverged -n openshift-cnv \
         --type=merge \
         -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
 
-    oc wait "${HCO_KIND}" kubevirt-hyperconverged -n openshift-cnv  \
+    oc wait "${hcoKind}" kubevirt-hyperconverged -n openshift-cnv  \
     --for=condition='Available' \
     --timeout='5m'
 }
@@ -157,9 +178,10 @@ function cnv::reimport_datavolumes() {
   oc delete datavolumes -n "${dvnamespace}" --selector='cdi.kubevirt.io/dataImportCron'
 
   # Ugly hack for this external-snapshotter bug: https://github.com/kubernetes-csi/external-snapshotter/issues/1258.
-  local retry_count=0
-  local max_retries=10
-  local interval=30
+  local -i retry_count=0
+  local -i max_retries=10
+  local -i interval=30
+  local volumesnapshotcontent_name=''
   while [[ $retry_count -lt $max_retries ]]; do
       echo "Attempting to delete all volumesnapshots in namespace ${dvnamespace} (Attempt $((retry_count + 1)) of ${max_retries})..."
 
@@ -196,43 +218,13 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-
-    [[ ${MAP_TESTS:-false} != "true" ]] && return
-
-    results_file="${1}"
-    echo "Patching Tests Result File: ${results_file}"
-    if [ -f "${results_file}" ]; then
-        install_yq_if_not_exists
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${results_file}"
-    fi
-}
-
-BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
-OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
+binFolder="$(mktemp -d /tmp/bin.XXXX)"
+ocUrl='https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz'
 
 # Exports
-export HCO_KIND='hyperconvergeds.v1beta1.hco.kubevirt.io'
-export PATH="${BIN_FOLDER}:${PATH}"
+export PATH="${binFolder}:${PATH}"
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
-export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
-export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
+
 set +x # We don't want to see it in the logs
 ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
@@ -254,10 +246,10 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 ###########################################################################
 # Get oc binary
-curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
+curl -fsSL "${ocUrl}" | tar -C "${binFolder}" -xzvf - oc
 
 oc whoami --show-console
-HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
+hcoSubscription="$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')"
 
 oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
@@ -271,13 +263,13 @@ uv --verbose --cache-dir /tmp/uv-cache \
     -o log_cli=true \
     --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
-    --junitxml "${JUNIT_RESULTS_FILE}" \
-    --html="${HTML_RESULTS_FILE}" --self-contained-html \
+    --junitxml "${junitResultsFile}" \
+    --html="${htmlResultsFile}" --self-contained-html \
     --tc-file=tests/global_config.py \
     --tb=native \
     --tc default_storage_class:ocs-storagecluster-ceph-rbd-virtualization \
     --tc default_volume_mode:Block \
-    --tc "hco_subscription:${HCO_SUBSCRIPTION}" \
+    --tc "hco_subscription:${hcoSubscription}" \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
@@ -292,10 +284,4 @@ uv --verbose --cache-dir /tmp/uv-cache \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
 
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
-
-# Send junit file to shared dir for Data Router Reporter step
-cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
-
-exit ${rc}
+exit "${rc}"
