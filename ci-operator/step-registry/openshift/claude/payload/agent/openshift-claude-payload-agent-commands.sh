@@ -242,14 +242,17 @@ PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
 # Validate structured output files, retry up to 3 times if missing/invalid
 SANITIZED_TAG=$(echo "${PAYLOAD_TAG}" | tr '.' '-')
+VALIDATE_YAML=$(find /home/claude/.claude -name "validate.py" -path "*/payload-results-yaml/*" 2>/dev/null | head -1)
+VALIDATE_JSON=$(find /home/claude/.claude -name "validate.py" -path "*/payload-autodl-json/*" 2>/dev/null | head -1)
+
 for attempt in 1 2 3; do
     YAML_OK=false
     JSON_OK=false
 
-    if python3 -c "import yaml; yaml.safe_load(open('payload-results-${SANITIZED_TAG}.yaml'))" 2>/dev/null; then
+    if python3 "${VALIDATE_YAML}" "payload-results-${SANITIZED_TAG}.yaml" 2>/dev/null; then
         YAML_OK=true
     fi
-    if python3 -c "import json; json.load(open('payload-analysis-${SANITIZED_TAG}-autodl.json'))" 2>/dev/null; then
+    if python3 "${VALIDATE_JSON}" "payload-analysis-${SANITIZED_TAG}-autodl.json" 2>/dev/null; then
         JSON_OK=true
     fi
 
