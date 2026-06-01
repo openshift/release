@@ -54,7 +54,7 @@ ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 # - k3s runs as regular server (no --rootless needed)
 echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
-rootlesskit --net=slirp4netns --state-dir=/tmp/rootlesskit \
+rootlesskit --net=slirp4netns --state-dir=/tmp/rootlesskit-state \
   --copy-up=/etc --copy-up=/run \
   sh -c '
     sysctl -w net.ipv4.ip_forward=1
