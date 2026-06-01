@@ -19,6 +19,10 @@ set -o errexit
 set -o pipefail
 
 echo "Starting claude-agent-eval"
+
+# The repo is at /opt/ai-helpers; WORKDIR is /workspace
+cd /opt/ai-helpers
+
 echo "Config: ${EVAL_CONFIG}"
 echo "Skill model: ${EVAL_MODEL}"
 echo "Judge model: ${EVAL_JUDGE_MODEL}"
@@ -55,67 +59,11 @@ for i in $(seq 1 30); do
 done
 
 # -----------------------------------------------------------------------
-# Generate hello-world smoke test if no eval config exists
+# Verify eval config exists
 # -----------------------------------------------------------------------
 if [[ ! -f "${EVAL_CONFIG}" ]]; then
-    echo "EVAL_CONFIG not found at ${EVAL_CONFIG}, generating hello-world smoke test..."
-    EVAL_SETUP_SCRIPT=""
-    mkdir -p "$(dirname "${EVAL_CONFIG}")"
-    cat > "${EVAL_CONFIG}" <<'EVALEOF'
-name: hello-world-smoke-test
-description: Smoke test for eval infrastructure using hello-world plugin
-skill: hello-world:echo
-
-execution:
-  mode: case
-  arguments: "{name}"
-  timeout: 60
-
-runner:
-  type: claude-code
-  plugin_dirs:
-    - plugins/hello-world
-
-dataset:
-  path: eval/cases/hello-world
-
-outputs:
-  files:
-    - "*.txt"
-
-traces:
-  stdout: true
-
-judges:
-  greeting_correct:
-    type: check
-    check: |
-      stdout = record.get("outputs", {}).get("stdout", "")
-      name = record.get("inputs", {}).get("name", "world")
-      expected = f"Hello {name}"
-      if expected.lower() in stdout.lower():
-          score = 1.0
-          rationale = f"Found expected greeting: {expected}"
-      else:
-          score = 0.0
-          rationale = f"Expected '{expected}' in output, got: {stdout[:200]}"
-
-thresholds:
-  greeting_correct:
-    min_pass_rate: 1.0
-EVALEOF
-
-    mkdir -p eval/cases/hello-world/case-001-default
-    cat > eval/cases/hello-world/case-001-default/input.yaml <<'CASEEOF'
-name: "world"
-CASEEOF
-
-    mkdir -p eval/cases/hello-world/case-002-named
-    cat > eval/cases/hello-world/case-002-named/input.yaml <<'CASEEOF'
-name: "Alice"
-CASEEOF
-
-    echo "Generated smoke test config at ${EVAL_CONFIG}"
+    echo "ERROR: EVAL_CONFIG not found at ${EVAL_CONFIG}"
+    exit 1
 fi
 
 # -----------------------------------------------------------------------
@@ -128,7 +76,8 @@ if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
     fi
     echo ""
     echo "=== Running setup script: ${EVAL_SETUP_SCRIPT} ==="
-    bash "${EVAL_SETUP_SCRIPT}"
+    export EVAL_SNAPSHOT_DIR=$(bash "${EVAL_SETUP_SCRIPT}")
+    echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
 fi
 
 # -----------------------------------------------------------------------
@@ -146,11 +95,11 @@ echo "agent-eval-harness cloned."
 copy_artifacts() {
     echo "Copying eval artifacts..."
     if [[ -d "${AGENT_EVAL_RUNS_DIR:-eval/runs}" ]]; then
-        find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "report.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+        find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "report.html" -exec cp {} "${ARTIFACT_DIR}/eval-report-summary.html" \; 2>/dev/null || true
         find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "summary.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
         find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "run_result.json" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
     fi
-    find . -name "eval-summary-*.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+    find . -name "*-summary.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
 
     # Copy MLflow data
     if [[ -d "mlruns" ]]; then
@@ -166,8 +115,9 @@ copy_artifacts() {
             touch "${SHARED_DIR}/claude-session-available" || true
     fi
 
-    # Stop MLflow server
+    # Stop MLflow server and all child processes (gunicorn workers)
     if [[ -n "${MLFLOW_PID:-}" ]]; then
+        pkill -P "${MLFLOW_PID}" 2>/dev/null || true
         kill "${MLFLOW_PID}" 2>/dev/null || true
     fi
 }
