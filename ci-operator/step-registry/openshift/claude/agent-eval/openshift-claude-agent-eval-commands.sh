@@ -52,6 +52,7 @@ done
 # -----------------------------------------------------------------------
 if [[ ! -f "${EVAL_CONFIG}" ]]; then
     echo "EVAL_CONFIG not found at ${EVAL_CONFIG}, generating hello-world smoke test..."
+    EVAL_SETUP_SCRIPT=""
     mkdir -p "$(dirname "${EVAL_CONFIG}")"
     cat > "${EVAL_CONFIG}" <<'EVALEOF'
 name: hello-world-smoke-test
