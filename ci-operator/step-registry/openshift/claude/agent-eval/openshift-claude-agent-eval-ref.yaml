@@ -1,0 +1,47 @@
+ref:
+  as: openshift-claude-agent-eval
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-claude-agent-eval-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  env:
+  - name: EVAL_CONFIG
+    default: "eval.yaml"
+  - name: EVAL_MODEL
+    default: "claude-sonnet-4-6"
+  - name: EVAL_JUDGE_MODEL
+    default: "claude-sonnet-4-6"
+  - name: EVAL_BASELINE
+    default: ""
+  - name: EVAL_EXTRA_ARGS
+    default: ""
+  - name: EVAL_SETUP_SCRIPT
+    default: ""
+  - name: MLFLOW_PORT
+    default: "5000"
+  - name: CLAUDE_MODEL
+    default: "claude-sonnet-4-6"
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 3h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs skill evaluations using the agent-eval-harness. Installs the
+    eval harness plugin, starts a local MLflow server, runs /eval-run
+    and /eval-mlflow with the specified config and model, and produces
+    JUnit XML + artifacts. MLflow data is archived for download.
