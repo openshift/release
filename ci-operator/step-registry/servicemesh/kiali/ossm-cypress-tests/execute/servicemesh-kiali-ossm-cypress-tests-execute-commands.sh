@@ -10,9 +10,14 @@ if [ "${MAP_TESTS}" = "true" ]; then
     ' EXIT
 fi
 
+typeset ocpCredUsr=''
+typeset ocpCredPsw=''
+
 # login for interop
 if [ -s "${KUBECONFIG}" ]; then
     oc whoami
+    ocpCredUsr="kubeadmin"
+    ocpCredPsw="$(set +x; cat "${SHARED_DIR}/kubeadmin-password")"
 else #login for ROSA & Hypershift platforms
     (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
 fi
@@ -55,6 +60,8 @@ oc wait --for condition=available deployment/kiali -n "${ISTIO_NAMESPACE}" --tim
 
 CYPRESS_BASE_URL=$(oc whoami --show-console)
 export CYPRESS_BASE_URL
+export CYPRESS_USERNAME=${ocpCredUsr}
+export CYPRESS_PASSWD=${ocpCredPsw}
 export CYPRESS_AUTH_PROVIDER="kube:admin"
 
 # for flaky tests
