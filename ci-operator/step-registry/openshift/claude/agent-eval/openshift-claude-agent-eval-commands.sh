@@ -56,6 +56,15 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
+# Register cleanup trap immediately so early exits don't leave mlflow running
+cleanup_mlflow() {
+    if [[ -n "${MLFLOW_PID:-}" ]]; then
+        pkill -f "mlflow.server" 2>/dev/null || true
+        kill "${MLFLOW_PID}" 2>/dev/null || true
+    fi
+}
+trap cleanup_mlflow EXIT
+
 # -----------------------------------------------------------------------
 # Verify eval config exists
 # -----------------------------------------------------------------------
@@ -114,13 +123,9 @@ copy_artifacts() {
             touch "${SHARED_DIR}/claude-session-available" || true
     fi
 
-    # Stop MLflow server and all child processes (gunicorn workers)
-    if [[ -n "${MLFLOW_PID:-}" ]]; then
-        pkill -P "${MLFLOW_PID}" 2>/dev/null || true
-        kill "${MLFLOW_PID}" 2>/dev/null || true
-    fi
+    cleanup_mlflow
 }
-trap copy_artifacts EXIT TERM INT
+trap copy_artifacts EXIT
 
 # -----------------------------------------------------------------------
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
