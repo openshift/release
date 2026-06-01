@@ -30,7 +30,6 @@ trap cleanup_kind EXIT
 USER_NAME=$(whoami)
 echo "${USER_NAME}:1001:65536" > /etc/subuid
 echo "${USER_NAME}:1001:65536" > /etc/subgid
-podman system migrate
 
 # ---- Configure podman for kind compatibility ----
 # Kind requires private UTS namespace (to set hostname in node containers)
@@ -42,6 +41,10 @@ cat > "${HOME}/.config/containers/containers.conf" <<EOF
 utsns = "private"
 cgroups = "enabled"
 EOF
+
+# Reset podman storage so it picks up the new subuid/subgid range
+# without triggering newuidmap (which is denied in this security context).
+podman system reset --force 2>/dev/null || true
 
 # ---- Install kind ----
 echo "[kind] Installing kind ${KIND_VERSION}"
