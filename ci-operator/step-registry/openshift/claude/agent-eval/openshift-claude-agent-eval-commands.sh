@@ -27,9 +27,9 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # Install dependencies
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
+export PATH="$HOME/.local/bin:$PATH"
 # mlflow 3.x requires sqlite >= 3.36.0; RHEL 9 ships 3.34.1
 python3 -m pip install --quiet 'mlflow==2.20.2'
-export PATH="$HOME/.local/bin:$PATH"
 echo "mlflow installed."
 
 # Start local MLflow server in background
@@ -136,10 +136,9 @@ fi
 # -----------------------------------------------------------------------
 echo ""
 echo "=== Installing plugins ==="
-git config --global url."https://github.com/".insteadOf "git@github.com:"
-claude plugin marketplace add opendatahub-io/skills-registry
-claude plugin install agent-eval-harness@opendatahub-skills
-echo "agent-eval-harness plugin installed."
+EVAL_HARNESS_DIR="/tmp/agent-eval-harness"
+git clone --depth 1 https://github.com/opendatahub-io/agent-eval-harness.git "${EVAL_HARNESS_DIR}"
+echo "agent-eval-harness cloned."
 
 # -----------------------------------------------------------------------
 # Artifact copy trap
@@ -205,6 +204,7 @@ EVAL_START=$(date +%s)
 EVAL_EXIT=0
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
+    --plugin-dir "${EVAL_HARNESS_DIR}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --max-turns 100 \
@@ -223,6 +223,7 @@ echo "=== Running eval-mlflow ==="
 MLFLOW_EXIT=0
 timeout 600 claude \
     --model "${CLAUDE_MODEL}" \
+    --plugin-dir "${EVAL_HARNESS_DIR}" \
     --continue \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
