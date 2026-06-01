@@ -248,6 +248,7 @@ else
     fi
 fi
 QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
+export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
