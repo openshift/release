@@ -28,11 +28,12 @@ images:
       RUN curl -Lo /usr/local/bin/clusterctl "https://github.com/kubernetes-sigs/cluster-api/releases/download/${CLUSTERCTL_VERSION}/clusterctl-linux-amd64" && \
           echo "${CLUSTERCTL_SHA256}  /usr/local/bin/clusterctl" | sha256sum -c && chmod +x /usr/local/bin/clusterctl
       RUN GOFLAGS='' GOBIN=/usr/local/bin go install gotest.tools/gotestsum@v1.13.0
-      RUN chmod -R 777 /opt/app-root 2>/dev/null || true
+      RUN chmod -R g+w /opt/app-root 2>/dev/null || true
       RUN rm -rf /home/user/.config 2>/dev/null || true
-      RUN chmod 777 /home/user 2>/dev/null || true
+      RUN chmod g+w /home/user 2>/dev/null || true
       COPY /src /go/src/github.com/stolostron
       WORKDIR /go/src/github.com/stolostron/capi-tests
+      USER 1000
     from: nested-podman
     inputs:
       src:

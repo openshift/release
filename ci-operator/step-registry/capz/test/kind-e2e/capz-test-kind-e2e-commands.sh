@@ -22,6 +22,16 @@ cleanup_kind() {
 }
 trap cleanup_kind EXIT
 
+# ---- Fix subuid/subgid range for kind node images ----
+# The nested-podman entrypoint sets subuid/subgid starting at UID+1 (1001)
+# with only 64535 IDs. Kind's node image contains files owned by GID 65534
+# (nobody), which maps to subordinate GID 66534 — outside that range.
+# Widen to 65536 IDs so the full UID/GID space is covered.
+USER_NAME=$(whoami)
+echo "${USER_NAME}:1001:65536" > /etc/subuid
+echo "${USER_NAME}:1001:65536" > /etc/subgid
+podman system migrate
+
 # ---- Configure podman for kind compatibility ----
 # Kind requires private UTS namespace (to set hostname in node containers)
 # and enabled cgroups (for kubelet cgroup management).
