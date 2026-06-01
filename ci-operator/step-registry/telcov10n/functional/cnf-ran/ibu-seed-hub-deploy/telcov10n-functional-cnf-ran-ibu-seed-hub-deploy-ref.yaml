@@ -1,0 +1,52 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-seed-hub-deploy
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-seed-hub-deploy-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: SEED_HUB_VERSION
+      default: "4.20"
+      documentation: OCP version to deploy on the seed hub (the upgrade destination version — the version spokes will upgrade TO)
+    - name: SEED_CLUSTER_NAME
+      default: "kni-qe-108"
+      documentation: BM cluster name for the IBU seed hub
+    - name: DISABLE_INSIGHTS
+      default: "false"
+      documentation: Set to "true" to remove cloud.openshift.com from pull secret, disabling Insights and Telemetry
+  credentials:
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+    # kni-qe-108 (seed hub)
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-108-master0
+      mount_path: /var/host_variables/kni-qe-108/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-108-bastion
+      mount_path: /var/host_variables/kni-qe-108/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-108-nodes
+      mount_path: /var/group_variables/kni-qe-108/nodes
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-108-masters
+      mount_path: /var/group_variables/kni-qe-108/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-helix89
+      mount_path: /var/host_variables/kni-qe-108/hypervisor
+  documentation: |-
+    Deploy IBU seed hub (kni-qe-108).
+    The seed hub provides the OCP image used for upgrading target spokes.
+    
