@@ -63,7 +63,7 @@ cleanup_mlflow() {
         kill "${MLFLOW_PID}" 2>/dev/null || true
     fi
 }
-trap cleanup_mlflow EXIT
+trap cleanup_mlflow EXIT TERM INT
 
 # -----------------------------------------------------------------------
 # Verify eval config exists
@@ -125,7 +125,7 @@ copy_artifacts() {
 
     cleanup_mlflow
 }
-trap copy_artifacts EXIT
+trap copy_artifacts EXIT TERM INT
 
 # -----------------------------------------------------------------------
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
