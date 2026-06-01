@@ -31,9 +31,6 @@ images:
   - dockerfile_path: ci-images/Dockerfile.lint
     from: assisted-service-base
     to: assisted-service-lint
-  - dockerfile_path: ci-images/Dockerfile.subsystem
-    from: assisted-service-base
-    to: assisted-service-subsystem
   - dockerfile_path: ci-images/Dockerfile.code-generation
     from: assisted-service-base
     to: assisted-service-generate
@@ -177,76 +174,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-- as: subsystem-aws
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: subsystem-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  cron: 0 22 * * 0-5
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

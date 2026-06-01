@@ -27,14 +27,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  postgresql-15-c9s:
-    name: postgresql
-    namespace: ci
-    tag: postgresql-15-c9s
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
 build_root:
   from_repository: true
 images:
@@ -44,47 +36,11 @@ images:
   - dockerfile_path: ci-images/Dockerfile.subsystem
     from: assisted-service-base
     to: assisted-service-subsystem
-  - dockerfile_path: Dockerfile.assisted-service-build
-    to: assisted-service-build-base
-  - dockerfile_literal: |
-      FROM base-build
-      COPY . .
-    inputs:
-      assisted-service-build-base:
-        as:
-        - base-build
-      src:
-        paths:
-        - destination_dir: ./
-          source_path: /go/src/github.com/openshift/assisted-service/.
-    to: assisted-service-build
   - dockerfile_path: Dockerfile.assisted-service
     to: assisted-service
-operator:
-  bundles:
-  - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/edge-infrastructure/assisted-service:latest
-    with: assisted-service
-  - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
-    with: assisted-installer
-  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
-    with: assisted-installer-agent
-  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:latest
-    with: assisted-installer-controller
-  - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
-    with: assisted-image-service
-  - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
-    with: postgresql-15-c9s
 releases:
   latest:
     candidate:
-      product: ocp
-      stream: nightly
-      version: "4.22"
-  latest-multi:
-    candidate:
-      architecture: multi
       product: ocp
       stream: nightly
       version: "4.22"
@@ -94,6 +50,76 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: subsystem-aws-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 0 22 * * 0-5
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
@@ -770,4 +796,4 @@ zz_generated_metadata:
   branch: master
   org: openshift
   repo: assisted-service
-  variant: edge-e2e
+  variant: edge-api
