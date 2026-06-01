@@ -12,7 +12,7 @@ export CLUSTER_ARCH
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
-ssh_key_string=$(cat "/etc/ocp-addons/key/httpd-vsi-key-addon-key")
+ssh_key_string=$(cat "${OCP_ADDONS_CREDENTIALS}/httpd-vsi-key-addon-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
 envsubst <<"EOF" >${tmp_ssh_key}
