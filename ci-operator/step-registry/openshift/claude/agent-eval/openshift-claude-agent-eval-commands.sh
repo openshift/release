@@ -27,7 +27,7 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # Install dependencies
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
-python3 -m pip install --quiet 'mlflow==3.12.0' 2>&1 | tail -1
+python3 -m pip install --quiet 'mlflow==2.20.2' 2>&1 | tail -1
 export PATH="$HOME/.local/bin:$PATH"
 echo "mlflow installed."
 
@@ -42,8 +42,13 @@ for i in $(seq 1 30); do
         echo "MLflow server ready (PID ${MLFLOW_PID})."
         break
     fi
+    if ! kill -0 "${MLFLOW_PID}" 2>/dev/null; then
+        echo "ERROR: MLflow server crashed."
+        exit 1
+    fi
     if [[ $i -eq 30 ]]; then
-        echo "Warning: MLflow server did not become ready in 30s. Continuing anyway."
+        echo "ERROR: MLflow server did not become ready in 30s."
+        exit 1
     fi
     sleep 1
 done
@@ -130,8 +135,7 @@ fi
 # -----------------------------------------------------------------------
 echo ""
 echo "=== Installing plugins ==="
-mkdir -p ~/.ssh
-ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+git config --global url."https://github.com/".insteadOf "git@github.com:"
 claude plugin marketplace add opendatahub-io/skills-registry
 claude plugin install agent-eval-harness@opendatahub-skills
 echo "agent-eval-harness plugin installed."
