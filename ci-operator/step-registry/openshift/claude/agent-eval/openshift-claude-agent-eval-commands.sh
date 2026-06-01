@@ -27,7 +27,8 @@ echo "Judge model: ${EVAL_JUDGE_MODEL}"
 # Install dependencies
 # -----------------------------------------------------------------------
 echo "Installing mlflow..."
-python3 -m pip install --quiet 'mlflow==2.20.2' 2>&1 | tail -1
+# mlflow 3.x requires sqlite >= 3.36.0; RHEL 9 ships 3.34.1
+python3 -m pip install --quiet 'mlflow==2.20.2'
 export PATH="$HOME/.local/bin:$PATH"
 echo "mlflow installed."
 
