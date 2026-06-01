@@ -104,7 +104,6 @@ tests:
         export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
         export OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n ${TARGET_NAMESPACE} $CSV_NAME -o json | jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
         export OCP_VIRT_VALIDATION_IMAGE=$(echo "$OCP_VIRT_VALIDATION_IMAGE" | sed "s|registry.redhat.io/container-native-virtualization|quay.io/openshift-virtualization/konflux-builds/v${CNV_VERSION//./-}|")
-        for node in $(oc get node -o NAME); do oc debug "${node}" -- chroot /host crictl rmi --prune; done
         make ci-validate-disconnected
       env:
       - default: "4.22"
