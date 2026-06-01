@@ -1,0 +1,29 @@
+ref:
+  as: capz-test-kind-e2e
+  from: nested-podman-k3s
+  commands: capz-test-kind-e2e-commands.sh
+  nested_podman: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+  env:
+  - name: KIND_VERSION
+    default: "v0.31.0"
+    documentation: |-
+      Kind release version to install.
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  grace_period: 60s
+  timeout: 3h
+  documentation: |-
+    Creates a Kind management cluster inside the test pod using podman-in-podman
+    (nested_podman capabilities), deploys CAPI/CAPZ/ASO controllers, then runs
+    the full e2e test suite (Phases 01-08). No IPI cluster required — Kind
+    provides the management cluster via podman containers, saving ~40 minutes
+    of provisioning time. Based on the adelton/kind-in-pod approach.
+    Requires nested_podman for the capabilities that podman and Kind need
+    (user namespaces, cgroups, networking).
