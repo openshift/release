@@ -26,7 +26,7 @@ if ! python3 -c 'import yaml' >/dev/null 2>&1; then
         python3 -m ensurepip --upgrade --user
     fi
     export PATH="\${HOME}/.local/bin:\${PATH}"
-    pip3 install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
+    python3 -m pip install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
 fi
 
 echo "Validating ART manifests in \${PWD}"

@@ -11,7 +11,7 @@ if ! python3 -c 'import yaml' >/dev/null 2>&1; then
         python3 -m ensurepip --upgrade --user
     fi
     export PATH="${HOME}/.local/bin:${PATH}"
-    pip3 install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
+    python3 -m pip install --user --disable-pip-version-check --no-cache-dir 'pyyaml==6.0'
 fi
 
 echo "Validating ART manifests in ${PWD}"
@@ -39,6 +39,45 @@ RELEASE_BRANCH_RE = re.compile(r"^release-(\d+)\.(\d+)$")
 ZSTREAM_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+")
 TEMPLATE_KEYS = ("MAJOR", "MINOR", "SUBMINOR", "RELEASE", "DATE_TIME", "FULL_VER")
 RELEASE_REPO_NAME = "release"
+REPORT_WIDTH = 72
+
+RULE_GUIDE: dict[str, dict[str, str]] = {
+    "R1": {
+        "title": "Image in image-references is not in the CSV",
+        "why": (
+            "Each container image listed in image-references must also appear in the "
+            "ClusterServiceVersion (CSV). If it does not, Doozer cannot update that image "
+            "during rebase and the change is silently skipped."
+        ),
+        "fix": (
+            "Add the pullspec to the CSV (relatedImages or annotations), or correct the "
+            "image name in image-references."
+        ),
+    },
+    "R2": {
+        "title": "registry.redhat.io image does not match this release branch",
+        "why": (
+            "Red Hat payload images must use the openshift4/ or openshift5/ namespace for "
+            "the OCP version on this branch, with an allowed tag (:latest, :X.Y, or :x.y.z)."
+        ),
+        "fix": (
+            "Update the pullspec in image-references to the correct namespace and tag for "
+            "this release branch."
+        ),
+    },
+    "R3": {
+        "title": "art.yaml tries to replace text that is not in the target file",
+        "why": (
+            "art.yaml lists find-and-replace edits Doozer runs at rebase time. The exact "
+            "'search' text must already exist in the target file. If it does not, the edit "
+            "does nothing."
+        ),
+        "fix": (
+            "Update art.yaml search strings to match what is in the file today, or update "
+            "the target manifest so the search text is present before the next rebase."
+        ),
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -85,20 +124,87 @@ class Violation:
     search: Optional[str] = None
 
     def format(self) -> str:
-        lines = [f"[{self.rule}] {self.message}"]
-        if self.image_refs_path:
-            lines.append(f"  image-references: {self.image_refs_path}")
-        if self.tag_name:
-            lines.append(f"  tag: {self.tag_name}")
-        if self.pullspec:
-            lines.append(f"  pullspec: {self.pullspec}")
-        if self.art_yaml_path:
-            lines.append(f"  art.yaml: {self.art_yaml_path}")
-        if self.target_file:
-            lines.append(f"  target file: {self.target_file}")
-        if self.search:
-            lines.append(f"  search: {self.search!r}")
-        return "\n".join(lines)
+        """Compact single-violation format (used in unit tests)."""
+        return format_violation_detail(self, Path("."))
+
+
+def rel_path(path: Path, repo_root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(repo_root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def format_violation_detail(violation: Violation, repo_root: Path) -> str:
+    lines: list[str] = [f"  Problem: {violation.message}"]
+    if violation.image_refs_path:
+        lines.append(f"  image-references: {rel_path(violation.image_refs_path, repo_root)}")
+    if violation.tag_name:
+        lines.append(f"  image tag name: {violation.tag_name}")
+    if violation.pullspec:
+        lines.append(f"  pullspec: {violation.pullspec}")
+    if violation.art_yaml_path:
+        lines.append(f"  art.yaml: {rel_path(violation.art_yaml_path, repo_root)}")
+    if violation.target_file:
+        lines.append(f"  target file: {rel_path(violation.target_file, repo_root)}")
+    if violation.search:
+        lines.append(f"  text art.yaml expects to find: {violation.search!r}")
+    return "\n".join(lines)
+
+
+def format_failure_report(
+    violations: list[Violation],
+    release_branch: str,
+    repo_root: Path,
+) -> str:
+    by_rule: dict[str, list[Violation]] = {"R1": [], "R2": [], "R3": []}
+    for violation in violations:
+        by_rule.setdefault(violation.rule, []).append(violation)
+
+    lines: list[str] = [
+        "=" * REPORT_WIDTH,
+        f"ART manifest check FAILED  (branch {release_branch})",
+        "=" * REPORT_WIDTH,
+        "",
+        f"Found {len(violations)} problem(s) in this operator repo.",
+        "",
+    ]
+
+    for rule in ("R1", "R2", "R3"):
+        rule_violations = by_rule.get(rule, [])
+        if not rule_violations:
+            continue
+        guide = RULE_GUIDE.get(rule, {})
+        title = guide.get("title", rule)
+        lines.append("-" * REPORT_WIDTH)
+        lines.append(f"{rule}: {title} ({len(rule_violations)})")
+        lines.append("-" * REPORT_WIDTH)
+        if guide.get("why"):
+            lines.append(guide["why"])
+            lines.append("")
+        if guide.get("fix"):
+            lines.append(f"How to fix: {guide['fix']}")
+            lines.append("")
+
+        for index, violation in enumerate(rule_violations, start=1):
+            lines.append(f"({index})")
+            lines.append(format_violation_detail(violation, repo_root))
+            lines.append("")
+
+    lines.extend(
+        [
+            "=" * REPORT_WIDTH,
+            "Next steps",
+            "=" * REPORT_WIDTH,
+            "  - Fix the files listed above in the operator repository (not openshift/release).",
+            "  - Re-run this check locally:",
+            f"      python3 hack/art-manifests-validate/validate_art_manifests.py "
+            f"--repo-root <operator-checkout> --release-branch {release_branch}",
+            "  - Details: https://redhat.atlassian.net/browse/ART-14695",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def is_release_branch(branch: str) -> bool:
@@ -263,7 +369,11 @@ def find_csv_for_image_refs(image_refs_path: Path) -> Optional[Path]:
     manifests_matches = [path for path in unique if path.parent == manifests_dir]
     if len(manifests_matches) == 1:
         return manifests_matches[0]
-    return unique[0]
+    candidates = ", ".join(str(path) for path in unique)
+    raise ValueError(
+        f"Multiple *.clusterserviceversion.yaml files match {image_refs_path}; "
+        f"cannot choose unambiguously: {candidates}"
+    )
 
 
 def find_art_yaml(image_refs_path: Path) -> Optional[Path]:
@@ -277,6 +387,8 @@ def find_art_yaml(image_refs_path: Path) -> Optional[Path]:
 def load_image_references(path: Path) -> list[dict]:
     with path.open(encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Data in {path} is not a valid image-references file")
     tags = data.get("spec", {}).get("tags", [])
     if not isinstance(tags, list) or not tags:
         raise ValueError(f"Data in {path} is not a valid image-references file")
@@ -362,26 +474,14 @@ def validate_r2_branch_registry_rules(
         if normalized_tag in allowed_tags:
             continue
         if ZSTREAM_TAG_RE.match(normalized_tag):
-            violations.append(
-                Violation(
-                    rule="R2",
-                    message=(
-                        "registry.redhat.io tag must be :latest or the release minor version "
-                        f"(:{branch.major}.{branch.minor}); z-stream tags are not allowed"
-                    ),
-                    image_refs_path=image_refs_path,
-                    tag_name=tag_name,
-                    pullspec=pullspec,
-                )
-            )
             continue
 
         violations.append(
             Violation(
                 rule="R2",
                 message=(
-                    "registry.redhat.io tag must be :latest or the release minor version "
-                    f"(:{branch.major}.{branch.minor})"
+                    "registry.redhat.io tag must be :latest, the release minor version "
+                    f"(:{branch.major}.{branch.minor}), or a z-stream tag (:x.y.z)"
                 ),
                 image_refs_path=image_refs_path,
                 tag_name=tag_name,
@@ -414,6 +514,16 @@ def validate_r3_art_yaml(
         )
         return
 
+    if not isinstance(art_yaml_data, dict):
+        violations.append(
+            Violation(
+                rule="R3",
+                message="art.yaml did not parse to a mapping after template expansion",
+                art_yaml_path=art_yaml_path,
+            )
+        )
+        return
+
     updates = art_yaml_data.get("updates", [])
     if not updates:
         return
@@ -428,6 +538,15 @@ def validate_r3_art_yaml(
         return
 
     for update in updates:
+        if not isinstance(update, dict):
+            violations.append(
+                Violation(
+                    rule="R3",
+                    message="art.yaml `updates` entries must be mappings",
+                    art_yaml_path=art_yaml_path,
+                )
+            )
+            continue
         relative_file = update.get("file")
         update_list = update.get("update_list", [])
         if not relative_file:
@@ -449,8 +568,40 @@ def validate_r3_art_yaml(
                 )
             )
             continue
+        if not isinstance(update_list, list):
+            violations.append(
+                Violation(
+                    rule="R3",
+                    message=f"art.yaml update_list must be a list for file {relative_file!r}",
+                    art_yaml_path=art_yaml_path,
+                    target_file=manifests_base / relative_file,
+                )
+            )
+            continue
 
-        target_path = manifests_base / relative_file
+        if Path(relative_file).is_absolute():
+            violations.append(
+                Violation(
+                    rule="R3",
+                    message="art.yaml target file must be a relative path within the manifests directory",
+                    art_yaml_path=art_yaml_path,
+                    target_file=Path(relative_file),
+                )
+            )
+            continue
+
+        base_dir = manifests_base.resolve()
+        target_path = (manifests_base / relative_file).resolve()
+        if target_path != base_dir and base_dir not in target_path.parents:
+            violations.append(
+                Violation(
+                    rule="R3",
+                    message="art.yaml target file must stay within the manifests directory",
+                    art_yaml_path=art_yaml_path,
+                    target_file=target_path,
+                )
+            )
+            continue
         if not target_path.is_file():
             violations.append(
                 Violation(
@@ -466,6 +617,16 @@ def validate_r3_art_yaml(
             target_content = handle.read()
 
         for entry in update_list:
+            if not isinstance(entry, dict):
+                violations.append(
+                    Violation(
+                        rule="R3",
+                        message="art.yaml update_list entries must be mappings",
+                        art_yaml_path=art_yaml_path,
+                        target_file=target_path,
+                    )
+                )
+                continue
             search = entry.get("search")
             replace = entry.get("replace")
             if search is None or replace is None:
@@ -538,7 +699,18 @@ def validate_repo(repo_root: Path, release_branch: str) -> list[Violation]:
             )
             continue
 
-        csv_path = find_csv_for_image_refs(image_refs_path)
+        try:
+            csv_path = find_csv_for_image_refs(image_refs_path)
+        except ValueError as exc:
+            violations.append(
+                Violation(
+                    rule="R1",
+                    message=str(exc),
+                    image_refs_path=image_refs_path,
+                )
+            )
+            continue
+
         if csv_path is None:
             violations.append(
                 Violation(
@@ -615,25 +787,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    print(f"Using release branch {release_branch!r} (from {branch_source})")
+    print(f"Checking operator manifests for {release_branch} (branch from {branch_source})")
 
     violations = validate_repo(repo_root, release_branch)
     if not violations:
         print(
-            f"Validated {len(image_refs_files)} image-references file(s) "
+            f"PASSED: {len(image_refs_files)} image-references file(s) look good "
             f"for {release_branch}."
         )
         return 0
 
-    print("ART manifest validation failed:", file=sys.stderr)
-    for violation in violations:
-        print(violation.format(), file=sys.stderr)
-        print(file=sys.stderr)
-    print(
-        "Fix image-references pullspecs and art.yaml search strings before merging. "
-        "See ART-14695 for rule details.",
-        file=sys.stderr,
-    )
+    print(format_failure_report(violations, release_branch, repo_root), file=sys.stderr)
     return 1
 
 if __name__ == "__main__":
