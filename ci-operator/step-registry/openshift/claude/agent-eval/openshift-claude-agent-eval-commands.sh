@@ -33,7 +33,7 @@ echo "mlflow installed."
 # Start local MLflow server in background
 echo "Starting local MLflow server on port ${MLFLOW_PORT}..."
 export MLFLOW_TRACKING_URI="http://127.0.0.1:${MLFLOW_PORT}"
-mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
+python3 -m mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
 MLFLOW_PID=$!
 
 for i in $(seq 1 30); do
