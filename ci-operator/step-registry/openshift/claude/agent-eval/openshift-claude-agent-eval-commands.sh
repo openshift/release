@@ -7,11 +7,12 @@
 #
 # Optional env:
 #   EVAL_MODEL        -- model for the skill under test (default: claude-sonnet-4-6)
+#   EVAL_PARALLELISM  -- number of test cases to run concurrently (default: 1)
+#   EVAL_CASES        -- comma-separated list of case IDs to run (default: all)
 #   EVAL_BASELINE     -- run-id of a previous run to compare against
 #   EVAL_EXTRA_ARGS   -- additional args passed to /eval-run
 #   EVAL_SETUP_SCRIPT -- script to run before eval (e.g. snapshot extraction)
 #   CLAUDE_MODEL      -- model for the eval harness orchestrator (default: claude-sonnet-4-6)
-#   MLFLOW_PORT       -- port for local MLflow server (default: 5000)
 
 set -o nounset
 set -o errexit
@@ -24,46 +25,6 @@ cd /opt/ai-helpers
 
 echo "Config: ${EVAL_CONFIG}"
 echo "Skill model: ${EVAL_MODEL}"
-
-# -----------------------------------------------------------------------
-# Install dependencies
-# -----------------------------------------------------------------------
-echo "Installing mlflow..."
-export PATH="$HOME/.local/bin:$PATH"
-# mlflow 3.x requires sqlite >= 3.36.0; RHEL 9 ships 3.34.1
-python3 -m pip install --quiet 'mlflow==2.20.2'
-echo "mlflow installed."
-
-# Start local MLflow server in background
-echo "Starting local MLflow server on port ${MLFLOW_PORT}..."
-export MLFLOW_TRACKING_URI="http://127.0.0.1:${MLFLOW_PORT}"
-mlflow server --port "${MLFLOW_PORT}" --host 127.0.0.1 &
-MLFLOW_PID=$!
-
-# Register cleanup trap immediately so early exits don't leave mlflow running
-cleanup_mlflow() {
-    if [[ -n "${MLFLOW_PID:-}" ]]; then
-        pkill -f "mlflow.server" 2>/dev/null || true
-        kill "${MLFLOW_PID}" 2>/dev/null || true
-    fi
-}
-trap cleanup_mlflow EXIT TERM INT
-
-for i in $(seq 1 30); do
-    if curl -sf "http://127.0.0.1:${MLFLOW_PORT}/health" >/dev/null 2>&1; then
-        echo "MLflow server ready (PID ${MLFLOW_PID})."
-        break
-    fi
-    if ! kill -0 "${MLFLOW_PID}" 2>/dev/null; then
-        echo "ERROR: MLflow server crashed."
-        exit 1
-    fi
-    if [[ $i -eq 30 ]]; then
-        echo "ERROR: MLflow server did not become ready in 30s."
-        exit 1
-    fi
-    sleep 1
-done
 
 # -----------------------------------------------------------------------
 # Verify eval config exists
@@ -102,28 +63,16 @@ echo "agent-eval-harness cloned."
 # -----------------------------------------------------------------------
 copy_artifacts() {
     echo "Copying eval artifacts..."
-    if [[ -d "${AGENT_EVAL_RUNS_DIR:-eval/runs}" ]]; then
-        find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "report.html" -exec cp {} "${ARTIFACT_DIR}/eval-report-summary.html" \; 2>/dev/null || true
-        find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "summary.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-        find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" -name "run_result.json" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-    fi
-    find . -name "*-summary.html" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-
-    # Copy MLflow data
-    if [[ -d "mlruns" ]]; then
-        tar -czf "${ARTIFACT_DIR}/mlflow-data.tar.gz" mlruns/ 2>/dev/null || true
+    RUNS_DIR="${AGENT_EVAL_RUNS_DIR:-eval/runs}"
+    if [[ -d "${RUNS_DIR}" ]]; then
+        tar -czf "${ARTIFACT_DIR}/eval-runs.tar.gz" "${RUNS_DIR}/" 2>/dev/null || true
     fi
 
-    # Archive Claude session for continue-session support
     CLAUDE_HOME="/home/claude/.claude"
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
-        echo "Archiving Claude session logs..."
-        tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
-            -C "${CLAUDE_HOME}" projects/ 2>/dev/null && \
-            touch "${SHARED_DIR}/claude-session-available" || true
+        tar -czf "${ARTIFACT_DIR}/claude-sessions.tar.gz" \
+            -C "${CLAUDE_HOME}" projects/ 2>/dev/null || true
     fi
-
-    cleanup_mlflow
 }
 trap copy_artifacts EXIT TERM INT
 
@@ -138,7 +87,10 @@ export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 RUN_ID="ci-$(date +%Y%m%d-%H%M%S)-${EVAL_MODEL}"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob Agent Skill"
 
-EVAL_RUN_ARGS="--config ${EVAL_CONFIG} --model ${EVAL_MODEL} --run-id ${RUN_ID}"
+EVAL_RUN_ARGS="--config ${EVAL_CONFIG} --model ${EVAL_MODEL} --run-id ${RUN_ID} --parallelism ${EVAL_PARALLELISM}"
+if [[ -n "${EVAL_CASES}" ]]; then
+    EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --cases ${EVAL_CASES//,/ }"
+fi
 if [[ -n "${EVAL_BASELINE}" ]]; then
     EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --baseline ${EVAL_BASELINE}"
 fi
@@ -167,25 +119,6 @@ timeout 7200 claude \
 EVAL_DURATION=$(( $(date +%s) - EVAL_START ))
 
 echo "eval-run completed in ${EVAL_DURATION}s (exit ${EVAL_EXIT})"
-
-# -----------------------------------------------------------------------
-# Run eval-mlflow to upload results
-# -----------------------------------------------------------------------
-echo ""
-echo "=== Running eval-mlflow ==="
-
-MLFLOW_EXIT=0
-timeout 600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --plugin-dir "${EVAL_HARNESS_DIR}" \
-    --continue \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
-    --max-turns 20 \
-    -p "/eval-mlflow --action all --run-id ${RUN_ID} --config ${EVAL_CONFIG}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval-mlflow.log" || MLFLOW_EXIT=$?
-
-echo "eval-mlflow completed with exit code ${MLFLOW_EXIT}"
 
 # -----------------------------------------------------------------------
 # Generate JUnit XML
