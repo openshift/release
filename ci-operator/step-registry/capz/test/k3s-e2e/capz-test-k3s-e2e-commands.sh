@@ -49,17 +49,18 @@ ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 # with slirp4netns connectivity. Inside that namespace:
 # - ip_forward can be set to 1 (own network namespace)
 # - iptables works (own network namespace with CAP_NET_ADMIN)
-# - --evacuate-cgroup2=yes creates a sub-cgroup + new cgroup namespace
-#   so we can mount a writable cgroup2 filesystem inside
+# - --pidns --cgroupns create PID + cgroup namespaces so we can
+#   mount a writable cgroup2 filesystem for runc container creation
 echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
 rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlesskit-state \
   --copy-up=/etc --copy-up=/run --copy-up=/var/lib --copy-up=/var/log --copy-up=/usr/libexec \
-  --pidns --cgroupns --evacuate-cgroup2=yes \
+  --pidns --cgroupns \
   sh -c '
     echo 1 > /proc/sys/net/ipv4/ip_forward
     ln -sf /dev/null /dev/kmsg 2>/dev/null || true
-    # Mount writable cgroup2 in the new cgroup namespace
+    # Mount writable cgroup2 in the new cgroup namespace so runc
+    # can create cgroup directories for containers
     mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null || true
     exec k3s server \
       --disable=traefik \
