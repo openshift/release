@@ -70,6 +70,7 @@ nodes:
         feature-gates: KubeletInUserNamespace=true
 networking:
   apiServerAddress: 127.0.0.1
+  ipFamily: ipv4
 EOF
 
 # ---- Create kind cluster ----
