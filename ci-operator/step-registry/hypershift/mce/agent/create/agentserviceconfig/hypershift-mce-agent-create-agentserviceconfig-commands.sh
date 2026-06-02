@@ -201,6 +201,9 @@ spec:
   - mirrors:
     - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
     source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+  - mirrors:
+    - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-release
 END
 }
 
