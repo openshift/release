@@ -116,7 +116,7 @@ timeout 7200 claude \
     --plugin-dir "${EVAL_HARNESS_DIR}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
-    --max-turns 100 \
+    --max-turns 500 \
     -p "/eval-run ${EVAL_RUN_ARGS}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval.log" || EVAL_EXIT=$?
 EVAL_DURATION=$(( $(date +%s) - EVAL_START ))
