@@ -259,17 +259,17 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (35m and 100 turns).
+# Run analysis on all releases and open rebase PRs (45m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
-timeout 2100 claude \
+timeout 2700 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor" 35
+check_claude_rc "${CLAUDE_RC}" "doctor" 45
 
 # Run bug creation for failed jobs (15m and 50 turns).
 echo "Running Claude to create bugs for failed jobs..."
@@ -283,30 +283,30 @@ timeout 900 claude \
     --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
 
-# Run bug fix for test bugs (5m and 20 turns).
+# Run bug fix for test bugs (15m and 50 turns).
 # Dry-run mode only.
 echo "Running Claude to fix test bugs (dry-run mode)..."
 CLAUDE_RC=0
-timeout 300 claude \
+timeout 900 claude \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 20 \
+    --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
     --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 5
+check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
 
-# Run HTML report refresh to include the new bugs (5m and 30 turns).
+# Run HTML report refresh to include the new bugs (10m and 20 turns).
 echo "Running Claude to refresh the HTML report..."
 CLAUDE_RC=0
-timeout 300 claude \
+timeout 600 claude \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 30 \
+    --max-turns 20 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 5
+check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.
