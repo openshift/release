@@ -42,6 +42,7 @@ cat > "${HOME}/.config/containers/containers.conf" <<EOF
 utsns = "private"
 cgroups = "enabled"
 log_driver = "k8s-file"
+label = false
 
 [network]
 firewall_driver = "nftables"
