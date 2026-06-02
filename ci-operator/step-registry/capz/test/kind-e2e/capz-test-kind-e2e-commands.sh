@@ -44,7 +44,7 @@ utsns = "private"
 cgroups = "enabled"
 
 [network]
-network_backend = "cni"
+firewall_driver = "nftables"
 EOF
 
 # ---- Install kind ----
