@@ -25,4 +25,4 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 SSH_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" sh patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso" "${SSH_KEY}"
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso" "${SSH_KEY}"

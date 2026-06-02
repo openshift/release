@@ -66,7 +66,7 @@ BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/gro
 echo "Run compute NROP gotests via ssh tunnel"
 # Temporarily disable set -e to capture SSH exit code
 set +e
-timeout -s 9 5h ssh \
+timeout -s 9 8h ssh \
   -o ServerAliveInterval=60 \
   -o ServerAliveCountMax=3 \
   -o StrictHostKeyChecking=no \

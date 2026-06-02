@@ -313,6 +313,16 @@ EOF
 "[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
 EOF
        fi
+       # Skip the HAProxy router idled service test for versions below 4.22 until the fix is backported
+       # The test fails due to missing port 80 configuration, which was fixed in 4.22 by https://github.com/openshift/installer/pull/10548
+       # Backporting to all lower versions requires significant resources and is not feasible at this time
+       # Bug reference: https://redhat.atlassian.net/browse/OCPBUGS-85232
+       if echo "${BRANCH}" | awk -F. '{ if ((($1 == 4) && ($2 < 22))) { exit 0 } else { exit 1 } }'; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
+EOF
+       fi
     fi
 else
     echo "Executing all tests"

@@ -21,8 +21,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-osd-ccs-gcp-ad-staging-main
       - --variant=ocm-fvt-osd-gcp-staging
       command:
@@ -42,8 +43,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -59,9 +63,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -93,8 +103,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-osd-ccs-gcp-marketplace-staging-main
       - --variant=ocm-fvt-osd-gcp-staging
       command:
@@ -114,8 +125,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -131,9 +145,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -165,8 +185,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-osd-gcp-non-cross-proj-wif-staging-main
       - --variant=ocm-fvt-osd-gcp-staging
       command:
@@ -186,8 +207,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -203,9 +227,97 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 9 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-osd-gcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+      - --variant=ocm-fvt-osd-gcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -237,8 +349,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-sts-ad-integration-main
       - --variant=ocm-fvt-rosa-classic-integration
       command:
@@ -258,8 +371,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -275,9 +391,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -309,8 +431,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-ocm-resources-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -330,8 +453,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -347,9 +473,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -381,8 +513,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-osd-rh-aws-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -402,8 +535,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -419,9 +555,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -453,8 +595,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-ad-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -474,8 +617,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -491,9 +637,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -525,8 +677,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -546,8 +699,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -563,9 +719,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -597,8 +759,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-sts-ad-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -618,8 +781,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -635,9 +801,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -669,8 +841,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-sts-pl-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -690,8 +863,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -707,9 +883,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -741,8 +923,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-sts-shared-vpc-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -762,8 +945,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -779,9 +965,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -813,8 +1005,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-sts-upgrade-staging-main
       - --variant=ocm-fvt-rosa-classic-staging
       command:
@@ -834,8 +1027,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -851,9 +1047,97 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-integration
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
+      - --variant=ocm-fvt-rosa-hcp-integration
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -885,8 +1169,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-backup-restore-integration-main
       - --variant=ocm-fvt-rosa-hcp-integration
       command:
@@ -906,8 +1191,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -923,9 +1211,97 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-integration
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-bkp-cp-upgrade-integration-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-bkp-cp-upgrade-integration-main
+      - --variant=ocm-fvt-rosa-hcp-integration
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -957,8 +1333,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-hcp-e2e-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -978,8 +1355,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -995,9 +1375,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1029,8 +1415,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1050,8 +1437,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1067,9 +1457,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1101,8 +1497,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1122,8 +1519,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1139,9 +1539,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1173,8 +1579,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1194,8 +1601,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1211,9 +1621,97 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-staging-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1245,8 +1743,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1266,8 +1765,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1283,9 +1785,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1317,8 +1825,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1338,8 +1847,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1355,9 +1867,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1389,8 +1907,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1410,8 +1929,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1427,9 +1949,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1461,8 +1989,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1482,8 +2011,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1499,9 +2031,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1533,8 +2071,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1554,8 +2093,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1571,9 +2113,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1605,8 +2153,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1626,8 +2175,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1643,9 +2195,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1677,8 +2235,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1698,8 +2257,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1715,9 +2277,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1749,8 +2317,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/cs-qe-credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
@@ -1770,8 +2339,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/cs-qe-credentials
-        name: cs-qe-credentials
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1787,9 +2359,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: cs-qe-credentials
+    - name: boskos
       secret:
-        secretName: cs-qe-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -2660,7 +3238,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build06
   cron: 0 14 * * *
   decorate: true
   decoration_config:
