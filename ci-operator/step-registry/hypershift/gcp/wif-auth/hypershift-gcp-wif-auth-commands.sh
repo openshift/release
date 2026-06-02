@@ -60,7 +60,13 @@ echo "WIF credential config written successfully"
 
 # Smoke-test: validate WIF is working before any downstream step runs,
 # using the same auth path as all downstream steps
-gcloud auth login --cred-file "${SHARED_DIR}/wif-cred.json"
+if ! gcloud auth login --cred-file "${SHARED_DIR}/wif-cred.json"; then
+  echo "ERROR: WIF login failed — verify wif-config.json in the cluster profile"
+  echo "  project_number, pool_id, service_account, and issuer_map must all be correct"
+  echo "  OIDC issuer detected: ${OIDC_ISSUER}"
+  echo "  WIF provider mapped: ${PROVIDER_ID}"
+  exit 1
+fi
 if ! gcloud auth print-access-token > /dev/null; then
   echo "ERROR: WIF token exchange failed — verify wif-config.json in the cluster profile"
   echo "  project_number, pool_id, service_account, and issuer_map must all be correct"
