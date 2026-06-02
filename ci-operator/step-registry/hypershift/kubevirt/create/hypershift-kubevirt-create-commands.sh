@@ -170,6 +170,10 @@ fi
 
 EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 
+if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --auto-repair"
+fi
+
 case "${IP_STACK}" in
  "v4")
    EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "

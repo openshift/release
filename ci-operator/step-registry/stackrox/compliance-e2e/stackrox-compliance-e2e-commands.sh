@@ -3,70 +3,25 @@
 # Enable strict mode options including xtrace (-x) and inherit_errexit
 set -euxo pipefail; shopt -s inherit_errexit
 
-# Env used by CleanupCollect/yq; defaults match step ref so they are always set (for trap and subprocesses).
-export MAP_TESTS="${MAP_TESTS:-false}"
-export MAP_TESTS_SUITE_NAME="${MAP_TESTS_SUITE_NAME:-ACS-lp-interop}"
-
-function InstallYq() {
-    : "Installing yq..."
-
-    # Install yq manually
-    mkdir -p /tmp/bin
-    export PATH="/tmp/bin:${PATH}"
-    typeset arch=""
-    arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
-    curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_${arch}" \
-        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    /tmp/bin/yq --version || export MAP_TESTS=false
-}
-
-# Merge multiple jUnit XML files into one (avoids naming conflict with other Steps). Optionally map suite name for CR.
-# Archives original XMLs so Prow does not see duplicated results.
-function CleanupCollect() {
-    typeset mergedFN="${1:-jUnit.xml}"; (($#)) && shift
-    typeset resultFile=''
-    typeset -a xmlFiles=()
-
-    InstallYq
-
-    while IFS= read -r -d '' resultFile; do
-        grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
-    done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" ! -name "${mergedFN}" -print0)
-
-    ((${#xmlFiles[@]})) || {
-        : 'Warning: No JUnit XML file found to process'
-        true
-        return
-    }
-
-    # Prepare one jUnit XML: collect -> map suite name and merge into a single document
-    yq eval-all --input-format xml --output-format xml -I2 '
-        (. | [.[] | (.testsuite // .) | ([] + .)[] | select(kind == "map")]) as $suites |
-        $suites | .[] |= (
-            (
-                select(env(MAP_TESTS) == "true") |
-                ."+@name" = env(MAP_TESTS_SUITE_NAME)
-            )//. |
-            ([] + (.testcase // [])) as $tc |
-            ."+@tests" = ($tc | length | tostring) |
-            ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
-            ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
-        ) |
-        {
-            "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
-            "testsuites": {"testsuite": $suites}
-        }
-    ' "${xmlFiles[@]}" 1> "${ARTIFACT_DIR}/${mergedFN}"
-
-    # Archive the original jUnit XMLs so Prow does not see duplicated results.
-    tar zcf "${ARTIFACT_DIR}/jUnit-original.tgz" -C "${ARTIFACT_DIR}/" "${xmlFiles[@]#${ARTIFACT_DIR}/}"
-    rm -f "${xmlFiles[@]}"
-
-    cp "${ARTIFACT_DIR}/${mergedFN}" "${SHARED_DIR}/"
-    true
-}
-
-trap 'CleanupCollect junit--stackrox__compliance-e2e__stackrox-compliance-e2e.xml' EXIT
+# Map results by setting identifier prefix in tests suites names for reporting tools
+# Merge original results into a single file and compress
+# Send modified file to shared dir for Data Router Reporter step
+if [ "${MAP_TESTS}" = "true" ]; then
+    # Avoid conflicts with the older versioned yq from the image:
+    # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        mkdir -p /tmp/bin
+        printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
+        PATH="/tmp/bin:${PATH}"
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--stackrox__compliance-e2e__stackrox-compliance-e2e.xml
+    ' EXIT
+fi
 
 # Determine job name from test suite or job name safe
 typeset job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
@@ -87,3 +42,5 @@ trap '' TERM
 
 # Execute dispatch script
 .openshift-ci/dispatch.sh "${job}"
+
+true
