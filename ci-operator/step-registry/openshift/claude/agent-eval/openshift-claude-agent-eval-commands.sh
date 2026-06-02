@@ -8,6 +8,7 @@
 # Optional env:
 #   EVAL_MODEL        -- model for the skill under test (default: claude-sonnet-4-6)
 #   EVAL_PARALLELISM  -- number of test cases to run concurrently (default: 1)
+#   EVAL_CASES        -- comma-separated list of case IDs to run (default: all)
 #   EVAL_BASELINE     -- run-id of a previous run to compare against
 #   EVAL_EXTRA_ARGS   -- additional args passed to /eval-run
 #   EVAL_SETUP_SCRIPT -- script to run before eval (e.g. snapshot extraction)
@@ -94,6 +95,9 @@ RUN_ID="ci-$(date +%Y%m%d-%H%M%S)-${EVAL_MODEL}"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob Agent Skill"
 
 EVAL_RUN_ARGS="--config ${EVAL_CONFIG} --model ${EVAL_MODEL} --run-id ${RUN_ID} --parallelism ${EVAL_PARALLELISM}"
+if [[ -n "${EVAL_CASES}" ]]; then
+    EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --cases ${EVAL_CASES//,/ }"
+fi
 if [[ -n "${EVAL_BASELINE}" ]]; then
     EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --baseline ${EVAL_BASELINE}"
 fi
