@@ -4,52 +4,80 @@ set -euo pipefail
 
 SCRIPT_EXIT_CODE=0
 
-# Cluster credentials from Vault
-if [[ -s /secret/kubeadmin_password ]]; then
-  KUBEADMIN_PASSWORD=$(<"/secret/kubeadmin_password")
-  KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
-  export KUBEADMIN_PASSWORD
+# SSH setup for direct cluster access
+if [[ -s /secret/cluster_address ]] && [[ -s /secret/provision_private_key ]]; then
+  CLUSTER_IP=$(<"/secret/cluster_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/provision_private_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+elif [[ -s /secret/bastion_address ]] && [[ -s /secret/jh_priv_ssh_key ]]; then
+  CLUSTER_IP=$(<"/secret/bastion_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/jh_priv_ssh_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 fi
 
-if [[ -s /secret/kubeconfig ]]; then
+# Cluster credentials: live from cluster via SSH → Vault fallback
+if [[ -n "${CLUSTER_IP:-}" ]]; then
+  KUBEADMIN_PASSWORD=$(ssh ${SSH_ARGS} root@"${CLUSTER_IP}" "cat /root/.kube/kubeadmin-password 2>/dev/null" || true)
+  KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
+  if [[ -z "${KUBEADMIN_PASSWORD}" ]] && [[ -s /secret/kubeadmin_password ]]; then
+    KUBEADMIN_PASSWORD=$(<"/secret/kubeadmin_password")
+    KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
+  fi
+  export KUBEADMIN_PASSWORD
+
+  CLUSTER_API=$(ssh ${SSH_ARGS} root@"${CLUSTER_IP}" "grep server /root/.kube/config 2>/dev/null | head -1 | awk '{print \$2}'" || true)
+  CLUSTER_API="${CLUSTER_API%$'\n'}"
+  CLUSTER_API="${CLUSTER_API// /}"
+  if [[ -n "${CLUSTER_API}" ]]; then
+    ssh ${SSH_ARGS} root@"${CLUSTER_IP}" \
+      "oc login '${CLUSTER_API}' -u kubeadmin -p '${KUBEADMIN_PASSWORD}' --insecure-skip-tls-verify >/dev/null 2>&1" || true
+  fi
+  if scp ${SSH_ARGS} root@"${CLUSTER_IP}":/root/.kube/config /tmp/kubeconfig 2>/dev/null; then
+    export KUBECONFIG=/tmp/kubeconfig
+    CLUSTER_NAME=$(oc config view --kubeconfig=/tmp/kubeconfig --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)
+    [[ -n "${CLUSTER_NAME}" ]] && oc config set-cluster "${CLUSTER_NAME}" --insecure-skip-tls-verify=true --kubeconfig=/tmp/kubeconfig >/dev/null
+    echo "Fetched fresh kubeconfig from cluster at runtime"
+  elif [[ -s /secret/kubeconfig ]]; then
+    cp /secret/kubeconfig /tmp/kubeconfig
+    export KUBECONFIG=/tmp/kubeconfig
+    echo "Using kubeconfig from Vault fallback"
+  else
+    echo "ERROR: could not fetch kubeconfig" >&2
+    exit 1
+  fi
+
+  # SOCKS proxy through cluster for private DNS resolution
+  SOCKS_PORT=$((RANDOM % 55536 + 10000))
+  ssh ${SSH_ARGS} root@"${CLUSTER_IP}" -fNT -D "${SOCKS_PORT}"
+  sleep 3
+  export HTTPS_PROXY="socks5h://localhost:${SOCKS_PORT}"
+  export https_proxy="socks5h://localhost:${SOCKS_PORT}"
+  export NO_PROXY="cloud-object-storage.appdomain.cloud,pypi.org,quay.io,github.com"
+  export no_proxy="${NO_PROXY}"
+  # Direct ES access (port 9200 open via ACL)
+  export ELASTICSEARCH="${CLUSTER_IP}"
+  export ELASTICSEARCH_PORT=9200
+  echo "SOCKS proxy on port ${SOCKS_PORT}, direct ES available"
+elif [[ -s /secret/kubeconfig ]]; then
+  if [[ -s /secret/kubeadmin_password ]]; then
+    KUBEADMIN_PASSWORD=$(<"/secret/kubeadmin_password")
+    KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
+    export KUBEADMIN_PASSWORD
+  fi
   cp /secret/kubeconfig /tmp/kubeconfig
   export KUBECONFIG=/tmp/kubeconfig
   echo "Using kubeconfig from Vault secret"
-
-  # SOCKS proxy for private VLAN clusters (API on 198.18.x.x)
-  CLUSTER_SERVER=$(oc config view --kubeconfig=/tmp/kubeconfig --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
-  if [[ -s /secret/bastion_address ]] && [[ -s /secret/jh_priv_ssh_key ]]; then
-    BASTION_ADDRESS=$(<"/secret/bastion_address")
-    BASTION_ADDRESS="${BASTION_ADDRESS%$'\n'}"
-    cp /secret/jh_priv_ssh_key /tmp/bastion_key
-    chmod 600 /tmp/bastion_key
-    if ! curl -sk --max-time 5 "${CLUSTER_SERVER}/version" &>/dev/null; then
-      echo "API not directly reachable, starting SOCKS proxy through ${BASTION_ADDRESS}"
-      SSH_ARGS="-i /tmp/bastion_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-      SOCKS_PORT=$((RANDOM % 55536 + 10000))
-      ES_PORT=$(<"/secret/elasticsearch_port")
-      ES_PORT="${ES_PORT%$'\n'}"
-      ssh ${SSH_ARGS} root@"${BASTION_ADDRESS}" -fNT -D "${SOCKS_PORT}" -L "127.0.0.1:${ES_PORT}:localhost:${ES_PORT}"
-      sleep 3
-      export HTTPS_PROXY="socks5h://localhost:${SOCKS_PORT}"
-      export https_proxy="socks5h://localhost:${SOCKS_PORT}"
-      export HTTP_PROXY="socks5h://localhost:${SOCKS_PORT}"
-      export http_proxy="socks5h://localhost:${SOCKS_PORT}"
-      export ELASTICSEARCH=localhost
-      echo "SOCKS proxy on port ${SOCKS_PORT}, ES tunnel on port ${ES_PORT}"
-    else
-      echo "API directly reachable, no SOCKS proxy needed"
-    fi
-  fi
 else
-  echo "ERROR: no kubeconfig found at /secret/kubeconfig" >&2
+  echo "ERROR: no cluster access available" >&2
   exit 1
 fi
 
 # Vault secrets
 if [[ -d /secret ]]; then
-  echo "=== Vault secret mounted at /secret ==="
-  ls -la /secret 2>/dev/null || true
   for key in base_domain elasticsearch elasticsearch_port lso_disk_id worker_disk_ids \
              redis threads_limit lso_node worker_disk_prefix scale_nodes windows_url \
              winmssql_url windows_server_2022_url windows_server_2025_url \
@@ -87,7 +115,7 @@ if [[ "${WORKLOAD:-}" == *"_vm"* ]] && oc get daemonset virt-handler -n openshif
   oc rollout status daemonset/virt-handler -n openshift-cnv --timeout=5m
   oc rollout status deployment/virt-controller -n openshift-cnv --timeout=3m
   oc rollout status deployment/virt-api -n openshift-cnv --timeout=3m
-  sleep 180
+  sleep 10
   echo "  $(oc get nodes -l kubevirt.io/schedulable=true -o name 2>/dev/null | wc -l) nodes with kubevirt.io/schedulable=true"
   echo "=== Pre-flight complete ==="
 fi
@@ -166,30 +194,9 @@ if [[ "${WORKLOAD}" == "all" ]]; then
     SCRIPT_EXIT_CODE=1
   fi
 else
-  # For VM workloads: monitor pod state in background
-  MONITOR_PID=""
-  if [[ "${WORKLOAD:-}" == *"_vm"* ]]; then
-    (
-      sleep 60
-      while true; do
-        echo "=== VM-MONITOR $(date -Iseconds) ==="
-        oc get pods -n benchmark-runner -o wide 2>/dev/null || true
-        oc get events -n benchmark-runner --sort-by='.lastTimestamp' 2>/dev/null | tail -3 || true
-        echo "=== END ==="
-        sleep 30
-      done
-    ) &
-    MONITOR_PID=$!
-  fi
-
   rc=0
   python3.14 /benchmark_runner/main/main.py || rc=$?
   SCRIPT_EXIT_CODE=$rc
-
-  if [[ -n "$MONITOR_PID" ]]; then
-    kill $MONITOR_PID 2>/dev/null || true
-    wait $MONITOR_PID 2>/dev/null || true
-  fi
 fi
 
 echo "=== Python end: $(date -Iseconds) exit_code: ${rc:-$SCRIPT_EXIT_CODE} ==="

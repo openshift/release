@@ -24,6 +24,22 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: deployment-validation
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      ADAPTER_IMAGE_REPO: ci/hyperfleet-adapter
+      API_IMAGE_REPO: ci/hyperfleet-api
+      CLUSTER_NAME: hyperfleet-dev-prow
+      IMAGE_REGISTRY: registry.ci.openshift.org
+      LABEL_FILTER: tier0
+      MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX: e2e
+      MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG: latest
+      REGION: us-central1-a
+      SENTINEL_IMAGE_REPO: ci/hyperfleet-sentinel
+    workflow: openshift-hyperfleet-e2e
 - as: tier0-nightly
   cron: 30 9 * * *
   reporter_config:
