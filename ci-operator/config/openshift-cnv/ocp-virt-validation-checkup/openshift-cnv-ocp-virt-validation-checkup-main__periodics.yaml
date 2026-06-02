@@ -104,6 +104,7 @@ tests:
         export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
         export OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n ${TARGET_NAMESPACE} $CSV_NAME -o json | jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
         export OCP_VIRT_VALIDATION_IMAGE=$(echo "$OCP_VIRT_VALIDATION_IMAGE" | sed "s|registry.redhat.io/container-native-virtualization|quay.io/openshift-virtualization/konflux-builds/v${CNV_VERSION//./-}|")
+        curl -sL https://gist.github.com/rlobillo/cd80d9d750c739876796b1d2269ced89/raw/ | git apply -
         make ci-validate-disconnected
       env:
       - default: "4.22"
@@ -114,7 +115,7 @@ tests:
         name: OCP_VIRT_VALIDATION_TIMEOUT
       - default: ocs-storagecluster-ceph-rbd-virtualization
         name: STORAGE_CLASS
-      - default: compute,network,storage,ssp
+      - default: storage,tier2
         name: TEST_SUITES
       - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
         name: TEST_SKIPS
