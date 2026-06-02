@@ -33,19 +33,34 @@ USER_NAME=$(whoami)
 printf '%s\n' "${USER_NAME}:1:999" "${USER_NAME}:1001:64535" > /etc/subuid
 printf '%s\n' "${USER_NAME}:1:999" "${USER_NAME}:1001:64535" > /etc/subgid
 
-# ---- Configure podman for kind compatibility ----
-# Kind requires private UTS namespace (to set hostname in node containers)
-# and enabled cgroups (for kubelet cgroup management).
+# ---- Configure podman for kind rootless compatibility ----
 # See https://github.com/adelton/kind-in-pod
 mkdir -p "${HOME}/.config/containers"
+
 cat > "${HOME}/.config/containers/containers.conf" <<EOF
 [containers]
 utsns = "private"
 cgroups = "enabled"
+log_driver = "k8s-file"
 
 [network]
 firewall_driver = "nftables"
 EOF
+
+if [ -c "/dev/fuse" ] && [ -f "/usr/bin/fuse-overlayfs" ]; then
+  cat > "${HOME}/.config/containers/storage.conf" <<EOF
+[storage]
+driver = "overlay"
+graphroot = "/tmp/graphroot"
+[storage.options.overlay]
+mount_program = "/usr/bin/fuse-overlayfs"
+EOF
+else
+  cat > "${HOME}/.config/containers/storage.conf" <<EOF
+[storage]
+driver = "vfs"
+EOF
+fi
 
 # ---- Install kind ----
 echo "[kind] Installing kind ${KIND_VERSION}"
@@ -54,12 +69,11 @@ chmod +x /tmp/kind
 export PATH="/tmp:${PATH}"
 echo "[kind] Installed: $(kind version)"
 
-# ---- Set kind to use podman ----
+# ---- Set kind to use rootless podman ----
 export KIND_EXPERIMENTAL_PROVIDER=podman
+export KIND_EXPERIMENTAL_ROOTLESS=true
 
 # ---- Prepare kind cluster config ----
-# KubeletInUserNamespace is required for rootless podman — kubelet
-# cannot access /dev/kmsg in a user namespace without this gate.
 cat > /tmp/kind-cluster.yaml <<'EOF'
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
