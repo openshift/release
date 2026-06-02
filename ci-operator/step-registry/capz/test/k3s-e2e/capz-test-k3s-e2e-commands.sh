@@ -47,10 +47,54 @@ echo "[k3s] Installed: $(k3s --version)"
 CONTAINERD_CFG_DIR="${K3S_DATA_DIR}/agent/etc/containerd"
 mkdir -p "${CONTAINERD_CFG_DIR}"
 cat > "${CONTAINERD_CFG_DIR}/config.toml.tmpl" << 'TMPL'
-{{ template "base" . }}
+version = 2
+root = {{ printf "%q" .NodeConfig.Containerd.Root }}
+state = {{ printf "%q" .NodeConfig.Containerd.State }}
+
+[grpc]
+  address = {{ deschemify .NodeConfig.Containerd.Address | printf "%q" }}
+
+[plugins."io.containerd.internal.v1.opt"]
+  path = {{ printf "%q" .NodeConfig.Containerd.Opt }}
+
+[plugins."io.containerd.grpc.v1.cri"]
+  stream_server_address = "127.0.0.1"
+  stream_server_port = "10010"
+  enable_selinux = {{ .NodeConfig.SELinux }}
+  enable_unprivileged_ports = {{ .EnableUnprivileged }}
+  enable_unprivileged_icmp = {{ .EnableUnprivileged }}
+  device_ownership_from_security_context = {{ .NonrootDevices }}
+{{- if .DisableCgroup}}
+  disable_cgroup = true
+{{end}}
+{{- if .IsRunningInUserNS }}
+  disable_apparmor = true
+  restrict_oom_score_adj = true
+{{end}}
+{{- if .NodeConfig.AgentConfig.PauseImage }}
+  sandbox_image = "{{ .NodeConfig.AgentConfig.PauseImage }}"
+{{end}}
+{{- if .NodeConfig.AgentConfig.Snapshotter }}
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  snapshotter = "{{ .NodeConfig.AgentConfig.Snapshotter }}"
+  disable_snapshot_annotations = {{ if eq .NodeConfig.AgentConfig.Snapshotter "stargz" }}false{{else}}true{{end}}
+  {{ if .NodeConfig.DefaultRuntime }}default_runtime_name = "{{ .NodeConfig.DefaultRuntime }}"{{end}}
+{{end}}
+{{- if or .NodeConfig.AgentConfig.CNIBinDir .NodeConfig.AgentConfig.CNIConfDir }}
+[plugins."io.containerd.grpc.v1.cri".cni]
+  {{ if .NodeConfig.AgentConfig.CNIBinDir }}bin_dir = {{ printf "%q" .NodeConfig.AgentConfig.CNIBinDir }}{{end}}
+  {{ if .NodeConfig.AgentConfig.CNIConfDir }}conf_dir = {{ printf "%q" .NodeConfig.AgentConfig.CNIConfDir }}{{end}}
+{{end}}
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   BinaryName = "/usr/bin/crun"
+  SystemdCgroup = {{ .SystemdCgroup }}
+
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = {{ printf "%q" .NodeConfig.Containerd.Registry }}
 TMPL
 
 # ---- Prepare /dev/kmsg ----
