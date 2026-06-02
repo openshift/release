@@ -118,7 +118,7 @@ class BranchVersion:
 
 
 @dataclass
-class Violation:
+class Violation:  # pylint: disable=too-many-instance-attributes
     rule: str
     message: str
     image_refs_path: Optional[Path] = None
@@ -569,7 +569,7 @@ def validate_r2_branch_registry_rules(
         )
 
 
-def validate_r3_art_yaml(
+def validate_r3_art_yaml(  # pylint: disable=too-many-statements
     violations: list[Violation],
     art_yaml_path: Path,
     ocp_branch: Optional[BranchVersion] = None,

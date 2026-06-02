@@ -363,10 +363,10 @@ def expected_embedded_python_source() -> str:
     return "".join(module_lines).rstrip() + "\n"
 
 
-class ValidateArtManifestsTest(unittest.TestCase):
+class ValidateArtManifestsTest(unittest.TestCase):  # pylint: disable=too-many-public-methods
     @classmethod
     def setUpClass(cls) -> None:
-        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         cls.fixtures = Path(cls.temp_dir.name)
         build_fixture_tree(cls.fixtures)
         (cls.fixtures / "no-image-references").mkdir()
