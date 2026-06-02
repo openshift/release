@@ -224,7 +224,6 @@ def format_failure_report(
             "  - Re-run this check locally:",
             f"      python3 hack/art-manifests-validate/validate_art_manifests.py "
             f"--repo-root <operator-checkout> --release-branch {release_branch}",
-            "  - Details: https://redhat.atlassian.net/browse/ART-14695",
             "",
         ]
     )
