@@ -65,6 +65,9 @@ copy_artifacts() {
     echo "Copying eval artifacts..."
     RUNS_DIR="${AGENT_EVAL_RUNS_DIR:-eval/runs}"
     if [[ -d "${RUNS_DIR}" ]]; then
+        find "${RUNS_DIR}" -name "report.html" -exec cp {} "${ARTIFACT_DIR}/eval-report-summary.html" \; 2>/dev/null || true
+        find "${RUNS_DIR}" -name "summary.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+        find "${RUNS_DIR}" -name "run_result.json" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
         tar -czf "${ARTIFACT_DIR}/eval-runs.tar.gz" "${RUNS_DIR}/" 2>/dev/null || true
     fi
 
