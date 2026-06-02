@@ -51,29 +51,303 @@ MAIN_PLAYBOOK="multi-conf-test.yml"
 SINGLE_TEST_TASKS="_run_single_test.yml"
 READINESS_TASKS="_readiness_wait.yml"
 DEBUG_TASKS="_debug_collect.yml"
-WAIT_SA_SECRETS_SCRIPT="wait-sa-secrets.sh"
+ENSURE_CLUSTER_PULL_SECRETS_SCRIPT="ensure-cluster-pull-secrets.sh"
 COLLECT_OC_DEBUG_SCRIPT="collect-oc-debug.sh"
 COLLECT_NODE_JOURNALS_SCRIPT="collect-node-journals.sh"
 
-cat > "${WAIT_SA_SECRETS_SCRIPT}" <<'SCRIPT'
+cat > "${ENSURE_CLUSTER_PULL_SECRETS_SCRIPT}" <<'SCRIPT'
 #!/usr/bin/bash
-set -euo pipefail
-probe_ns="e2e-readiness-probe-${RANDOM}"
-oc create namespace "${probe_ns}"
-trap 'oc delete namespace "${probe_ns}" --ignore-not-found=true --wait=false >/dev/null 2>&1 || true' EXIT
-for attempt in $(seq 1 60); do
-  secrets=$(oc get sa default -n "${probe_ns}" -o jsonpath='{.secrets[*].name}' 2>/dev/null || true)
-  pull_secrets=$(oc get sa default -n "${probe_ns}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || true)
-  if echo "${secrets} ${pull_secrets}" | tr ' ' '\n' | grep -qE 'dockercfg|dockerconfig'; then
-    echo "default service account has image pull secrets after ${attempt} attempt(s): secrets='${secrets}' imagePullSecrets='${pull_secrets}'"
-    exit 0
+set -uo pipefail
+
+# Secret names include "dockercfg" so openshift-tests' WaitForServiceAccount* checks match.
+E2E_DOCKERCFG_SECRET_SUFFIX="-dockercfg-test-infra"
+
+log_banner() {
+  echo ""
+  echo "################################################################"
+  printf '### %s\n' "$*"
+  echo "################################################################"
+  echo ""
+}
+
+secret_name_for_sa() {
+  printf '%s%s\n' "$1" "${E2E_DOCKERCFG_SECRET_SUFFIX}"
+}
+
+# openshift-tests WaitForServiceAccount* checks mountable .secrets on each SA
+# (log: secrets () to include dockercfg), not imagePullSecrets alone.
+sa_has_mountable_dockercfg() {
+  local ns="$1"
+  local sa_name="$2"
+  local expected_secret sa_secrets s
+  expected_secret=$(secret_name_for_sa "${sa_name}")
+  sa_secrets=$(oc get sa "${sa_name}" -n "${ns}" -o jsonpath='{.secrets[*].name}' 2>/dev/null || true)
+  for s in ${sa_secrets}; do
+    [[ "${s}" == "${expected_secret}" ]] && return 0
+    [[ "${s}" == *dockercfg* || "${s}" == *dockerconfig* ]] && return 0
+  done
+  return 1
+}
+
+namespace_pull_secrets_ready() {
+  local ns="$1"
+  local sa
+  for sa in default builder; do
+    if ! oc get sa "${sa}" -n "${ns}" >/dev/null 2>&1; then
+      return 1
+    fi
+    sa_has_mountable_dockercfg "${ns}" "${sa}" || return 1
+  done
+  if oc get sa deployer -n "${ns}" >/dev/null 2>&1; then
+    sa_has_mountable_dockercfg "${ns}" deployer || return 1
   fi
-  echo "attempt ${attempt}/60: waiting for default service account secrets (secrets='${secrets}' imagePullSecrets='${pull_secrets}')"
-  sleep 5
-done
-echo "timed out waiting for default service account dockercfg/dockerconfig secrets in ${probe_ns}" >&2
-oc get sa default -n "${probe_ns}" -o yaml || true
-exit 1
+  return 0
+}
+
+resolve_pull_secret_file() {
+  if [[ -f /root/pull-secret ]]; then
+    echo /root/pull-secret
+    return 0
+  fi
+  if oc get secret pull-secret -n openshift-config >/dev/null 2>&1; then
+    local tmp
+    tmp=$(mktemp)
+    if ! oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d >"${tmp}"; then
+      rm -f "${tmp}"
+      return 1
+    fi
+    echo "${tmp}"
+    return 0
+  fi
+  return 1
+}
+
+describe_namespace_pull_state() {
+  local ns="$1"
+  local sa sa_secrets sa_pull
+  echo "--- namespace ${ns} ---"
+  oc get secrets -n "${ns}" -o custom-columns=NAME:.metadata.name,TYPE:.type 2>/dev/null \
+    | grep -E 'dockercfg|dockerconfig|NAME' || echo "  (no dockercfg/dockerconfigjson secrets listed)"
+  for sa in default builder deployer; do
+    if ! oc get sa "${sa}" -n "${ns}" >/dev/null 2>&1; then
+      continue
+    fi
+    sa_secrets=$(oc get sa "${sa}" -n "${ns}" -o jsonpath='{.secrets[*].name}' 2>/dev/null || true)
+    sa_pull=$(oc get sa "${sa}" -n "${ns}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || true)
+    echo "  ${sa} SA .secrets: ${sa_secrets:-<none>}"
+    echo "  ${sa} SA .imagePullSecrets: ${sa_pull:-<none>}"
+  done
+}
+
+ensure_sa_secrets_field() {
+  local ns="$1"
+  local sa_name="$2"
+  local secret_name
+  secret_name=$(secret_name_for_sa "${sa_name}")
+  if sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
+    return 0
+  fi
+  if oc get sa "${sa_name}" -n "${ns}" -o json | jq -e '.secrets != null' >/dev/null 2>&1; then
+    oc patch sa "${sa_name}" -n "${ns}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/secrets/-\",\"value\":{\"name\":\"${secret_name}\"}}]" || return 1
+  else
+    oc patch sa "${sa_name}" -n "${ns}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/secrets\",\"value\":[{\"name\":\"${secret_name}\"}]}]" || return 1
+  fi
+  return 0
+}
+
+ensure_sa_pull_secret() {
+  local ns="$1"
+  local sa_name="$2"
+  local secret_name pull_file pull_file_tmp=false
+
+  secret_name=$(secret_name_for_sa "${sa_name}")
+
+  if ! oc get namespace "${ns}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! oc get sa "${sa_name}" -n "${ns}" >/dev/null 2>&1; then
+    echo "skip ${ns}/${sa_name}: service account does not exist"
+    return 0
+  fi
+  if sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
+    echo "namespace ${ns}/${sa_name}: already has a mountable dockercfg secret"
+    return 0
+  fi
+
+  if ! pull_file=$(resolve_pull_secret_file); then
+    log_banner "CANNOT CREATE pull secret in namespace ${ns}: missing /root/pull-secret and openshift-config/pull-secret"
+    return 1
+  fi
+  if [[ "${pull_file}" != /root/pull-secret ]]; then
+    pull_file_tmp=true
+  fi
+
+  if ! oc create secret generic "${secret_name}" \
+    --from-file=.dockerconfigjson="${pull_file}" \
+    --type=kubernetes.io/dockerconfigjson \
+    -n "${ns}" --dry-run=client -o yaml | oc apply -f -; then
+    log_banner "FAILED to apply secret ${secret_name} in namespace ${ns}"
+    ${pull_file_tmp} && rm -f "${pull_file}"
+    return 1
+  fi
+  ${pull_file_tmp} && rm -f "${pull_file}"
+
+  if ! oc secrets link "${sa_name}" "${secret_name}" --for=mount,pull -n "${ns}"; then
+    log_banner "FAILED to link secret ${secret_name} to ServiceAccount ${sa_name} in namespace ${ns} (for=mount,pull)"
+    return 1
+  fi
+
+  if ! ensure_sa_secrets_field "${ns}" "${sa_name}"; then
+    log_banner "FAILED to add ${secret_name} to ServiceAccount ${sa_name} .secrets in namespace ${ns}"
+    return 1
+  fi
+
+  if ! sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
+    log_banner "FAILED: ServiceAccount ${sa_name} in ${ns} still has no mountable dockercfg after ensure"
+    return 1
+  fi
+
+  echo "Attached ${secret_name} to ServiceAccount ${sa_name} in ${ns} (mount+pull)"
+  return 0
+}
+
+ensure_namespace_pull_secrets() {
+  local ns="$1"
+  local sa failed=0
+
+  if ! oc get namespace "${ns}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  describe_namespace_pull_state "${ns}"
+
+  for sa in default builder; do
+    if ! ensure_sa_pull_secret "${ns}" "${sa}"; then
+      failed=1
+    fi
+  done
+  if oc get sa deployer -n "${ns}" >/dev/null 2>&1; then
+    if ! ensure_sa_pull_secret "${ns}" deployer; then
+      failed=1
+    fi
+  fi
+
+  if [[ "${failed}" -ne 0 ]]; then
+    describe_namespace_pull_state "${ns}"
+    return 1
+  fi
+
+  if ! namespace_pull_secrets_ready "${ns}"; then
+    log_banner "FAILED: namespace ${ns} still missing mountable dockercfg on one or more ServiceAccounts"
+    describe_namespace_pull_state "${ns}"
+    return 1
+  fi
+
+  log_banner "PASS: namespace ${ns} has mountable dockercfg on default/builder/deployer ServiceAccounts"
+  describe_namespace_pull_state "${ns}"
+  return 0
+}
+
+watch_e2e_test_namespaces() {
+  local seen_file
+  seen_file=$(mktemp)
+  trap 'rm -f "${seen_file}"' EXIT
+
+  echo "Watching for openshift-tests e2e-test-* namespaces (default/builder/deployer dockercfg)"
+  if ! resolve_pull_secret_file >/dev/null; then
+    echo "FATAL: cannot start watcher without /root/pull-secret or openshift-config/pull-secret"
+    exit 1
+  fi
+
+  while true; do
+    while IFS= read -r ns; do
+      [[ -z "${ns}" ]] && continue
+      case "${ns}" in
+        e2e-test-*)
+          ;;
+        *)
+          continue
+          ;;
+      esac
+      if grep -qxF "${ns}" "${seen_file}" 2>/dev/null; then
+        continue
+      fi
+      if namespace_pull_secrets_ready "${ns}"; then
+        echo "${ns}" >>"${seen_file}"
+        continue
+      fi
+      if ! oc get sa default -n "${ns}" >/dev/null 2>&1; then
+        continue
+      fi
+      if ensure_namespace_pull_secrets "${ns}"; then
+        echo "${ns}" >>"${seen_file}"
+        echo "watcher: provisioned dockercfg secrets in ${ns}"
+      fi
+    done < <(oc get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
+    sleep 1
+  done
+}
+
+run_once() {
+echo "===== test-infra PULL_SECRET source (/root/pull-secret on ci_machine) ====="
+if [[ -f /root/pull-secret ]]; then
+  size=$(wc -c </root/pull-secret | tr -d ' ')
+  echo "present: /root/pull-secret (${size} bytes)"
+  if jq -e '.auths' /root/pull-secret >/dev/null 2>&1; then
+    echo "registry keys in pull-secret file: $(jq -r '.auths | keys | join(", ")' /root/pull-secret)"
+  else
+    echo "WARNING: /root/pull-secret is missing a valid .auths object"
+  fi
+else
+  echo "MISSING: /root/pull-secret — not copied by assisted-common-setup-prepare"
+fi
+
+echo "===== cluster global pull secret (openshift-config/pull-secret) ====="
+if oc get secret pull-secret -n openshift-config >/dev/null 2>&1; then
+  oc get secret pull-secret -n openshift-config -o jsonpath='present: name={.metadata.name} type={.type}{"\n"}' 2>/dev/null
+else
+  log_banner "FATAL: openshift-config/pull-secret missing — cannot create namespace pull credentials for openshift-tests"
+  exit 1
+fi
+
+echo "===== image-registry clusteroperator (informational) ====="
+oc get clusteroperator image-registry -o jsonpath='Available={.status.conditions[?(@.type=="Available")].status} Reason={.status.conditions[?(@.type=="Available")].reason}{"\n"}' 2>/dev/null \
+  || echo "could not read image-registry clusteroperator"
+
+log_banner "Ensuring pull secrets in namespace: default (default/builder/deployer ServiceAccounts)"
+if ! ensure_namespace_pull_secrets default; then
+  log_banner "FATAL: could not ensure dockercfg secrets in namespace default"
+  exit 1
+fi
+
+echo "===== probe namespace verification (new namespace, same as openshift-tests) ====="
+probe_ns="e2e-secrets-probe-${RANDOM}"
+oc create namespace "${probe_ns}" >/dev/null
+trap 'oc delete namespace "${probe_ns}" --ignore-not-found=true --wait=false >/dev/null 2>&1 || true' EXIT
+ensure_namespace_pull_secrets "${probe_ns}"
+if namespace_pull_secrets_ready "${probe_ns}"; then
+  log_banner "PASS: probe namespace ${probe_ns} has mountable dockercfg on default/builder/deployer ServiceAccounts"
+else
+  log_banner "FAIL: probe namespace ${probe_ns} still missing mountable dockercfg on one or more ServiceAccounts"
+  describe_namespace_pull_state "${probe_ns}"
+  exit 1
+fi
+}
+
+case "${1:-once}" in
+  watch)
+    watch_e2e_test_namespaces
+    ;;
+  once)
+    run_once
+    ;;
+  *)
+    echo "usage: $0 [once|watch]" >&2
+    exit 2
+    ;;
+esac
 SCRIPT
 
 cat > "${COLLECT_OC_DEBUG_SCRIPT}" <<'SCRIPT'
@@ -159,7 +433,7 @@ while IFS= read -r vm_name; do
 done < <(grep -v '^[[:space:]]*$' "${journal_dir}/virsh-list.txt" 2>/dev/null || true)
 SCRIPT
 
-chmod +x "${WAIT_SA_SECRETS_SCRIPT}" "${COLLECT_OC_DEBUG_SCRIPT}" "${COLLECT_NODE_JOURNALS_SCRIPT}"
+chmod +x "${ENSURE_CLUSTER_PULL_SECRETS_SCRIPT}" "${COLLECT_OC_DEBUG_SCRIPT}" "${COLLECT_NODE_JOURNALS_SCRIPT}"
 
 cat > "${MAIN_PLAYBOOK}" <<-EOF
 - name: Run OpenShift conformance tests across all clusters
@@ -339,6 +613,16 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
 
         - name: "Launch conformance tests for {{ kubeconfig_basename }}"
           ansible.builtin.shell: |
+            set -euo pipefail
+            export KUBECONFIG={{ kubeconfig_file }}
+            watcher_log="{{ remote_artifact_dir_run }}/pull-secret-watcher.log"
+            nohup bash ./${ENSURE_CLUSTER_PULL_SECRETS_SCRIPT} watch >>"\${watcher_log}" 2>&1 &
+            watcher_pid=\$!
+            stop_watcher() {
+              kill "\${watcher_pid}" 2>/dev/null || true
+              wait "\${watcher_pid}" 2>/dev/null || true
+            }
+            trap stop_watcher EXIT
             podman run --network host --rm -i \
               --authfile {{ pull_secret_file }} \
               -e KUBECONFIG={{ kubeconfig_file }} \
@@ -418,50 +702,21 @@ cat > "${READINESS_TASKS}" <<-EOF
   register: readiness_wait_co
   changed_when: false
 
-- name: Wait for image-registry clusteroperator to be Available
-  ansible.builtin.command:
-    cmd: >
-      oc --kubeconfig {{ kubeconfig_file }}
-      wait clusteroperator/image-registry
-      --for=condition=Available=True --timeout=10m
-  register: readiness_wait_image_registry_co
-  changed_when: false
-
-- name: Wait for image-registry pods to be Ready
-  ansible.builtin.command:
-    cmd: >
-      oc --kubeconfig {{ kubeconfig_file }}
-      wait -n openshift-image-registry
-      --for=condition=Ready pod --all --timeout=10m
-  register: readiness_wait_image_registry_pods
-  changed_when: false
-
-- name: Wait for image-registry deployment to exist
-  ansible.builtin.command:
-    cmd: >
-      oc --kubeconfig {{ kubeconfig_file }}
-      get deployment -n openshift-image-registry
-  register: readiness_image_registry_deployments
-  changed_when: false
-  retries: 30
-  delay: 10
-  until: readiness_image_registry_deployments.rc == 0
-
-- name: Probe namespace for default service account image pull secrets
-  ansible.builtin.script: ${WAIT_SA_SECRETS_SCRIPT}
+- name: Ensure default/builder/deployer ServiceAccount dockercfg for openshift-tests (from /root/pull-secret)
+  ansible.builtin.script: ${ENSURE_CLUSTER_PULL_SECRETS_SCRIPT}
   environment:
     KUBECONFIG: "{{ kubeconfig_file }}"
-  register: readiness_wait_sa_secrets
+  register: readiness_ensure_pull_secrets
   changed_when: false
+
+- name: Print pull secret ensure output
+  ansible.builtin.debug:
+    msg: "{{ readiness_ensure_pull_secrets.stdout_lines }}"
 
 - name: Print readiness wait summary
   ansible.builtin.debug:
     msg:
-      - "clusteroperators: {{ readiness_wait_co.rc | default('skipped') }}"
-      - "image-registry CO: {{ readiness_wait_image_registry_co.rc | default('skipped') }}"
-      - "image-registry pods: {{ readiness_wait_image_registry_pods.rc | default('skipped') }}"
-      - "image-registry deployments: {{ readiness_image_registry_deployments.rc | default('skipped') }}"
-      - "probe SA secrets: {{ readiness_wait_sa_secrets.rc | default('skipped') }}"
+      - "clusteroperators wait rc: {{ readiness_wait_co.rc | default('skipped') }}"
 EOF
 
 cat > "${DEBUG_TASKS}" <<-EOF
