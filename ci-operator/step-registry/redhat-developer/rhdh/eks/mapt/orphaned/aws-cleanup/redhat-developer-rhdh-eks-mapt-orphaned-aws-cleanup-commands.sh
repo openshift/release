@@ -212,10 +212,10 @@ clean_cluster() {
     echo "[WARN] ⚠️ No OIDC issuer found for cluster ${cluster}, skipping OIDC cleanup"
   fi
 
-  # i. Delete IAM roles
+  # i. Delete IAM roles (scoped to this cluster via kubernetes.io/cluster tag)
   echo "[INFO] 🎭 Cleaning up IAM roles..."
   local ROLES
-  ROLES=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=origin,Values=mapt Key=projectName,Values=eks --resource-type-filters iam:role --query 'ResourceTagMappingList[].ResourceARN' --output text 2>/dev/null | awk -F'/' '{print $NF}' || true)
+  ROLES=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=origin,Values=mapt Key=projectName,Values=eks "Key=kubernetes.io/cluster/${cluster},Values=owned" --resource-type-filters iam:role --query 'ResourceTagMappingList[].ResourceARN' --output text 2>/dev/null | awk -F'/' '{print $NF}' || true)
   for role in ${ROLES}; do
     if [[ -n "${role}" ]] && [[ "${role}" != "None" ]]; then
       echo "Cleaning up role: ${role}"
@@ -253,10 +253,10 @@ clean_cluster() {
     fi
   done
 
-  # j. Delete IAM policies
+  # j. Delete IAM policies (scoped to this cluster via kubernetes.io/cluster tag)
   echo "[INFO] 📜 Cleaning up IAM policies..."
   local MAPT_POLICIES
-  MAPT_POLICIES=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=origin,Values=mapt Key=projectName,Values=eks --resource-type-filters iam:policy --query 'ResourceTagMappingList[].ResourceARN' --output text 2>/dev/null || true)
+  MAPT_POLICIES=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=origin,Values=mapt Key=projectName,Values=eks "Key=kubernetes.io/cluster/${cluster},Values=owned" --resource-type-filters iam:policy --query 'ResourceTagMappingList[].ResourceARN' --output text 2>/dev/null || true)
   for policy_arn in ${MAPT_POLICIES}; do
     if [[ -n "${policy_arn}" ]] && [[ "${policy_arn}" != "None" ]]; then
       echo "Deleting IAM Policy: ${policy_arn}"
@@ -342,10 +342,10 @@ clean_cluster() {
     aws ec2 delete-vpc --vpc-id "${VPC_ID}" || true
   fi
 
-  # l. Delete launch templates
+  # l. Delete launch templates (scoped to this cluster via kubernetes.io/cluster tag)
   echo "[INFO] 🚀 Cleaning up launch templates..."
   local LTS
-  LTS=$(aws ec2 describe-launch-templates --filters Name=tag:origin,Values=mapt Name=tag:projectName,Values=eks --query 'LaunchTemplates[].LaunchTemplateId' --output text 2>/dev/null || true)
+  LTS=$(aws ec2 describe-launch-templates --filters Name=tag:origin,Values=mapt Name=tag:projectName,Values=eks "Name=tag:kubernetes.io/cluster/${cluster},Values=owned" --query 'LaunchTemplates[].LaunchTemplateId' --output text 2>/dev/null || true)
   for lt in ${LTS}; do
     if [[ -n "${lt}" ]] && [[ "${lt}" != "None" ]]; then
       aws ec2 delete-launch-template --launch-template-id "${lt}" || true
