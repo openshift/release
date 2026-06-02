@@ -11,6 +11,7 @@ mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
 CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
+CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
 CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
 MCP_JIRA_LOG="${WORKDIR}/mcp-jira.log"
 
@@ -47,7 +48,7 @@ atexit_handler() {
     fi
 
     # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
+    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -179,11 +180,7 @@ configure_claude() {
       "Write(//tmp/**)",
       "Bash(bash plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
-      "Skill(microshift-ci:create-bugs)",
-      "Skill(microshift-ci:doctor)",
-      "Skill(microshift-ci:prow-job)",
-      "Skill(microshift-ci:test-job)",
-      "Skill(microshift-ci:test-scenario)"
+      "Skill(microshift-ci:*)"
     ]
   }
 }
@@ -237,6 +234,16 @@ cd "${SRC_DIR}"
 # Configure the GitHub token for MicroShift repo operations
 { set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
 
+# Close duplicate rebase PRs before running the analysis to prevent them
+# from being included in the analysis and bug creation.
+echo "Running automatic closing of duplicate rebase PRs..."
+"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --mode close-duplicates \
+    --execute \
+    --author 'microshift-rebase-script[bot]' \
+    --filter 'NO-ISSUE: rebase-release'
+echo "Automatic closing of duplicate rebase PRs completed"
+
 # Run analysis on all releases and open rebase PRs (45m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 timeout 2700 claude \
@@ -255,9 +262,21 @@ timeout 600 claude \
     --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create --auto" \
+    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
     --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}"
 echo "Bug creation for failed jobs completed"
+
+# Run bug fix for test bugs (5m and 20 turns).
+# Dry-run mode only.
+echo "Running Claude to fix test bugs (dry-run mode)..."
+timeout 300 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 20 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
+    --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}"
+echo "Bug fix for test bugs (dry-run mode) completed"
 
 # Run HTML report refresh to include the new bugs (5m and 30 turns).
 echo "Running Claude to refresh the HTML report..."
@@ -269,15 +288,6 @@ timeout 300 claude \
     -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
     --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}"
 echo "HTML report refresh completed"
-
-# Close duplicate rebase PRs before attempting to restart failed test jobs.
-echo "Running automatic closing of duplicate rebase PRs..."
-"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
-    --mode close-duplicates \
-    --execute \
-    --author 'microshift-rebase-script[bot]' \
-    --filter 'NO-ISSUE: rebase-release'
-echo "Automatic closing of duplicate rebase PRs completed"
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.
