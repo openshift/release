@@ -71,6 +71,21 @@ atexit_handler() {
     done
 }
 
+check_claude_rc() {
+    local -r rc="$1"
+    local -r session="$2"
+    local -r timeout_min="$3"
+
+    if [ "${rc}" -eq 124 ]; then
+        echo "ERROR: Claude ${session} session timed out after ${timeout_min} minutes"
+        exit 1
+    elif [ "${rc}" -ne 0 ]; then
+        echo "ERROR: Claude ${session} session failed with exit code ${rc}"
+        exit 1
+    fi
+    echo "Claude ${session} session completed successfully"
+}
+
 github_app_token() {
     local -r jwt="$1"
     local -r repo="$2"
@@ -244,50 +259,54 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
+# Run analysis on all releases and open rebase PRs (35m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-timeout 2700 claude \
+CLAUDE_RC=0
+timeout 2100 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}"
-echo "Analysis for MicroShift CI jobs and pull requests completed"
+    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "doctor" 35
 
-# Run bug creation for failed jobs (10m and 50 turns).
+# Run bug creation for failed jobs (15m and 50 turns).
 echo "Running Claude to create bugs for failed jobs..."
-timeout 600 claude \
+CLAUDE_RC=0
+timeout 900 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
-    --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}"
-echo "Bug creation for failed jobs completed"
+    --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
 
 # Run bug fix for test bugs (5m and 20 turns).
 # Dry-run mode only.
 echo "Running Claude to fix test bugs (dry-run mode)..."
+CLAUDE_RC=0
 timeout 300 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 20 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
-    --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}"
-echo "Bug fix for test bugs (dry-run mode) completed"
+    --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 5
 
 # Run HTML report refresh to include the new bugs (5m and 30 turns).
 echo "Running Claude to refresh the HTML report..."
+CLAUDE_RC=0
 timeout 300 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 30 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}"
-echo "HTML report refresh completed"
+    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 5
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.
