@@ -55,6 +55,9 @@ export CORRELATE_MAPT
 # Trap TERM signal (job was interrupted/cancelled) into cleanup function to ensure MAPT infrastructure is destroyed
 trap cleanup TERM
 
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+echo "[INFO] 🕒 Setting expirationDate=${EXPIRATION_DATE} and launch-id=${BUILD_ID}"
+
 echo "[INFO] 🚀 Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks create \
   --project-name "eks" \
@@ -69,7 +72,7 @@ mapt aws eks create \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
-  --tags app-code=rhdh-003,service-phase=dev,cost-center=726
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726,expirationDate=${EXPIRATION_DATE},launch-id=${BUILD_ID}
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
   echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
   echo "[ERROR] ❌ Failed to create MAPT EKS cluster"

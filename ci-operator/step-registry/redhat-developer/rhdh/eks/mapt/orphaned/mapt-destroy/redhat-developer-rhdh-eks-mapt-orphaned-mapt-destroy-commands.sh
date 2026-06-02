@@ -11,7 +11,7 @@ export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
 echo "[SUCCESS] ✅ AWS credentials loaded successfully"
 
 export PULUMI_K8S_DELETE_UNREACHABLE=true
-  echo "[INFO] ⚙️ Environment variable PULUMI_K8S_DELETE_UNREACHABLE set to true"
+echo "[INFO] ⚙️ Environment variable PULUMI_K8S_DELETE_UNREACHABLE set to true"
 
 echo "[INFO] 📋 Reading S3 top-level folders from ${SHARED_DIR}/s3_top_level_folders.txt..."
 
