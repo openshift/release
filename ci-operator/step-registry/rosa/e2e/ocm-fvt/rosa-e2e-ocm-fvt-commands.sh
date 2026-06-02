@@ -75,4 +75,6 @@ echo "Running ocmtest: ${ocmtest_args[*]}"
 podman run \
   "${podman_args[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
-  ocmtest "${ocmtest_args[@]}"
+  ocmtest "${ocmtest_args[@]}" 2>&1 | tee "${ARTIFACT_DIR}/ocmtest-output.log"
+exit_code=${PIPESTATUS[0]}
+exit $exit_code
