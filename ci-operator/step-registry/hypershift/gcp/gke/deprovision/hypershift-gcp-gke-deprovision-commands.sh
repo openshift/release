@@ -2,9 +2,14 @@
 
 set -euo pipefail
 
-# Load GCP credentials from cluster profile
-GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
-gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
+# Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step.
+# wif-cred.json is always present: it is written by step 1 of the pre phase and synced
+# to SHARED_DIR before any step that could be interrupted runs.
+if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
+  echo "ERROR: ${SHARED_DIR}/wif-cred.json not found — hypershift-gcp-wif-auth step may not have run"
+  exit 1
+fi
+gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
 # Load cluster info from SHARED_DIR (written by provision step).
 # If SHARED_DIR files are missing (provision was aborted before the Secret was synced),
