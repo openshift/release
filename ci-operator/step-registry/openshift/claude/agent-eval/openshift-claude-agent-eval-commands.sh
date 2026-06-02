@@ -13,6 +13,7 @@
 #   EVAL_EXTRA_ARGS   -- additional args passed to /eval-run
 #   EVAL_SETUP_SCRIPT -- script to run before eval (e.g. snapshot extraction)
 #   CLAUDE_MODEL      -- model for the eval harness orchestrator (default: claude-sonnet-4-6)
+#   EVAL_MAX_TURNS    -- max conversation turns for the orchestrator (default: 100)
 
 set -o nounset
 set -o errexit
@@ -116,7 +117,7 @@ timeout 7200 claude \
     --plugin-dir "${EVAL_HARNESS_DIR}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
-    --max-turns 100 \
+    --max-turns "${EVAL_MAX_TURNS}" \
     -p "/eval-run ${EVAL_RUN_ARGS}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval.log" || EVAL_EXIT=$?
 EVAL_DURATION=$(( $(date +%s) - EVAL_START ))
