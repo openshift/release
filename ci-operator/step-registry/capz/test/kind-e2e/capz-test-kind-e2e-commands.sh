@@ -27,11 +27,11 @@ trap cleanup_kind EXIT
 # which only covers container UIDs up to 64535. Kind's node image has
 # files with GID 65534 (nobody) which can't be mapped in that range.
 # The pod's user namespace limits host UIDs to 0-65535, so we can't
-# extend past 65535. Instead, start subordinate IDs at 1 — podman
-# splits the mapping around UID 1000 (our user) automatically.
+# extend past 65535. Split the range around our UID (1000) to cover
+# UIDs 1-999 and 1001-65535, giving 65534 subordinate IDs total.
 USER_NAME=$(whoami)
-echo "${USER_NAME}:1:65535" > /etc/subuid
-echo "${USER_NAME}:1:65535" > /etc/subgid
+printf '%s\n' "${USER_NAME}:1:999" "${USER_NAME}:1001:64535" > /etc/subuid
+printf '%s\n' "${USER_NAME}:1:999" "${USER_NAME}:1001:64535" > /etc/subgid
 
 # ---- Configure podman for kind compatibility ----
 # Kind requires private UTS namespace (to set hostname in node containers)
