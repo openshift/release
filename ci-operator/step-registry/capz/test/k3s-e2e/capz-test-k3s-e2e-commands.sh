@@ -39,7 +39,19 @@ chmod +x /tmp/k3s
 export PATH="/tmp:${PATH}"
 echo "[k3s] Installed: $(k3s --version)"
 
-# rootlesskit is pre-installed in the nested-podman-k3s image
+# rootlesskit and crun are pre-installed in the nested-podman-k3s image
+
+# ---- Configure containerd to use crun instead of runc ----
+# crun handles read-only /sys/fs/cgroup gracefully (skips cgroup setup),
+# unlike runc which fails with "mkdir /sys/fs/cgroup/k8s.io: read-only file system"
+CONTAINERD_CFG_DIR="${K3S_DATA_DIR}/agent/etc/containerd"
+mkdir -p "${CONTAINERD_CFG_DIR}"
+cat > "${CONTAINERD_CFG_DIR}/config.toml.tmpl" << 'TMPL'
+{{ template "base" . }}
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  BinaryName = "/usr/bin/crun"
+TMPL
 
 # ---- Prepare /dev/kmsg ----
 ln -sf /dev/null /dev/kmsg 2>/dev/null || true
@@ -49,13 +61,11 @@ ln -sf /dev/null /dev/kmsg 2>/dev/null || true
 # with slirp4netns connectivity. Inside that namespace:
 # - ip_forward can be set to 1 (own network namespace)
 # - iptables works (own network namespace with CAP_NET_ADMIN)
-# - --copy-up=/sys/fs/cgroup makes cgroup filesystem writable (tmpfs overlay)
-#   so runc can create cgroup directories for containers
+# - crun handles read-only cgroup filesystem gracefully
 echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
 rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlesskit-state \
   --copy-up=/etc --copy-up=/run --copy-up=/var/lib --copy-up=/var/log --copy-up=/usr/libexec \
-  --copy-up=/sys/fs/cgroup \
   sh -c '
     echo 1 > /proc/sys/net/ipv4/ip_forward
     ln -sf /dev/null /dev/kmsg 2>/dev/null || true
