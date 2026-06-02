@@ -5,11 +5,13 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-DEFAULT_MCE_VERSION=$(oc get csv -n multicluster-engine -l operators.coreos.com/multicluster-engine.multicluster-engine= -o=jsonpath='{.items[].spec.version}' | cut -d'.' -f1,2)
-MCE_VERSION=${MCE_VERSION:-$DEFAULT_MCE_VERSION}
-
 # When ACM is not installed, we can use the OCP version to determine the ACM version for must-gather
 declare -A OCP_TO_ACM=(
+  ["4.14"]="2.9"
+  ["4.15"]="2.10"
+  ["4.16"]="2.11"
+  ["4.17"]="2.12"
+  ["4.18"]="2.13"
   ["4.19"]="2.14"
   ["4.20"]="2.15"
   ["4.21"]="2.16"
@@ -27,11 +29,6 @@ if [[ -z "${ACM_VERSION}" ]]; then
   fi
 fi
 
-function version_ge() {
-  [[ "$1" == "$2" ]] && return 0
-  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
-}
-
 HC_ARGS=""
 HC_NAMESPACE=$(oc get hostedclusters.hypershift.openshift.io -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
 HC_NAME=$(oc get hostedclusters.hypershift.openshift.io -A -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -43,20 +40,11 @@ fi
 # For pre-release images, we need to use the pre-release registry.
 # Pulling from the pre-release registry requires credentials.
 # The credentials for acm-d are present in acm-d-mce-quay-credentials secret.
-if version_ge "${OCP_VERSION}" "4.19"; then
-  echo "OCP >= 4.19: using ACM must-gather image with ACM_VERSION=${ACM_VERSION}"
-  MUST_GATHER_IMAGE="registry.redhat.io/rhacm2/acm-must-gather-rhel9:v${ACM_VERSION}"
-  if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/null; then
-    echo "Image ${MUST_GATHER_IMAGE} not found, falling back to pre-release registry"
-    MUST_GATHER_IMAGE="quay.io:443/acm-d/acm-must-gather-rhel9:${ACM_VERSION}-dev"
-  fi
-else
-  echo "OCP < 4.19: using MCE must-gather image with MCE_VERSION=${MCE_VERSION}"
-  MUST_GATHER_IMAGE="registry.redhat.io/multicluster-engine/must-gather-rhel9:v${MCE_VERSION}"
-  if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/null; then
-    echo "Image ${MUST_GATHER_IMAGE} not found, falling back to pre-release registry"
-    MUST_GATHER_IMAGE="quay.io:443/acm-d/must-gather-rhel9:${MCE_VERSION}-dev"
-  fi
+echo "Using ACM must-gather image with ACM_VERSION=${ACM_VERSION}"
+MUST_GATHER_IMAGE="registry.redhat.io/rhacm2/acm-must-gather-rhel9:v${ACM_VERSION}"
+if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/null; then
+  echo "Image ${MUST_GATHER_IMAGE} not found, falling back to pre-release registry"
+  MUST_GATHER_IMAGE="quay.io:443/acm-d/acm-must-gather-rhel9:${ACM_VERSION}-dev"
 fi
 
 # shellcheck disable=SC2086
