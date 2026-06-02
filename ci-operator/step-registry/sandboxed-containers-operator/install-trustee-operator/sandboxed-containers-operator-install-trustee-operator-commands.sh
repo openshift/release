@@ -321,7 +321,8 @@ function wait_for_operator() {
     echo ">>> Waiting for CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} to be READY..."
     local catalog_ready=false
     for i in {1..12}; do
-      local state=$(oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
+      local state
+      state=$(oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
       if [[ "${state}" == "READY" ]]; then
         echo ">>> CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} is READY"
         catalog_ready=true
@@ -363,7 +364,8 @@ function wait_for_operator() {
   echo ">>> Waiting for InstallPlan ${installplan_ref} to be Complete..."
   local installplan_complete=false
   for i in {1..12}; do
-    local phase=$(oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    local phase
+    phase=$(oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
     if [[ "${phase}" == "Complete" ]]; then
       echo ">>> InstallPlan is Complete"
       installplan_complete=true
@@ -383,7 +385,8 @@ function wait_for_operator() {
   local csv_succeeded=false
   local csv_name=""
   for i in {1..12}; do
-    local csv_phase=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
+    local csv_phase
+    csv_phase=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
     if [[ "${csv_phase}" == "Succeeded" ]]; then
       csv_name=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
       echo ">>> CSV ${csv_name} is Succeeded"
