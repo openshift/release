@@ -9,10 +9,14 @@ export AZURE_CREDENTIALS_FILE=/etc/hypershift-ci-jobs-self-managed-azure/credent
 # Returns 0 if the resource group name matches CI naming conventions.
 # Management cluster RGs: {10-hex}-mgmt-{10-hex}-mgmt (with optional vnet-/nsg- infix)
 # Guest cluster RGs: {20-hex}-{5..20-hex} (with optional vnet-/nsg- infix)
+# V2 self-managed guest RGs: {type}-{10hex}-{type}-{9-10hex}-{suffix}
+#   e.g., public-ea334332a2-public-ea334332a2-dx4l4
+#         oauth-lb-ea334332a2-vnet-oauth-lb-ea334332a2-hw2zq
 is_ci_rg() {
   local name="$1"
   [[ "$name" =~ ^[0-9a-f]{10}-mgmt-((vnet|nsg)-)?[0-9a-f]{10}-mgmt$ ]] && return 0
   [[ "$name" =~ ^[0-9a-f]{20}-((vnet|nsg)-)?[0-9a-f]{5,20}$ ]] && return 0
+  [[ "$name" =~ ^[a-z]([a-z-]*[a-z])?-[0-9a-f]{10}-((vnet|nsg)-)?[a-z]([a-z-]*[a-z])?-[0-9a-f]{9,10}-[a-z0-9]+$ ]] && return 0
   return 1
 }
 
@@ -178,21 +182,21 @@ phase3_dns_sweep() {
     [[ -z "${rg_name}" ]] && continue
     [[ "${rg_state}" == "Deleting" ]] && continue
     if is_ci_rg "${rg_name}"; then
-      # Strip vnet-/nsg- infix and trailing infra-id suffix to get the cluster name prefix.
-      # Management: {10hex}-mgmt-[vnet-|nsg-]{10hex}-mgmt → {10hex}-mgmt
-      # Guest:      {20hex}-[vnet-|nsg-]{5-20hex}         → {20hex}
-      local prefix="${rg_name}"
-      prefix="${prefix//-vnet-/-}"
-      prefix="${prefix//-nsg-/-}"
-      prefix="${prefix%%-[0-9a-f]*}"
-      # For mgmt clusters the prefix is "{10hex}-mgmt", re-add -mgmt if stripped
+      local prefix=""
       if [[ "${rg_name}" == *-mgmt-* ]]; then
-        prefix="${rg_name%%-mgmt-*}-mgmt"
-      else
-        # Guest cluster: prefix is the first 20 hex chars
+        # Management: {10hex}-mgmt-[vnet-|nsg-]{10hex}-mgmt → {10hex}
+        prefix="${rg_name%%-mgmt-*}"
+      elif [[ "${rg_name}" =~ ^[0-9a-f]{20} ]]; then
+        # Legacy guest cluster: prefix is the first 20 hex chars
         prefix="${rg_name:0:20}"
+      elif [[ "${rg_name}" =~ -([0-9a-f]{10})- ]]; then
+        # V2 self-managed guest: extract the 10-hex job hash
+        # e.g., public-ea334332a2-public-ea334332a2-dx4l4 → ea334332a2
+        prefix="${BASH_REMATCH[1]}"
       fi
-      active_prefixes["${prefix}"]=1
+      if [[ -n "${prefix}" ]]; then
+        active_prefixes["${prefix}"]=1
+      fi
     fi
   done < <(az group list --query "[].{name:name, state:properties.provisioningState}" -o tsv)
 
@@ -201,7 +205,7 @@ phase3_dns_sweep() {
   local prefix_count=${#active_prefixes[@]}
   local prefix_keys=("${!active_prefixes[@]}")
   set -o nounset
-  echo "Found ${prefix_count} active CI cluster prefix(es)."
+  echo "Found ${prefix_count} active CI cluster prefix(es): ${prefix_keys[*]:-}"
 
   local dns_zones=(
     "hcp-sm-azure.azure.devcluster.openshift.com"
