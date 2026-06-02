@@ -42,6 +42,9 @@ cat > "${HOME}/.config/containers/containers.conf" <<EOF
 [containers]
 utsns = "private"
 cgroups = "enabled"
+
+[network]
+network_backend = "cni"
 EOF
 
 # ---- Install kind ----
