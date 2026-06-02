@@ -55,7 +55,7 @@ echo "[k3s] Starting k3s via rootlesskit (slirp4netns networking)"
 
 rootlesskit --net=slirp4netns --disable-host-loopback --state-dir=/tmp/rootlesskit-state \
   --copy-up=/etc --copy-up=/run --copy-up=/var/lib --copy-up=/var/log --copy-up=/usr/libexec \
-  --cgroupns --evacuate-cgroup2=yes \
+  --pidns --cgroupns --evacuate-cgroup2=yes \
   sh -c '
     echo 1 > /proc/sys/net/ipv4/ip_forward
     ln -sf /dev/null /dev/kmsg 2>/dev/null || true
