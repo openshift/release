@@ -101,6 +101,28 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-two-node-arbiter-upgrade-day-2-workers
   timeout: 5h0m0s
+- as: e2e-metal-ovn-two-node-fencing-techpreview-upgrade-os-rhel10
+  capabilities:
+  - intranet
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+      MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT: rhel-10
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+    test:
+    - chain: baremetalds-ipi-test
+    - ref: mco-conf-day2-os-image-stream-default
+    workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ipi-ovn-upgrade-runc
   capabilities:
   - intranet

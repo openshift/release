@@ -282,9 +282,10 @@ tests:
     - ref: hypershift-analyze-e2e-failure
     - chain: hypershift-destroy-nested-management-cluster
     workflow: hypershift-azure-e2e-self-managed
-- always_run: false
+- always_run: true
   as: e2e-azure-v2-self-managed
   optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-azure
     dependencies:
@@ -578,18 +579,6 @@ tests:
   skip_if_only_changed: .*
   steps:
     workflow: hypershift-review-agent
-- always_run: false
-  as: e2e-gke
-  capabilities:
-  - build-tmpfs
-  optional: true
-  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
-  steps:
-    cluster_profile: hypershift-gcp
-    env:
-      GKE_REGION: us-central1
-      GKE_RELEASE_CHANNEL: stable
-    workflow: hypershift-gcp-gke-e2e
 - always_run: false
   as: e2e-v2-gke
   capabilities:
