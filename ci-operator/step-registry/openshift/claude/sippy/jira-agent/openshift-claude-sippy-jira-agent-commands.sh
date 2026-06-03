@@ -59,26 +59,6 @@ echo "Status: ${ISSUE_STATUS}"
 # Source is baked into the image at /workspace via ci-operator src input
 cd /workspace
 
-# Debug: show what's in the workspace
-echo "=== Debug: workspace contents ==="
-echo "PWD: $(pwd)"
-echo "whoami: $(whoami 2>/dev/null || echo 'unknown (uid '$(id -u)')')"
-echo "id: $(id)"
-ls -la
-echo "=== Debug: .git check ==="
-ls -la .git 2>/dev/null || echo ".git directory NOT found"
-git status 2>/dev/null || echo "git status failed"
-echo "=== Debug: key tools ==="
-which podman 2>/dev/null && podman --version || echo "podman not found"
-which go 2>/dev/null && go version || echo "go not found"
-which node 2>/dev/null && node --version || echo "node not found"
-which gh 2>/dev/null && gh --version || echo "gh not found"
-echo "=== Debug: environment ==="
-echo "HOME=${HOME}"
-echo "GOPATH=${GOPATH:-unset}"
-echo "PATH=${PATH}"
-echo "================================"
-
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 
@@ -133,11 +113,11 @@ ${ISSUE_COMMENTS}
    - 'sippy_serve' starts the API server (builds automatically)
    - 'sippy_ng_start' starts the React frontend dev server
    - 'run_e2e' runs the end-to-end test suite
-   Run e2e tests before committing to catch integration issues.
-7. Create a feature branch named '${JIRA_ISSUE_KEY}' (lowercase).
-8. Commit your changes with a meaningful commit message that references ${JIRA_ISSUE_KEY}.
-9. Push the branch to the fork: git push fork HEAD
-10. Create a PR from the fork using: gh pr create --repo openshift/sippy --head ${SIPPY_FORK_REPO##*/}:${JIRA_ISSUE_KEY} --title '${JIRA_ISSUE_KEY}: <brief description>' --body '<description of changes>'
+7. Run e2e tests using the 'run_e2e' MCP tool. E2e tests MUST pass before creating a PR.
+8. Create a feature branch named '${JIRA_ISSUE_KEY}' (lowercase).
+9. Commit your changes with a meaningful commit message that references ${JIRA_ISSUE_KEY}.
+10. Push the branch to the fork: git push fork HEAD
+11. Create a PR from the fork using: gh pr create --repo openshift/sippy --head ${SIPPY_FORK_REPO##*/}:${JIRA_ISSUE_KEY} --title '${JIRA_ISSUE_KEY}: <brief description>' --body '<description of changes>'
 
 ## Important
 - Always create a regular PR (not a draft) so CI tests run automatically.
@@ -179,10 +159,60 @@ fi
 
 # Check if a PR was created
 PR_URL=$(grep -o 'https://github.com/openshift/sippy/pull/[0-9]*' "/workspace/artifacts/claude-output.log" | head -1 || echo "")
-if [[ -n "${PR_URL}" ]]; then
-    echo "PR created: ${PR_URL}"
-else
+if [[ -z "${PR_URL}" ]]; then
     echo "Warning: No PR URL found in output."
+    echo "=== Sippy Jira Agent Complete ==="
+    exit 0
 fi
+
+PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
+echo "PR created: ${PR_URL} (#${PR_NUM})"
+
+# Poll for review comments (e.g. CodeRabbit) for up to 1 hour after PR creation
+echo ""
+echo "=== Watching PR #${PR_NUM} for review comments (up to 1 hour) ==="
+PR_CREATED_AT=$(date +%s)
+REVIEW_ROUND=0
+
+for i in $(seq 1 6); do
+    echo "Waiting 10 minutes before checking for comments (check $i/6)..."
+    sleep 600
+
+    COMMENTS_JSON=$(gh api "repos/openshift/sippy/pulls/${PR_NUM}/comments" --paginate 2>/dev/null || echo "[]")
+    REVIEWS_JSON=$(gh api "repos/openshift/sippy/pulls/${PR_NUM}/reviews" --paginate 2>/dev/null || echo "[]")
+
+    NEW_REVIEW_COMMENTS=$(echo "${COMMENTS_JSON}" | jq --arg since "${PR_CREATED_AT}" \
+        '[.[] | select((.created_at | fromdateiso8601) > ($since | tonumber))] | length' 2>/dev/null || echo "0")
+    NEW_REVIEWS=$(echo "${REVIEWS_JSON}" | jq --arg since "${PR_CREATED_AT}" \
+        '[.[] | select((.submitted_at | fromdateiso8601) > ($since | tonumber)) | select(.state != "APPROVED" and .state != "PENDING")] | length' 2>/dev/null || echo "0")
+
+    TOTAL_NEW=$(( NEW_REVIEW_COMMENTS + NEW_REVIEWS ))
+    echo "Found ${TOTAL_NEW} new comment(s)/review(s) since PR creation."
+
+    if [[ "${TOTAL_NEW}" -gt 0 ]]; then
+        REVIEW_ROUND=$(( REVIEW_ROUND + 1 ))
+        echo "Addressing review comments (round ${REVIEW_ROUND})..."
+
+        REVIEW_BODY=$(echo "${COMMENTS_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
+        REVIEW_SUMMARY=$(echo "${REVIEWS_JSON}" | jq -r '.[] | select(.state != "APPROVED" and .state != "PENDING") | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
+
+        timeout 1800 claude \
+            --model "${CLAUDE_MODEL}" \
+            --continue \
+            --allowedTools "${ALLOWED_TOOLS}" \
+            --output-format stream-json \
+            --max-turns 50 \
+            -p "Review comments have been posted on the PR. Address all of them, then push your fixes to the fork.
+
+${REVIEW_BODY}
+${REVIEW_SUMMARY}
+
+After fixing, run 'make test' and 'make lint' to verify. Then run e2e tests using the 'run_e2e' MCP tool — e2e tests MUST pass before pushing. Then push: git push fork HEAD" \
+            --verbose 2>&1 | tee -a "/workspace/artifacts/claude-output.log" || true
+
+        # Reset the timestamp so we only pick up comments newer than this round
+        PR_CREATED_AT=$(date +%s)
+    fi
+done
 
 echo "=== Sippy Jira Agent Complete ==="
