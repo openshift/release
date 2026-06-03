@@ -193,7 +193,7 @@ if [[ "${ORION_PR_ANALYSIS:-false}" == "true" ]] && [[ "${JOB_TYPE}" == "presubm
     job_type="pull"
     pull_number="${PULL_NUMBER}"
     EXTRA_FLAGS+=" --pr-analysis"
-    EXTRA_FLAGS+=" --input-vars '{\"jobtype\":\"pull\",\"pull_number\":\"${PULL_NUMBER}\",\"organization\":\"${REPO_OWNER}\",\"repository\":\"${REPO_NAME}\"}'"
+    EXTRA_FLAGS+=" --input-vars {\"jobtype\":\"pull\",\"pull_number\":\"${PULL_NUMBER}\",\"organization\":\"${REPO_OWNER}\",\"repository\":\"${REPO_NAME}\"}"
 elif [[ "${JOB_TYPE}" == "periodic" ]]; then
     if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
         pull_number="(${PULL_NUMBER} OR 0)"
