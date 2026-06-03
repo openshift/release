@@ -125,9 +125,9 @@ copy_artifacts() {
     if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
         {
             sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+'
+                | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
             sed -n '/INFORMING_JOBS_START/,/INFORMING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[^|"\\]+'
+                | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
         } | sort -u > "${SHARED_DIR}/failing-jobs.txt" || true
     fi
 
