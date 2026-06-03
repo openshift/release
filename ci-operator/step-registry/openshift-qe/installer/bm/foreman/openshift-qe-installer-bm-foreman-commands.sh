@@ -34,7 +34,7 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
     BOOT_MODE="Bios"
     echo "SuperMicro server detected, setting boot mode to Bios"
   else
-    BOOT_MODE=$(podman run quay.io/quads/badfish:latest --get-bios-attribute --attribute BootMode -H mgmt-$i -u $USER -p $PSWD -o json 2>&1 | jq -r .CurrentValue)
+    BOOT_MODE=$(podman run quay.io/quads/badfish:latest --insecure --get-bios-attribute --attribute BootMode -H mgmt-$i -u $USER -p $PSWD -o json 2>&1 | jq -r .CurrentValue)
   fi
 
   # Set PXE loader based on boot mode
@@ -63,9 +63,9 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
   if echo "$i" | grep -qE "(1029u|1029p|5039ms|6018r|6029p|6029r|6048p|6048r|6049p)"; then
     podman run quay.io/ocp-edge-qe/ipmitool ipmitool -I lanplus -H mgmt-$i -U $USER -P $PSWD chassis bootdev pxe
   else
-    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
+    podman run quay.io/quads/badfish:latest --insecure -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
   fi
-  podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
+  podman run quay.io/quads/badfish:latest --insecure --reboot-only -H mgmt-$i -u $USER -p $PSWD
 done
 
 # Collect node lists and identify Dell vs SuperMicro
@@ -141,7 +141,7 @@ if [ ${#STUCK_DELL_NODES[@]} -gt 0 ]; then
   echo "Starting recovery for stuck Dell nodes: ${STUCK_DELL_NODES[*]}"
   for i in "${STUCK_DELL_NODES[@]}"; do
     echo "Recovery: clearing jobs on $i"
-    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PSWD --clear-jobs --force
+    podman run quay.io/quads/badfish:latest -v --insecure -H mgmt-$i -u $USER -p $PSWD --clear-jobs --force
     sleep 30
 
     echo "Recovery: waiting for BIOS attributes to become accessible on $i"
@@ -164,7 +164,7 @@ if [ ${#STUCK_DELL_NODES[@]} -gt 0 ]; then
 
     echo "Recovery: setting boot device on $i"
     for attempt in $(seq 1 3); do
-      if podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman; then
+      if podman run quay.io/quads/badfish:latest --insecure -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman; then
         echo "Boot device set successfully for $i"
         break
       fi
@@ -173,7 +173,7 @@ if [ ${#STUCK_DELL_NODES[@]} -gt 0 ]; then
     done
 
     echo "Recovery: rebooting $i"
-    podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
+    podman run quay.io/quads/badfish:latest --insecure --reboot-only -H mgmt-$i -u $USER -p $PSWD
   done
 else
   echo "All nodes came up successfully, no recovery needed"

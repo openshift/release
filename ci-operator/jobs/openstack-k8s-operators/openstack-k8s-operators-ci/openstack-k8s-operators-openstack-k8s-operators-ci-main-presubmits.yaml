@@ -1,20 +1,25 @@
 presubmits:
   openstack-k8s-operators/openstack-k8s-operators-ci:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build12
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/build-root/Dockerfile.custom
+      - images/build-root/Dockerfile.rhel-9.custom
+      - images/pre-commit/Dockerfile
+      - images/tempest-container/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-openstack-k8s-operators-ci-main-images
     rerun_command: /test images
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:

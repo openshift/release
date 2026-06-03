@@ -97,7 +97,11 @@ case "${CLOUD_PROVIDER}" in
 
     if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
       AZURE_MANAGED_SERVICE_ARGS=""
-      # Keep external DNS enabled - domain filter is set via HYPERSHIFT_EXTERNAL_DNS_DOMAIN env var
+      if [[ "${AZURE_EXTERNAL_DNS_DOMAIN}" != *"aks-e2e"* ]] && [ -f "/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json" ]; then
+        AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+          --external-dns-credentials=/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json \
+          --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
+      fi
 
       # Enable Azure private platform support (Private Link Services) if credentials and resource group are provided.
       # Values can come from env vars or from SHARED_DIR files written by the
@@ -118,7 +122,6 @@ case "${CLOUD_PROVIDER}" in
     fi
 
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --enable-conversion-webhook=false \
     ${AZURE_MANAGED_SERVICE_ARGS} \
     ${AZURE_EXTERNAL_DNS_ARGS} \
     --platform-monitoring=All \
@@ -144,7 +147,6 @@ case "${CLOUD_PROVIDER}" in
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --enable-conversion-webhook=false \
   --external-dns-provider=google \
   --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
   --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \

@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -12,8 +16,11 @@ images:
     to: apiserver-network-proxy
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   latest:
     integration:
@@ -32,6 +39,11 @@ tests:
   commands: go mod vendor && git diff --exit-code
   container:
     from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
 - as: unit
   commands: make test
   container:

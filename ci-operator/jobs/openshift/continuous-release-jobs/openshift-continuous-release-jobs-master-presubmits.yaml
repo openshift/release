@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build08
+    cluster: build13
     context: ci/prow/config
     decorate: true
     decoration_config:
@@ -40,22 +40,29 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )config,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build08
+    cluster: build13
     context: ci/prow/images
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - go/crt-admission-webhook-server/images/Dockerfile
+      - go/dpcr-bugzilla-updater/Dockerfile
+      - images/base/Dockerfile
+      - images/cluster-apply/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-continuous-release-jobs-master-images
     rerun_command: /test images
+    run_if_changed: ^(.*Dockerfile.*)$
     spec:
       containers:
       - args:
@@ -105,7 +112,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build08
+    cluster: build13
     context: ci/prow/vector-config
     decorate: true
     decoration_config:

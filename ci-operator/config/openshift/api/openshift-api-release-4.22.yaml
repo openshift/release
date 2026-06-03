@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -12,8 +16,7 @@ images:
     to: cluster-config-api
 promotion:
   to:
-  - disabled: true
-    name: "4.22"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -93,8 +96,7 @@ tests:
     go build ./...
   container:
     from: src
-- always_run: false
-  as: verify-hypershift-integration
+- as: verify-hypershift-integration
   commands: |
     dir=$GOPATH/src/github.com/openshift/hypershift
     git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
@@ -116,7 +118,6 @@ tests:
     make api test-envtest-api-all
   container:
     from: src
-  optional: true
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
@@ -152,7 +153,7 @@ tests:
   as: e2e-gcp
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure

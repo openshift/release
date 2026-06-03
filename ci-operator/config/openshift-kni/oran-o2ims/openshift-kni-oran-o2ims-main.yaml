@@ -9,8 +9,7 @@ base_images:
     tag: "9"
 binary_build_commands: make binary
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.tools
+  from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -21,6 +20,7 @@ images:
     to: oran-o2ims-operator-bundle
   - dockerfile_path: Dockerfile.must-gather
     to: oran-o2ims-operator-must-gather
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
 operator:
   bundles:
   - as: operator-bundle
@@ -31,18 +31,18 @@ operator:
     with: pipeline:oran-o2ims-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
       reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
       reference_policy: Local
 resources:
@@ -56,10 +56,16 @@ test_binary_build_commands: |
   ./hack/install-markdownlint.sh
 tests:
 - as: ci-job
-  commands: make ci-job
+  commands: |
+    unset VERSION
+    unset GOFLAGS
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make ci-job
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
 - always_run: false
   as: scorecard
   run_if_changed: ^bundle/

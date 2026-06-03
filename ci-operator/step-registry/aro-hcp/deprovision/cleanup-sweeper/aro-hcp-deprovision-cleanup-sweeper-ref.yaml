@@ -1,0 +1,37 @@
+ref:
+  as: aro-hcp-deprovision-cleanup-sweeper
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-deprovision-cleanup-sweeper-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: CLEANUP_SWEEPER_WORKFLOW
+    default: "shared-leftovers"
+    documentation: Cleanup workflow to execute (for example, "shared-leftovers" or "rg-ordered").
+  - name: CLEANUP_SWEEPER_POLICY
+    default: ""
+    documentation: Optional policy file path for policy-driven workflows.
+  - name: CLEANUP_SWEEPER_PARALLELISM
+    default: "8"
+    documentation: Optional cleanup-sweeper --parallelism value.
+  - name: CLEANUP_SWEEPER_WAIT
+    default: ""
+    documentation: Optional wait flag value passed as --wait=<value>.
+  - name: CLEANUP_SWEEPER_VERBOSITY
+    default: ""
+    documentation: Optional verbosity level passed as --verbosity=<value>.
+  - name: CLEANUP_SWEEPER_EXTRA_ARGS
+    default: ""
+    documentation: Optional additional CLI arguments appended to cleanup-sweeper.
+  documentation: |-
+    Run cleanup-sweeper with configurable workflow settings. Subscription IDs are auto-discovered from the mounted secret directory.

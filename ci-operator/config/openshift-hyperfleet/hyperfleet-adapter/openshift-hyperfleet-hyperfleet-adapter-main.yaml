@@ -3,21 +3,33 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  jasee_openshift-build_rhel-9-golang-1.25:
-    name: openshift-build
-    namespace: jasee
-    tag: rhel-9-golang-1.25
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
 build_root:
   image_stream_tag:
-    name: openshift-build
-    namespace: jasee
-    tag: rhel-9-golang-1.25
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+prowgen:
+  expose: true
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: validate-commits
+  steps:
+    test:
+    - ref: hyperfleet-commitlint
+- as: risk-scorer
+  optional: true
+  steps:
+    test:
+    - ref: hyperfleet-risk-scorer
 - as: lint
   commands: |
     export HOME=/tmp

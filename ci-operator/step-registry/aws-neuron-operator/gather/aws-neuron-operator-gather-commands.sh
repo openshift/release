@@ -44,4 +44,15 @@ if [[ -n "${NEURON_NS}" ]]; then
     oc get events -n "${NEURON_NS}" --sort-by='.lastTimestamp' > "${DUMP_DIR}/neuron-ns-events.txt" 2>&1 || true
 fi
 
+KSERVE_DIR="${DUMP_DIR}/kserve"
+INFERENCE_NAMESPACE="${INFERENCE_NAMESPACE:-neuron-inference}"
+mkdir -p "${KSERVE_DIR}"
+oc get inferenceservice -A -o yaml > "${KSERVE_DIR}/inferenceservices.yaml" 2>&1 || true
+oc get servingruntime -A -o yaml > "${KSERVE_DIR}/servingruntimes.yaml" 2>&1 || true
+oc get datasciencecluster -A -o yaml > "${KSERVE_DIR}/datascienceclusters.yaml" 2>&1 || true
+oc get knativeserving -A -o yaml > "${KSERVE_DIR}/knativeserving.yaml" 2>&1 || true
+oc get pods -n "${INFERENCE_NAMESPACE}" -o wide > "${KSERVE_DIR}/inference-pods.txt" 2>&1 || true
+oc get events -n "${INFERENCE_NAMESPACE}" --sort-by='.lastTimestamp' > "${KSERVE_DIR}/inference-events.txt" 2>&1 || true
+oc get ksvc -n "${INFERENCE_NAMESPACE}" -o yaml > "${KSERVE_DIR}/knative-services.yaml" 2>&1 || true
+
 echo "Neuron diagnostic data collected in ${DUMP_DIR}"

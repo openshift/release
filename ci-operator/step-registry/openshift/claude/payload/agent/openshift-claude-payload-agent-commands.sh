@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
+echo "Model: ${CLAUDE_MODEL}"
 
 # Load secrets with xtrace disabled to prevent leaking credentials in logs
 set +x
@@ -16,9 +17,12 @@ else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
 fi
 
-if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+if [[ "${ENABLE_SLACK_NOTIFICATIONS}" == "true" ]] && [ -f "${SLACK_WEBHOOK_URL}" ]; then
     SLACK_WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
     echo "Slack webhook loaded."
+elif [[ "${ENABLE_SLACK_NOTIFICATIONS}" != "true" ]]; then
+    SLACK_WEBHOOK=""
+    echo "Slack notifications disabled via ENABLE_SLACK_NOTIFICATIONS."
 else
     SLACK_WEBHOOK=""
     echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
@@ -61,19 +65,30 @@ echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
 echo "Automatic reverts enabled: ${ENABLE_PAYLOAD_REVERT}"
 
-# Poll until all blocking jobs have finished (no Pending jobs remain).
-# We can't wait for the payload to reach terminal state because this
-# analysis job is itself part of the payload's verification jobs.
+# Poll until blocking jobs finish OR the payload reaches a terminal state.
+# The release controller can report jobs as Pending even after they complete
+# in Prow, so also check the payload phase as a fallback. The phase can be
+# briefly wrong at creation time (RC bug), so we require PHASE_GRACE_PERIOD
+# to elapse before trusting a terminal phase.
 MAX_WAIT=36000 # 10 hours in seconds
 POLL_INTERVAL=300  # 5 minutes
+PHASE_GRACE_PERIOD=3600 # 1 hour
 ELAPSED=0
 POLL_COUNT=0
+
+# Extract payload creation time from the tag (e.g. 4.22.0-0.nightly-2026-02-25-152806)
+PAYLOAD_TIMESTAMP=$(echo "${PAYLOAD_TAG}" | grep -oP '\d{4}-\d{2}-\d{2}-\d{6}$')
+PAYLOAD_CREATED=$(date -u -d "${PAYLOAD_TIMESTAMP:0:10} ${PAYLOAD_TIMESTAMP:11:2}:${PAYLOAD_TIMESTAMP:13:2}:${PAYLOAD_TIMESTAMP:15:2}" +%s 2>/dev/null || echo "0")
 
 PHASE_WAIT_START=$(date +%s)
 
 echo ""
-echo "=== Waiting for all blocking jobs to complete before analysis ==="
+echo "=== Waiting for blocking jobs to complete (or payload to reach terminal state) ==="
 echo "Polling every $((POLL_INTERVAL / 60)) minutes (timeout: $((MAX_WAIT / 3600)) hours)"
+if [[ "${PAYLOAD_CREATED}" -gt 0 ]]; then
+    echo "Payload created at: $(date -u -d "@${PAYLOAD_CREATED}" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "${PAYLOAD_TIMESTAMP}")"
+    echo "Terminal phase trusted after: $((PHASE_GRACE_PERIOD / 60)) minutes from creation"
+fi
 echo ""
 
 while true; do
@@ -83,11 +98,12 @@ while true; do
     FAILED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed")] | length')
     SUCCEEDED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Succeeded")] | length')
     TOTAL=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[]] | length')
+    PHASE=$(echo "${RELEASE_JSON}" | jq -r '.phase // "Unknown"')
     # Guard against release controller race: jobs may briefly report as Succeeded before being dispatched
     NOT_STARTED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.url == null or .value.url == "")] | length')
 
     ELAPSED_MIN=$((ELAPSED / 60))
-    echo "[Poll #${POLL_COUNT} | ${ELAPSED_MIN}m elapsed] Blocking jobs: ${SUCCEEDED}/${TOTAL} succeeded, ${PENDING} pending, ${FAILED} failed"
+    echo "[Poll #${POLL_COUNT} | ${ELAPSED_MIN}m elapsed] Phase: ${PHASE} | Blocking jobs: ${SUCCEEDED}/${TOTAL} succeeded, ${PENDING} pending, ${FAILED} failed"
 
     if [[ "${NOT_STARTED}" -gt 0 ]]; then
         echo "  ${NOT_STARTED} job(s) have no prow URL yet, waiting for them to be dispatched..."
@@ -108,7 +124,8 @@ while true; do
 
                 SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
-All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
+All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}
+_Agent: ${CLAUDE_MODEL}_"
 
                 set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
@@ -120,13 +137,30 @@ All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
         break
+    elif [[ "${PHASE}" == "Accepted" || "${PHASE}" == "Rejected" ]]; then
+        NOW=$(date +%s)
+        PAYLOAD_AGE=$(( NOW - PAYLOAD_CREATED ))
+        if [[ "${PAYLOAD_CREATED}" -gt 0 && "${PAYLOAD_AGE}" -lt "${PHASE_GRACE_PERIOD}" ]]; then
+            REMAINING=$(( (PHASE_GRACE_PERIOD - PAYLOAD_AGE) / 60 ))
+            echo "  Payload phase is ${PHASE} but payload is only $((PAYLOAD_AGE / 60))m old (grace period: $((PHASE_GRACE_PERIOD / 60))m). Waiting ${REMAINING}m more before trusting phase..."
+        else
+            echo ""
+            echo "Payload reached terminal state (${PHASE}) with ${PENDING} job(s) still pending."
+            if [[ "${FAILED}" -gt 0 ]]; then
+                echo "${FAILED}/${TOTAL} blocking jobs failed. Starting analysis..."
+                break
+            elif [[ "${PHASE}" == "Accepted" ]]; then
+                echo "Payload was accepted. No analysis needed."
+                exit 0
+            fi
+        fi
     fi
 
     ELAPSED=$((ELAPSED + POLL_INTERVAL))
     if [[ ${ELAPSED} -ge ${MAX_WAIT} ]]; then
         echo ""
-        echo "Timed out after $((MAX_WAIT / 3600)) hours waiting for blocking jobs to complete (${PENDING} still pending)."
-        exit 1
+        echo "ERROR: Timed out after $((MAX_WAIT / 3600)) hours waiting for blocking jobs to complete (${PENDING} still pending). Proceeding to analyze what we have..."
+        break
     fi
 
     echo "  Next check in $((POLL_INTERVAL / 60)) minutes..."
@@ -137,8 +171,8 @@ PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
 # Sessions created by -p get sessionKind tagged and are filtered from --continue lookup.
-# Setting CLAUDE_CODE_ENTRYPOINT=cli prevents the sessionKind tag from being set.
-export CLAUDE_CODE_ENTRYPOINT=cli
+# Setting CLAUDE_CODE_ENTRYPOINT=-sdk-cli prevents the sessionKind tag from being set.
+export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
@@ -353,7 +387,8 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
 
 ${SUMMARY:-No summary available.}
 
-<${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
+<${PROW_JOB_URL}|:point_right: View Full Analysis Report>
+_Agent: ${CLAUDE_MODEL}_"
 
     set +x
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \

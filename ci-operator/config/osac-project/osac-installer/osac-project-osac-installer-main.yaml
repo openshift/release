@@ -1,17 +1,24 @@
 base_images:
-  fulfillment-cli:
-    name: latest
-    namespace: osac-project
-    tag: fulfillment-cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   origin-cli:
     name: "4.20"
     namespace: ocp
     tag: cli
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
+binary_build_commands: |
+  git submodule update --init base/osac-fulfillment-service
+  cd base/osac-fulfillment-service && GOFLAGS="-mod=readonly" go build -o /tmp/osac ./cmd/osac
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -24,22 +31,32 @@ images:
       RUN git submodule update --init --recursive
 
       RUN cp oc /usr/local/bin/oc
-      RUN cp fulfillment-cli /usr/local/bin/fulfillment-cli
+      RUN cp osac /usr/local/bin/osac
     from: src
     inputs:
-      fulfillment-cli:
+      bin:
         paths:
         - destination_dir: .
-          source_path: /app/fulfillment-cli
+          source_path: /tmp/osac
       origin-cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: osac-installer
+  - dockerfile_literal: FROM scratch
+    to: component-image
 promotion:
   to:
-  - name: latest
+  - excluded_images:
+    - component-image
+    name: latest
     namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -48,10 +65,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: temp
-  commands: echo "Test"
-  container:
-    from: src
+- as: e2e-vmaas
+  capabilities:
+  - intranet
+  run_if_changed: ^(base/|overlays/|scripts/|prerequisites/)
+  steps:
+    dependencies:
+      OSAC_INSTALLER_IMAGE: osac-installer
+      OSAC_TEST_IMAGE: osac-test-infra
+    workflow: osac-project-cluster-tool-vmaas
 zz_generated_metadata:
   branch: main
   org: osac-project

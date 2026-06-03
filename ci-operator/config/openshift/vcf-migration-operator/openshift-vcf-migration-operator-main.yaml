@@ -1,22 +1,19 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.25
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: vcf-migration-operator
 promotion:
   to:
-  - name: "4.22"
-    namespace: ocp
+  - namespace: vcf
+    tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.22"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.22"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -24,6 +21,11 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift

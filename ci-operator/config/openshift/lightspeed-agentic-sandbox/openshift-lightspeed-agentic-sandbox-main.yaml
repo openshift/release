@@ -1,0 +1,145 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-312:9
+      USER 0
+      RUN pip install uv==0.9.24
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: lightspeed-agentic-sandbox
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/lightspeed-agentic-sandbox
+      USER root
+      RUN dnf install -y python3.12 python3.12-pip && dnf clean all
+      RUN pip3.12 install --no-cache-dir uv==0.9.24
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/lightspeed-agentic-sandbox
+    to: e2e-podman
+promotion:
+  to:
+  - namespace: ols
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: lint
+  commands: make install && make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: unit-test
+  commands: make install && make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e-claude
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        set -euo pipefail
+        podman login --tls-verify=false -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" "$(echo "$IMAGE" | cut -d/ -f1)"
+        export GOOGLE_APPLICATION_CREDENTIALS=/var/run/vertex/token
+        mkdir -p "${HOME}/.config/gcloud"
+        cp /var/run/vertex/token "${HOME}/.config/gcloud/application_default_credentials.json"
+        export CLAUDE_CODE_USE_VERTEX=1
+        export ANTHROPIC_VERTEX_PROJECT_ID="$(python3.12 -c "import json;print(json.load(open('/var/run/vertex/token'))['project_id'])")"
+        export E2E_ARGS="--junitxml=${ARTIFACT_DIR}/junit_e2e.xml --tb=short"
+        bash scripts/e2e-containers.sh claude
+      credentials:
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: lightspeed-agentic-sandbox
+      from: e2e-podman
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-gemini
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        set -euo pipefail
+        podman login --tls-verify=false -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" "$(echo "$IMAGE" | cut -d/ -f1)"
+        export GOOGLE_APPLICATION_CREDENTIALS=/var/run/vertex/token
+        mkdir -p "${HOME}/.config/gcloud"
+        cp /var/run/vertex/token "${HOME}/.config/gcloud/application_default_credentials.json"
+        export E2E_ARGS="--junitxml=${ARTIFACT_DIR}/junit_e2e.xml --tb=short"
+        bash scripts/e2e-containers.sh gemini
+      credentials:
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: lightspeed-agentic-sandbox
+      from: e2e-podman
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-openai
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  skip_if_only_changed: ^docs/|\.md$|^\.ols/|^evals/|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        set -euo pipefail
+        podman login --tls-verify=false -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" "$(echo "$IMAGE" | cut -d/ -f1)"
+        export OPENAI_API_KEY="$(cat /var/run/openai/token)"
+        export E2E_ARGS="--junitxml=${ARTIFACT_DIR}/junit_e2e.xml --tb=short"
+        bash scripts/e2e-containers.sh openai
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: lightspeed-agentic-sandbox
+      from: e2e-podman
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-agentic-sandbox

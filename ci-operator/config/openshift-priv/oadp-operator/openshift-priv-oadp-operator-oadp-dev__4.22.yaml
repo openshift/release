@@ -1,3 +1,8 @@
+base_images:
+  tls-scanner-tool:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -16,6 +21,8 @@ operator:
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
+prowgen:
+  private: true
 releases:
   latest:
     candidate:
@@ -81,6 +88,46 @@ tests:
         requests:
           cpu: 1000m
           memory: 512Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-adp
+      SCANNER_CPU: "2"
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls13-adherence
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: openshift-adp
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: oadp-dev

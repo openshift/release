@@ -1,0 +1,79 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+binary_build_commands: make binaries
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/Azure/azure-service-operator
+images:
+  items:
+  - dockerfile_path: openshift/Dockerfile
+    to: azure-service-operator
+promotion:
+  to:
+  - name: 5.1-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 5.1-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.1-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: openshift/unit-tests.sh
+tests:
+- as: e2e-azure-ovn-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: e2e-azure-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure
+- as: unit
+  commands: openshift/unit-tests.sh
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: azure-service-operator

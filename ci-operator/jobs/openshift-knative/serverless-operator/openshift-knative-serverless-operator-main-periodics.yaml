@@ -4,19 +4,36 @@ periodics:
   cron: 25 3 * * 6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: 4.20-techpreview
+    ci-operator.openshift.io/variant: 4.21-techpreview
     ci.openshift.io/generator: prowgen
-    job-release: "4.20"
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-4.20-techpreview-olmv1-operator-e2e
+  name: periodic-ci-openshift-knative-serverless-operator-main-4.21-techpreview-olmv1-operator-e2e
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -37,7 +54,118 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=olmv1-operator-e2e
-      - --variant=4.20-techpreview
+      - --variant=4.21-techpreview
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 45 7 * * 0
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+    ci-operator.openshift.io/variant: 4.21-techpreview
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-4.21-techpreview-olmv1-operator-upgrade
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=olmv1-operator-upgrade
+      - --variant=4.21-techpreview
       command:
       - ci-operator
       env:
@@ -98,18 +226,35 @@ periodics:
   cron: 23 1 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-kitchensink-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-kitchensink-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -130,7 +275,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=kitchensink-e2e-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -191,18 +336,35 @@ periodics:
   cron: 43 1 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-kitchensink-upgrade-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-kitchensink-upgrade-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -223,7 +385,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=kitchensink-upgrade-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -284,18 +446,35 @@ periodics:
   cron: 4 1 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-mesh-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-mesh-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -316,7 +495,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mesh-e2e-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -377,18 +556,35 @@ periodics:
   cron: 16 5 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-operator-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-operator-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -409,7 +605,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=operator-e2e-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -470,18 +666,35 @@ periodics:
   cron: 41 0 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-test-soak-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-test-soak-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -502,7 +715,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-soak-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -563,18 +776,35 @@ periodics:
   cron: 35 4 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-test-upgrade-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-test-upgrade-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -595,7 +825,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-upgrade-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -656,18 +886,35 @@ periodics:
   cron: 42 1 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-ui-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-ui-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -688,7 +935,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ui-e2e-c
-      - --variant=414
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -749,18 +996,35 @@ periodics:
   cron: 6 5 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "416"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-414-upstream-e2e-kafka-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-416-upstream-e2e-kafka-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -781,379 +1045,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=upstream-e2e-kafka-c
-      - --variant=414
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 25 0 * * 6
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: 420-aws-ovn
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-aws-ovn-e2e-aws-ovn-continuous
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-ovn-continuous
-      - --variant=420-aws-ovn
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 6 7 * * 6
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: 420-azure
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-azure-e2e-azure-continuous
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-azure-continuous
-      - --variant=420-azure
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build08
-  cron: 10 14 * * 6
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp
-    ci-operator.openshift.io/variant: 420-gcp
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-gcp-e2e-gcp-continuous
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-gcp-continuous
-      - --variant=420-gcp
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 43 20 * * 6
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-knative
-    repo: serverless-operator
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: 420-hypershift
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-hypershift-e2e-hypershift-continuous
-  reporter_config:
-    slack:
-      channel: '#serverless-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-hypershift-continuous
-      - --variant=420-hypershift
+      - --variant=416
       command:
       - ci-operator
       env:
@@ -1214,16 +1106,35 @@ periodics:
   cron: 1 3 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "420"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-kitchensink-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-420-kitchensink-upgrade-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1239,12 +1150,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=kitchensink-e2e-c
+      - --target=kitchensink-upgrade-c
       - --variant=420
       command:
       - ci-operator
@@ -1272,8 +1182,115 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 25 0 * * 6
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: 421-aws-ovn
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-aws-ovn-e2e-aws-ovn-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-ovn-continuous
+      - --variant=421-aws-ovn
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -1295,9 +1312,336 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: manifest-tool-local-pusher
       secret:
-        secretName: hive-hive-credentials
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 6 7 * * 6
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+    ci-operator.openshift.io/variant: 421-azure
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-azure-e2e-azure-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-azure-continuous
+      - --variant=421-azure
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 10 14 * * 6
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
+    ci-operator.openshift.io/variant: 421-gcp
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-gcp-e2e-gcp-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-gcp-continuous
+      - --variant=421-gcp
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 43 20 * * 6
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-knative
+    repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: 421-hypershift
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-hypershift-e2e-hypershift-continuous
+  reporter_config:
+    slack:
+      channel: '#serverless-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-hypershift-continuous
+      - --variant=421-hypershift
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1312,16 +1656,33 @@ periodics:
   cron: 18 3 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-kitchensink-upgrade-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-kitchensink-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1342,8 +1703,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=kitchensink-upgrade-c
-      - --variant=420
+      - --target=kitchensink-e2e-c
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1410,16 +1771,33 @@ periodics:
   cron: 44 2 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-mesh-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-mesh-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1441,7 +1819,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mesh-e2e-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1508,16 +1886,33 @@ periodics:
   cron: 57 0 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-operator-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-operator-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1539,7 +1934,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=operator-e2e-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1606,18 +2001,35 @@ periodics:
   cron: 24 10 * * 0
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp
-    ci-operator.openshift.io/variant: 420-single-node
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
+    ci-operator.openshift.io/variant: 421-single-node
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-single-node-e2e-sno-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-single-node-e2e-sno-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1638,7 +2050,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-sno-continuous
-      - --variant=420-single-node
+      - --variant=421-single-node
       command:
       - ci-operator
       env:
@@ -1699,16 +2111,33 @@ periodics:
   cron: 45 5 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-test-soak-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-test-soak-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1730,7 +2159,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-soak-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1797,16 +2226,33 @@ periodics:
   cron: 32 2 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-test-upgrade-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-test-upgrade-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1828,7 +2274,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-upgrade-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1895,16 +2341,33 @@ periodics:
   cron: 36 4 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-ui-e2e-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-ui-e2e-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -1926,7 +2389,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ui-e2e-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -1993,16 +2456,33 @@ periodics:
   cron: 58 2 * * 1,5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-upstream-e2e-kafka-c
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-upstream-e2e-kafka-c
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -2024,7 +2504,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=upstream-e2e-kafka-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -2091,18 +2571,35 @@ periodics:
   cron: 26 4 * * 3
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift-knative
     repo: serverless-operator
+    sparse_checkout_files:
+    - knative-operator/Dockerfile
+    - must-gather/Dockerfile
+    - olm-catalog/serverless-operator-index/Dockerfile
+    - olm-catalog/serverless-operator/Dockerfile
+    - openshift-knative-operator/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
+    - serving/ingress/Dockerfile
+    - serving/metadata-webhook/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: 420-vsphere
+    ci-operator.openshift.io/variant: 421-vsphere
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-serverless-operator-main-420-vsphere-e2e-vsphere-continuous
+  name: periodic-ci-openshift-knative-serverless-operator-main-421-vsphere-e2e-vsphere-continuous
   reporter_config:
     slack:
       channel: '#serverless-ci'
@@ -2123,7 +2620,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-continuous
-      - --variant=420-vsphere
+      - --variant=421-vsphere
       command:
       - ci-operator
       env:

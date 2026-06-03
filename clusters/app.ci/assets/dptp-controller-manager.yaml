@@ -13,6 +13,12 @@ rules:
   - watch
   - update
 - apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
   - prow.k8s.io
   resources:
   - prowjobs
@@ -109,6 +115,16 @@ spec:
       tolerations:
       - key: manual-provision
         operator: Exists
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
         command:

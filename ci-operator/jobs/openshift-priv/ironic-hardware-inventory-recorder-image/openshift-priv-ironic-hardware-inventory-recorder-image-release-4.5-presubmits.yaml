@@ -5,11 +5,15 @@ presubmits:
     branches:
     - ^release-4\.5$
     - ^release-4\.5-
-    cluster: build11
+    cluster: build07
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.ocp
     hidden: true
     labels:
       capability/intranet: intranet
@@ -80,9 +84,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -94,15 +95,19 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.5$
     - ^release-4\.5-
-    cluster: build06
+    cluster: build13
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.ocp
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -110,6 +115,7 @@ presubmits:
     name: pull-ci-openshift-priv-ironic-hardware-inventory-recorder-image-release-4.5-images
     path_alias: github.com/openshift/ironic-hardware-inventory-recorder-image
     rerun_command: /test images
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -144,9 +150,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

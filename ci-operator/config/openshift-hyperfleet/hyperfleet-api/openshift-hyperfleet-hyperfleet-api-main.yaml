@@ -5,9 +5,9 @@ base_images:
     tag: latest
 build_root:
   image_stream_tag:
-    name: openshift-build
-    namespace: jasee
-    tag: rhel-9-golang-1.25
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
   items:
   - dockerfile_literal: |
@@ -24,12 +24,24 @@ images:
         - destination_dir: src
           source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-api
     to: podman-test
+prowgen:
+  expose: true
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: validate-commits
+  steps:
+    test:
+    - ref: hyperfleet-commitlint
+- as: risk-scorer
+  optional: true
+  steps:
+    test:
+    - ref: hyperfleet-risk-scorer
 - as: lint
   capabilities:
   - nested-podman
@@ -50,6 +62,12 @@ tests:
   container:
     from: podman-test
   nested_podman: true
+- as: verify-migrations
+  commands: |
+    make verify-migrations
+  container:
+    from: src
+  run_if_changed: ^pkg/db/migrations/
 - as: helm-test
   commands: |
     curl -fsSL https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz | tar xz

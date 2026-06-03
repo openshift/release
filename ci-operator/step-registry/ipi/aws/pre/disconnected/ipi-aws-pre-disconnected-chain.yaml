@@ -1,0 +1,58 @@
+chain:
+  as: ipi-aws-pre-disconnected
+  steps:
+  - ref: aws-provision-vpc-disconnected
+  - chain: aws-provision-bastionhost
+  - chain: mirror-images-payload
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-aws
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: aws-provision-cco-manual-users-static
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-aws
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - as: disable-default-sources
+    from: cli
+    commands: |-
+      set -euo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json \
+        -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+    grace_period: 5m0s
+  env:
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: "Mirror images from the bastion host rather than the build farm."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy for disconnected install."
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Manually create ingress DNS records for private clusters."
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: "Number of availability zones. Default 2 to avoid regions with fewer than 3 AZs."
+  documentation: |-
+    The ipi-aws-pre-disconnected chain provisions a fully disconnected
+    OpenShift cluster on AWS. It creates an isolated VPC with private subnets
+    and no direct internet access, a bastion host on the public subnet
+    providing a mirror registry, egress proxy, and SSH jump host, then
+    mirrors the release payload and installs the cluster using manual CCO
+    credentials.

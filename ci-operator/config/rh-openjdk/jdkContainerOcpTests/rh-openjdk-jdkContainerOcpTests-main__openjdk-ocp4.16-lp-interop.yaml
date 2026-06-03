@@ -28,6 +28,16 @@ resources:
 tests:
 - as: openjdk-interop-aws
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#java-qe-infrastructure-monitoring'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -52,6 +62,16 @@ tests:
     workflow: firewatch-ipi-aws
 - as: openjdk-interop-ibmcloud
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#java-qe-infrastructure-monitoring'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: ibmcloud-cspi-qe
     env:

@@ -32,11 +32,20 @@ if ! [[ -s /tmp/clusterpools.configured ]]; then
   exit 1
 fi
 
-echo "Discovering configured ClusterImageSets..."
-find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' | xargs grep 'kind: ClusterImageSet' | awk -F: '{print $1}' | xargs /tmp/yq -N e '.metadata.name' | sort > /tmp/imgsets.configured
+echo "Discovering configured ClusterImageSet names (ClusterImageSet manifests + ClusterPool imageSetRef in git)..."
+find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' | xargs grep 'kind: ClusterImageSet' | awk -F: '{print $1}' | xargs /tmp/yq -N e '.metadata.name' > /tmp/imgsets.from_manifests
+
+: > /tmp/imgsets.from_pools
+while IFS= read -r -d '' f; do
+  if grep -q 'kind: ClusterPool' "$f"; then
+    /tmp/yq -N e '.spec.imageSetRef.name | select(. != null)' "$f" >> /tmp/imgsets.from_pools
+  fi
+done < <(find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' -print0)
+
+cat /tmp/imgsets.from_manifests /tmp/imgsets.from_pools | grep -v '^$' | sort -u > /tmp/imgsets.configured
 
 if ! [[ -s /tmp/imgsets.configured ]]; then
-  echo "ERROR: Discovered no configured ClusterImageSets. This probably means something is wrong. Aborting."
+  echo "ERROR: No ClusterImageSet names from manifests or ClusterPool specs in git. Aborting."
   exit 1
 fi
 
@@ -73,7 +82,7 @@ if [[ -s /tmp/imgsets.stale ]]; then
       echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterimageset $name"
     else
       echo "Deleting zombie ClusterImageSets"
-      oc --context hosted-mgmt delete clusterimageset $name
+      oc --context hosted-mgmt delete clusterimageset "$name"
     fi
   done < /tmp/imgsets.stale
 else

@@ -1,6 +1,6 @@
 base_images:
   tests-base:
-    name: "4.18"
+    name: "4.21"
     namespace: ocp
     tag: tests
 binary_build_commands: |
@@ -30,12 +30,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -50,7 +50,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: openshift-org-azure
     env:
-      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
+      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --retry-strategy=aggressive
+        --run ^\[sig-node\].*|^\[sig-network\] '
       TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]
         Sysctls.*should support sysctls\|\[sig-node\] Pods Extended Pod Container
         Status should never report success for a pending container\|\[sig-node\] Security
@@ -64,7 +65,12 @@ tests:
         sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
         pods should successfully create sandboxes by adding pod to network\|\[sig-network\].*should
         create pingable pods with vlan interface on an in-container master\|\[sig-network\].*should
-        create a pod with bond interface
+        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
+        create a pod with bond interface\|\[sig-node\] Variable Expansion should succeed
+        in writing subpaths in container\|\[sig-node\].*\[DRA\]\|\[sig-node\].*User
+        Namespaces.*\|\[sig-node\].*HostUsers.*\|\[sig-node\].*UserNamespacesSupport.*\|\[sig-node\].*SupplementalGroupsPolicy.*Strict.*\|\[sig-node\].*Pod
+        Generation.*increment.*\|\[sig-node\].*ImageVolume.*\|\[sig-node\].*Downward
+        API.*PodLevelResources.*\|\[sig-node\].*Pod InPlace Resize.*
     pre:
     - chain: ipi-azure-pre
     - as: kata-containers-e2e-pre

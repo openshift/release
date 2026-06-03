@@ -72,12 +72,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-tests-deploy-odf
-    - ref: interop-tests-ocs-tests
     - ref: interop-tests-cnv-tests-e2e-deploy
     - ref: interop-tests-openshift-virtualization-tests
     workflow: firewatch-ipi-aws-cr
 - as: aws-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#cnv-release-4-22-z'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -108,14 +117,12 @@ tests:
       OCP_VERSION: "4.23"
       ODF_OPERATOR_CHANNEL: stable-4.20
       ODF_VERSION_MAJOR_MINOR: "4.21"
-      REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: CNV-lp-interop
       USER_TAGS: |
         scenario cnv
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-tests-deploy-odf
-    - ref: interop-tests-ocs-tests
     - ref: interop-tests-cnv-tests-e2e-deploy
     - ref: interop-tests-openshift-virtualization-tests
     workflow: firewatch-ipi-aws-cr

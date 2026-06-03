@@ -427,17 +427,18 @@ tests:
     workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 0 * * 2,4
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.20"
       ETCD_DISK_SPEED: slow
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-ovn-agent-remote-libvirt-multi-z-z
   capabilities:
   - intranet
@@ -466,36 +467,6 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi-heterogeneous
-- as: ocp-heavy-build-ovn-remote-libvirt-multi-s390x
-  capabilities:
-  - intranet
-  cron: 0 1 * * 1,3
-  steps:
-    cluster_profile: libvirt-s390x-vpn
-    dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
-    env:
-      ARCH: s390x
-      BRANCH: "4.20"
-      ETCD_DISK_SPEED: slow
-      NODE_TUNING: "true"
-      TEST_TYPE: heavy-build
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-vpn
-- as: ocp-heavy-build-ovn-remote-libvirt-multi-z-z
-  capabilities:
-  - intranet
-  cron: 0 1 * * 2,4
-  steps:
-    cluster_profile: libvirt-s390x-vpn
-    env:
-      ARCH: s390x
-      BRANCH: "4.20"
-      ETCD_DISK_SPEED: slow
-      NODE_TUNING: "true"
-      TEST_TYPE: heavy-build
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
@@ -552,7 +523,7 @@ tests:
     workflow: openshift-e2e-libvirt-vpn-fips
 - as: ocp-e2e-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 0 * * 1,3
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -568,7 +539,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 0 * * 2,4
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -582,7 +553,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-s2s-libvirt-multi-p-p
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 2 * * 0
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -598,7 +569,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 0 * * 0
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -610,7 +581,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 0 * * 6
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -622,7 +593,7 @@ tests:
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
-  - power-s2s-dns
+  - intranet
   cron: 0 1 * * 6
   steps:
     cluster_profile: libvirt-ppc64le-s2s
@@ -638,7 +609,7 @@ tests:
   - sshd-bastion
   cron: 0 1,13 * * *
   steps:
-    cluster_profile: powervs-9
+    cluster_profile: powervs-6
     env:
       ARCH: ppc64le
       BRANCH: "4.20"
@@ -694,20 +665,21 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - as: ocp-e2e-gcp-ovn-multi-a-a
-  cron: 0 11 * * 0
+  interval: 186h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-2
       OCP_ARCH: arm64
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-gcp-ovn-multi-x-x-to-a-x
   interval: 72h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       MIGRATION_CP_MACHINE_TYPE: t2a-standard-4
-      MIGRATION_INFRA_MACHINE_TYPE: t2a-standard-4
+      MIGRATION_INFRA_MACHINE_TYPE: t2a-standard-2
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
         builds should succeed\| build can reference a cluster service\| custom build
@@ -720,6 +692,7 @@ tests:
         pod should start\| pod sysctls\| build volumes should mount given secrets
         and configmaps into the build pod\| control plane machine set operator should
         not cause an early rollout\| The openshift-image-registry pods
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     test:
     - ref: ipi-conf-inframachineset
     - ref: multiarch-migration-machine-type
@@ -728,9 +701,9 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-a-a-to-x-a
   interval: 72h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-2
       MIGRATION_ARCHITECTURE: x86_64
       MIGRATION_CP_MACHINE_TYPE: n2-standard-4
       MIGRATION_INFRA_MACHINE_TYPE: n2-standard-4
@@ -747,6 +720,7 @@ tests:
         pod should start\| pod sysctls\| build volumes should mount given secrets
         and configmaps into the build pod\| control plane machine set operator should
         not cause an early rollout\| The openshift-image-registry pods
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     test:
     - ref: ipi-conf-inframachineset
     - ref: multiarch-migration-machine-type
@@ -755,19 +729,22 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   interval: 72h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
-      COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-2
       OCP_ARCH: arm64
       TEST_TYPE: upgrade-conformance
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     workflow: openshift-upgrade-gcp
 - as: ocp-e2e-gcp-ovn-multi-x-ax
-  cron: 0 11 * * 0
+  interval: 192h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2
+      ADDITIONAL_WORKERS: "2"
+      COMPUTE_NODE_REPLICAS: "2"
       OCP_ARCH: amd64
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
@@ -782,14 +759,15 @@ tests:
         and configmaps into the build pod\| zstd:chunked Image should successfully
         run date command\| templateinstance readiness test should report ready soon
         after all annotated objects are ready
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     test:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-gcp-ovn-multi-day-0-a-x
-  cron: 0 11 * * 0
+  interval: 198h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -807,16 +785,20 @@ tests:
         and configmaps into the build pod\| zstd:chunked Image should successfully
         run date command\| templateinstance readiness test should report ready soon
         after all annotated objects are ready
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     workflow: openshift-e2e-gcp-ovn
 - as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   interval: 72h
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2
+      ADDITIONAL_WORKERS: "2"
+      COMPUTE_NODE_REPLICAS: "2"
       OCP_ARCH: amd64
       TEST_SUITE: upgrade-conformance
+      ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     workflow: openshift-upgrade-gcp-heterogeneous
 zz_generated_metadata:
   branch: main

@@ -42,6 +42,11 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
   : Overriding step defaults by sourcing clusterbot settings
   # shellcheck disable=SC1090
   source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+  # Always assemble CLONEREFS for cloning when using clusterbot.
+  # The only sitation it would have JOB_SPEC with clonerefs is for rehearsal which is not the main usecase.
+  # When running via cluster bot, it's always empty and the decision "what to clone" is made based on the sourced
+  # `microshift-clusterbot-settings` file (envs like MICROSHIFT_PR, MICROSHIFT_GIT, MICROSHIFT_NIGHTLY, *AND* OCP_VERSION).
+  SRC_FROM_GIT=true
 fi
 
 # All graviton instances have a lower case g in the family part. Using
@@ -126,11 +131,12 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      echo "Waiting up to 5 min for RHEL host to be up."
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-ids "${INSTANCE_ID}"
+
       ci_script_prologue
       scp -F "${HOME}/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
 
-      echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared

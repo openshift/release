@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -36,11 +36,11 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.10_cli:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: cli
   ocp_4.22_base-rhel9:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: base-rhel9
   shellcheck:
@@ -118,7 +118,7 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
@@ -129,25 +129,25 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -270,6 +270,34 @@ tests:
         keyA valueA
         keyB valueB
         keyC valueC
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-pki-default-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: ECDSA
+      EXPECTED_KEY_PARAM: secp384r1
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-pki-rsa-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_ALGORITHM: RSA
+      EXPECTED_KEY_PARAM: "4096"
+      FEATURE_SET: TechPreviewNoUpgrade
+      PKI_ALGORITHM: RSA
+      PKI_RSA_KEY_SIZE: "4096"
+    test:
+    - ref: openshift-installer-pki-verify
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-dualstack-ipv4-primary-techpreview
@@ -495,14 +523,14 @@ tests:
 - as: e2e-gcp-ovn
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-default-config
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     post:
     - chain: ipi-gcp-post
     pre:
@@ -513,7 +541,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -521,7 +549,7 @@ tests:
   as: e2e-gcp-ovn-devpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -545,14 +573,14 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-byo-vpc
 - always_run: false
   as: e2e-azure-default-config
@@ -609,7 +637,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv4-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
@@ -618,7 +646,7 @@ tests:
   as: e2e-azure-ovn-dualstack-ipv6-primary-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
@@ -689,21 +717,21 @@ tests:
 - as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - always_run: false
   as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi-xpn
 - always_run: false
   as: e2e-gcp-xpn-dedicated-dns-project
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
 - always_run: false
   as: e2e-gcp-xpn-custom-dns
@@ -724,7 +752,7 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - always_run: false
   as: e2e-azure-ovn-upi
@@ -737,7 +765,7 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ovn-two-node-arbiter
@@ -884,7 +912,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 7h0m0s
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   run_if_changed: openstack
@@ -892,6 +920,13 @@ tests:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
 - as: e2e-vsphere-ovn
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
@@ -966,6 +1001,13 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-upi
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
@@ -1022,7 +1064,7 @@ tests:
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-crc
 - always_run: false
   as: e2e-metal-assisted
@@ -1144,6 +1186,51 @@ tests:
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-compact-ipv4-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_DISK=100
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-ha-dualstack-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-sno-ipv6-rhel10-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+        AGENT_USE_ZTP_MANIFESTS=true
+        FEATURE_SET=TechPreviewNoUpgrade
+        OS_IMAGE_STREAM="rhel-10"
     workflow: agent-e2e-compact-ipv4
 - always_run: false
   as: e2e-agent-compact-ipv4-none-platform
@@ -1332,7 +1419,7 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       PUBLISH: Internal
     post:
@@ -1418,7 +1505,7 @@ tests:
   as: e2e-gcp-ovn-heterogeneous
   optional: true
   steps:
-    cluster_profile: gcp-arm64
+    cluster_profile: openshift-org-gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -1440,18 +1527,15 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-public-ipv4-pool-disabled
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: none
     workflow: openshift-e2e-aws
@@ -1473,14 +1557,14 @@ tests:
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-custom-endpoints
 - always_run: false
   as: gcp-custom-endpoints-proxy-wif
   optional: true
   run_if_changed: (gcp|google)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       ADDITIONAL_WHITELIST_URLS: s3.us-east-1.amazonaws.com
       RESTRICTED_NETWORK: "yes"

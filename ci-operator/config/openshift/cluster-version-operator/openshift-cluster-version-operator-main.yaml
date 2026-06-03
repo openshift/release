@@ -3,6 +3,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v2.10.1
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -23,17 +27,17 @@ images:
     to: cluster-version-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -194,7 +198,7 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - always_run: false
-  as: tls-scanner
+  as: tls-scanner-default-profile
   optional: true
   steps:
     cluster_profile: openshift-org-aws
@@ -202,6 +206,20 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: openshift-cluster-version
     test:
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- always_run: false
+  as: tls-scanner-modern-profile
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: openshift-cluster-version
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
 zz_generated_metadata:

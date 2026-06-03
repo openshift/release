@@ -5,11 +5,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build12
     context: ci/prow/e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/component-monitor/Dockerfile
+      - images/dashboard/Dockerfile
+      - images/mcp/Dockerfile
+      - images/migrate/Dockerfile
+      - images/mock-monitored-component/Dockerfile
+      - images/mock-oauth-proxy/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -92,11 +98,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build12
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/component-monitor/Dockerfile
+      - images/dashboard/Dockerfile
+      - images/mcp/Dockerfile
+      - images/migrate/Dockerfile
+      - images/mock-monitored-component/Dockerfile
+      - images/mock-oauth-proxy/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -147,11 +159,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build12
     context: ci/prow/lint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/component-monitor/Dockerfile
+      - images/dashboard/Dockerfile
+      - images/mcp/Dockerfile
+      - images/migrate/Dockerfile
+      - images/mock-monitored-component/Dockerfile
+      - images/mock-oauth-proxy/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -206,15 +224,91 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build12
+    context: ci/prow/mcp-test
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - images/component-monitor/Dockerfile
+      - images/dashboard/Dockerfile
+      - images/mcp/Dockerfile
+      - images/migrate/Dockerfile
+      - images/mock-monitored-component/Dockerfile
+      - images/mock-oauth-proxy/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ship-status-dash-main-mcp-test
+    rerun_command: /test mcp-test
+    run_if_changed: ^(mcp/|ship-status-dev/|images/mcp/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=mcp-test
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )mcp-test,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build12
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/component-monitor/Dockerfile
+      - images/dashboard/Dockerfile
+      - images/mcp/Dockerfile
+      - images/migrate/Dockerfile
+      - images/mock-monitored-component/Dockerfile
+      - images/mock-oauth-proxy/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

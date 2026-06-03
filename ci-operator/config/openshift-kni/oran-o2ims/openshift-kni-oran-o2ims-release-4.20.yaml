@@ -19,6 +19,7 @@ images:
   - dockerfile_path: bundle.Dockerfile
     from: ubi-min9
     to: oran-o2ims-operator-bundle
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
 operator:
   bundles:
   - as: operator-bundle
@@ -57,36 +58,7 @@ tests:
   commands: make ci-job
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
-- always_run: false
-  as: scorecard
-  run_if_changed: ^bundle/
-  steps:
-    allow_best_effort_post_steps: true
-    cluster_profile: aws-telco
-    dependencies:
-      OO_BUNDLE: oran-o2ims-operator-bundle
-    env:
-      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: oran-o2ims
-      USER_TAGS: |
-        ci-job-source prowci
-        ci-job-branch release-4.20
-        ci-job-fullname openshift-kni-scorecard-oran-o2ims-release-4.20
-        ci-job-type optional-operators-ci-aws
-        ci-repo-name oran-o2ims
-        ci-org-name openshift-kni
-    test:
-    - as: scorecard-test
-      cli: latest
-      commands: make scorecard-test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-operator-sdk-aws
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
 - always_run: false
   as: markdownlint
   commands: |

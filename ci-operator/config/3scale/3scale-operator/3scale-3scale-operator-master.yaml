@@ -3,7 +3,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 releases:
   latest:
     release:
@@ -32,6 +32,20 @@ tests:
       commands: |
         unset GOFLAGS
         make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: test-integration
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test-integration
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test-integration
       from: src
       resources:
         requests:

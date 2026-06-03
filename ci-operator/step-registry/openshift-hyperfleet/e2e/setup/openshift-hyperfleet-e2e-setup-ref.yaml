@@ -9,7 +9,7 @@ ref:
       memory: 300Mi
   timeout: 1h0m0s
   env:
-  - name: NAMESPACE_PREFIX
+  - name: MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX
     default: "e2e"
     documentation: The CLM deployed namespace prefix in shared cluster.
   - name: CLUSTER_NAME
@@ -45,27 +45,48 @@ ref:
   - name: SENTINEL_CHART_PATH
     default: "charts"
     documentation: The path to the charts directory within the Sentinel chart repository.
+  - name: API_RETRY_ATTEMPTS
+    default: "30"
+    documentation: Maximum number of retry attempts for API accessibility checks.
+  - name: API_RETRY_INTERVAL
+    default: "10"
+    documentation: Seconds to wait between API accessibility retry attempts.
   - name: IMAGE_REGISTRY
-    default: "registry.ci.openshift.org"
+    default: "quay.io"
     documentation: The container image registry to pull images from.
   - name: API_IMAGE_REPO
-    default: "ci/hyperfleet-api"
+    default: "redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api"
     documentation: The image repository path for the API component.
-  - name: API_IMAGE_TAG
+  - name: MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG
     default: "latest"
     documentation: The image tag for the API component.
   - name: ADAPTER_IMAGE_REPO
-    default: "ci/hyperfleet-adapter"
+    default: "redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter"
     documentation: The image repository path for the Adapter component.
-  - name: ADAPTER_IMAGE_TAG
+  - name: MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG
     default: "latest"
     documentation: The image tag for the Adapter component.
   - name: SENTINEL_IMAGE_REPO
-    default: "ci/hyperfleet-sentinel"
+    default: "redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-sentinel"
     documentation: The image repository path for the Sentinel component.
-  - name: SENTINEL_IMAGE_TAG
+  - name: MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG
     default: "latest"
     documentation: The image tag for the Sentinel component.
+  - name: MULTISTAGE_PARAM_OVERRIDE_E2E_REF
+    default: ""
+    documentation: >-
+      Branch or tag name in hyperfleet-e2e to source deploy assets from.
+      Must be a valid branch or tag (not a commit SHA). When empty, uses
+      the deploy-scripts, testdata, and configs baked into the pod image
+      (built from main). When set (e.g., "release-1.5"), clones the repo
+      at that ref and uses deploy-scripts, testdata, and configs from
+      that clone for the deployment. The setup step does not build the
+      test binary or share it via SHARED_DIR — the test step clones and
+      builds independently. SHARED_DIR is used only for kubeconfig,
+      namespace name, and the resolved API and Maestro URLs.
+      Prefixed for Gangway override compatibility (ci-operator's
+      MULTISTAGE_PARAM_OVERRIDE_ env-var path only matches step
+      parameter names that include the prefix).
   credentials:
   - collection: ""
     namespace: test-credentials

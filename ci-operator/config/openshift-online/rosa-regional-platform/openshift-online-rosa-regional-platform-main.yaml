@@ -38,51 +38,30 @@ tests:
   commands: ./ci/check-rendered-files.sh
   container:
     from: src
+- as: unit-tests
+  commands: ./ci/run-unit-tests.sh
+  container:
+    from: src
 - as: nightly-ephemeral
   cron: 0 4 * * *
   steps:
+    allow_best_effort_post_steps: true
+    env:
+      ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET: "false"
     post:
-    - as: teardown-ephemeral
-      commands: ./ci/nightly.sh --teardown
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: rosa-regional-platform-teardown
     pre:
-    - as: provision-ephemeral
-      commands: ./ci/nightly.sh
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: rosa-regional-platform-provision
     test:
-    - as: e2e
-      commands: ./ci/e2e-tests.sh
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: rosa-regional-platform-e2e
 - as: nightly-integration
   cron: 0 4 * * *
   steps:
     test:
     - as: e2e
-      commands: ./ci/e2e-tests.sh
+      commands: |-
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-integration-creds
@@ -100,7 +79,8 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh --teardown-fire-and-forget
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -115,7 +95,9 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        uv run --no-cache ci/ephemeral-provider/main.py \
+          --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json"
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
@@ -127,55 +109,12 @@ tests:
           memory: 200Mi
     test:
     - as: e2e
-      commands: ./ci/e2e-tests.sh
+      commands: |-
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: ephemeral-resources-janitor
-  cron: 0 12 * * 0
-  steps:
-    test:
-    - as: ephemeral-resources-janitor
-      commands: ./ci/ephemeral-resources-janitor.sh
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: customer-account-ephemeral-ci-janitor
-  cron: 0 2 * * *
-  steps:
-    test:
-    - as: customer-account-ephemeral-ci-janitor
-      commands: ./ci/ephemeral-resources-janitor.sh customer
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: customer-account-ephemeral-dev-janitor
-  cron: 0 2 * * *
-  steps:
-    test:
-    - as: customer-account-ephemeral-dev-janitor
-      commands: ./ci/ephemeral-resources-janitor.sh customer
-      credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-dev-creds
         namespace: test-credentials
       from: src
       resources:

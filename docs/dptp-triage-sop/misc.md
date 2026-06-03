@@ -38,6 +38,8 @@ The logs can be deleted in case of leak of secrets or other sensitive informatio
 quay-io-image-mirroring-failures
 ================================
 
+**Alert:** `quay-io-image-mirroring-failures` — **cluster:** `app.ci`. **Rules:** [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `quay-io-image-mirroring`. **Severity:** `critical`.
+
 The alert is fired if there are many failures of `oc image mirror` in `ci-images-mirror`.
 
 Choose a method below - pod logs, cloudwatch or splunk - and then we can run the command locally in our computer:
@@ -52,11 +54,11 @@ $ oc image mirror --keep-manifest-list --registry-config=/tmp/qci.json --continu
 If it reproduces the same error, mostly, it is caused by a broken source image. In that case, we should
 - Fix the source image, e.g. by rebuilding the image from **Pod logs** example below:
   - Inside `release` repo search for the job that promotes the image: `grep -r 'to: cluster-capi-operator'`
-  - Observe the directory three of the returned files: `ci-operator/config/openshift/cluster-capi-operator/`
+  - Observe the directory tree of the returned files: `ci-operator/config/openshift/cluster-capi-operator/`
   - Find the equivalent `ProwJob`, e.g. `ci-operator/jobs/openshift/cluster-capi-operator/openshift-cluster-capi-operator-release-4.16-postsubmits.yaml`
   - Pick the right `ProwJob` from the file, e.g. `branch-ci-openshift-cluster-capi-operator-release-4.16-okd-scos-images`
   - Execute from inside `release` repository: `make job JOB='branch-ci-openshift-cluster-capi-operator-release-4.16-okd-scos-images' BASE_REF=release-4.16`
-- Ignore the mirroring otherwise: See [RFE-5363](https://issues.redhat.com/browse/) for example.
+- Ignore the mirroring otherwise: See [RFE-5363](https://issues.redhat.com/browse/RFE-5363) for example.
 
 
 Pod logs

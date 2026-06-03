@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -14,6 +18,8 @@ promotion:
   to:
   - name: 4.23-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -131,7 +137,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -148,7 +154,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -165,7 +171,7 @@ tests:
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -207,6 +213,16 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: e2e-aws-nto-ext
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: openshift/cluster-node-tuning-operator/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.23
   org: openshift-priv

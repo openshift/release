@@ -9,7 +9,8 @@ presubmits:
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -93,7 +94,8 @@ presubmits:
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -169,20 +171,22 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build03
+    cluster: build13
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ocp
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ironic-agent-image-release-4.8-images
     rerun_command: /test images
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
     spec:
       containers:
       - args:

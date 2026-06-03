@@ -19,7 +19,9 @@ function version_le() {
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -z "${AWS_CONFIG_FILE:-}" ]]; then
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
 
 if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   echo "Using default value: ${BASE_DOMAIN}"
@@ -340,9 +342,17 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
-  else
-    # 4.10 and above
+  elif version_le "${ocp_version}" "4.21"; then
+    # 4.10 to 4.21
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+  else
+    # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
+    coreos_file="coreos-rhel-9.json"
+    if [[ "${OS_IMAGE_STREAM:-}" == "rhel-10" ]]; then
+      coreos_file="coreos-rhel-10.json"
+    fi
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   fi
   COMPUTE_AMI="${CONTROL_PLANE_AMI}"
@@ -615,4 +625,39 @@ EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
   cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
   echo "Dual-stack networking configuration added to install-config.yaml"
+fi
+
+# Configure PKI signer certificates if PKI_ALGORITHM is set
+if [[ -n "${PKI_ALGORITHM:-}" ]]; then
+  echo "Configuring PKI with algorithm: ${PKI_ALGORITHM}"
+  patch_pki="${SHARED_DIR}/install-config-pki.yaml.patch"
+  case "${PKI_ALGORITHM}" in
+    RSA)
+      cat > "${patch_pki}" << EOF
+pki:
+  signerCertificates:
+    key:
+      algorithm: RSA
+      rsa:
+        keySize: ${PKI_RSA_KEY_SIZE}
+EOF
+      ;;
+    ECDSA)
+      cat > "${patch_pki}" << EOF
+pki:
+  signerCertificates:
+    key:
+      algorithm: ECDSA
+      ecdsa:
+        curve: ${PKI_ECDSA_CURVE}
+EOF
+      ;;
+    *)
+      echo "ERROR: Unsupported PKI_ALGORITHM: ${PKI_ALGORITHM}. Must be RSA or ECDSA."
+      exit 1
+      ;;
+  esac
+  yq-go m -x -i "${CONFIG}" "${patch_pki}"
+  cp "${patch_pki}" "${ARTIFACT_DIR}/"
+  echo "PKI configuration added to install-config.yaml"
 fi

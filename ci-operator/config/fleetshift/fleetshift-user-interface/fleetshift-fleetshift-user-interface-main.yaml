@@ -1,0 +1,46 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs20-linux
+images:
+  items:
+  - dockerfile_path: Dockerfile.web
+    to: fleetshift-web
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      IMAGE_REPO: fleetshift-web
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-latest
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      IMAGE_REPO: fleetshift-web
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-sha
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      IMAGE_REPO: fleetshift-web
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: fleetshift
+  repo: fleetshift-user-interface

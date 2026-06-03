@@ -47,6 +47,9 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  expose: true
+  private: true
 releases:
   arm64-latest:
     candidate:
@@ -70,16 +73,36 @@ resources:
 tests:
 - as: aws-ipi-amd-f14-netobserv
   cron: 41 23 16,30 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.2xlarge
     test:
-    - chain: openshift-e2e-test-netobserv-qe
+    - chain: openshift-e2e-test-netobserv-qe-pf5
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-arm-f28-netobserv
   cron: 44 13 7 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: aws-qe
     env:
@@ -87,7 +110,7 @@ tests:
       COMPUTE_NODE_TYPE: m6gd.2xlarge
       OCP_ARCH: arm64
     test:
-    - chain: openshift-e2e-test-netobserv-qe
+    - chain: openshift-e2e-test-netobserv-qe-pf5
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-arm-mixarch-f14-day2-64k-pagesize
   cron: 33 8 9,25 * *
@@ -457,6 +480,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipv4-subnet
 - as: aws-ipi-ovn-arm-mixarch-mto-hypershift-arm-mgmt-f14
   cron: 13 5 8,24 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -482,6 +515,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous
 - as: aws-ipi-ovn-arm-mixarch-mto-hypershift-arm-guest-f14
   cron: 42 17 2,16 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -506,6 +549,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous-guest
 - as: aws-ipi-ovn-amd-hypershift-guest-mto-f14
   cron: 22 12 8,22 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
@@ -582,57 +635,45 @@ tests:
 - as: aws-ipi-public-ipv4-pool-byo-subnet-amd-f28-destructive
   cron: 27 5 23 1 *
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool-byo-subnet
 - as: aws-ipi-public-ipv4-pool-byo-subnet-mini-perm-arm-f14
   cron: 43 13 15 12 *
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool-byo-subnet
 - as: aws-ipi-public-ipv4-pool-mini-perm-amd-f28-destructive
   cron: 37 5 23 9 *
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool
 - as: aws-ipi-public-ipv4-pool-mini-perm-arm-f14
   cron: 54 12 13 9 *
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-public-ipv4-pool
@@ -791,13 +832,23 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: azure-ipi-amd-f14-netobserv
   cron: 52 4 5,19 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_B8ms
     test:
-    - chain: openshift-e2e-test-netobserv-qe
+    - chain: openshift-e2e-test-netobserv-qe-pf5
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f14-day2-64k-pagesize
   cron: 2 20 3,17 * *
@@ -1415,7 +1466,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
-- as: baremetal-ipi-ovn-ipv4-amd-f60
+- as: metal-ipi-ovn-ipv4-amd-f60
   capabilities:
   - intranet
   cron: 16 17 15 1,3,5,7,9,11 *
@@ -1431,7 +1482,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-arm-f60
+- as: metal-ipi-ovn-ipv4-arm-f60
   capabilities:
   - intranet
   cron: 26 14 29 1,3,5,7,9,11 *
@@ -1447,7 +1498,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-vmedia-amd-f60
+- as: metal-ipi-ovn-ipv4-vmedia-amd-f60
   capabilities:
   - intranet
   cron: 36 14 13 2,4,6,8,10,12 *
@@ -1462,7 +1513,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
-- as: baremetal-ipi-ovn-ipv4-vmedia-disruptive-amd-f60
+- as: metal-ipi-ovn-ipv4-vmedia-disruptive-amd-f60
   capabilities:
   - intranet
   cron: 38 13 27 1,3,5,7,9,11 *
@@ -1481,7 +1532,7 @@ tests:
     test:
     - ref: openshift-extended-test-disruptive
     workflow: baremetal-lab-ipi-virtual-media
-- as: baremetal-ipi-ovn-dualstack-arm-vmedia-f60
+- as: metal-ipi-ovn-dualstack-arm-vmedia-f60
   capabilities:
   - intranet
   cron: 49 18 4 1,3,5,7,9,11 *
@@ -1498,7 +1549,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
-- as: baremetal-ipi-ovn-ipv4-basecap-none-arm-f60
+- as: metal-ipi-ovn-ipv4-basecap-none-arm-f60
   capabilities:
   - intranet
   cron: 32 13 6 2,4,6,8,10,12 *
@@ -1516,7 +1567,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
-- as: baremetal-ipi-ovn-ipv4-external-lb-arm-f60
+- as: metal-ipi-ovn-ipv4-external-lb-arm-f60
   capabilities:
   - intranet
   cron: 42 20 9 1,3,5,7,9,11 *
@@ -1532,7 +1583,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
-- as: baremetal-upi-ovn-ipv4-arm-mixarch-f60-day2-64k-pagesize
+- as: metal-upi-ovn-ipv4-arm-mixarch-f60-day2-64k-pagesize
   capabilities:
   - intranet
   cron: 54 17 10 1,3,5,7,9,11 *
@@ -1555,7 +1606,7 @@ tests:
     - ref: mco-conf-day2-kerneltype
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: baremetal-upi-ovn-ipv4-disconnected-arm-f60
+- as: metal-upi-ovn-ipv4-disconnected-arm-f60
   capabilities:
   - intranet
   cron: 2 13 13 2,4,6,8,10,12 *
@@ -1573,12 +1624,22 @@ tests:
     workflow: baremetal-lab-upi-install-disconnected
 - as: gcp-ipi-amd-f14-netobserv
   cron: 35 2 4,20 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: c2-standard-8
     test:
-    - chain: openshift-e2e-test-netobserv-qe
+    - chain: openshift-e2e-test-netobserv-qe-pf5
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-basecap-none-additionalcaps-amd-f28-destructive
   cron: 26 14 14 * *
@@ -1702,8 +1763,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       E2E_RUN_TAGS: '@level0'
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -1721,8 +1782,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -1732,12 +1793,21 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity-machine-api-controller-without-actas
 - as: gcp-ipi-oidc-mini-perm-arm-f28-longduration-cloud
   cron: 47 13 6 * *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -1924,8 +1994,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1936,8 +2006,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1964,8 +2034,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
@@ -1977,8 +2047,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
@@ -1987,12 +2057,21 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
 - as: gcp-ipi-xpn-oidc-mini-perm-arm-f28-longduration-cloud
   cron: 13 14 26 * *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
@@ -2055,6 +2134,16 @@ tests:
     workflow: openshift-e2e-ibmcloud-heterogeneous-test-qe
 - as: aws-ipi-ovn-hypershift-mgmt-f14
   cron: 58 12 10,26 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
@@ -2071,6 +2160,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous
 - as: aws-ipi-ovn-hypershift-guest-f14
   cron: 42 4 5,19 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
@@ -2086,6 +2185,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous-guest
 - as: aws-ipi-ovn-hypershift-guest-f28-destructive
   cron: 56 23 11 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
@@ -2099,7 +2208,7 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous-guest
-- as: baremetal-upi-ovn-ipv4-day2-scale-amd-f60
+- as: metal-upi-ovn-ipv4-day2-scale-amd-f60
   capabilities:
   - intranet
   cron: 26 13 5 2,4,6,8,10,12 *

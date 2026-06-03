@@ -9,10 +9,17 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ -z "${AGENT_ISO}" ] && { echo "\$AGENT_ISO is not filled. Failing."; exit 1; }
-[ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && { echo "Proxy conf file is not found. Failing."; exit 1; }
 
-source "${SHARED_DIR}/proxy-conf.sh"
+if [ "${DISCONNECTED}" == "true" ]; then
+  [ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && {
+    echo "Proxy conf file is not found. Failing."
+    exit 1
+  }
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
 yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
 
 function mount_virtual_media() {
@@ -46,7 +53,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
      iso_path="${IP_ADDRESS}/isos/${AGENT_ISO}"
    else
      # Assuming HTTP or HTTPS
-     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${AGENT_ISO}"
+     # IF _SNAPSHOT_ is not empty, this is a konflux job
+     OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
+     if [ ! -z "${SNAPSHOT}" ]; then
+        iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${CLUSTER_NAME}.agent-ove.x86_64.iso"
+     else
+        iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${AGENT_ISO}"
+     fi
    fi
    mount_virtual_media "${host}" "${iso_path}"
 

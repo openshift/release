@@ -76,15 +76,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-metal3-conformance
@@ -150,6 +141,7 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
@@ -165,6 +157,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         MIRROR_IMAGES=true
+        NUM_WORKERS=4
         NETWORK_TYPE=OVNKubernetes
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
@@ -176,35 +169,16 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
     workflow: hypershift-mce-agent-disconnected-conformance
-- as: e2e-agent-connected-ovn-ipv4-metal-oadp
+- as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
   capabilities:
   - intranet
   cron: 0 6 22-28 * 4
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OVNKubernetes
-        NUM_WORKERS=3
-        WORKER_MEMORY=32768
-        WORKER_VCPU=8
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=500G
-        NUM_EXTRA_WORKERS=3
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
-      OADP_OPERATOR_SUB_CHANNEL: stable-1.4
-      OADP_OPERATOR_SUB_SOURCE: qe-app-registry
-    test:
-    - ref: hypershift-mce-agent-minio
-    - ref: operatorhub-subscribe-oadp-operator
-    - ref: hypershift-mce-agent-oadp-v2
-    - chain: hypershift-conformance
-    workflow: hypershift-mce-agent-metal3-conformance
+    workflow: hypershift-mce-agent-metal3-backuprestore
 - as: e2e-kubevirt-metal-ovn
   capabilities:
   - intranet
@@ -296,6 +270,16 @@ tests:
     workflow: hypershift-mce-kubevirt-gpu-conformance
 - as: e2e-ibmz-ovn-conformance
   minimum_interval: 168h
+  reporter_config:
+    channel: '#ibmz-prowci-notifier'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -331,6 +315,7 @@ tests:
     cluster_profile: openshift-org-aws
     dependencies:
       HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:419-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:419-latest
     env:
       MCE_VERSION: "2.9"
       TEST_SUITE: openshift/conformance/parallel/minimal

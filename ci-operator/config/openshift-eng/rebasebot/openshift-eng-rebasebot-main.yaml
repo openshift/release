@@ -24,6 +24,10 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: rebasebot
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     limits:
@@ -33,6 +37,64 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make deps
 tests:
+- as: apiserver-network-proxy
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: apiserver-network-proxy
+      commands: |
+        rebasebot --source https://github.com/kubernetes-sigs/apiserver-network-proxy:master \
+                  --dest openshift/apiserver-network-proxy:main \
+                  --rebase openshift/apiserver-network-proxy:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-app-id 3706026 \
+                  --github-cloner-id 3706026 \
+                  --git-username hypershift-rebase-bot \
+                  --git-email hypershift-rebase-bot@redhat.com \
+                  --bot-emails hypershift-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: hypershift-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+- as: azure-kubernetes-kms
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: azure-kubernetes-kms
+      commands: |
+        rebasebot --source https://github.com/Azure/kubernetes-kms:master \
+                  --dest openshift/azure-kubernetes-kms:main \
+                  --rebase openshift/azure-kubernetes-kms:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/hypershift-rebase-bot-key \
+                  --github-app-id 3706026 \
+                  --github-cloner-id 3706026 \
+                  --git-username hypershift-rebase-bot \
+                  --git-email hypershift-rebase-bot@redhat.com \
+                  --bot-emails hypershift-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: hypershift-rebasebot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
 - as: cloud-provider-aws
   cron: 0 12 * * Mon,Thu
   steps:
@@ -43,12 +105,11 @@ tests:
                   --dest openshift/cloud-provider-aws:main \
                   --rebase openshift-cloud-team/cloud-provider-aws:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -73,12 +134,10 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-nutanix:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -103,12 +162,11 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-azure:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -133,12 +191,11 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-aws:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -159,16 +216,15 @@ tests:
       commands: |
         rebasebot --source-repo kubernetes-sigs/cluster-api-provider-gcp \
                   --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
-                  --dest openshift/cluster-api-provider-gcp:master \
-                  --rebase openshift-cloud-team/cluster-api-provider-gcp:rebase-bot-master \
+                  --dest openshift/cluster-api-provider-gcp:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-gcp:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -189,16 +245,15 @@ tests:
       commands: |
         rebasebot --source-repo kubernetes-sigs/cluster-api-provider-vsphere \
                   --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
-                  --dest openshift/cluster-api-provider-vsphere:master \
-                  --rebase openshift-cloud-team/cluster-api-provider-vsphere:rebase-bot-master \
+                  --dest openshift/cluster-api-provider-vsphere:main \
+                  --rebase openshift-cloud-team/cluster-api-provider-vsphere:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -223,12 +278,10 @@ tests:
                   --rebase openshift-cloud-team/cluster-api-provider-ibmcloud:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -249,16 +302,15 @@ tests:
       commands: |
         rebasebot --source-repo kubernetes-sigs/cluster-api \
                   --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
-                  --dest openshift/cluster-api:master \
-                  --rebase openshift-cloud-team/cluster-api:rebase-bot-master \
+                  --dest openshift/cluster-api:main \
+                  --rebase openshift-cloud-team/cluster-api:rebase-bot-main \
                   --update-go-modules \
                   --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -282,12 +334,10 @@ tests:
                   --dest openshift/cloud-provider-ibm:main \
                   --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -310,12 +360,10 @@ tests:
                   --dest openshift/cloud-provider-vpc-controller:master \
                   --rebase openshift-cloud-team/cloud-provider-vpc-controller:rebase-bot-master \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -339,7 +387,6 @@ tests:
                   --dest openshift/cloud-provider-powervs:main \
                   --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
@@ -367,12 +414,11 @@ tests:
                   --dest openshift/cloud-provider-azure:main \
                   --rebase openshift-cloud-team/cloud-provider-azure:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -395,12 +441,11 @@ tests:
                   --dest openshift/cloud-provider-gcp:main \
                   --rebase openshift-cloud-team/cloud-provider-gcp:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -423,12 +468,11 @@ tests:
                   --dest openshift/cloud-provider-vsphere:main \
                   --rebase openshift-cloud-team/cloud-provider-vsphere:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -451,12 +495,10 @@ tests:
                   --dest openshift/cloud-provider-nutanix:main \
                   --rebase openshift-cloud-team/cloud-provider-nutanix:rebase-bot-main \
                   --update-go-modules \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
                   --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
@@ -589,6 +631,36 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: openstack-networking-generic-switch
+  cron: 40 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-networking-generic-switch
+      commands: |
+        rebasebot --source https://github.com/openstack/networking-generic-switch:master \
+                  --dest openshift/openstack-networking-generic-switch:main \
+                  --rebase openshift-metal3/openstack-networking-generic-switch:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: kubernetes-autoscaler
   cron: 20 13 * * Mon,Thu
   steps:
@@ -598,17 +670,19 @@ tests:
         UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes/autoscaler/releases" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | grep -E 'cluster-autoscaler-[0-9.]+' | sort -V | tail -n1)
         rebasebot --source https://github.com/kubernetes/autoscaler:"${UPSTREAM_VERSION}" \
                   --dest openshift/kubernetes-autoscaler:main \
-                  --rebase openshift-cloud-team/kubernetes-autoscaler:rebase-bot-main \
-                  --slack-webhook /secrets/rebasebot/team-cloud-slack-webhook \
-                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
-                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
-                  --git-username cloud-team-rebase-bot \
-                  --git-email cloud-team-rebase-bot@redhat.com \
-                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --rebase openshift/kubernetes-autoscaler:rebase-bot-main \
+                  --slack-webhook /secrets/rebasebot/autoscaling-team-bot-spam-slack-incoming-webhook \
+                  --github-app-id 1183368 \
+                  --github-cloner-id 1183368 \
+                  --github-app-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                  --github-cloner-key /secrets/rebasebot/autoscaling-team-rebasebot-github-application-key \
+                  --git-username autoscaling-team-rebase-bot \
+                  --git-email autoscaling-team-rebase-bot@redhat.com \
+                  --bot-emails autoscaling-team-rebase-bot@redhat.com \
                   --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
-        name: rebasebot-credentials
+        name: autoscaling-team-rebasebot-credentials
         namespace: test-credentials
       from: rebasebot
       resources:

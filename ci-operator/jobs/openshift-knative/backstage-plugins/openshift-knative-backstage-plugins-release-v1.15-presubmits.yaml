@@ -1,21 +1,26 @@
 presubmits:
   openshift-knative/backstage-plugins:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build08
+    cluster: build13
     context: ci/prow/414-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/eventmesh/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-backstage-plugins-release-v1.15-414-images
     rerun_command: /test 414-images
+    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:
@@ -59,21 +64,26 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )414-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build08
+    cluster: build13
     context: ci/prow/418-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/eventmesh/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "418"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-backstage-plugins-release-v1.15-418-images
     rerun_command: /test 418-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:

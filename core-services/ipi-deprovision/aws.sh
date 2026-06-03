@@ -36,12 +36,74 @@ function deprovision() {
 	fi
 }
 
+function vpc_has_only_orphaned_eni() {
+	local region="${1}" vpc_id="${2}"
+
+	local enis
+	enis="$(aws ec2 describe-network-interfaces \
+		--region "${region}" \
+		--filters "Name=vpc-id,Values=${vpc_id}" \
+		--query 'NetworkInterfaces[].{Id:NetworkInterfaceId,Status:Status,Desc:Description,Subnet:SubnetId,Type:InterfaceType,RequesterManaged:RequesterManaged}' \
+		--output json)"
+
+	local total
+	total="$(echo "${enis}" | jq 'length')"
+	if [[ "${total}" -ne 1 ]]; then
+		return 1
+	fi
+
+	local requester_managed
+	requester_managed="$(echo "${enis}" | jq -r '.[0].RequesterManaged')"
+	if [[ "${requester_managed}" != "true" ]]; then
+		return 1
+	fi
+
+	local interface_type
+	interface_type="$(echo "${enis}" | jq -r '.[0].Type')"
+
+	local owner_gone=false
+	case "${interface_type}" in
+		network_load_balancer|gateway_load_balancer)
+			local lb_count
+			lb_count="$(aws elbv2 describe-load-balancers \
+				--region "${region}" \
+				--query "length(LoadBalancers[?VpcId=='${vpc_id}'])" \
+				--output text)"
+			if [[ "${lb_count}" -eq 0 ]]; then
+				owner_gone=true
+			fi
+			;;
+		*)
+			return 1
+			;;
+	esac
+
+	if [[ "${owner_gone}" != "true" ]]; then
+		return 1
+	fi
+
+	echo "WARNING: Known AWS bug -- orphaned ENI in VPC ${vpc_id} (region ${region})."
+	echo "WARNING: The ENI is RequesterManaged but its owning resource (${interface_type}) no longer exists:"
+	echo "${enis}" | jq -r '.[0] | "  ENI: \(.Id)  Type: \(.Type)  Status: \(.Status)  Subnet: \(.Subnet)  Description: \(.Desc)"'
+	echo "WARNING: Skipping deprovision for this VPC."
+	return 0
+}
+
 if [[ -n ${HYPERSHIFT_PRUNER:-} ]]; then
 	had_failure=0
-	hostedclusters="$(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 14400 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name')"
-	for hostedcluster in $hostedclusters; do
-		hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace clusters --name "${hostedcluster}" || had_failure=$((had_failure+1))
-	done
+	if [[ -n ${HYPERSHIFT_PRUNER_ALL_NAMESPACES:-} ]]; then
+		hostedclusters="$(oc get hostedcluster -A -o json | jq -r --argjson timestamp 14400 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp) | .metadata.namespace + "/" + .metadata.name')"
+		for hostedcluster in $hostedclusters; do
+			ns="${hostedcluster%%/*}"
+			name="${hostedcluster##*/}"
+			hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace "${ns}" --name "${name}" || had_failure=$((had_failure+1))
+		done
+	else
+		hostedclusters="$(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 14400 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name')"
+		for hostedcluster in $hostedclusters; do
+			hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace clusters --name "${hostedcluster}" || had_failure=$((had_failure+1))
+		done
+	fi
 	# Exit here if we had errors, otherwise we destroy the OIDC providers for the hostedclusters and deadlock deletion as cluster api creds stop working so it will never be able to remove machine finalizers
 	if [[ $had_failure -ne 0 ]]; then exit $had_failure; fi
 fi
@@ -54,8 +116,11 @@ echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cu
 # --region is necessary when there is no profile customization
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
 	echo "deprovisioning in AWS region ${region} ..."
-	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | .Key' > /tmp/clusters
-	while read cluster; do
+	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | . as $vpc | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | "\($vpc.VpcId) \(.Key)"' > /tmp/clusters
+	while read vpc_id cluster; do
+		if vpc_has_only_orphaned_eni "${region}" "${vpc_id}"; then
+			continue
+		fi
 		workdir="${logdir}/${cluster:22}"
 		mkdir -p "${workdir}"
 		cat <<-EOF >"${workdir}/metadata.json"

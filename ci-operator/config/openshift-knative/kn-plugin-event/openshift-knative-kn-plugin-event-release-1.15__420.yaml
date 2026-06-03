@@ -39,6 +39,7 @@ images:
         as:
         - $GO_BUILDER
     to: kn-plugin-event-test-wathola-forwarder
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
 promotion:
   to:
   - additional_images:
@@ -148,6 +149,16 @@ tests:
     timeout: 2h0m0s
     version: "4.20"
   cron: 23 1 * * 2,6
+  reporter_config:
+    channel: '#knative-client'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
