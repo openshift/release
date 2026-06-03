@@ -173,7 +173,7 @@ python3 "${SNAPSHOT_SCRIPT}" "${PAYLOAD_TAG}" --output-dir "${SNAPSHOT_DIR}"
 PHASE_SNAPSHOT_DURATION=$(( $(date +%s) - PHASE_SNAPSHOT_START ))
 echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s at ${SNAPSHOT_DIR}/${PAYLOAD_TAG}"
 echo "Archiving payload snapshot to artifacts..."
-tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" "${PAYLOAD_TAG}"
+tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 
 # Ensure reports and session logs are copied to artifacts even if the script exits early
 copy_reports() {
