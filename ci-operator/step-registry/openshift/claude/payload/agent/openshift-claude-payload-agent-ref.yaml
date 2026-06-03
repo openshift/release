@@ -7,7 +7,7 @@ ref:
   commands: openshift-claude-payload-agent-commands.sh
   credentials:
   - namespace: test-credentials
-    name: hypershift-team-claude-prow
+    name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
   - namespace: test-credentials
     name: trt-alert-slack-webhook-url
@@ -15,9 +15,6 @@ ref:
   - namespace: test-credentials
     name: claude-payload-agent-github-token
     mount_path: /var/run/github-token
-  - namespace: test-credentials
-    name: claude-payload-agent-jira-token
-    mount_path: /var/run/jira-token
   env:
   - name: PAYLOAD_TAG
   - name: CLAUDE_CODE_USE_VERTEX
@@ -27,21 +24,13 @@ ref:
   - name: ANTHROPIC_VERTEX_PROJECT_ID
     default: "itpc-gcp-hybrid-pe-eng-claude"
   - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: "/var/run/claude-code-service-account/claude-prow"
+    default: "/var/run/claude-code-service-account/token"
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
   - name: SLACK_WEBHOOK_URL
     default: "/var/run/slack-webhook/url"
   - name: GITHUB_TOKEN_PATH
     default: "/var/run/github-token/token"
-  - name: JIRA_API_TOKEN_PATH
-    default: "/var/run/jira-token/token"
-  - name: JIRA_USERNAME_PATH
-    default: "/var/run/jira-token/username"
-  - name: JIRA_URL
-    default: "https://redhat.atlassian.net"
-  - name: ENABLE_PAYLOAD_REVERT
-    default: "false"
   - name: ENABLE_SLACK_NOTIFICATIONS
     default: "true"
   resources:
@@ -51,9 +40,7 @@ ref:
   timeout: 12h0m0s
   grace_period: 1m0s
   documentation: |-
-    Analyzes rejected release payloads using Claude AI and optionally
-    stages reverts for high-confidence causes. Receives a PAYLOAD_TAG
-    from the release controller, polls until blocking jobs complete,
-    runs the analyze-payload skill to identify root causes, generates
-    an HTML report, and when ENABLE_PAYLOAD_REVERT is true, stages
-    reverts for high-confidence candidates via payload-revert.
+    Analyzes rejected release payloads using Claude AI. Creates a
+    deterministic snapshot of payload data, then runs the
+    payload-analysis skill to identify root causes and generate an
+    HTML report with revert recommendations.
