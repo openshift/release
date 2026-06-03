@@ -253,10 +253,13 @@ for attempt in 1 2 3; do
     YAML_OK=false
     JSON_OK=false
 
-    if python3 "${VALIDATE_YAML}" "payload-results-${PAYLOAD_TAG}.yaml"; then
+    RESULTS_YAML=$(find . -maxdepth 1 -name "payload-results-*.yaml" -print -quit)
+    RESULTS_JSON=$(find . -maxdepth 1 -name "payload-analysis-*-autodl.json" -print -quit)
+
+    if [[ -n "${RESULTS_YAML}" ]] && python3 "${VALIDATE_YAML}" "${RESULTS_YAML}"; then
         YAML_OK=true
     fi
-    if python3 "${VALIDATE_JSON}" "payload-analysis-${PAYLOAD_TAG}-autodl.json"; then
+    if [[ -n "${RESULTS_JSON}" ]] && python3 "${VALIDATE_JSON}" "${RESULTS_JSON}"; then
         JSON_OK=true
     fi
 
