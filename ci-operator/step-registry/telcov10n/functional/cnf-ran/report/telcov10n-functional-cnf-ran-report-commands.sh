@@ -77,16 +77,13 @@ done
 
 cd /eco-ci-cd
 
-SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
-CI_LANE="${REPORTER_TEMPLATE_NAME%-*.*}"
 METRICS_FILE="/tmp/metrics/ran-metrics.txt"
 
 echo "Collecting metrics"
 ansible-playbook ./playbooks/ran/collect-metrics.yml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
-    ran_spoke_kubeconfig=${SPOKE_KUBECONFIG} \
-    ran_ci_lane='${CI_LANE}' \
+    ran_ci_lane='${REPORTER_LAUNCH_NAME}' \
     ran_output_file=${METRICS_FILE} \
     ran_metrics_list=${RAN_METRICS_LIST}" || true
 
@@ -104,6 +101,7 @@ ansible-playbook ./playbooks/upload-report.yaml \
     processed_report_dir=/tmp/reports \
     junit_report_dir=/tmp/junit \
     reports_directory=/tmp/upload \
+    reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
     report_portal_url_filename='${REPORTPORTAL_FILES}' \
     reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
