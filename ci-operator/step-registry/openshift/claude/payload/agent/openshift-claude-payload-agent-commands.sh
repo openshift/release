@@ -166,16 +166,14 @@ cd "${WORKDIR}"
 # Create payload snapshot deterministically (no tokens spent)
 echo ""
 echo "=== Creating payload snapshot ==="
-SNAPSHOT_SCRIPT=$(find /home/claude/.claude -name "payload_snapshot.py" -path "*/payload-snapshot/*" 2>/dev/null | head -1)
-if [[ -z "${SNAPSHOT_SCRIPT}" ]]; then
-    echo "ERROR: payload_snapshot.py not found. Is the ai-helpers plugin installed?"
-    exit 1
-fi
+SNAPSHOT_SCRIPT="/opt/ai-helpers/plugins/ci/skills/payload-snapshot/scripts/payload_snapshot.py"
 SNAPSHOT_DIR="${WORKDIR}/snapshot"
 PHASE_SNAPSHOT_START=$(date +%s)
 python3 "${SNAPSHOT_SCRIPT}" "${PAYLOAD_TAG}" --output-dir "${SNAPSHOT_DIR}"
 PHASE_SNAPSHOT_DURATION=$(( $(date +%s) - PHASE_SNAPSHOT_START ))
 echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s at ${SNAPSHOT_DIR}/${PAYLOAD_TAG}"
+echo "Archiving payload snapshot to artifacts..."
+tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" "${PAYLOAD_TAG}"
 
 # Ensure reports and session logs are copied to artifacts even if the script exits early
 copy_reports() {
@@ -240,13 +238,8 @@ PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
 # Validate structured output files, retry up to 3 times if missing/invalid
 SANITIZED_TAG=$(echo "${PAYLOAD_TAG}" | tr '.' '-')
-VALIDATE_YAML=$(find /home/claude/.claude -name "validate.py" -path "*/payload-results-yaml/*" 2>/dev/null | head -1)
-VALIDATE_JSON=$(find /home/claude/.claude -name "validate.py" -path "*/payload-autodl-json/*" 2>/dev/null | head -1)
-
-if [[ -z "${VALIDATE_YAML}" || -z "${VALIDATE_JSON}" ]]; then
-    echo "ERROR: validation scripts not found in the ai-helpers plugin installation."
-    exit 1
-fi
+VALIDATE_YAML="/opt/ai-helpers/plugins/ci/skills/payload-results-yaml/scripts/validate.py"
+VALIDATE_JSON="/opt/ai-helpers/plugins/ci/skills/payload-autodl-json/scripts/validate.py"
 
 for attempt in 1 2 3; do
     YAML_OK=false
