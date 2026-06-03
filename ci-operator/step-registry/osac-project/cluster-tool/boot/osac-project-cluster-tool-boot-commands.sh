@@ -80,6 +80,19 @@ timeout -s 9 2m scp -F "${SHARED_DIR}/ssh_config" \
     /tmp/license.zip \
     ci_machine:/tmp/license.zip
 
+# === Determine fork repo URL for AAP project sync ===
+AAP_SOURCE_REPO_URL=""
+if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "osac-aap" ]]; then
+    PR_AUTHOR=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].author // empty' 2>/dev/null || true)
+    if [[ -n "${PR_AUTHOR}" ]] && [[ "${PR_AUTHOR}" != "${REPO_OWNER:-}" ]]; then
+        CANDIDATE_URL="https://github.com/${PR_AUTHOR}/${REPO_NAME}"
+        if curl -sfI "${CANDIDATE_URL}" &>/dev/null; then
+            AAP_SOURCE_REPO_URL="${CANDIDATE_URL}.git"
+            echo "Fork PR detected, AAP source repo: ${AAP_SOURCE_REPO_URL}"
+        fi
+    fi
+fi
+
 # === Write boot script to machine and execute ===
 echo "Creating boot script on machine..."
 timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/boot.sh' <<'REMOTE_SCRIPT'
@@ -94,6 +107,7 @@ VM_TEMPLATE="$6"
 COMPONENT_IMAGE="${7:-}"
 COMPONENT_IMAGE_NAME="${8:-}"
 NAMESPACE="${9:-osac-e2e-ci}"
+AAP_SOURCE_REPO_URL="${10:-}"
 
 _timer() {
     local elapsed=$(( $(date +%s) - $1 ))
@@ -189,6 +203,10 @@ AAP_SOURCE_SHA=$(podman run --authfile /root/pull-secret --rm "${INSTALLER_IMAGE
 if [[ -n "${AAP_SOURCE_SHA}" ]]; then
     echo "=== AAP project git ref override: ${AAP_SOURCE_SHA} ==="
     AAP_OVERRIDE_CMD="sed -i 's|AAP_PROJECT_GIT_BRANCH=.*|AAP_PROJECT_GIT_BRANCH=${AAP_SOURCE_SHA}|' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml && grep -q 'AAP_PROJECT_GIT_BRANCH=${AAP_SOURCE_SHA}' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml || { echo 'ERROR: AAP_PROJECT_GIT_BRANCH override failed'; exit 1; } && "
+    if [[ -n "${AAP_SOURCE_REPO_URL}" ]]; then
+        echo "=== AAP project git URI override: ${AAP_SOURCE_REPO_URL} ==="
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|AAP_PROJECT_GIT_URI=.*|AAP_PROJECT_GIT_URI=${AAP_SOURCE_REPO_URL}|' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml && grep -q 'AAP_PROJECT_GIT_URI=${AAP_SOURCE_REPO_URL}' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml || { echo 'ERROR: AAP_PROJECT_GIT_URI override failed'; exit 1; } && "
+    fi
     if [[ -n "${COMPONENT_IMAGE}" ]]; then
         echo "=== AAP EE image override: ${COMPONENT_IMAGE} ==="
         AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|AAP_EE_IMAGE=.*|AAP_EE_IMAGE=${COMPONENT_IMAGE}|' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml && grep -q 'AAP_EE_IMAGE=${COMPONENT_IMAGE}' /installer/overlays/${KUSTOMIZE_OVERLAY}/kustomization.yaml || { echo 'ERROR: AAP_EE_IMAGE override failed'; exit 1; } && "
@@ -226,6 +244,7 @@ timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     '${E2E_VM_TEMPLATE}' \
     '${COMPONENT_IMAGE:-}' \
     '${COMPONENT_IMAGE_NAME:-}' \
-    '${E2E_NAMESPACE}'"
+    '${E2E_NAMESPACE}' \
+    '${AAP_SOURCE_REPO_URL:-}'"
 
 echo "Boot step finished successfully."
