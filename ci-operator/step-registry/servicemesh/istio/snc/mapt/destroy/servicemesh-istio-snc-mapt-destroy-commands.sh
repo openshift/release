@@ -78,7 +78,7 @@ aws_validation
 echo "[SUCCESS] !!!! AWS credentials loaded successfully"
 
 echo "[INFO] TAG Setting CORRELATE_MAPT..."
-CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID}"
+CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID:-unknown}"
 
 echo "[INFO] READ Reading dynamic S3 bucket name from shared directory..."
 if [[ ! -f "${SHARED_DIR}/mapt-s3-bucket-name" ]]; then

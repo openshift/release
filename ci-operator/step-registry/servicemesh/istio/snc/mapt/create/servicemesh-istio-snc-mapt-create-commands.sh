@@ -30,19 +30,39 @@ function cleanup() {
 
     echo "[INFO] **** Emergency cleanup: Deleting S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
 
-    aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
+    local _km="" _vm="" _page _nk
+    while true; do
+      if [[ -n "${_km}" ]]; then
+        _page=$(aws s3api list-object-versions \
+          --bucket "${DYNAMIC_BUCKET_NAME}" \
+          --key-marker "${_km}" \
+          --version-id-marker "${_vm}" \
+          --output json 2>/dev/null || echo '{}')
+      else
+        _page=$(aws s3api list-object-versions \
+          --bucket "${DYNAMIC_BUCKET_NAME}" \
+          --output json 2>/dev/null || echo '{}')
+      fi
 
-    aws s3api list-object-versions --bucket "${DYNAMIC_BUCKET_NAME}" --output json 2>/dev/null | \
-    jq -r '.Versions[]?, .DeleteMarkers[]? | @base64' | \
-    while IFS= read -r row; do
-      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
-      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
-      aws s3api delete-object \
-        --bucket "${DYNAMIC_BUCKET_NAME}" \
-        --key "${key}" \
-        --version-id "${version_id}" >/dev/null 2>&1 || true
+      echo "${_page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
+      while IFS= read -r row; do
+        key="$(echo "${row}" | base64 -d | jq -r '.Key')"
+        version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+        aws s3api delete-object \
+          --bucket "${DYNAMIC_BUCKET_NAME}" \
+          --key "${key}" \
+          --version-id "${version_id}" >/dev/null 2>&1 || true
+      done
+
+      _nk=$(echo "${_page}" | jq -r '.NextKeyMarker // empty')
+      if [[ -z "${_nk}" ]]; then
+        break
+      fi
+      _km="${_nk}"
+      _vm=$(echo "${_page}" | jq -r '.NextVersionIdMarker // empty')
     done
 
+    aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
     aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}" 2>/dev/null || echo "[WARN] WARN Bucket deletion failed or bucket already deleted"
 
     echo "[INFO] !!!! Emergency S3 bucket cleanup attempted"
@@ -82,7 +102,7 @@ if [ ! -f /tmp/secrets/pull-secret ]; then
 fi
 
 echo "[INFO] TAG Setting CORRELATE_MAPT..."
-CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID}"
+CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID:-unknown}"
 export CORRELATE_MAPT
 
 echo "[INFO] BUCKET Creating dynamic S3 bucket for MAPT state storage..."
@@ -104,7 +124,7 @@ aws s3api put-bucket-tagging \
   --tagging 'TagSet=[
     {Key=app-code,Value=ossm-mapt},
     {Key=mapt-job,Value='${CORRELATE_MAPT}'},
-    {Key=build-id,Value='${BUILD_ID}'},
+    {Key=build-id,Value='${BUILD_ID:-unknown}'},
     {Key=auto-cleanup,Value=true}
   ]'
 
