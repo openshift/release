@@ -246,7 +246,6 @@ fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
 # Validate structured output files, retry up to 3 times if missing/invalid
-SANITIZED_TAG=$(echo "${PAYLOAD_TAG}" | tr '.' '-')
 VALIDATE_YAML="/opt/ai-helpers/plugins/ci/skills/payload-results-yaml/scripts/validate.py"
 VALIDATE_JSON="/opt/ai-helpers/plugins/ci/skills/payload-autodl-json/scripts/validate.py"
 
@@ -254,10 +253,10 @@ for attempt in 1 2 3; do
     YAML_OK=false
     JSON_OK=false
 
-    if python3 "${VALIDATE_YAML}" "payload-results-${SANITIZED_TAG}.yaml"; then
+    if python3 "${VALIDATE_YAML}" "payload-results-${PAYLOAD_TAG}.yaml"; then
         YAML_OK=true
     fi
-    if python3 "${VALIDATE_JSON}" "payload-analysis-${SANITIZED_TAG}-autodl.json"; then
+    if python3 "${VALIDATE_JSON}" "payload-analysis-${PAYLOAD_TAG}-autodl.json"; then
         JSON_OK=true
     fi
 
