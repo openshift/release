@@ -54,6 +54,7 @@ oc get imagestreamtag ingress-node-firewall-tests:latest -n test-extensions -o j
 echo "Ingress Node Firewall extension setup complete!"
 
 # Run the extension tests
-echo "Running ingress-node-firewall extension tests..."
-openshift-tests run openshift/ingress-node-firewall/all \
+SUITE="${INFW_TEST_SUITE:-openshift/ingress-node-firewall/aws}"
+echo "Running ingress-node-firewall extension tests (suite: ${SUITE})..."
+openshift-tests run "${SUITE}" \
     --junit-dir="${ARTIFACT_DIR}/junit"
