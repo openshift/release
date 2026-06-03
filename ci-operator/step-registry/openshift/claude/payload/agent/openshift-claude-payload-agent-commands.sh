@@ -114,7 +114,7 @@ while true; do
                 SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}
-_Agent: ${CLAUDE_MODEL}_"
+_Model: ${CLAUDE_MODEL}_"
 
                 set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
@@ -382,7 +382,7 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
 ${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>
-_Agent: ${CLAUDE_MODEL}_"
+_Model: ${CLAUDE_MODEL}_"
 
     set +x
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
