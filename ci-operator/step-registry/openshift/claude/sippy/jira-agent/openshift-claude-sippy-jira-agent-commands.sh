@@ -56,14 +56,11 @@ echo "Summary: ${ISSUE_SUMMARY}"
 echo "Type: ${ISSUE_TYPE}"
 echo "Status: ${ISSUE_STATUS}"
 
-# Clone sippy
-echo "Cloning sippy..."
-WORKDIR=$(mktemp -d /tmp/sippy-XXXXXX)
-git clone https://github.com/openshift/sippy "${WORKDIR}"
-cd "${WORKDIR}"
+# Source is baked into the image at /workspace via ci-operator src input
+cd /workspace
 
-git config user.name "OpenShift CI Bot"
-git config user.email "ci-bot@redhat.com"
+git config user.name "openshift-trt"
+git config user.email "openshift-trt@redhat.com"
 
 # Set up fork as push target using the GitHub token
 set +x
@@ -83,7 +80,7 @@ echo "Running post-create setup..."
 # Ensure artifacts are copied even on early exit
 copy_artifacts() {
     echo "Copying artifacts..."
-    cp "${WORKDIR}"/artifacts/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "/workspace"/artifacts/* "${ARTIFACT_DIR}/" 2>/dev/null || true
     podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
 }
 trap copy_artifacts EXIT TERM INT
@@ -136,7 +133,7 @@ ${ISSUE_COMMENTS}
 PROMPT_EOF
 
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
-mkdir -p "${WORKDIR}/artifacts"
+mkdir -p "/workspace/artifacts"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch"
 
 CLAUDE_EXIT=0
@@ -146,7 +143,7 @@ timeout 5400 claude \
     --output-format stream-json \
     --max-turns 100 \
     -p "$(cat "${PROMPT_FILE}")" \
-    --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
+    --verbose 2>&1 | tee "/workspace/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
@@ -157,11 +154,11 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --output-format stream-json \
         --max-turns 10 \
         -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push, and create the PR now." \
-        --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
+        --verbose 2>&1 | tee -a "/workspace/artifacts/claude-output.log" || true
 fi
 
 # Check if a PR was created
-PR_URL=$(grep -o 'https://github.com/openshift/sippy/pull/[0-9]*' "${WORKDIR}/artifacts/claude-output.log" | head -1 || echo "")
+PR_URL=$(grep -o 'https://github.com/openshift/sippy/pull/[0-9]*' "/workspace/artifacts/claude-output.log" | head -1 || echo "")
 if [[ -n "${PR_URL}" ]]; then
     echo "PR created: ${PR_URL}"
 else

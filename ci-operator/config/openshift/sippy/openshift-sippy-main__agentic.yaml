@@ -12,8 +12,15 @@ images:
       FROM sippy-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils && dnf clean all
+      COPY /src /workspace
+      RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
       USER vscode
     from: sippy-devcontainer
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/sippy
     to: sippy-ci-dev
 resources:
   '*':
