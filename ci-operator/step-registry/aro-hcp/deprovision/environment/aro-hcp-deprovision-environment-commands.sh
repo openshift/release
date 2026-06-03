@@ -4,6 +4,11 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+if [[ "${SKIP_DEPROVISION:-false}" == "true" ]]; then
+  echo "SKIP_DEPROVISION is set to true, skipping infrastructure cleanup"
+  exit 0
+fi
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
