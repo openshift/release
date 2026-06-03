@@ -13,7 +13,7 @@ podman run -e ACCEPT_EULA=Y -m 4G -d -p 8080:8080 \
 for i in $(seq 1 60); do
   if curl -sf -X POST -H 'Content-Type: application/json' \
     -d '{"csl":".show cluster"}' http://localhost:8080/v1/rest/mgmt > /dev/null 2>&1; then
-    echo "Kusto emulator is ready"
+    echo "Kusto emulator is ready at attempt ${i}"
     break
   fi
   sleep 2
