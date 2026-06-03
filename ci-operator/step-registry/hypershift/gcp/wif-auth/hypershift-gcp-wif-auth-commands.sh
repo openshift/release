@@ -10,7 +10,20 @@ MOD=$(( ${#SA_TOKEN_PAYLOAD} % 4 ))
 if [[ $MOD -eq 2 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}=="; elif [[ $MOD -eq 3 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}="; fi
 OIDC_ISSUER=$(echo "${SA_TOKEN_PAYLOAD}" | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r '.iss')
 
+if [[ -z "${OIDC_ISSUER}" || "${OIDC_ISSUER}" == "null" ]]; then
+  echo "ERROR: Failed to extract OIDC issuer from SA token at ${SA_TOKEN_FILE}"
+  echo "  The token may be malformed or base64 decoding failed"
+  exit 1
+fi
+
 WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
+
+if [[ ! -f "${WIF_CONFIG}" ]]; then
+  echo "ERROR: ${WIF_CONFIG} not found in cluster profile"
+  echo "  The cluster profile must contain wif-config.json with fields:"
+  echo "  project_number, pool_id, service_account, issuer_map"
+  exit 1
+fi
 
 # Read all WIF infrastructure values from the consolidated config file.
 PROJECT_NUMBER=$(jq -r '.project_number // empty' "${WIF_CONFIG}")

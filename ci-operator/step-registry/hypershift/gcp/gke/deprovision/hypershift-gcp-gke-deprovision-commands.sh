@@ -3,11 +3,49 @@
 set -euo pipefail
 
 # Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step.
-# wif-cred.json is always present: it is written by step 1 of the pre phase and synced
-# to SHARED_DIR before any step that could be interrupted runs.
+# If the file is missing (e.g., SHARED_DIR sync did not complete after a SIGTERM, or
+# wif-auth exited non-zero before the sync), re-derive the credential from wif-config.json
+# in the cluster profile, which is always available — same pattern as project ID fallback below.
 if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
-  echo "ERROR: ${SHARED_DIR}/wif-cred.json not found — hypershift-gcp-wif-auth step may not have run"
-  exit 1
+  echo "WARNING: ${SHARED_DIR}/wif-cred.json not found — re-deriving from cluster profile"
+  WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
+  if [[ ! -f "${WIF_CONFIG}" ]]; then
+    echo "ERROR: ${WIF_CONFIG} not found — cannot authenticate for cleanup"
+    exit 1
+  fi
+  SA_TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
+  SA_TOKEN_PAYLOAD=$(cut -d. -f2 < "${SA_TOKEN_FILE}")
+  MOD=$(( ${#SA_TOKEN_PAYLOAD} % 4 ))
+  if [[ $MOD -eq 2 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}=="; elif [[ $MOD -eq 3 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}="; fi
+  OIDC_ISSUER=$(echo "${SA_TOKEN_PAYLOAD}" | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r '.iss')
+  if [[ -z "${OIDC_ISSUER}" || "${OIDC_ISSUER}" == "null" ]]; then
+    echo "ERROR: Failed to extract OIDC issuer from SA token — cannot authenticate for cleanup"
+    exit 1
+  fi
+  PROJECT_NUMBER=$(jq -r '.project_number // empty' "${WIF_CONFIG}")
+  POOL_ID=$(jq -r '.pool_id // empty' "${WIF_CONFIG}")
+  SERVICE_ACCOUNT=$(jq -r '.service_account // empty' "${WIF_CONFIG}")
+  PROVIDER_ID=$(jq -r --arg iss "${OIDC_ISSUER}" '.issuer_map[$iss] // empty' "${WIF_CONFIG}")
+  if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${SERVICE_ACCOUNT}" || -z "${PROVIDER_ID}" ]]; then
+    echo "ERROR: Failed to derive WIF config from ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  cat > "${SHARED_DIR}/wif-cred.json" <<EOF
+{
+  "type": "external_account",
+  "audience": "//iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+  "token_url": "https://sts.googleapis.com/v1/token",
+  "credential_source": {
+    "file": "${SA_TOKEN_FILE}",
+    "format": {
+      "type": "text"
+    }
+  },
+  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken"
+}
+EOF
+  echo "WIF credential re-derived successfully"
 fi
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
