@@ -24,16 +24,50 @@ sippy_init() {
     echo "Issue: ${JIRA_ISSUE_KEY} | Model: ${CLAUDE_MODEL} | Fork: ${SIPPY_FORK_REPO}"
 }
 
-sippy_load_github_token() {
+GH_APP_DIR="/var/run/github-token"
+
+# Generate a GitHub App installation token via JWT.
+# Installation tokens expire after 1 hour — call this before any push/PR operation.
+sippy_generate_github_token() {
     set +x
-    [[ -f "${GITHUB_TOKEN_PATH}" ]] || { echo "ERROR: GitHub token not found at ${GITHUB_TOKEN_PATH}."; exit 1; }
+    local app_id installation_id private_key_file
+    app_id=$(cat "${GH_APP_DIR}/app-id")
+    installation_id=$(cat "${GH_APP_DIR}/installation-id")
+    private_key_file="${GH_APP_DIR}/private-key"
+
+    local now iat exp header payload signature jwt
+    now=$(date +%s)
+    iat=$((now - 60))
+    exp=$((now + 600))
+
+    header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    payload=$(echo -n "{\"iat\":${iat},\"exp\":${exp},\"iss\":\"${app_id}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${private_key_file}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    jwt="${header}.${payload}.${signature}"
+
     local token
-    token=$(cat "${GITHUB_TOKEN_PATH}")
-    # Authenticate gh CLI, then configure git credential helper.
-    # Avoids exporting the token as an env var or embedding it in remote URLs.
+    token=$(curl -sf -X POST \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${installation_id}/access_tokens" \
+        | jq -r '.token')
+
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate GitHub App installation token."
+        return 1
+    fi
+
     echo "${token}" | gh auth login --with-token 2>/dev/null
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub token loaded via gh auth + credential helper."
+    echo "GitHub App token generated."
+}
+
+sippy_load_github_token() {
+    set +x
+    for f in app-id installation-id private-key; do
+        [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
+    done
+    sippy_generate_github_token || exit 1
 }
 
 sippy_fetch_jira_issue() {
@@ -142,6 +176,24 @@ sippy_fetch_review_comments() {
     return $(( comment_count + review_count ))
 }
 
+sippy_find_pr() {
+    echo "Searching for PR associated with ${JIRA_ISSUE_KEY}..."
+    local pr_json
+    pr_json=$(gh pr list --repo openshift/sippy --state open --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
+    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
+        echo "No open PR found. Searching closed PRs..."
+        pr_json=$(gh pr list --repo openshift/sippy --state closed --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
+    fi
+    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
+        echo "ERROR: No PR found for ${JIRA_ISSUE_KEY}."; exit 1;
+    fi
+    PR_NUM=$(echo "${pr_json}" | jq -r '.[0].number')
+    PR_TITLE=$(echo "${pr_json}" | jq -r '.[0].title')
+    PR_BRANCH=$(echo "${pr_json}" | jq -r '.[0].headRefName')
+    PR_URL=$(echo "${pr_json}" | jq -r '.[0].url')
+    echo "Found PR #${PR_NUM}: ${PR_TITLE} | Branch: ${PR_BRANCH}"
+}
+
 sippy_address_reviews() {
     timeout 1800 claude \
         --model "${CLAUDE_MODEL}" \
@@ -240,6 +292,9 @@ echo ""
 echo "=== Watching PR #${PR_NUM} for review comments (up to 1 hour) ==="
 REVIEW_ROUND=0
 
+# Refresh token before polling — the initial token may have expired during Claude's run
+sippy_generate_github_token || echo "Warning: Failed to refresh token before polling."
+
 for i in $(seq 1 6); do
     echo "Waiting 10 minutes before checking for comments (check $i/6)..."
     sleep 600
@@ -256,6 +311,7 @@ for i in $(seq 1 6); do
     if [[ "${TOTAL_NEW}" -gt 0 ]]; then
         REVIEW_ROUND=$(( REVIEW_ROUND + 1 ))
         echo "Addressing review comments (round ${REVIEW_ROUND})..."
+        sippy_generate_github_token || echo "Warning: Failed to refresh token before review round."
         sippy_address_reviews
     fi
 done

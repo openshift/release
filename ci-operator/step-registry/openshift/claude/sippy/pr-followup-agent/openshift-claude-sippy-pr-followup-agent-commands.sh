@@ -24,14 +24,64 @@ sippy_init() {
     echo "Issue: ${JIRA_ISSUE_KEY} | Model: ${CLAUDE_MODEL} | Fork: ${SIPPY_FORK_REPO}"
 }
 
-sippy_load_github_token() {
+GH_APP_DIR="/var/run/github-token"
+
+# Generate a GitHub App installation token via JWT.
+# Installation tokens expire after 1 hour — call this before any push/PR operation.
+sippy_generate_github_token() {
     set +x
-    [[ -f "${GITHUB_TOKEN_PATH}" ]] || { echo "ERROR: GitHub token not found at ${GITHUB_TOKEN_PATH}."; exit 1; }
+    local app_id installation_id private_key_file
+    app_id=$(cat "${GH_APP_DIR}/app-id")
+    installation_id=$(cat "${GH_APP_DIR}/installation-id")
+    private_key_file="${GH_APP_DIR}/private-key"
+
+    local now iat exp header payload signature jwt
+    now=$(date +%s)
+    iat=$((now - 60))
+    exp=$((now + 600))
+
+    header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    payload=$(echo -n "{\"iat\":${iat},\"exp\":${exp},\"iss\":\"${app_id}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${private_key_file}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    jwt="${header}.${payload}.${signature}"
+
     local token
-    token=$(cat "${GITHUB_TOKEN_PATH}")
+    token=$(curl -sf -X POST \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${installation_id}/access_tokens" \
+        | jq -r '.token')
+
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate GitHub App installation token."
+        return 1
+    fi
+
     echo "${token}" | gh auth login --with-token 2>/dev/null
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub token loaded via gh auth + credential helper."
+    echo "GitHub App token generated."
+}
+
+sippy_load_github_token() {
+    set +x
+    for f in app-id installation-id private-key; do
+        [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
+    done
+    sippy_generate_github_token || exit 1
+}
+
+sippy_fetch_jira_issue() {
+    echo "Fetching issue details from Jira..."
+    JIRA_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
+        "https://redhat.atlassian.net/rest/api/2/issue/${JIRA_ISSUE_KEY}?fields=summary,description,status,labels,comment,issuetype,priority") || {
+        echo "ERROR: Failed to fetch issue ${JIRA_ISSUE_KEY} from Jira."; exit 1;
+    }
+    ISSUE_SUMMARY=$(echo "${JIRA_RESPONSE}" | jq -r '.fields.summary // "No summary"')
+    ISSUE_DESCRIPTION=$(echo "${JIRA_RESPONSE}" | jq -r '.fields.description // "No description"')
+    ISSUE_TYPE=$(echo "${JIRA_RESPONSE}" | jq -r '.fields.issuetype.name // "Unknown"')
+    ISSUE_STATUS=$(echo "${JIRA_RESPONSE}" | jq -r '.fields.status.name // "Unknown"')
+    ISSUE_COMMENTS=$(echo "${JIRA_RESPONSE}" | jq -r '[.fields.comment.comments[]? | "\(.author.displayName) (\(.created)): \(.body)"] | join("\n---\n")' 2>/dev/null || echo "No comments")
+    echo "Summary: ${ISSUE_SUMMARY} | Type: ${ISSUE_TYPE} | Status: ${ISSUE_STATUS}"
 }
 
 sippy_setup_workspace() {
@@ -57,65 +107,6 @@ sippy_setup_artifact_trap() {
     trap copy_artifacts EXIT TERM INT
 }
 
-sippy_find_pr() {
-    echo "Searching for PR associated with ${JIRA_ISSUE_KEY}..."
-    local pr_json
-    pr_json=$(gh pr list --repo openshift/sippy --state open --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
-    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
-        echo "No open PR found. Searching closed PRs..."
-        pr_json=$(gh pr list --repo openshift/sippy --state closed --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
-    fi
-    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
-        echo "ERROR: No PR found for ${JIRA_ISSUE_KEY}."; exit 1;
-    fi
-    PR_NUM=$(echo "${pr_json}" | jq -r '.[0].number')
-    PR_TITLE=$(echo "${pr_json}" | jq -r '.[0].title')
-    PR_BRANCH=$(echo "${pr_json}" | jq -r '.[0].headRefName')
-    PR_URL=$(echo "${pr_json}" | jq -r '.[0].url')
-    echo "Found PR #${PR_NUM}: ${PR_TITLE} | Branch: ${PR_BRANCH}"
-}
-
-TRUSTED_BOTS="coderabbitai"
-
-sippy_is_trusted_user() {
-    local login=$1
-    for bot in ${TRUSTED_BOTS}; do
-        [[ "${login}" == "${bot}" || "${login}" == "${bot}[bot]" ]] && return 0
-    done
-    gh api "orgs/openshift/members/${login}" --silent 2>/dev/null && return 0
-    echo "Skipping comment from untrusted user: ${login}"
-    return 1
-}
-
-sippy_fetch_review_comments() {
-    local pr_num=$1
-    local raw_comments raw_reviews
-    raw_comments=$(gh api "repos/openshift/sippy/pulls/${pr_num}/comments" --paginate 2>/dev/null || echo "[]")
-    raw_reviews=$(gh api "repos/openshift/sippy/pulls/${pr_num}/reviews" --paginate 2>/dev/null || echo "[]")
-
-    local all_users
-    all_users=$(echo "${raw_comments}" "${raw_reviews}" | jq -r '.[].user.login' 2>/dev/null | sort -u)
-    local trusted_users=""
-    for user in ${all_users}; do
-        if sippy_is_trusted_user "${user}"; then
-            trusted_users="${trusted_users} ${user}"
-        fi
-    done
-
-    local trusted_jq_filter
-    trusted_jq_filter=$(echo "${trusted_users}" | xargs -n1 | jq -R . | jq -s '.')
-    COMMENTS_JSON=$(echo "${raw_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
-    REVIEWS_JSON=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
-
-    local comment_count review_count
-    comment_count=$(echo "${COMMENTS_JSON}" | jq 'length')
-    review_count=$(echo "${REVIEWS_JSON}" | jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length')
-    REVIEW_BODY=$(echo "${COMMENTS_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
-    REVIEW_SUMMARY=$(echo "${REVIEWS_JSON}" | jq -r '.[] | select(.state != "APPROVED" and .state != "PENDING") | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
-    echo "Found ${comment_count} inline comment(s) and ${review_count} review(s) from trusted users."
-    return $(( comment_count + review_count ))
-}
-
 sippy_run_claude() {
     local prompt=$1
     local nudge_msg=${2:-"You hit the timeout. Please commit and push whatever you have now: git push fork HEAD"}
@@ -138,6 +129,85 @@ sippy_run_claude() {
             -p "${nudge_msg}" \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
     fi
+}
+
+TRUSTED_BOTS="coderabbitai"
+
+sippy_is_trusted_user() {
+    local login=$1
+    # Allow known bots
+    for bot in ${TRUSTED_BOTS}; do
+        [[ "${login}" == "${bot}" || "${login}" == "${bot}[bot]" ]] && return 0
+    done
+    # Check openshift org membership
+    gh api "orgs/openshift/members/${login}" --silent 2>/dev/null && return 0
+    echo "Skipping comment from untrusted user: ${login}"
+    return 1
+}
+
+sippy_fetch_review_comments() {
+    local pr_num=$1
+    local raw_comments raw_reviews
+    raw_comments=$(gh api "repos/openshift/sippy/pulls/${pr_num}/comments" --paginate 2>/dev/null || echo "[]")
+    raw_reviews=$(gh api "repos/openshift/sippy/pulls/${pr_num}/reviews" --paginate 2>/dev/null || echo "[]")
+
+    # Build list of trusted users from this batch
+    local all_users
+    all_users=$(echo "${raw_comments}" "${raw_reviews}" | jq -r '.[].user.login' 2>/dev/null | sort -u)
+    local trusted_users=""
+    for user in ${all_users}; do
+        if sippy_is_trusted_user "${user}"; then
+            trusted_users="${trusted_users} ${user}"
+        fi
+    done
+
+    # Filter to trusted users only
+    local trusted_jq_filter
+    trusted_jq_filter=$(echo "${trusted_users}" | xargs -n1 | jq -R . | jq -s '.')
+    COMMENTS_JSON=$(echo "${raw_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
+    REVIEWS_JSON=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
+
+    local comment_count review_count
+    comment_count=$(echo "${COMMENTS_JSON}" | jq 'length')
+    review_count=$(echo "${REVIEWS_JSON}" | jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length')
+    REVIEW_BODY=$(echo "${COMMENTS_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
+    REVIEW_SUMMARY=$(echo "${REVIEWS_JSON}" | jq -r '.[] | select(.state != "APPROVED" and .state != "PENDING") | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
+    echo "Found ${comment_count} inline comment(s) and ${review_count} review(s) from trusted users."
+    return $(( comment_count + review_count ))
+}
+
+sippy_find_pr() {
+    echo "Searching for PR associated with ${JIRA_ISSUE_KEY}..."
+    local pr_json
+    pr_json=$(gh pr list --repo openshift/sippy --state open --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
+    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
+        echo "No open PR found. Searching closed PRs..."
+        pr_json=$(gh pr list --repo openshift/sippy --state closed --search "${JIRA_ISSUE_KEY}" --json number,title,headRefName,url --limit 5 2>/dev/null || echo "[]")
+    fi
+    if [[ $(echo "${pr_json}" | jq 'length') -eq 0 ]]; then
+        echo "ERROR: No PR found for ${JIRA_ISSUE_KEY}."; exit 1;
+    fi
+    PR_NUM=$(echo "${pr_json}" | jq -r '.[0].number')
+    PR_TITLE=$(echo "${pr_json}" | jq -r '.[0].title')
+    PR_BRANCH=$(echo "${pr_json}" | jq -r '.[0].headRefName')
+    PR_URL=$(echo "${pr_json}" | jq -r '.[0].url')
+    echo "Found PR #${PR_NUM}: ${PR_TITLE} | Branch: ${PR_BRANCH}"
+}
+
+sippy_address_reviews() {
+    timeout 1800 claude \
+        --model "${CLAUDE_MODEL}" \
+        --continue \
+        --allowedTools "${ALLOWED_TOOLS}" \
+        --output-format stream-json \
+        --max-turns 50 \
+        -p "Review comments have been posted on the PR. Address all of them, then push your fixes to the fork.
+
+${REVIEW_BODY}
+${REVIEW_SUMMARY}
+
+After fixing, run 'make test' and 'make lint' to verify. Then run e2e tests using the 'run_e2e' MCP tool — e2e tests MUST pass before pushing. Then push: git push fork HEAD" \
+        --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
 }
 
 # --- Main ---
@@ -218,6 +288,7 @@ DO NOT push until e2e tests pass.
 PROMPT_EOF
 
 echo "Invoking Claude to address review comments..."
+sippy_generate_github_token || echo "Warning: Failed to refresh token before Claude run."
 sippy_run_claude "$(cat "${PROMPT_FILE}")" \
     "You hit the timeout. Please commit and push whatever fixes you have now: git push fork HEAD"
 
