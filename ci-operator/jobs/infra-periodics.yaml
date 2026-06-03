@@ -863,8 +863,16 @@ periodics:
     containers:
     - args:
       - --config=core-services/prow/02_config/_release-bumper.yaml
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
       imagePullPolicy: IfNotPresent
       name: autobump
@@ -873,12 +881,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 0 22 * * 3
@@ -898,8 +906,16 @@ periodics:
     containers:
     - args:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
       imagePullPolicy: IfNotPresent
       name: autobump
@@ -908,12 +924,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-bot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   cron: 0 */4 * * 1-5
