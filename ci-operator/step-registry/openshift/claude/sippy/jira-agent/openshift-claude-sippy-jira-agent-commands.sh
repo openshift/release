@@ -40,8 +40,8 @@ fi
 # Fetch issue details from Jira REST API (public project, no auth needed)
 echo "Fetching issue details from Jira..."
 JIRA_URL="https://redhat.atlassian.net/rest/api/2/issue/${JIRA_ISSUE_KEY}?fields=summary,description,status,labels,comment,issuetype,priority"
-JIRA_RESPONSE=$(curl -sf "${JIRA_URL}") || {
-    echo "ERROR: Failed to fetch issue ${JIRA_ISSUE_KEY} from Jira."
+JIRA_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 "${JIRA_URL}") || {
+    echo "ERROR: Failed to fetch issue ${JIRA_ISSUE_KEY} from Jira after retries."
     exit 1
 }
 

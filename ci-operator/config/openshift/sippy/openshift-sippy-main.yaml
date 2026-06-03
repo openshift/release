@@ -20,13 +20,6 @@ images:
     to: sippy-chat
   - dockerfile_path: .devcontainer/Dockerfile
     to: sippy-devcontainer
-  - dockerfile_literal: |
-      FROM sippy-devcontainer
-      USER root
-      RUN dnf install -y podman fuse-overlayfs shadow-utils && dnf clean all
-      USER vscode
-    from: sippy-devcontainer
-    to: sippy-ci-dev
 promotion:
   to:
   - excluded_images:
@@ -71,12 +64,6 @@ tests:
     version: "4.18"
   steps:
     workflow: sippy-e2e
-- as: periodic-sippy-jira-agent
-  capabilities:
-  - nested-podman
-  cron: '@yearly'
-  steps:
-    workflow: openshift-claude-sippy-jira-agent
 - as: security
   steps:
     env:

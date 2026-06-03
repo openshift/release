@@ -1,0 +1,31 @@
+base_images:
+  sippy-devcontainer:
+    name: sippy
+    namespace: ci
+    tag: sippy-devcontainer
+images:
+  items:
+  - dockerfile_literal: |
+      FROM sippy-devcontainer
+      USER root
+      RUN dnf install -y podman fuse-overlayfs shadow-utils && dnf clean all
+      USER vscode
+    from: sippy-devcontainer
+    to: sippy-ci-dev
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-sippy-jira-agent
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    workflow: openshift-claude-sippy-jira-agent
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: sippy
+  variant: agentic
