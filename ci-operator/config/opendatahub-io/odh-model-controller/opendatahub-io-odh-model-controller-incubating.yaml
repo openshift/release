@@ -1,33 +1,34 @@
 base_images:
+  openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.21
+
+      USER 0:0
+      RUN dnf install -y python3.11 python3.11-pip && dnf clean all
+      WORKDIR /go
+      RUN chown 1001:0 .
+
+      USER 1001:0
+  use_build_cache: true
 images:
-- context_dir: .
-  dockerfile_path: Containerfile
-  from: ubi_minimal
-  to: odh-model-controller
-- dockerfile_literal: |-
-    FROM registry.access.redhat.com/ubi9/python-311:1
-
-    # Prow expects to be able to check out a repo under /go
-    USER 0:0
-    WORKDIR /go
-    RUN chown 1001:0 .
-
-    USER 1001:0
-
-    # The VENV that is activated by default conflicts with KServe
-    # scripts. These variables are set to empty to not activate any
-    # VENV by default.
-    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
-  to: odhmc-kserve-tests
+  items:
+  - context_dir: .
+    dockerfile_path: Containerfile
+    from: ubi_minimal
+    to: odh-model-controller
+  - context_dir: .
+    dockerfile_path: Containerfile.server
+    from: ubi_minimal
+    to: odh-model-serving-api
 promotion:
   to:
   - namespace: opendatahub-io
@@ -37,7 +38,7 @@ releases:
     release:
       architecture: multi
       channel: fast
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -47,7 +48,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: e2e-odh-kserve
+  as: e2e-kserve-raw
   optional: true
   skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.*/)?(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
   steps:
@@ -56,7 +57,6 @@ tests:
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
     post:
     - as: testlog-gather
@@ -64,7 +64,7 @@ tests:
       cli: latest
       commands: |
         cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log "${ARTIFACT_DIR}/" || true
-      from: odhmc-kserve-tests
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -77,7 +77,7 @@ tests:
           --image=quay.io/modh/must-gather:rhoai-2.24 \
           --dest-dir "${ARTIFACT_DIR}/gather-kserve" \
           -- "export COMPONENT=kserve; /usr/bin/gather"
-      from: odhmc-kserve-tests
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -86,68 +86,89 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: odhmc-kserve-tests
+      from: src
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
     - chain: hypershift-hostedcluster-destroy
     test:
-    - as: raw
+    - as: kserve-raw
       cli: latest
       commands: |
-        set -euxo pipefail
-        echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
-
-        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
-        pushd /tmp/kserve
-          git fetch --all --tags
-          git checkout release-v0.15
-
-          git clone --depth 1 --branch incubating \
-            https://github.com/opendatahub-io/odh-model-controller.git /tmp/kserve/odh-model-controller
-          export ODH_MC_MANIFEST_SOURCE=../../odh-model-controller/config/base
-
-          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
-          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
-
-          echo "Loading environment variables from params.env"
-          #Parse params.env into shell vars with underscores instead of dashes
-          while IFS='=' read -r key value; do
-            case "$key" in
-              ''|\#*) continue ;;
-            esac
-            key="${key%%[[:space:]]*}"
-            value="${value##[[:space:]]}"
-            sane_key="${key//-/_}"
-            printf -v "$sane_key" '%s' "$value"
-          done < config/overlays/odh/params.env
-
-          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
-          export KSERVE_AGENT_IMAGE="${kserve_agent}"
-          export KSERVE_ROUTER_IMAGE="${kserve_router}"
-          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
-          export LLMD_IMAGE="${kserve_llm_d}"
-          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
-          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
-          export KUBE_RBAC_PROXY_IMAGE="${kube_rbac_proxy}"
-
-          echo "Loaded all images from params.env:"
-          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
-          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
-          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
-          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
-          echo "LLMD_IMAGE=${LLMD_IMAGE}"
-          echo "LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}"
-          echo "LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}"
-          echo "KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}"
-
-          ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
-        popd
+        unset GOFLAGS
+        make test-e2e-kserve-ocp E2E_TEST_ARGS="raw 6 raw"
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
         name: odh-model-controller
-      from: odhmc-kserve-tests
+      - env: IMG
+        name: odh-model-controller
+      - env: SERVER_IMG
+        name: odh-model-serving-api
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-kserve-llmisvc
+  optional: true
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.*/)?(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log "${ARTIFACT_DIR}/" || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        oc adm must-gather \
+          --image=quay.io/modh/must-gather:rhoai-2.24 \
+          --dest-dir "${ARTIFACT_DIR}/gather-kserve" \
+          -- "export COMPONENT=kserve; /usr/bin/gather"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - chain: hypershift-hostedcluster-destroy
+    test:
+    - as: kserve-llmisvc
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test-e2e-kserve-ocp E2E_TEST_ARGS="llminferenceservice and cluster_cpu" 2 "llm-d"
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      - env: IMG
+        name: odh-model-controller
+      - env: SERVER_IMG
+        name: odh-model-serving-api
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -168,6 +189,16 @@ tests:
       SOURCE_IMAGE_REF: odh-model-controller
     env:
       IMAGE_REPO: odh-model-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-server-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-serving-api
+    env:
+      IMAGE_REPO: odh-model-serving-api
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:

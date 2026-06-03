@@ -9,23 +9,24 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.18
 images:
-- dockerfile_path: Dockerfile
-  to: quay-server
-- dockerfile_literal: |
-    FROM src
-    RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
-        dnf install -y nodejs \
-        alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
-        libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
-        libxkbcommon libXfixes libXcursor libXext libXi libXtst \
-        libwayland-client && \
-        dnf clean all
-    WORKDIR /go/src/github.com/quay/quay/web
-    RUN npm ci
-    ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-    RUN npx playwright install chromium
-  from: src
-  to: quay-playwright-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: quay-server
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf module enable -y nodejs:20 && \
+          dnf install -y nodejs \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      WORKDIR /go/src/github.com/quay/quay/web
+      RUN npm ci
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN npx playwright install chromium
+    from: src
+    to: quay-playwright-runner
 releases:
   latest:
     candidate:

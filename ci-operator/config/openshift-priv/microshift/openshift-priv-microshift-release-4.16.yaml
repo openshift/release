@@ -10,24 +10,27 @@ build_root:
     tag: rhel-9-release-golang-1.21-openshift-4.16
 canonical_go_repository: github.com/openshift/microshift
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-  inputs:
-    src:
-      as:
-      - src
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift
-  optional: true
-  to: microshift-test-rpm
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+    inputs:
+      src:
+        as:
+        - src
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/microshift
+    optional: true
+    to: microshift-test-rpm
 promotion:
   to:
   - excluded_images:
     - microshift-test-rpm
     name: 4.16-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   latest:
     candidate:
@@ -120,13 +123,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
-- as: ocp-conformance-rhel-eus-arm
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-full-conformance-rhel-eus

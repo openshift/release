@@ -45,10 +45,11 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.18
 images:
-- dockerfile_path: Dockerfile.prow
-  to: recert-check
-- dockerfile_path: Dockerfile
-  to: recert
+  items:
+  - dockerfile_path: Dockerfile.prow
+    to: recert-check
+  - dockerfile_path: Dockerfile
+    to: recert
 promotion:
   to:
   - namespace: edge-infrastructure
@@ -67,16 +68,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
+- always_run: false
   as: cargo-check
   commands: cargo check
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
+- always_run: false
   as: cargo-clippy
   commands: cargo clippy
   container:
     from: recert-check
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
   steps:
@@ -180,7 +183,7 @@ tests:
     - ref: openshift-e2e-test-qe-report
     workflow: baremetal-lab-agent-install-pxe
 - as: ibu-e2e-flow
-  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -198,7 +201,7 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
 - as: ibi-e2e-flow
-  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

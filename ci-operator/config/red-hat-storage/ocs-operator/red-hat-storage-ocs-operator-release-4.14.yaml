@@ -4,16 +4,17 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
-- build_args:
-  - name: LDFLAGS
-    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
-  dockerfile_path: Dockerfile
-  to: ocs-operator
-- build_args:
-  - name: LDFLAGS
-    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
-  dockerfile_path: metrics/Dockerfile
-  to: ocs-metrics-exporter
+  items:
+  - build_args:
+    - name: LDFLAGS
+      value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+    dockerfile_path: Dockerfile
+    to: ocs-operator
+  - build_args:
+    - name: LDFLAGS
+      value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+    dockerfile_path: metrics/Dockerfile
+    to: ocs-metrics-exporter
 operator:
   bundles:
   - as: ocs-operator-bundle
@@ -44,8 +45,10 @@ tests:
   steps:
     cluster_profile: odf-aws
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      USER_TAGS: |
+        createdBy gh-openshift-ci
       ZONES_COUNT: "3"
     test:
     - as: e2e-test

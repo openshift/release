@@ -7,11 +7,54 @@ ref:
     requests:
       cpu: 100m
       memory: 300Mi
-  timeout: 1h0m0s
+  timeout: 2h0m0s
   env:
   - name: LABEL_FILTER
     default: ""
     documentation: The label filter for the e2e tests.
+  - name: SUITE_TIMEOUT
+    default: "2h"
+    documentation: >-
+      Ginkgo suite timeout for the whole e2e run, read by the e2e binary.
+      Defaults to 2h so the combined tier0+tier1 rc-e2e job (~60 min) is not
+      cut off at Ginkgo's 1h default. Nightly single-tier jobs finish well
+      under this.
+  - name: ADAPTER_CHART_REPO
+    default: "https://github.com/openshift-hyperfleet/hyperfleet-adapter.git"
+    documentation: The Helm chart repository URL for the Adapter component.
+  - name: ADAPTER_CHART_REF
+    default: "main"
+    documentation: The git reference (branch/tag/commit) for the Adapter chart repository.
+  - name: ADAPTER_CHART_PATH
+    default: "charts"
+    documentation: The path to the charts directory within the Adapter chart repository.
+  - name: IMAGE_REGISTRY
+    default: "quay.io"
+    documentation: The container image registry to pull images from.
+  - name: ADAPTER_IMAGE_REPO
+    default: "redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter"
+    documentation: The image repository path for the Adapter component.
+  - name: MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG
+    default: "latest"
+    documentation: The image tag for the Adapter component.
+  - name: API_CHART_REPO
+    default: "https://github.com/openshift-hyperfleet/hyperfleet-api.git"
+    documentation: The Helm chart repository URL for the API component.
+  - name: API_CHART_REF
+    default: "main"
+    documentation: The git reference (branch/tag/commit) for the API chart repository.
+  - name: API_CHART_PATH
+    default: "charts"
+    documentation: The path to the charts directory within the API chart repository.
+  - name: MULTISTAGE_PARAM_OVERRIDE_E2E_REF
+    default: ""
+    documentation: >-
+      When set, the test step clones hyperfleet-e2e at this ref into
+      /tmp/e2e-src, runs `make build`, and points E2E_BIN at
+      /tmp/e2e-src/bin/hyperfleet-e2e (with TESTDATA from the same
+      clone). When empty, uses the pre-built binary and testdata from
+      the pod image (main). Independent of the setup step's clone.
+      Prefixed for Gangway override compatibility.
   credentials:
   - collection: ""
     namespace: test-credentials

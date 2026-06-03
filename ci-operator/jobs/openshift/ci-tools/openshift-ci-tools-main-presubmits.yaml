@@ -5,9 +5,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/breaking-changes
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -18,8 +72,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=breaking-changes
         command:
@@ -39,8 +98,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -53,6 +121,21 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -68,9 +151,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/checkconfig
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -130,9 +267,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/codegen
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -194,9 +385,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/e2e
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -205,8 +450,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e
         command:
@@ -226,8 +476,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -240,6 +499,21 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -257,9 +531,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/e2e-oo
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -269,8 +597,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=e2e-oo
         command:
@@ -290,8 +623,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -304,6 +646,21 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -319,9 +676,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/format
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -381,9 +792,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/frontend-checks
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -443,9 +908,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -505,9 +1024,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/integration
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -567,9 +1140,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/lint
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -628,9 +1255,130 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: app.ci
+    context: ci/prow/secret-bootstrapper-validation
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: openshift
+      repo: release
+    name: pull-ci-openshift-ci-tools-main-secret-bootstrapper-validation
+    optional: true
+    rerun_command: /test secret-bootstrapper-validation
+    spec:
+      containers:
+      - command:
+        - ./../release/hack/validate-ci-secret-boostrap.sh
+        env:
+        - name: BOOTSTRAP_BINARY
+          value: /tmp/ci-secret-bootstrap
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: secret-bootstrap
+    trigger: (?m)^/test( | .* )secret-bootstrapper-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/secret-generator-validation
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: openshift
+      repo: release
+    name: pull-ci-openshift-ci-tools-main-secret-generator-validation
+    optional: true
+    rerun_command: /test secret-generator-validation
+    spec:
+      containers:
+      - args:
+        - --config=../release/core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=../release/core-services/ci-secret-bootstrap/_config.yaml
+        - --enable-gsm-sync=true
+        - --gsm-config=../release/core-services/ci-secret-bootstrap/gsm-config.yaml
+        - --gsm-project-config=../release/core-services/ci-secret-bootstrap/gsm-project-config.yaml
+        - --validate-only=true
+        command:
+        - go
+        - run
+        - -mod=mod
+        - -race
+        - ./cmd/ci-secret-generator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
     context: ci/prow/security
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -640,8 +1388,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=security
         command:
@@ -661,8 +1414,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -675,6 +1437,21 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -690,9 +1467,63 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
     context: ci/prow/unit
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -752,9 +1583,96 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build06
+    context: ci/prow/validate-prow
+    decorate: true
+    extra_refs:
+    - base_ref: main
+      org: kubernetes-sigs
+      repo: prow
+    - base_ref: main
+      org: openshift
+      repo: ci-chat-bot
+    - base_ref: main
+      org: openshift
+      repo: release-controller
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-main-validate-prow
+    rerun_command: /test validate-prow
+    spec:
+      containers:
+      - command:
+        - hack/check-prow-version.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )validate-prow,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
     context: ci/prow/validate-vendor
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/applyconfig/Dockerfile
+      - images/auto-config-brancher/Dockerfile
+      - images/auto-peribolos-sync/Dockerfile
+      - images/auto-testgrid-generator/Dockerfile
+      - images/autoowners/Dockerfile
+      - images/autopublicizeconfig/Dockerfile
+      - images/blocking-issue-creator/Dockerfile
+      - images/bugzilla-backporter/Dockerfile
+      - images/check-cluster-profiles-config/Dockerfile
+      - images/check-gh-automation/Dockerfile
+      - images/ci-operator-checkconfig/Dockerfile
+      - images/ci-operator-config-mirror/Dockerfile
+      - images/ci-operator-configresolver/Dockerfile
+      - images/ci-operator-minimal/Dockerfile
+      - images/ci-operator-prowgen/Dockerfile
+      - images/ci-operator/Dockerfile
+      - images/ci-secret-bootstrap/Dockerfile
+      - images/ci-secret-generator/Dockerfile
+      - images/cluster-init/Dockerfile
+      - images/clusterimageset-updater/Dockerfile
+      - images/config-brancher/Dockerfile
+      - images/config-change-trigger/Dockerfile
+      - images/cvp-trigger/Dockerfile
+      - images/determinize-ci-operator/Dockerfile
+      - images/determinize-prow-config/Dockerfile
+      - images/dptp-3312-hypershift-leaks-cleaner/Dockerfile
+      - images/dptp-controller-manager/Dockerfile
+      - images/entrypoint-wrapper/Dockerfile
+      - images/generate-registry-metadata/Dockerfile
+      - images/gsm-secret-sync/Dockerfile
+      - images/job-run-aggregator/Dockerfile
+      - images/multi-arch-builder-controller/Dockerfile
+      - images/multi-pr-prow-plugin/Dockerfile
+      - images/ocp-build-data-enforcer/Dockerfile
+      - images/payload-testing-ui/Dockerfile
+      - images/pj-rehearse/Dockerfile
+      - images/pod-scaler/Dockerfile
+      - images/private-org-peribolos-sync/Dockerfile
+      - images/private-org-sync/Dockerfile
+      - images/private-prow-configs-mirror/Dockerfile
+      - images/prow-job-dispatcher/Dockerfile
+      - images/registry-replacer/Dockerfile
+      - images/repo-brancher/Dockerfile
+      - images/repo-init/Dockerfile
+      - images/result-aggregator/Dockerfile
+      - images/sanitize-prow-jobs/Dockerfile
+      - images/serviceaccount-secret-rotation-trigger/Dockerfile
+      - images/slack-bot/Dockerfile
+      - images/sprint-automation/Dockerfile
+      - images/testgrid-config-generator/Dockerfile
+      - images/tide-config-manager/Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen

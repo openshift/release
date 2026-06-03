@@ -1,8 +1,67 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  origin-cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
+binary_build_commands: GOFLAGS="-mod=readonly" go build -o /tmp/osac ./cmd/osac
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      WORKDIR /app
+      COPY osac /app/osac
+    from: src
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/osac
+    to: osac-cli
+  - dockerfile_path: Containerfile
+    to: fulfillment-service-pr
+  - dockerfile_literal: |
+      FROM osac-installer
+      COPY manifests/ /installer/base/osac-fulfillment-service/manifests/
+      COPY osac /usr/local/bin/osac
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/osac
+      osac-installer:
+        as:
+        - osac-installer
+    to: osac-installer-with-pr
+promotion:
+  to:
+  - excluded_images:
+    - fulfillment-service-pr
+    - osac-installer-with-pr
+    name: latest
+    namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -15,6 +74,17 @@ tests:
   commands: echo "Test"
   container:
     from: src
+- as: e2e-vmaas
+  capabilities:
+  - intranet
+  steps:
+    dependencies:
+      COMPONENT_IMAGE: fulfillment-service-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+      OSAC_TEST_IMAGE: osac-test-infra
+    env:
+      COMPONENT_IMAGE_NAME: ghcr.io/osac-project/fulfillment-service
+    workflow: osac-project-cluster-tool-vmaas
 zz_generated_metadata:
   branch: main
   org: osac-project

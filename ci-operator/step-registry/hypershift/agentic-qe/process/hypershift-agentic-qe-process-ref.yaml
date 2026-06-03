@@ -1,0 +1,45 @@
+ref:
+  as: hypershift-agentic-qe-process
+  from: claude-ai-helpers
+  cli: latest
+  commands: hypershift-agentic-qe-process-commands.sh
+  timeout: 2h0m0s
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: |-
+      Enable Vertex AI for Claude Code.
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: |-
+      Claude model to use for executing test plans.
+  - name: TEST_PLAN_DIR
+    default: "test-plan"
+    documentation: |-
+      Directory in the hypershift repo containing test plan files.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Process step for the HyperShift Agent QE presubmit job.
+    Reads test plan files changed/added by the PR from the test-plan/ directory,
+    then uses Claude to execute each test plan against the HostedCluster
+    created in the pre phase. Both management and guest cluster kubeconfigs
+    are available via SHARED_DIR.

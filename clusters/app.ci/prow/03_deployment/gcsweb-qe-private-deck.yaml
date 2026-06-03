@@ -32,6 +32,25 @@ objects:
       spec:
         serviceAccountName: gcsweb-qe-private-deck
         containers:
+        - image: quay.io/openshift/ci:ci_gcsweb_latest
+          name: gcsweb-qe-private-deck
+          args:
+          - "-b"
+          - "qe-private-deck"
+          - --gcs-credentials-file=/etc/sa/credentials.json
+          volumeMounts:
+          - mountPath: /etc/sa
+            name: gcs-credentials-file
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds:
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         - name: oauth-proxy
           image: quay.io/openshift/origin-oauth-proxy:4.16
           imagePullPolicy: IfNotPresent
@@ -58,25 +77,6 @@ objects:
             name: gcsweb-qe-private-deck-tls
           - mountPath: /etc/proxy/secrets
             name: session-secret
-        - image: quay.io/openshift/ci:ci_gcsweb_latest
-          name: gcsweb-qe-private-deck
-          args:
-          - "-b"
-          - "qe-private-deck"
-          - --gcs-credentials-file=/etc/sa/credentials.json
-          volumeMounts:
-          - mountPath: /etc/sa
-            name: gcs-credentials-file
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds:
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
         volumes:
         - name: gcsweb-qe-private-deck-tls
           secret:

@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -16,11 +12,12 @@ build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
-  to: cluster-autoscaler
-- context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.openshift
-  to: vertical-pod-autoscaler
+  items:
+  - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+    to: cluster-autoscaler
+  - context_dir: vertical-pod-autoscaler
+    dockerfile_path: Dockerfile.openshift
+    to: vertical-pod-autoscaler
 promotion:
   to:
   - name: "4.21"
@@ -116,7 +113,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -149,7 +146,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

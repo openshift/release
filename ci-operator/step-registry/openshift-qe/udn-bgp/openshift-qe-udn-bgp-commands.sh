@@ -20,24 +20,30 @@ EXTRA_FLAGS=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+EXTRA_FLAGS+=" --frr-external-ip=${bastion}"
+
 # shellcheck disable=SC2087
 ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
     set -e
     set -o pipefail
-    export KUBECONFIG=/root/vmno/kubeconfig
+    export KUBECONFIG=/root/mno/kubeconfig
     export PROW_JOB_ID="${PROW_JOB_ID:-}"
     export BUILD_ID="${BUILD_ID:-}"
     export JOB_NAME="${JOB_NAME:-}"
     export JOB_TYPE="${JOB_TYPE:-}"
+    for node in \$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+      echo "Pre-loading image on node \${node}..."
+      oc debug "node/\${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/sampleapp:latest
+    done
     rm -rf ~/e2e-benchmarking
     git clone "$REPO_URL" $TAG_OPTION --depth 1
     pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper

@@ -3,10 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -14,21 +10,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-baremetal-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-baremetal-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -95,12 +92,38 @@ tests:
       RUN_UPGRADE_TEST: "true"
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - always_run: false
+  as: e2e-metal-ipi-upgrade-out-of-change
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+- always_run: false
   as: e2e-metal-ipi-upgrade-ovn-ipv6
   capabilities:
   - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-upgrade-ovn-ipv6-out-of-change
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-ovn-ipv6

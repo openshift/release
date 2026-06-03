@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.22
+    tag: rhel-9-release-golang-1.25-openshift-4.23
 releases:
   latest:
     candidate:
@@ -35,23 +35,37 @@ resources:
 tests:
 - as: rebase-on-nightlies
   cron: 0 4 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     workflow: openshift-microshift-rebase
 - as: publish-release-notes
   cron: 0 5 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     workflow: openshift-microshift-publish-release-notes
-- as: update-versions-releases
-  cron: 0 5 * 1 1-5
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: t3.medium
-    workflow: openshift-microshift-manage-versions-releases
 - as: e2e-aws-tests-cache-nightly
   capabilities:
   - intranet
   cron: 30 0 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   restrict_network_access: false
   steps:
     cluster_profile: openshift-org-aws
@@ -63,6 +77,13 @@ tests:
   capabilities:
   - intranet
   cron: 30 0 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   restrict_network_access: false
   steps:
     cluster_profile: openshift-org-aws
@@ -71,26 +92,51 @@ tests:
       MICROSHIFT_OS: rhel-9.6
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
-- as: e2e-aws-tests-bootc-nightly
+- as: e2e-aws-tests-bootc-nightly-el9
   cron: 0 3 * 1 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics
+      SCENARIO_TYPE: bootc-periodics-el9
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-arm-nightly
+- as: e2e-aws-tests-bootc-nightly-el10
+  cron: 0 3 * 1 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly-el9
   cron: 0 3 * 1 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics
+      SCENARIO_TYPE: bootc-periodics-el9
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly-el10
+  cron: 0 3 * 1 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-nightly
   cron: 30 3 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -100,6 +146,13 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-arm-nightly
   cron: 30 3 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -109,6 +162,13 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-ovn-ocp-conformance
   cron: 0 4 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -117,32 +177,28 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
 - as: e2e-aws-ovn-ocp-conformance-serial
   cron: 0 4 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
-      MICROSHIFT_OS: rhel-9.6
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-microshift-e2e-origin-conformance
-- as: e2e-aws-ovn-ocp-conformance-arm64
-  cron: 0 4 * 1 1-5
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
-      MICROSHIFT_OS: rhel-9.6
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-microshift-e2e-origin-conformance
-- as: e2e-aws-ovn-ocp-conformance-serial-arm64
-  cron: 0 4 * 1 1-5
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.6
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-microshift-e2e-origin-conformance
 - as: clusterbot-nightly
   cron: 0 1 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -151,6 +207,13 @@ tests:
     workflow: openshift-microshift-clusterbot
 - as: e2e-aws-footprint-and-performance-nightly
   cron: 0 1 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -159,6 +222,13 @@ tests:
     workflow: openshift-microshift-e2e-bare-metal-tests
 - as: e2e-aws-ai-model-serving-nightly
   cron: 0 1 * 1 1-5
+  reporter_config:
+    channel: '#microshift-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -186,24 +256,44 @@ tests:
       SCENARIO_TYPE: releases
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-periodic
+- as: e2e-aws-tests-bootc-release-periodic-el9
   cron: 0 3 * 1 0,2,4
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-releases
+      SCENARIO_TYPE: bootc-releases-el9
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-arm-periodic
+- as: e2e-aws-tests-bootc-release-periodic-el10
+  cron: 0 3 * 1 0,2,4
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases-el10
+      TEST_EXECUTION_TIMEOUT: 60m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release-arm-periodic-el9
   cron: 0 3 * 1 0,2,4
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-releases
+      SCENARIO_TYPE: bootc-releases-el9
+      TEST_EXECUTION_TIMEOUT: 60m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-release-arm-periodic-el10
+  cron: 0 3 * 1 0,2,4
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-releases-el10
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:

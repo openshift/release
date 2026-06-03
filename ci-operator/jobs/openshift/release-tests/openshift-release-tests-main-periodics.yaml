@@ -1,14 +1,19 @@
 periodics:
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 1 * 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     repo: release-tests
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   labels:
     capability/arm64: arm64
     capability/intranet: intranet
@@ -21,6 +26,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=image-consistency-check
@@ -41,6 +47,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -58,6 +67,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -71,15 +86,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build07
   cron: 0 */4 * * 1-5
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     repo: release-tests
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   labels:
     capability/arm64: arm64
     capability/intranet: intranet
@@ -100,6 +120,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=jira-notificator
@@ -120,6 +141,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -137,6 +161,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -150,15 +180,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build11
   cron: 15 * * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     repo: release-tests
+    sparse_checkout_files:
+    - Dockerfile
+    - prow/Dockerfile
   labels:
     capability/arm64: arm64
     ci.openshift.io/generator: prowgen
@@ -179,6 +214,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=qe-release-gate-test
@@ -199,6 +235,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -216,6 +255,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials

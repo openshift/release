@@ -7,8 +7,26 @@ set -o pipefail
 # The script will enable UIPlugin and add test alerts first, then start cypress test.
 # We use '|| true' on the final cypress command to ensure that the script does not exit with 1.
 
+# List of variables to check.
+vars=(
+  CYPRESS_SKIP_COO_INSTALL
+  CYPRESS_COO_NAMESPACE
+  CYPRESS_COO_UI_INSTALL
+  CYPRESS_SESSION
+)
+
+# Loop through each variable.
+for var in "${vars[@]}"; do
+  if [[ -z "${!var}" ]]; then
+    unset "$var"
+    echo "Unset variable: $var"
+  else
+    echo "$var is set to '${!var}'"
+  fi
+done
+
 echo "--- Applying UIPlugin CR to integrate ACM observability into the console ---"
-cat <<EOF | oc apply -f -
+cat <<EOF | oc apply -n "${CYPRESS_COO_NAMESPACE}" -f -
 apiVersion: observability.openshift.io/v1alpha1
 kind: UIPlugin
 metadata:

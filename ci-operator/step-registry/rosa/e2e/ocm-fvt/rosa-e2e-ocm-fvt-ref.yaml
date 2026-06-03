@@ -1,0 +1,54 @@
+ref:
+  as: rosa-e2e-ocm-fvt
+  from: nested-podman
+  commands: rosa-e2e-ocm-fvt-commands.sh
+  nested_podman: true
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_FVT_JOB_NAME
+    documentation: |-
+      Required. The ocmtest job name passed to --job flag.
+      Example: cs-rosa-hcp-ad-staging-main
+  - name: OCM_FVT_SERVICE
+    default: "cms"
+    documentation: |-
+      Optional. The ocmtest --service flag value.
+      Use "cms" for Clusters Service tests (default), "osdfm" for
+      OSD Fleet Manager tests.
+  - name: OCM_FVT_REPORT_JIRA
+    default: "true"
+    documentation: |-
+      Optional. Set to "true" to enable Jira reporting via
+      --reportJiraTicket flag and ENABLE_JIRA_REPORTING env var.
+      Set to "false" for tests that do not use Jira reporting.
+  - name: OCM_FVT_OCM_ENV
+    default: ""
+    documentation: |-
+      Optional. OCM environment override. Set to "integration" for
+      integration tests. When empty, ocmtest uses its default (staging).
+  - name: OCM_FVT_EXTRA_ENVS
+    default: ""
+    documentation: |-
+      Optional. Newline-delimited KEY=VALUE pairs for additional env vars
+      injected into the podman container. Example:
+        DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+  - name: OCM_FVT_GCP_CREDS
+    default: "false"
+    documentation: |-
+      Optional. Set to "true" to mount the GCP credentials file
+      (osd-ccs-admin.json) into the podman container at
+      /home/ci-user/.gcp/osd-ccs-admin.json. Required for OSD GCP tests.
+  documentation: |-
+    Runs an OCM FVT (Functional Verification Test) using ocmtest inside
+    a nested podman container. The ocmtest tool is pulled from
+    quay.io/redhat-services-prod/ocmci/ocmci:latest and executed with
+    the specified job name and service. Supports CMS, OSDFM, AWS, GCP,
+    and integration environments via environment variable parameterization.

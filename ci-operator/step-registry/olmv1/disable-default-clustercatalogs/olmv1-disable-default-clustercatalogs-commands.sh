@@ -1,6 +1,13 @@
 #!/bin/bash
 set -u
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" == "$2" ]] && return 1
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$2" ]]
+}
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -42,10 +49,8 @@ function patch_clustercatalog_if_exists() {
 }
 
 function disable_default_clustercatalog () {
-    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
-    major_version=$(echo ${ocp_version} | cut -d '.' -f1)
-    minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
-    if [[ "X${major_version}" == "X4" && -n "${minor_version}" && "${minor_version}" -gt 17 ]]; then
+    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version | cut -d '.' -f1,2)
+    if version_gt "${ocp_version}" "4.17"; then
         echo "disable olmv1 default clustercatalogs"
         run_command "oc patch clustercatalog openshift-certified-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
         run_command "oc patch clustercatalog openshift-redhat-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"

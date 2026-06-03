@@ -1,13 +1,37 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_path: Dockerfile.build
-  to: assisted-events-stream-build
-- dockerfile_path: Dockerfile
-  to: assisted-events-stream
+  items:
+  - dockerfile_path: Dockerfile.build
+    to: assisted-events-stream-build
+  - dockerfile_path: Dockerfile
+    to: assisted-events-stream
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS go-toolset
+      FROM nested-podman
+      USER root
+      RUN dnf install -y make && dnf clean all
+      COPY --from=go-toolset /usr/lib/golang /usr/lib/golang
+      ENV GOROOT=/usr/lib/golang
+      ENV PATH=/usr/lib/golang/bin:/usr/bin:/bin
+      ENV GOFLAGS=-mod=vendor
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/assisted-events-stream
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-assisted/assisted-events-stream
+    to: assisted-events-stream-unit-test
 resources:
   '*':
     limits:
@@ -15,12 +39,41 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  unit-test:
+    requests:
+      cpu: "1"
+      memory: 1Gi
 tests:
 - as: unit-test
-  commands: make unit-test
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    PODMAN_PID=""
+    cleanup() {
+        if [[ -n "$PODMAN_PID" ]]; then
+            kill "$PODMAN_PID" 2>/dev/null || true
+            wait "$PODMAN_PID" 2>/dev/null || true
+        fi
+    }
+    trap cleanup EXIT
+
+    podman system service --time=0 &
+    PODMAN_PID=$!
+
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    for i in $(seq 1 30); do
+        [ -S "$SOCKET_PATH" ] && break
+        sleep 1
+    done
+
+    export TESTCONTAINERS_RYUK_DISABLED=true
+
+    make unit-test
   container:
-    clone: true
-    from: assisted-events-stream-build
+    from: assisted-events-stream-unit-test
+  nested_podman: true
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && make lint
   container:

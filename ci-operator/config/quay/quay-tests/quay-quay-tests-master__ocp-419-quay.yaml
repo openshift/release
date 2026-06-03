@@ -12,6 +12,9 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -29,6 +32,16 @@ resources:
 tests:
 - as: quay-e2e-tests-quay313-ocp419-lp-interop
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -62,6 +75,16 @@ tests:
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay313-ocp419-lp-interop-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -208,14 +231,24 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-ceph-ocp419-quay316
   cron: '@yearly'
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-19@sha256:0a7400b365d49af12bb2a7f30996beaf4edb9c29d7b20bbbbcf551b4d1f14db9
       ODF_OPERATOR_CHANNEL: stable-4.19
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-19@sha256:0a7400b365d49af12bb2a7f30996beaf4edb9c29d7b20bbbbcf551b4d1f14db9
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.16"

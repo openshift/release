@@ -2,12 +2,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/prometheus-alertmanager
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: prometheus-alertmanager
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: prometheus-alertmanager
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -30,7 +34,7 @@ tests:
     from: src
 - as: test
   commands: |
-    nodejs_version=v20.12.2
+    nodejs_version=v24.15.0
     nodejs_platform=linux-x64
     nodejs="node-${nodejs_version}-${nodejs_platform}"
 
@@ -46,6 +50,7 @@ tests:
     cd -
 
     export npm_config_cache="/tmp/.npm"
+    export ELM_HOME="/tmp/.elm"
     make build && make test
   container:
     from: src
@@ -70,7 +75,6 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: ginkgo-tests-cmo
-  optional: true
   steps:
     cluster_profile: openshift-org-azure
     test:

@@ -11,17 +11,20 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
 images:
-- dockerfile_path: Dockerfile
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.20
-  to: console-plugin-demo
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.20
+    to: console-plugin-demo
 promotion:
   to:
   - additional_images:
       console-tests: src
     name: 4.20-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -81,7 +84,7 @@ tests:
 - as: e2e-gcp-console
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

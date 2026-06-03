@@ -2,13 +2,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: konveyor
-    tag: ubi9-v1.24
+    tag: ubi9-v1.25
 canonical_go_repository: github.com/openshift/velero
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.ubi
-  to: velero
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.ubi
+    to: velero
 promotion:
   to:
   - additional_images:
@@ -16,6 +17,8 @@ promotion:
     disabled: true
     name: velero
     namespace: konveyor
+prowgen:
+  private: true
 releases:
   latest:
     release:
@@ -34,8 +37,7 @@ tests:
   steps:
     test:
     - as: unit
-      commands: PATH="/go/bin:$PATH" GOTOOLCHAIN=go1.25.0+auto make -f Makefile.prow
-        ci
+      commands: PATH="/go/bin:$PATH" make -f Makefile.prow ci
       from: src
       resources:
         requests:

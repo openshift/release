@@ -142,11 +142,20 @@ fi
 
 # check if FIPS enabled
 fips_enabled=false
-node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
-str=`oc debug node/$node_name -- chroot /host fips-mode-setup --check`
-if [[ $str =~ "FIPS mode is enabled" ]]
-then
+node_name=$(oc get node -l node-role.kubernetes.io/master= --no-headers | awk '$2=="Ready" {print $1; exit}')
+if [[ -z "$node_name" ]]; then
+  echo "ERROR: No Ready master node found"
+  exit 1
+fi
+fips_flag=$(oc debug node/$node_name -- chroot /host cat /proc/sys/crypto/fips_enabled 2>&1)
+fips_value=$(echo "$fips_flag" | grep -oE '^[01]$')
+if [[ $fips_value == "1" ]]; then
     fips_enabled=true
+elif [[ $fips_value == "0" ]]; then
+    fips_enabled=false
+else
+    echo "ERROR: Failed to check FIPS status. Output: $fips_flag"
+    exit 1
 fi
 echo "Cluster FIPS enabled: $fips_enabled"
 

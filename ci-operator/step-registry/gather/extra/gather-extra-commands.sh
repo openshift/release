@@ -104,6 +104,8 @@ queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.j
 queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A
+queue ${ARTIFACT_DIR}/clusterapis.operator.openshift.io.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusterapis.operator.openshift.io oc --insecure-skip-tls-verify --request-timeout=5s get clusterapis.operator.openshift.io
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
@@ -136,6 +138,7 @@ queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-t
 queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
 queue ${ARTIFACT_DIR}/networkpolicies.json oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/networkpolicies oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces
+queue ${ARTIFACT_DIR}/pacemakercluster-cluster.json oc --insecure-skip-tls-verify --request-timeout=5s get pacemakerclusters cluster -ojson
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 

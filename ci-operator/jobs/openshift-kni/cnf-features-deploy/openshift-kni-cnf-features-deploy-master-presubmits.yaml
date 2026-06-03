@@ -8,15 +8,14 @@ presubmits:
     cluster: build11
     context: ci/prow/ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-ci
     rerun_command: /test ci
-    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -73,17 +72,16 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-aws-ci-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-aws-ci-tests
     rerun_command: /test e2e-aws-ci-tests
-    skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
+    skip_if_only_changed: ^ztp|^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -157,17 +155,17 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-aws-ran-profile
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-aws-ran-profile
     optional: true
     rerun_command: /test e2e-aws-ran-profile
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -241,21 +239,22 @@ presubmits:
     cluster: build03
     context: ci/prow/e2e-telco5g-cnftests
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-telco5g-cnftests
     optional: true
     rerun_command: /test e2e-telco5g-cnftests
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-telco5g-cnftests
@@ -276,6 +275,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -293,6 +295,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -314,21 +322,22 @@ presubmits:
     cluster: build03
     context: ci/prow/e2e-telco5g-hcp-cnftests
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       capability/intranet: intranet
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-telco5g-hcp-cnftests
     optional: true
     rerun_command: /test e2e-telco5g-hcp-cnftests
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-telco5g-hcp-cnftests
@@ -349,6 +358,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -366,6 +378,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -387,15 +405,14 @@ presubmits:
     cluster: build11
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-images
     rerun_command: /test images
-    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -444,21 +461,21 @@ presubmits:
     cluster: build11
     context: ci/prow/security
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-security
     optional: true
     rerun_command: /test security
-    skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|renovate.json
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -479,6 +496,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -496,6 +516,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -517,11 +543,10 @@ presubmits:
     cluster: build11
     context: ci/prow/ztp-ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-master-ztp-ci
     rerun_command: /test ztp-ci

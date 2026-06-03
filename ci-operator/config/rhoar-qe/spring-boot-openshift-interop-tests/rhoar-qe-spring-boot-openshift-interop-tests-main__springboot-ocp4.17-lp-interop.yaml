@@ -9,9 +9,10 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.19-openshift-4.15
 images:
-- context_dir: .
-  dockerfile_path: Dockerfile
-  to: springboot-runner
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile
+    to: springboot-runner
 releases:
   latest:
     prerelease:
@@ -28,6 +29,16 @@ resources:
 tests:
 - as: springboot-interop-ibmcloud
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#springboot-interop'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: ibmcloud-cspi-qe
     env:
@@ -51,6 +62,16 @@ tests:
     workflow: firewatch-ipi-ibmcloud
 - as: springboot-interop-aws
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#springboot-interop'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -76,6 +97,16 @@ tests:
     workflow: firewatch-ipi-aws
 - as: springboot-interop-aws-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#springboot-interop'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:

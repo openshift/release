@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-ssh root@${bastion} "
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=240 root@${bastion} "
   set -o errexit
   set -o pipefail
   # Export CI metadata and ES host to the remote environment
@@ -33,6 +33,7 @@ ssh root@${bastion} "
   export ES_SERVER=\"${es_host}\"
   export KUBECONFIG=\"${kubeconfig}\"
   export BENCHMARK=\"${WORKLOAD:-}\"
+  export WORKLOAD_TYPE=\"${WORKLOAD_TYPE:-rally}\"
   JOB_START=\\\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
   rm -rf cpt-browbeat-configs
   git clone https://gitlab.cee.redhat.com/eng/openstack/team/performance-and-scale/cpt-browbeat-configs.git
@@ -47,10 +48,11 @@ ssh root@${bastion} "
   sed -i \"s|cloud_name: .*|cloud_name: cpt-${build_id}|\" browbeat-config.yaml
   sed -i \"s|host: .*|host: ${es_host}|\" browbeat-config.yaml
   source .browbeat-venv/bin/activate
-  log_file=\"browbeat-rally-${WORKLOAD}-${build_id}.log\"
+  workload_type=\"${WORKLOAD_TYPE:-rally}\"
+  log_file=\"browbeat-\\\${workload_type}-${WORKLOAD}-${build_id}.log\"
   export BROWBEAT_LOG=\"\\\$(pwd)/\\\${log_file}\"
   set -o pipefail
-  python3 browbeat.py rally 2>&1 | tee \"\\\$log_file\"
+  python3 browbeat.py \\\${workload_type} 2>&1 | tee \"\\\$log_file\"
   deactivate
   JOB_END=\\\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
   export JOB_START JOB_END BROWBEAT_LOG

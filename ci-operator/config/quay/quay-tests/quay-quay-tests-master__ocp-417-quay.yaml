@@ -12,6 +12,9 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -92,13 +95,23 @@ tests:
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay313-ocp417-unmanaged-tls
   cron: 0 22 25 * *
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:886942
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:886942
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_VERSION: "3.13"
@@ -112,14 +125,24 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay313-ocp417-virtual-builder
   cron: 0 23 25 * *
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:894318
       ODF_OPERATOR_CHANNEL: stable-4.17
       QUAY_BUILDER_IMAGE: brew.registry.redhat.io/rh-osbs/quay-quay-builder-rhel8:v3.9.0-19
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:894318
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_VERSION: "3.13"
@@ -134,12 +157,22 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay313-ocp417-aws-sts
   cron: 0 23 26 * *
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:894318
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:894318
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_STORAGE_PROVIDER: awssts
@@ -161,8 +194,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:909520
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:909520
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
     test:
@@ -174,14 +207,24 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-ceph-ocp417-quay315
   cron: '@yearly'
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1046361
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1046361
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_VERSION: "3.15"

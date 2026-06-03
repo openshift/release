@@ -2,12 +2,12 @@ base_images:
   e2e-test-runner:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 releases:
   latest:
     release:
@@ -23,10 +23,20 @@ resources:
 tests:
 - as: konflux-e2e-v420
   cron: 0 3 * * *
+  reporter_config:
+    channel: '#infra-deployments-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :success-kid: {{ else }}
+      :fuuuuuu: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
   steps:
     cluster_profile: aws-konflux-qe
     test:
     - ref: konflux-ci-install-operator
+    - ref: konflux-ci-e2e-tests
     workflow: konflux-ci-ipi
 zz_generated_metadata:
   branch: main

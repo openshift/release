@@ -1,7 +1,7 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
+  commitchecker:
+    name: commitchecker
+    namespace: ci
     tag: latest
   hypershift-tests:
     name: hypershift-tests
@@ -10,11 +10,12 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: azure-kms-encryption-provider
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: azure-kms-encryption-provider
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -22,11 +23,11 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.22"
+      version: "5.0"
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -36,6 +37,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
 - as: unit
   commands: make unit-test
   container:

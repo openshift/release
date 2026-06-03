@@ -4,10 +4,11 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.13$
-    cluster: build11
+    cluster: build13
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ocp
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
@@ -64,10 +65,11 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.13$
-    cluster: build11
+    cluster: build13
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ocp
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -77,8 +79,8 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
         - --target=publish
         command:
         - ci-operator
@@ -97,8 +99,8 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
+        - mountPath: /etc/boskos
+          name: boskos
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -114,9 +116,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
+      - name: boskos
         secret:
-          secretName: ci-pull-credentials
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

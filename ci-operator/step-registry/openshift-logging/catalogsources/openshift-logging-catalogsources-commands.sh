@@ -4,6 +4,14 @@ set -e
 set -u
 set -o pipefail
 
+if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+    echo "setting the proxy"
+    echo "source ${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
+else
+    echo "no proxy setting."
+fi
+
 test_version="${LOGGING_TEST_VERSION}"
 
 if [[ -z ${test_version} ]] ; then
@@ -16,16 +24,6 @@ if [[ -z "${ocp_version}" ]]; then
     echo "could not detect cluster version"
     exit 1
 fi
-
-function set_proxy () {
-    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
-        echo "setting the proxy"
-        echo "source ${SHARED_DIR}/proxy-conf.sh"
-        source "${SHARED_DIR}/proxy-conf.sh"
-    else
-        echo "no proxy setting."
-    fi
-}
 
 function run_command() {
     local CMD="$1"
@@ -272,7 +270,6 @@ function check_olm_capability() {
     return 0 # Return 0 for success
 }
 
-set_proxy
 # Check for required commands
 command -v jq >/dev/null 2>&1 || { echo >&2 "Error: jq is not installed. Aborting."; exit 1; }
 command -v yq-go >/dev/null 2>&1 || { echo >&2 "Error: yq-go is not installed. Aborting."; exit 1; }

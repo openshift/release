@@ -31,12 +31,13 @@ binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  from: base
-  to: aws-efs-csi-operator-create-efs
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    from: base
+    to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -100,6 +101,13 @@ tests:
     workflow: openshift-e2e-aws-csi-efs
 - as: nightly-operator-e2e
   cron: 58 0 20 8 *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

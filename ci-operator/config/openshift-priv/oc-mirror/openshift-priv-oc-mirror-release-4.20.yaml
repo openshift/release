@@ -8,16 +8,19 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/oc-mirror
 images:
-- dockerfile_path: images/cli/Dockerfile.ci
-  to: oc-mirror
-- dockerfile_path: images/cli/Dockerfile.test
-  to: oc-mirror-tests
+  items:
+  - dockerfile_path: images/cli/Dockerfile.ci
+    to: oc-mirror
+  - dockerfile_path: images/cli/Dockerfile.test
+    to: oc-mirror-tests
 promotion:
   to:
   - excluded_images:
     - oc-mirror-tests
     name: 4.20-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -71,7 +74,8 @@ tests:
     - ref: go-verify-deps
 - as: integration
   commands: |
-    ./scripts/flow-controller.sh all_happy_path
+    export OC_MIRROR_VERSION=4.20
+    cd /artifacts && ./integration.test
   container:
     from: oc-mirror-tests
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)

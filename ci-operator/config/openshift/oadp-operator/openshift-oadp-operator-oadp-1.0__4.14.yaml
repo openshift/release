@@ -4,10 +4,11 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: Dockerfile
-  to: oadp-operator-1.0
-- dockerfile_path: build/ci-Dockerfile
-  to: test-oadp-operator-1.0
+  items:
+  - dockerfile_path: Dockerfile
+    to: oadp-operator-1.0
+  - dockerfile_path: build/ci-Dockerfile
+    to: test-oadp-operator-1.0
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
@@ -55,6 +56,15 @@ tests:
     workflow: optional-operators-ci-aws
 - as: e2e-test-aws-periodic
   cron: 13 19 14,28 * *
+  reporter_config:
+    channel: '#oadp-cicd'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :alert-siren: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :alert-siren: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

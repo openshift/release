@@ -6,11 +6,12 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: gcp-pd-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: gcp-pd-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: gcp-pd-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: gcp-pd-csi-driver-operator-test
 promotion:
   to:
   - name: "4.17"
@@ -45,15 +46,15 @@ tests:
     from: src
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-csi
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-ovn
 - always_run: false
   as: e2e-gcp-csi-extended

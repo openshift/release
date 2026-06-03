@@ -246,6 +246,17 @@ tests:
     - ref: openshift-qe-installer-bm-day2-cnv
     - chain: openshift-qe-data-path-tests
 - always_run: false
+  as: egressip
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-egressip
+- always_run: false
   as: foreman-1node
   capabilities:
   - intranet
@@ -270,7 +281,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-cpt
     env:
-      RUN_ORION: "true"
+      RUN_ORION: deferred
       VERSION: "4.19"
     test:
     - chain: openshift-qe-orion-consolidated-virt
@@ -355,6 +366,31 @@ tests:
       STARTING_NODE: "4"
     test:
     - ref: openshift-qe-installer-bm-foreman
+- always_run: false
+  as: orion-rds-core
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      RUN_ORION: "true"
+      VERSION: "4.20"
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-orion-rds-core
+- always_run: false
+  as: k8s-io
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-k8s-io
 zz_generated_metadata:
   branch: main
   org: openshift-eng

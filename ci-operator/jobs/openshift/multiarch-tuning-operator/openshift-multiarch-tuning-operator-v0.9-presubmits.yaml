@@ -9,7 +9,9 @@ presubmits:
     context: ci/prow/bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -70,11 +72,13 @@ presubmits:
     branches:
     - ^v0\.9$
     - ^v0\.9-
-    cluster: build01
+    cluster: build05
     context: ci/prow/ci-index-multiarch-tuning-operator-bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -129,11 +133,13 @@ presubmits:
     context: ci/prow/e2e-gcp-multi-operator
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-multiarch-tuning-operator-v0.9-e2e-gcp-multi-operator
@@ -214,11 +220,13 @@ presubmits:
     context: ci/prow/e2e-gcp-multi-operator-olm
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-multiarch-tuning-operator-v0.9-e2e-gcp-multi-operator-olm
@@ -298,7 +306,9 @@ presubmits:
     context: ci/prow/fmt
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -363,7 +373,9 @@ presubmits:
     context: ci/prow/generate
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -428,7 +440,9 @@ presubmits:
     context: ci/prow/goimports
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -489,11 +503,13 @@ presubmits:
     branches:
     - ^v0\.9$
     - ^v0\.9-
-    cluster: build01
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -549,7 +565,9 @@ presubmits:
     context: ci/prow/lint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -614,7 +632,9 @@ presubmits:
     context: ci/prow/manifests
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -679,7 +699,9 @@ presubmits:
     context: ci/prow/sast
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -744,7 +766,9 @@ presubmits:
     context: ci/prow/security
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -758,6 +782,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
@@ -778,6 +803,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -795,6 +823,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -817,7 +851,9 @@ presubmits:
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -882,7 +918,9 @@ presubmits:
     context: ci/prow/vendor
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -947,7 +985,9 @@ presubmits:
     context: ci/prow/vet
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile
+      - bundle.Dockerfile
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen

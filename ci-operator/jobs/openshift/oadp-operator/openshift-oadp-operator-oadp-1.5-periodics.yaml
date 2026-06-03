@@ -1,14 +1,19 @@
 periodics:
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -93,15 +98,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 5 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -176,15 +186,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -269,15 +284,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -362,15 +382,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 5 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -445,15 +470,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
+    - build/ci-Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -542,11 +572,14 @@ periodics:
   cron: 0 4 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
   extra_refs:
   - base_ref: oadp-1.5
     org: openshift
     repo: oadp-operator
+    sparse_checkout_files:
+    - Dockerfile
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -566,6 +599,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --target=unit-test-periodic
       command:
@@ -585,6 +619,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -599,6 +636,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

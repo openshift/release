@@ -20,7 +20,7 @@ GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
@@ -38,7 +38,7 @@ declare -A WORKLOAD_PIDS
 
 # Kick off run with vars set
 if [[ $WORKLOAD == "node-density-heavy" ]]; then
-    EXTRA_FLAGS+=" --gc-metrics=true --pods-per-node=$PODS_PER_NODE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+    EXTRA_FLAGS+=" --gc-metrics=false --pods-per-node=$PODS_PER_NODE --profile-type=${PROFILE_TYPE}" CLEANUP_WHEN_FINISH=true ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 fi
 
 if [[ $WORKLOAD == "cluster-density-v2" ]]; then
@@ -47,7 +47,7 @@ if [[ $WORKLOAD == "cluster-density-v2" ]]; then
     iteration_multiplier=$ITERATION_MULTIPLIER_ENV
     ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
     export ITERATIONS
-    EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
+    EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 fi
 
 WORKLOAD_PIDS["$WORKLOAD"]=$!

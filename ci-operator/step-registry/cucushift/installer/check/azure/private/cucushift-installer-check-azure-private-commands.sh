@@ -55,6 +55,7 @@ RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
 if [[ -z "${RESOURCE_GROUP}" ]]; then
     RESOURCE_GROUP="${INFRA_ID}-rg"
 fi
+CLOUD_NAME=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.cloudName')
 
 critical_check_result=0
 #lb check
@@ -70,7 +71,15 @@ fi
 
 #lb outbound rule check
 echo "Check that outbound rules are created on private cluster..."
-outbound_rules=$(az network lb show --name ${public_lb} -g ${RESOURCE_GROUP} -ojson | jq -r ".outboundRules[]")
+# Outbound rules visible in ASH portal but not queryable via Azure CLI
+# Azure Stack Hub CLI uses an older API profile by default that doesn't expose the outboundRules property
+# Use az rest with an explicit newer API version instead of the standard az network lb commands
+if [[ "${CLOUD_NAME}" == "AzureStackCloud" ]]; then
+    ARM_ENDPOINT=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.armEndpoint')
+    outbound_rules=$(az rest --method get --url "${ARM_ENDPOINT}/subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/${public_lb}?api-version=2018-11-01" --query "properties.outboundRules" -o json)
+else
+    outbound_rules=$(az network lb show --name ${public_lb} -g ${RESOURCE_GROUP} -ojson | jq -r ".outboundRules[]")
+fi
 if [[ -z "${outbound_rules}" ]]; then
     echo "ERROR: Not found outbound rules for public load balancer ${public_lb} on private cluster!"
     critical_check_result=1

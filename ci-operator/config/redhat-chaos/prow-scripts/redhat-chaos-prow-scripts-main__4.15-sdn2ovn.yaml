@@ -22,23 +22,24 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-415
-- dockerfile_path: Dockerfile
-  from: krkn
-  to: prow-scripts
-- dockerfile_literal: |-
-    FROM prow-scripts.prow
-    RUN ls
-  from: prow-scripts.prow
-  to: prow-scripts-415-sdn2ovn
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-415
+  - dockerfile_path: Dockerfile
+    from: krkn
+    to: prow-scripts
+  - dockerfile_literal: |-
+      FROM prow-scripts.prow
+      RUN ls
+    from: prow-scripts.prow
+    to: prow-scripts-415-sdn2ovn
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   initial:
     integration:
@@ -59,6 +60,16 @@ resources:
 tests:
 - as: chaos-aws-during-limited-live-sdn2ovn-migration
   cron: 0 4 11 * *
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -92,6 +103,16 @@ tests:
     workflow: redhat-chaos-installer-aws-sdn
 - as: chaos-aws-after-limited-live-sdn2ovn-migration
   cron: 0 4 6 * *
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true

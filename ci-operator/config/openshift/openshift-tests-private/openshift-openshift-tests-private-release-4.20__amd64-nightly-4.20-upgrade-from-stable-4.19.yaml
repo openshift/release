@@ -59,6 +59,9 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     release:
@@ -77,8 +80,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-disconnected-pin-mco-f60
-  cron: 22 18 2 * *
+- as: aws-ipi-disconnected-pin-mco-f14
+  cron: 27 2 8,22 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -194,8 +197,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-cco-manual-security-token-service
-- as: aws-ipi-ovn-hypershift-replace-f7
-  cron: 56 16 3,10,19,26 * *
+- as: aws-ipi-ovn-hypershift-replace-f14
+  cron: 21 22 11,27 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -340,6 +343,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
 - as: azure-aks-hypershift-byo-vnet-inplace-guest-f28
   cron: 3 20 12 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -350,6 +363,16 @@ tests:
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-aks-hypershift-byo-vnet-replace-guest-f28
   cron: 44 23 6 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -359,6 +382,16 @@ tests:
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
 - as: azure-aks-hypershift-etcd-disk-encryption-replace-guest-f28
   cron: 43 11 8 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -368,6 +401,16 @@ tests:
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-etcd-disk-encryption-guest
 - as: azure-aks-hypershift-registry-overrides-replace-guest-f28
   cron: 52 6 14 * *
+  reporter_config:
+    channel: '#forum-prow-hypershift-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -501,10 +544,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-stack-upi
-- as: baremetal-upi-ovn-ipv4-f28
+- as: metal-upi-ovn-ipv4-f28
   capabilities:
   - intranet
-  cron: 48 14 30 * *
+  cron: 55 19 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -515,7 +558,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: baremetal-lab-upi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f999
+- as: metal-ds-ipi-ovn-dualstack-primaryv6-f999
   capabilities:
   - intranet
   cron: 8 8 29 2 *
@@ -530,10 +573,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv4-fips-canary-f28
+- as: metal-ds-ipi-ovn-ipv4-fips-canary-f28
   capabilities:
   - intranet
-  cron: 3 20 2 * *
+  cron: 26 17 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -544,7 +587,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv6-fips-f999
+- as: metal-ds-ipi-ovn-ipv6-fips-f999
   capabilities:
   - intranet
   cron: 8 8 29 2 *
@@ -560,10 +603,10 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-lvms-f28
+- as: metal-ds-ipi-ovn-lvms-f28
   capabilities:
   - intranet
-  cron: 21 15 5 * *
+  cron: 52 6 15 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -852,10 +895,9 @@ tests:
 - as: vsphere-ipi-remote-worker-f28
   cron: 46 9 1 * *
   steps:
-    cluster_profile: vsphere-connected-2
-    leases:
-    - env: VSPHERE_EXTRA_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
+    cluster_profile: vsphere-elastic
+    env:
+      RESERVE_EXTRA_NETWORK: "true"
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker
@@ -946,8 +988,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-canary
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
-- as: aws-ipi-ovn-winc-f7
-  cron: 7 22 5,14,21,28 * *
+- as: aws-ipi-ovn-winc-f14
+  cron: 23 1 9,25 * *
   steps:
     cluster_profile: aws-qe
     env:

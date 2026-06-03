@@ -7,15 +7,18 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-os-images
 images:
-- build_args:
-  - name: DIRECT_DOWNLOAD
-    value: "true"
-  dockerfile_path: Dockerfile
-  to: machine-os-images
+  items:
+  - build_args:
+    - name: DIRECT_DOWNLOAD
+      value: "true"
+    dockerfile_path: Dockerfile
+    to: machine-os-images
 promotion:
   to:
   - name: 4.23-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -52,6 +55,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
+- as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
 zz_generated_metadata:
   branch: release-4.23
   org: openshift-priv

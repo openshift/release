@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 
+import argparse
+import json
 import yaml
 
+parser = argparse.ArgumentParser(description="Boskos config generator")
+parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
+args = parser.parse_args()
 
 CONFIG = {
+    'aws-us-east-1-quota-slice': {
+        'us-east-1': 15,
+    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -61,9 +69,6 @@ CONFIG = {
     'aws-sd-qe-quota-slice': {
         'us-west-2': 10,
     },
-    'aws-outpost-quota-slice': {
-        'us-east-1': 10,
-    },
     'aws-outpost-qe-quota-slice': {
         'us-east-1': 5,
     },
@@ -88,12 +93,20 @@ CONFIG = {
         'us-east-1': 10,
         'us-west-2': 10,
     },
-    'aws-splat-quota-slice': {
-        'us-east-1': 5,
-        'us-west-2': 5
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
+    },
+    'rosa-e2e-01-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
+    },
+    'rosa-e2e-02-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
+    },
+    'rosa-e2e-03-quota-slice': {
+        'us-west-2': 5,
+        'us-east-2': 5
     },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
@@ -103,6 +116,9 @@ CONFIG = {
     },
     'metal-perfscale-osp-quota-slice': {
         'metal-perfscale-osp-rdu2': 1,
+    },
+    'metal-perfscale-osp-nfv-quota-slice': {
+        'metal-perfscale-osp-nfv-bos2': 1,
     },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
@@ -142,6 +158,9 @@ CONFIG = {
     },
     'aws-rhdh-performance-quota-slice': {
         'eu-west-1': 10
+    },
+    'aws-rhdh-disconnected-quota-slice': {
+        'us-east-2': 5
     },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
@@ -212,9 +231,9 @@ CONFIG = {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
-        'northcentralus': 10,
-        'westus2': 10,
-        'centralus': 10
+        'northcentralus': 15,
+        'westus2': 15,
+        'centralus': 15
     },
     'azure-observability-quota-slice': {
         'westus': 3
@@ -250,6 +269,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'azure-perfscale-qe-quota-slice': {
+        'centralus': 6,
+   },
     'aro-classic-int-quota-slice': {
         'default': 1,
     },
@@ -263,21 +285,33 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 5,
+        'default': 1,
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
     },
     'aro-hcp-dev-quota-slice': {
-        'default': 15,
+        'default': 14,
     },
     'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-cspr-pipeline-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
+    # BEGIN ARO-HCP E2E SLOT TYPES
+    'aro-hcp-dev-shard0-centralus-slot': {},
+    'aro-hcp-dev-shard1-canadacentral-slot': {},
+    'aro-hcp-dev-shard1-centralus-slot': {},
+    # END ARO-HCP E2E SLOT TYPES
+    'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -303,7 +337,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
         'us-central1': 30,
@@ -337,6 +371,9 @@ CONFIG = {
     },
     'gcp-telco-quota-slice': {
         'us-central1': 40,
+    },
+    'gcp-perfscale-qe-quota-slice': {
+        'us-east1': 6,
     },
     'libvirt-s390x-1-quota-slice': {},
     'libvirt-s390x-2-quota-slice': {},
@@ -438,9 +475,7 @@ CONFIG = {
         'syd04': 1,
         'syd05': 1,
     },
-    'powervs-3-quota-slice': {
-        'dal10': 1,
-    },
+    'powervs-3-quota-slice': {},
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
@@ -448,8 +483,9 @@ CONFIG = {
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
+    'powervs-9-quota-slice': {},
     'powervs-multi-1-quota-slice': {
-        'wdc06': 2,
+        'lon04': 2,
     },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 40,
@@ -463,11 +499,8 @@ CONFIG = {
     'ibmcloud-qe-2-quota-slice': {
         'us-east': 10,
     },
-    'ibmcloud-gpu-quota-slice': {
-        'us-east': 10,
-    },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'us-east': 3,
+        'lon04': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -639,7 +672,7 @@ CONFIG = {
         'default': 1,
     },
     'amd-gpu-quota-slice': {
-        '10.1.178.14': 1,
+        '10.8.231.19': 1,
     },
     'aws-osp-qe-quota-slice': {
         'us-east-1': 10,
@@ -707,6 +740,9 @@ for i in range(0,80):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in range(4):
+    CONFIG['powervs-3-quota-slice']['dal10-powervs-3-quota-slice-{}'.format(i)] = 1
+
+for i in range(4):
     CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
 
 for i in range(4):
@@ -718,6 +754,9 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
+for i in range(2):
+    CONFIG['powervs-9-quota-slice']['sao04-powervs-9-quota-slice-{}'.format(i)] = 1
+
 for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
 for i in range(150):
@@ -725,58 +764,107 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
+# BEGIN ARO-HCP E2E SLOT RESOURCES
+for i in range(15):
+    CONFIG['aro-hcp-dev-shard0-centralus-slot']['aro-hcp-dev-shard0-centralus-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-shard1-canadacentral-slot']['aro-hcp-dev-shard1-canadacentral-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(6):
+    CONFIG['aro-hcp-dev-shard1-centralus-slot']['aro-hcp-dev-shard1-centralus-slot-{i:0>2}'.format(i=i)] = 1
+# END ARO-HCP E2E SLOT RESOURCES
+for i in range(20):
+    CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
+
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
         'aws': {
+            'install': 50,
             'quota': CONFIG['aws-quota-slice'],
         },
         'aws-2': {
+            'install': 50,
             'quota': CONFIG['aws-2-quota-slice'],
         },
         'aws-3': {
+            'install': 50,
             'quota': CONFIG['aws-3-quota-slice'],
         },
         'aws-4': {
+            'install': 50,
             'quota': CONFIG['aws-4-quota-slice'],
-        },
-        'aws-5': {
-            'quota': CONFIG['aws-5-quota-slice'],
         },
     },
     'openshift-org-azure': {
         'azure-2': {
-            'install': 32,
+            'install': 50,
             'quota': CONFIG['azure-2-quota-slice'],
         },
         'azure4': {
-            'install': 32,
+            'install': 50,
             'quota': CONFIG['azure4-quota-slice'],
         },
-    }
+    },
+    'openshift-org-gcp': {
+        'gcp': {
+            'install': 50,
+            'quota': CONFIG['gcp-quota-slice'],
+        },
+        'gcp-arm64': {
+            'install': 20,
+            'quota': CONFIG['gcp-arm64-quota-slice'],
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': CONFIG['gcp-3-quota-slice'],
+        },
+    },
 }
 
-config = {
-    'resources': [],
-}
+CLUSTER_PROFILE_SETS_IGNORE = {
+    # Do not dump the following cps. Useful when a new profile is about to be introduced
+    # and it is not fully defined yet.
+    'profiles': [],
 
-for typeName, data in sorted(CONFIG.items()):
-    resource = {
-        'type': typeName,
-        'state': 'free',
-    }
-    if set(data.keys()) == {'default'}:
-        resource['min-count'] = resource['max-count'] = data['default']
-    else:
-        resource['names'] = []
-        for name, count in sorted(data.items()):
-            if '--' in name:
-                raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
-            if count > 1:
-                width = len(str(count-1))
-                resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
-            else:
-                resource['names'].append(name)
-    config['resources'].append(resource)
+    # Do not enforce any Cluster Profile Set usage policy on these tests. The schema of
+    # this stanza is defined as follow:
+    #
+    #  'tests_allowlist': {
+    #    '${ORGANIZATION_REGEXP}/${REPOSITORY_REGEXP}' : {
+    #      '${BRANCH_REGEXP}': {
+    #        '${VARIANT_REGEXP}': [
+    #           '${TEST_REGEXP}'
+    #         ]
+    #      }
+    #    }
+    #  }
+    'tests_allowlist': {
+        'openshift(-priv)?/openshift-tests-private': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        },
+        'openshift(-priv)?/installer': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        },
+        'openshift/release': {
+            '.+': {
+                '.*': [
+                    '.+-public-ipv4-pool.*'
+                ]
+            }
+        }
+    },
+}
 
 def cluster_profile_set_resources(clusterProfileSets):
     def profile_set_resource(profileSet, profileSetData):
@@ -819,9 +907,52 @@ def cluster_profile_set_resources(clusterProfileSets):
 
     return resources
 
-config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+def generate_config():
+    config = {
+        'resources': [],
+    }
 
-with open('_boskos.yaml', 'w') as f:
-    f.write('# generated with generate-boskos.py; do not edit directly\n')
-    yaml.dump(config, f, default_flow_style=False)
+    for typeName, data in sorted(CONFIG.items()):
+        resource = {
+            'type': typeName,
+            'state': 'free',
+        }
+        if set(data.keys()) == {'default'}:
+            resource['min-count'] = resource['max-count'] = data['default']
+        else:
+            resource['names'] = []
+            for name, count in sorted(data.items()):
+                if '--' in name:
+                    raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
+                if count > 1:
+                    width = len(str(count-1))
+                    resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
+                else:
+                    resource['names'].append(name)
+        config['resources'].append(resource)
 
+    config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+
+    with open('_boskos.yaml', 'w') as f:
+        f.write('# generated with generate-boskos.py; do not edit directly\n')
+        yaml.dump(config, f, default_flow_style=False)
+
+def print_cluster_profile_set_details():
+    ignored_cps = CLUSTER_PROFILE_SETS_IGNORE['profiles']
+    cps = {
+        'cluster_profile_sets': {},
+        'tests_allowlist': {},
+    }
+
+    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
+        if not cps_name in ignored_cps:
+            cps['cluster_profile_sets'][cps_name] = list(cps_data.keys())
+
+    cps['tests_allowlist'] = CLUSTER_PROFILE_SETS_IGNORE['tests_allowlist']
+
+    print(json.dumps(cps, indent=2))
+
+if args.print_cps:
+    print_cluster_profile_set_details()
+else:
+    generate_config()

@@ -1,7 +1,7 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39
+      FROM registry.access.redhat.com/ubi9/python-312:latest
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
@@ -10,8 +10,9 @@ build_root:
 
       USER 1001:1001
 images:
-- dockerfile_path: Containerfile
-  to: merge-bot
+  items:
+  - dockerfile_path: Containerfile
+    to: merge-bot
 resources:
   '*':
     limits:
@@ -38,6 +39,36 @@ tests:
         merge-bot --source https://github.com/kubernetes-sigs/cluster-api-provider-openstack:release-0.14 \
                   --dest openshift/cluster-api-provider-openstack:main \
                   --merge shiftstack/cluster-api-provider-openstack:merge-bot-main \
+                  --update-go-modules \
+                  --run-make \
+                  --bot-name shiftstack-merge-bot \
+                  --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-shiftstack
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-openstack-4-22
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-openstack-4-22
+      commands: |
+        merge-bot --source https://github.com/kubernetes-sigs/cluster-api-provider-openstack:release-0.14 \
+                  --dest openshift/cluster-api-provider-openstack:release-4.22 \
+                  --merge shiftstack/cluster-api-provider-openstack:merge-bot-release-4.22 \
                   --update-go-modules \
                   --run-make \
                   --bot-name shiftstack-merge-bot \
@@ -245,9 +276,38 @@ tests:
     test:
     - as: cloud-provider-openstack-main
       commands: |
-        merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:release-1.35 \
+        merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:release-1.36 \
                   --dest openshift/cloud-provider-openstack:main \
                   --merge shiftstack/cloud-provider-openstack:merge-bot-main \
+                  --update-go-modules \
+                  --bot-name shiftstack-merge-bot \
+                  --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-shiftstack
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cloud-provider-openstack-4-22
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-openstack-4-22
+      commands: |
+        merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:release-1.35 \
+                  --dest openshift/cloud-provider-openstack:release-4.22 \
+                  --merge shiftstack/cloud-provider-openstack:merge-bot-release-4.22 \
                   --update-go-modules \
                   --bot-name shiftstack-merge-bot \
                   --bot-email shiftstack-merge-bot@redhat.com \
@@ -478,7 +538,7 @@ tests:
     test:
     - as: openstack-resource-controller-main
       commands: |
-        merge-bot --source https://github.com/k-orc/openstack-resource-controller:release-1.0 \
+        merge-bot --source https://github.com/k-orc/openstack-resource-controller:release-2.0 \
                   --dest openshift/openstack-resource-controller:main \
                   --merge shiftstack/openstack-resource-controller:merge-bot-main \
                   --update-go-modules \

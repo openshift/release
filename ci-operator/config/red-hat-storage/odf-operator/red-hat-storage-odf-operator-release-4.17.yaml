@@ -9,11 +9,12 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- dockerfile_path: Dockerfile
-  from: golang-image
-  to: odf-operator
-- dockerfile_path: catalog.deps.Dockerfile
-  to: odf-operator-catalog-deps
+  items:
+  - dockerfile_path: Dockerfile
+    from: golang-image
+    to: odf-operator
+  - dockerfile_path: catalog.deps.Dockerfile
+    to: odf-operator-catalog-deps
 operator:
   bundles:
   - as: odf-operator-bundle
@@ -37,7 +38,9 @@ tests:
   steps:
     cluster_profile: odf-aws
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
+      USER_TAGS: |
+        createdBy gh-openshift-ci
     test:
     - as: unit-tests
       cli: latest

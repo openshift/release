@@ -48,40 +48,41 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/csi-operator
 images:
-- dockerfile_path: Dockerfile.aws-ebs
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.aws-efs
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  to: aws-efs-csi-operator-create-efs
-- dockerfile_path: Dockerfile.azure-disk
-  to: azure-disk-csi-driver-operator
-- dockerfile_path: Dockerfile.azure-file
-  to: azure-file-csi-driver-operator
-- dockerfile_path: Dockerfile.openstack-cinder
-  to: openstack-cinder-csi-driver-operator
-- dockerfile_path: Dockerfile.openstack-manila
-  to: csi-driver-manila-operator
-- dockerfile_path: Dockerfile.samba
-  to: smb-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: aws-ebs-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-disk-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: azure-file-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: openstack-cinder-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: smb-csi-driver-operator-test
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: manila-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.aws-ebs
+    to: aws-ebs-csi-driver-operator
+  - dockerfile_path: Dockerfile.aws-efs
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    to: aws-efs-csi-operator-create-efs
+  - dockerfile_path: Dockerfile.azure-disk
+    to: azure-disk-csi-driver-operator
+  - dockerfile_path: Dockerfile.azure-file
+    to: azure-file-csi-driver-operator
+  - dockerfile_path: Dockerfile.openstack-cinder
+    to: openstack-cinder-csi-driver-operator
+  - dockerfile_path: Dockerfile.openstack-manila
+    to: csi-driver-manila-operator
+  - dockerfile_path: Dockerfile.samba
+    to: smb-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: aws-ebs-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-disk-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: azure-file-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: openstack-cinder-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: smb-csi-driver-operator-test
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: manila-csi-driver-operator-test
 operator:
   bundles:
   - as: smb-csi-driver-operator-bundle
@@ -113,8 +114,11 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - name: 5.0-priv
+  - disabled: true
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -254,6 +258,27 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
+- always_run: false
+  as: e2e-azure-csi-hypershift
+  optional: true
+  run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: azure-qe
+    workflow: openshift-e2e-azure-csi-hypershift
+- always_run: false
+  as: e2e-azure-file-csi-hypershift
+  optional: true
+  run_if_changed: ^(Dockerfile\.azure-file|assets\/overlays\/azure-file\/.*|pkg\/driver\/azure-file\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: azure-qe
+    workflow: openshift-e2e-azure-csi-file-hypershift
+- always_run: false
+  as: e2e-azure-file-nfs-csi-hypershift
+  optional: true
+  run_if_changed: ^(Dockerfile\.azure-file|assets\/overlays\/azure-file\/.*|pkg\/driver\/azure-file\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: azure-qe
+    workflow: openshift-e2e-azure-csi-file-nfs-hypershift
 - as: e2e-azure-ovn-upgrade
   steps:
     cluster_profile: openshift-org-azure
@@ -283,6 +308,15 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-azure-csi-volumeattributesclass
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      TEST_ARGS: --run=VolumeAttributesClass
+      TEST_SUITE: all
+    workflow: openshift-e2e-azure-csi-ultrassd
 - as: e2e-azure-file-csi
   steps:
     cluster_profile: openshift-org-azure
@@ -305,7 +339,7 @@ tests:
   optional: true
   run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
@@ -313,7 +347,7 @@ tests:
 - as: e2e-openstack-cinder-csi
   run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
     env:
       TEST_SKIPS: should concurrently access the volume and restored snapshot from
         pods on the same node
@@ -332,13 +366,13 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
       TEST_SUITE: openshift/csi
     leases:
     - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
+      resource_type: openstack-vexxhost-quota-slice
     workflow: hypershift-openstack-aws-conformance
 - as: hypershift-e2e-openstack-aws-csi-manila
   run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
@@ -431,6 +465,18 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: eastus
     workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aws-eusc-techpreview-csi
+  optional: true
+  steps:
+    cluster_profile: aws-eusc
+    env:
+      BASE_DOMAIN: ci-eusc.devcluster.openshift.com
+      COMPUTE_AMI: ami-0b78302f83217d149
+      CONTROL_PLANE_AMI: ami-0b78302f83217d149
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+    workflow: openshift-e2e-aws-csi
 zz_generated_metadata:
   branch: release-5.0
   org: openshift-priv

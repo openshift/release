@@ -8,14 +8,15 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/build-root/Dockerfile
 images:
-- context_dir: openshift-ci/build-root/source-image
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: oc-bin-image
+  items:
+  - context_dir: openshift-ci/build-root/source-image
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: oc-bin-image
 releases:
   latest:
     candidate:
@@ -30,6 +31,16 @@ resources:
 tests:
 - as: odo-scenario-aws
   cron: 0 0 11 6 *
+  reporter_config:
+    channel: '#odo-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -53,6 +64,16 @@ tests:
     workflow: firewatch-ipi-aws
 - as: odo-scenario-aws-fips
   cron: 0 0 11 6 *
+  reporter_config:
+    channel: '#odo-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:

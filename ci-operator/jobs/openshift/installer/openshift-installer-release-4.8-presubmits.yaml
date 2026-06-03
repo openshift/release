@@ -5,11 +5,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -88,11 +94,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -171,11 +183,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -254,11 +272,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -337,11 +361,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -420,11 +450,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -502,11 +538,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -585,98 +627,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build06
-    context: ci/prow/e2e-aws-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.8-e2e-aws-upi
-    optional: true
-    rerun_command: /test e2e-aws-upi
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-aws-upi
-        - --template=/usr/local/e2e-aws-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -755,11 +716,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -838,11 +805,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure-resourcegroup
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -920,11 +893,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -1003,100 +982,20 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
-    context: ci/prow/e2e-azure-upi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.8-e2e-azure-upi
-    rerun_command: /test e2e-azure-upi
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-azure-upi
-        - --template=/usr/local/e2e-azure-upi
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-azure-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-azure-upi|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.8$
-    - ^release-4\.8-
     cluster: build08
     context: ci/prow/e2e-crc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-crc
@@ -1176,10 +1075,16 @@ presubmits:
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-gcp
@@ -1259,10 +1164,16 @@ presubmits:
     context: ci/prow/e2e-gcp-byo-vpc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-gcp-byo-vpc
@@ -1342,10 +1253,16 @@ presubmits:
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-gcp-upgrade
@@ -1425,10 +1342,16 @@ presubmits:
     context: ci/prow/e2e-gcp-upi
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-gcp-upi
@@ -1508,10 +1431,16 @@ presubmits:
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-gcp-upi-xpn
@@ -1591,10 +1520,16 @@ presubmits:
     context: ci/prow/e2e-libvirt
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-libvirt
@@ -1670,11 +1605,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build12
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: packet-edge
@@ -1753,11 +1694,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build12
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1836,11 +1783,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build12
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1919,11 +1872,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build12
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2003,11 +1962,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build10
+    cluster: build12
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2086,11 +2051,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
@@ -2169,11 +2140,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: ovirt
       ci-operator.openshift.io/cloud-cluster-profile: ovirt
@@ -2256,7 +2233,13 @@ presubmits:
     context: ci/prow/e2e-vsphere
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -2340,7 +2323,13 @@ presubmits:
     context: ci/prow/e2e-vsphere-upi
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -2418,11 +2407,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2482,11 +2477,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/golint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2546,11 +2547,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/govet
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2610,11 +2617,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2667,7 +2680,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -2696,7 +2709,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -2726,7 +2739,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -2755,11 +2768,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2819,11 +2838,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2882,11 +2907,17 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/baremetal/Dockerfile.ci
+      - images/installer-artifacts/Dockerfile.rhel
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2946,7 +2977,7 @@ presubmits:
     branches:
     - ^release-4\.8$
     - ^release-4\.8-
-    cluster: build01
+    cluster: build06
     context: ci/prow/yaml-lint
     decorate: true
     labels:

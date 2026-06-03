@@ -1,12 +1,21 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build13
   cron: 20 7 * * *
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.image-service
+    - Dockerfile.image-service-build
   extra_refs:
   - base_ref: release-ocm-2.15
     org: openshift
     repo: assisted-image-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.image-service
+    - Dockerfile.image-service-build
   labels:
     ci.openshift.io/generator: prowgen
     job-release: "4.20"
@@ -17,6 +26,7 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mirror-nightly-image
@@ -37,6 +47,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -54,6 +67,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials

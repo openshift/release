@@ -21,12 +21,13 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.23
 images:
-- dockerfile_path: Dockerfile
-  to: image-based-install-operator
-- dockerfile_literal: |
-    FROM placeholder
-  from: src
-  to: image-based-install-operator-code
+  items:
+  - dockerfile_path: Dockerfile
+    to: image-based-install-operator
+  - dockerfile_literal: |
+      FROM placeholder
+    from: src
+    to: image-based-install-operator-code
 promotion:
   to:
   - name: "2.12"
@@ -140,6 +141,16 @@ tests:
   capabilities:
   - intranet
   cron: 30 20 * * 0-5
+  reporter_config:
+    channel: '#image-based-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -242,6 +253,16 @@ tests:
   capabilities:
   - intranet
   cron: 15 21 * * 0-5
+  reporter_config:
+    channel: '#image-based-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: packet-assisted
     dependencies:

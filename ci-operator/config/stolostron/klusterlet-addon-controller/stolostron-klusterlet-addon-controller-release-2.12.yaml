@@ -10,9 +10,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: klusterlet-addon-controller
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: klusterlet-addon-controller
 promotion:
   to:
   - name: "2.12"
@@ -45,14 +46,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
-    env:
-      IMAGE_REPO: klusterlet-addon-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:

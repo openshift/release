@@ -6,17 +6,19 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-group-upgrades-operator
-- dockerfile_path: Dockerfile.precache
-  from: base
-  to: cluster-group-upgrades-operator-precache
-- dockerfile_path: Dockerfile.recovery
-  from: base
-  to: cluster-group-upgrades-operator-recovery
-- dockerfile_path: bundle.Dockerfile
-  to: cluster-group-upgrades-operator-bundle
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-group-upgrades-operator
+  - dockerfile_path: Dockerfile.precache
+    from: base
+    to: cluster-group-upgrades-operator-precache
+  - dockerfile_path: Dockerfile.recovery
+    from: base
+    to: cluster-group-upgrades-operator-recovery
+  - dockerfile_path: bundle.Dockerfile
+    to: cluster-group-upgrades-operator-bundle
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -56,9 +58,9 @@ tests:
     make ci-job
   container:
     from: src
-  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - as: integration
-  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -69,7 +71,7 @@ tests:
       OO_TARGET_NAMESPACES: '!all'
       USER_TAGS: |
         ci-job-source prowci
-        ci-job-branch main
+        ci-job-branch release-4.20
         ci-job-fullname openshift-kni-cluster-group-upgrades-operator-main
         ci-job-type optional-operators-ci-aws
         ci-repo-name cluster-group-upgrades-operator
@@ -104,19 +106,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: tekton-linting
-  commands: |
-    unset VERSION
-    export XDG_CACHE_HOME=/tmp/.cache
-    export XDG_CONFIG_HOME=/tmp/.config
-    export XDG_DATA_HOME=/tmp/.local/share
-    make yamllint
-  container:
-    from: src
-  optional: true
-  run_if_changed: ^(?:.*/)?(?:\.tekton/.*|\.konflux/.*)$
 - as: security
   optional: true
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     env:
       PROJECT_NAME: cluster-group-upgrades-operator

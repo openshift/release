@@ -1,14 +1,17 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 0 0 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
   extra_refs:
   - base_ref: main
     org: redhat-appstudio
     repo: infra-deployments
+    sparse_checkout_files:
+    - components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -29,6 +32,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=appstudio-e2e-tests-periodic
@@ -49,6 +53,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -69,6 +76,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -85,15 +98,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 0 1 * * *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
   extra_refs:
   - base_ref: main
     org: redhat-appstudio
     repo: infra-deployments
+    sparse_checkout_files:
+    - components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -114,6 +130,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=konflux-openshift-upgrade-periodic
@@ -134,6 +151,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
@@ -154,6 +174,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
@@ -170,7 +196,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
+  cluster: build10
   cron: 0 2 * * *
   decorate: true
   decoration_config:
@@ -182,10 +208,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-konflux-qe
-    ci-operator.openshift.io/variant: ocp418
+    ci-operator.openshift.io/variant: ocp419
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-appstudio-infra-deployments-main-ocp418-konflux-e2e-v418
+  name: periodic-ci-redhat-appstudio-infra-deployments-main-ocp419-konflux-e2e-v419
   spec:
     containers:
     - args:
@@ -194,8 +220,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=konflux-e2e-v418
-      - --variant=ocp418
+      - --target=konflux-e2e-v419
+      - --variant=ocp419
       command:
       - ci-operator
       env:

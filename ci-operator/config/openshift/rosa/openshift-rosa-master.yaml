@@ -7,7 +7,10 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.22
+prowgen:
+  expose: true
+  private: true
 resources:
   '*':
     requests:
@@ -21,22 +24,26 @@ tests:
     make lint
   container:
     from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: build
   commands: |
     unset GOFLAGS
     make
   container:
     from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: test
   commands: |
     make test verify
   container:
     from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: commits
   commands: |
     make commits/check
   container:
     from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -46,6 +53,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: rosa-codecov-token
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)

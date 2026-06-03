@@ -35,12 +35,17 @@ metadata:
     keel.sh/pollSchedule: "@every 5m"
   namespace: ci
 spec:
-  replicas: 3
+  replicas: 2
   revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: prow
       component: pj-rehearse-plugin
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -65,8 +70,15 @@ spec:
         - --hmac-secret-file=/etc/webhook/hmac.yaml
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --config-path=/etc/config/config.yaml
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-merge-bot
+              key: appid
         ports:
           - name: http
             containerPort: 8888
@@ -84,15 +96,18 @@ spec:
         - name: hmac
           mountPath: /etc/webhook
           readOnly: true
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
         - name: cache
           mountPath: /var/tmp
         resources:
           requests:
-            memory: "20Gi"
-            cpu: "4"
+            memory: "32Gi"
+            cpu: "6"
+          limits:
+            memory: "64Gi"
+            cpu: "6"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -116,8 +131,25 @@ spec:
       - name: hmac
         secret:
           secretName: github-webhook-credentials
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-merge-bot
       - name: cache
         emptyDir: {}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "node.kubernetes.io/instance-type"
+                operator: In
+                values:
+                - r5.4xlarge
+                - m5.4xlarge
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: prow
+                component: pj-rehearse-plugin
+            topologyKey: kubernetes.io/hostname

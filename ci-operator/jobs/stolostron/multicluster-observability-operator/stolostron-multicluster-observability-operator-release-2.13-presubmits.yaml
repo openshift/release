@@ -5,11 +5,17 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build08
+    cluster: build06
     context: ci/prow/e2e-kind
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - collectors/metrics/Dockerfile
+      - loaders/dashboards/Dockerfile
+      - operators/endpointmetrics/Dockerfile
+      - operators/multiclusterobservability/Dockerfile
+      - proxy/Dockerfile
+      - tests/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -20,6 +26,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-kind
@@ -40,6 +47,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -57,6 +67,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -75,11 +91,17 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build08
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - collectors/metrics/Dockerfile
+      - loaders/dashboards/Dockerfile
+      - operators/endpointmetrics/Dockerfile
+      - operators/multiclusterobservability/Dockerfile
+      - proxy/Dockerfile
+      - tests/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -130,11 +152,12 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build08
+    cluster: build06
     context: ci/prow/opp-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.interop
     labels:
       ci-operator.openshift.io/variant: opp
       ci.openshift.io/generator: prowgen
@@ -187,11 +210,17 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build08
+    cluster: build06
     context: ci/prow/test-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - collectors/metrics/Dockerfile
+      - loaders/dashboards/Dockerfile
+      - operators/endpointmetrics/Dockerfile
+      - operators/multiclusterobservability/Dockerfile
+      - proxy/Dockerfile
+      - tests/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -203,6 +232,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-e2e
@@ -223,6 +253,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -240,6 +273,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -258,11 +297,17 @@ presubmits:
     branches:
     - ^release-2\.13$
     - ^release-2\.13-
-    cluster: build08
+    cluster: build06
     context: ci/prow/test-unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - collectors/metrics/Dockerfile
+      - loaders/dashboards/Dockerfile
+      - operators/endpointmetrics/Dockerfile
+      - operators/multiclusterobservability/Dockerfile
+      - proxy/Dockerfile
+      - tests/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

@@ -18,44 +18,45 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.16-openshift-4.8
 images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/metrics-exporter
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
-  to: ocs-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry
-  to: ocs-registry
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: _output/bin
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
-      - destination_dir: _output/bin
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/metrics-exporter
-      - destination_dir: _output
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
-      - destination_dir: .
-        source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
-  to: ocs-operator-quay
-- dockerfile_path: openshift-ci/Dockerfile.registry
-  from: operator-registry
-  to: ocs-registry-quay
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: ocs-must-gather
+  items:
+  - dockerfile_path: openshift-ci/Dockerfile.deploy
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/metrics-exporter
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
+    to: ocs-operator
+  - dockerfile_path: openshift-ci/Dockerfile.registry.build
+    from: operator-registry
+    to: ocs-registry
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: _output/bin
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/ocs-operator
+        - destination_dir: _output/bin
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/build/_output/bin/metrics-exporter
+        - destination_dir: _output
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
+        - destination_dir: .
+          source_path: /go/src/github.com/red-hat-storage/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
+    to: ocs-operator-quay
+  - dockerfile_path: openshift-ci/Dockerfile.registry
+    from: operator-registry
+    to: ocs-registry-quay
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: ocs-must-gather
 operator:
   bundles:
   - as: dev-master-dependencies
@@ -106,11 +107,13 @@ tests:
     dependencies:
       OO_INDEX: ci-index-fixed-dependencies
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
       OO_PACKAGE: ocs-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        createdBy gh-openshift-ci
     post:
     - as: ocs-must-gather
       cli: latest
@@ -140,11 +143,13 @@ tests:
     dependencies:
       OO_INDEX: ci-index-dev-master-dependencies
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
       OO_PACKAGE: ocs-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        createdBy gh-openshift-ci
     post:
     - as: ocs-must-gather
       cli: latest
@@ -171,7 +176,9 @@ tests:
   steps:
     cluster_profile: odf-aws
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
+      USER_TAGS: |
+        createdBy gh-openshift-ci
     test:
     - as: test
       cli: latest

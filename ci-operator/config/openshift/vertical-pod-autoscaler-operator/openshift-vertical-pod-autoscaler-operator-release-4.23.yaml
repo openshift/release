@@ -19,18 +19,19 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- build_args:
-  - name: TARGETOS
-    value: linux
-  - name: TARGETARCH
-    value: amd64
-  dockerfile_path: Dockerfile
-  to: vertical-pod-autoscaler-operator
-- dockerfile_literal: |
-    FROM ubi-python-311
-    RUN pip3 install yamllint
-  from: ubi-python-311
-  to: vpa-yamllint
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    dockerfile_path: Dockerfile
+    to: vertical-pod-autoscaler-operator
+  - dockerfile_literal: |
+      FROM ubi-python-311
+      RUN pip3 install yamllint
+    from: ubi-python-311
+    to: vpa-yamllint
 operator:
   bundles:
   - as: vertical-pod-autoscaler-operator-bundle
@@ -118,6 +119,13 @@ tests:
         name: vertical-pod-autoscaler-operator
       - env: OPERAND_IMG
         name: vertical-pod-autoscaler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: operator
+      cli: latest
+      commands: SUITE=operator KUBECTL=$(which oc) make test-e2e
       from: src
       resources:
         requests:

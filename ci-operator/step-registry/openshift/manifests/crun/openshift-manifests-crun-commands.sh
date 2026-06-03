@@ -9,6 +9,11 @@ cat > "/tmp/50-crun" << EOF
 default_runtime = "crun"
 [crio.runtime.runtimes.crun]
 runtime_root = "/run/crun"
+allowed_annotations = [
+	"io.containers.trace-syscall",
+	"io.kubernetes.cri-o.Devices",
+	"io.kubernetes.cri-o.LinkLogs",
+]
 EOF
 
 cat > "${SHARED_DIR}/manifest_mc-master-crun.yml" << EOF

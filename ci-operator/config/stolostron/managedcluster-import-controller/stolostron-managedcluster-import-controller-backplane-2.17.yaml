@@ -10,9 +10,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: managedcluster-import-controller
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: managedcluster-import-controller
 promotion:
   to:
   - name: "2.17"
@@ -80,14 +81,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: managedcluster-import-controller
-    env:
-      IMAGE_REPO: managedcluster-import-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:

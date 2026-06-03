@@ -13,6 +13,12 @@ rules:
   - watch
   - update
 - apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
   - prow.k8s.io
   resources:
   - prowjobs
@@ -109,6 +115,16 @@ spec:
       tolerations:
       - key: manual-provision
         operator: Exists
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
         command:
@@ -195,8 +211,10 @@ spec:
           mountPath: /etc/secret-mirroring
           readOnly: true
         resources:
+          limits:
+            memory: "48Gi"
           requests:
-            memory: "15Gi"
+            memory: "24Gi"
             cpu: "1"
       serviceAccountName: dptp-controller-manager
       volumes:

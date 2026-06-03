@@ -6,6 +6,13 @@
 # The script exit 0 if fail to mirror images. this allows the other test can be executed continuously
 # The script exit 0 if fail to create catalogsource. this allows  the other test can be executed continuously
 set -u
+
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # use it as a bool
 marketplace=0
 mirror=0
@@ -146,10 +153,8 @@ function disable_default_catalogsource () {
         echo "!!! fail to disable default Catalog Source"
         return 1
     fi
-    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
-    major_version=$(echo ${ocp_version} | cut -d '.' -f1)
-    minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
-    if [[ "X${major_version}" == "X4" && -n "${minor_version}" && "${minor_version}" -gt 17 ]]; then
+    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version | cut -d '.' -f1,2)
+    if version_gt "${ocp_version}" "4.17"; then
         echo "disable olmv1 default clustercatalog"
         run_command "oc patch clustercatalog openshift-certified-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
         run_command "oc patch clustercatalog openshift-redhat-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"

@@ -4,10 +4,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
@@ -64,10 +84,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -77,6 +117,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-base-c9s-python-3-11-image-mirror
@@ -97,6 +138,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -114,6 +158,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -130,10 +180,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -143,6 +213,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-base-ubi9-python-3-11-image-mirror
@@ -163,6 +234,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -180,6 +254,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -196,10 +276,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -225,6 +325,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-codeserver-ubi9-python-3-11-image-mirror
@@ -245,6 +346,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -262,6 +366,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -278,10 +388,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -291,6 +421,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-c9s-python-3-11-image-mirror
@@ -311,6 +442,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -328,6 +462,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -344,10 +484,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -373,6 +533,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-ds-ubi9-python-3-11-image-mirror
@@ -393,6 +554,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -410,6 +574,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -426,10 +596,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -455,6 +645,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-minimal-ubi9-python-3-11-image-mirror
@@ -475,6 +666,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -492,6 +686,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -508,10 +708,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -537,6 +757,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
@@ -557,6 +778,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -574,6 +798,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -590,10 +820,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -619,6 +869,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-rstudio-c9s-python-3-11-image-mirror
@@ -639,6 +890,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -656,6 +910,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -672,10 +932,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -685,6 +965,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-ubi9-python-3-11-image-mirror
@@ -705,6 +986,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -722,6 +1006,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -738,10 +1028,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -767,6 +1077,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-datascience-ubi9-python-3-11-image-mirror
@@ -787,6 +1098,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -804,6 +1118,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -820,10 +1140,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -849,6 +1189,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
@@ -869,6 +1210,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -886,6 +1230,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -902,10 +1252,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -931,6 +1301,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
@@ -951,6 +1322,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -968,6 +1342,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -984,10 +1364,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1013,6 +1413,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
@@ -1033,6 +1434,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1050,6 +1454,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1066,10 +1476,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1095,6 +1525,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
@@ -1115,6 +1546,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1132,6 +1566,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1148,10 +1588,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1177,6 +1637,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
@@ -1197,6 +1658,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1214,6 +1678,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1230,10 +1700,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1259,6 +1749,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
@@ -1279,6 +1770,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1296,6 +1790,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1312,10 +1812,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1325,6 +1845,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rocm-ubi9-python-3-11-image-mirror
@@ -1345,6 +1866,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1362,6 +1886,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1378,10 +1908,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1407,6 +1957,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rstudio-c9s-python-3-11-image-mirror
@@ -1427,6 +1978,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1444,6 +1998,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1460,10 +2020,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1489,6 +2069,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
@@ -1509,6 +2090,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1526,6 +2110,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1542,10 +2132,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1571,6 +2181,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-datascience-ubi9-python-3-11-image-mirror
@@ -1591,6 +2202,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1608,6 +2222,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1624,10 +2244,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1653,6 +2293,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-minimal-ubi9-python-3-11-image-mirror
@@ -1673,6 +2314,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1690,6 +2334,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1706,10 +2356,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1735,6 +2405,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-pytorch-ubi9-python-3-11-image-mirror
@@ -1755,6 +2426,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1772,6 +2446,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1788,10 +2468,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1817,6 +2517,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
@@ -1837,6 +2538,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1854,6 +2558,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -1870,10 +2580,30 @@ postsubmits:
     always_run: true
     branches:
     - ^2024b$
-    cluster: build03
+    cluster: build07
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1899,6 +2629,7 @@ postsubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
@@ -1919,6 +2650,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -1936,6 +2670,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials

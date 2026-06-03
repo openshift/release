@@ -12,9 +12,10 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/must-gather-operator
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base-rhel9
-  to: must-gather-operator
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base-rhel9
+    to: must-gather-operator
 operator:
   bundles:
   - as: must-gather-operator-bundle
@@ -30,6 +31,8 @@ promotion:
   to:
   - name: 4.21-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -83,7 +86,7 @@ tests:
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_BUNDLE: must-gather-operator-bundle
     env:
@@ -94,6 +97,9 @@ tests:
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
       from: src
       resources:
         requests:

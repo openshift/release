@@ -7,21 +7,24 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/monitoring-plugin
 images:
-- dockerfile_path: Dockerfile
-  to: monitoring-plugin
-- dockerfile_path: Dockerfile.test
-  to: monitoring-plugin-test
-- dockerfile_path: Dockerfile.mcp
-  to: monitoring-console-plugin
-- context_dir: .
-  dockerfile_path: web/cypress/Dockerfile
-  to: monitoring-ui-tests-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: monitoring-plugin
+  - dockerfile_path: Dockerfile.test
+    to: monitoring-plugin-test
+  - dockerfile_path: Dockerfile.mcp
+    to: monitoring-console-plugin
+  - context_dir: .
+    dockerfile_path: web/cypress/Dockerfile
+    to: monitoring-ui-tests-runner
 promotion:
   to:
   - excluded_images:
     - monitoring-plugin-test
     name: 4.21-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -84,6 +87,16 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
@@ -100,6 +113,16 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-coo-ui
@@ -116,6 +139,16 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-incidents-ui
@@ -212,6 +245,16 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-virtualization-ui
@@ -219,6 +262,16 @@ tests:
 - always_run: false
   as: e2e-monitoring-dev
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     test:

@@ -9,9 +9,10 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
 images:
-- context_dir: .
-  dockerfile_path: Dockerfile
-  to: openshift-pipelines-runner
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile
+    to: openshift-pipelines-runner
 releases:
   latest:
     candidate:
@@ -27,11 +28,22 @@ resources:
       memory: 200Mi
 tests:
 - as: cr-openshift-pipelines-aws
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#tektoncd-pipeline-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--OpenshiftPipelines
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -47,7 +59,6 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MAP_TESTS: "true"
       OCP_VERSION: "4.22"
-      REPORTPORTAL_CMP: lp-interop-OpenshiftPipelines
       USER_TAGS: |
         scenario pipelines
     test:
@@ -57,10 +68,21 @@ tests:
   timeout: 3h0m0s
 - as: openshift-pipelines-aws-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#tektoncd-pipeline-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      DR__RP__CR_COMP_NAME: lp-ocp-compat--OpenshiftPipelines
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -76,7 +98,6 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MAP_TESTS: "true"
       OCP_VERSION: "4.22"
-      REPORTPORTAL_CMP: lp-interop-OpenshiftPipelines
       USER_TAGS: |
         scenario pipelines
     test:

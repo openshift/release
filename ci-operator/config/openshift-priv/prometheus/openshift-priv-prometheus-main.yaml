@@ -2,21 +2,24 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/prometheus
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: prometheus
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: prometheus
 promotion:
   to:
-  - name: 4.22-priv
+  - name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':
@@ -25,7 +28,14 @@ resources:
       memory: 200Mi
 tests:
 - as: vendor
-  commands: go mod vendor && make unused && git diff --exit-code
+  commands: |
+    VENDOR_MODE="mod"
+    if [[ -f "go.work" ]]; then
+      echo "Detected go workspace; using \"go work vendor\"."
+      VENDOR_MODE="work"
+    fi
+    echo "Running: go ${VENDOR_MODE} vendor"
+    go "${VENDOR_MODE}" vendor && make unused && git diff --exit-code
   container:
     from: src
 - as: common-test
@@ -77,7 +87,6 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: ginkgo-tests-cmo
-  optional: true
   steps:
     cluster_profile: openshift-org-azure
     test:

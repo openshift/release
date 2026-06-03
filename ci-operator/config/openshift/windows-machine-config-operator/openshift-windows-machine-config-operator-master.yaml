@@ -4,20 +4,26 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: windows-machine-config-operator-test
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 binary_build_commands: make build
 build_root:
   from_repository: true
   use_build_cache: true
 images:
-- dockerfile_path: build/Dockerfile.ci
-  to: windows-machine-config-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.ci
+    to: windows-machine-config-operator-test
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -31,13 +37,17 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
 releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -77,7 +87,7 @@ tests:
     workflow: openshift-ci-security
 - always_run: false
   as: aws-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -89,6 +99,13 @@ tests:
 - always_run: false
   as: aws-e2e-operator-windows-server-2025
   cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -100,6 +117,13 @@ tests:
     workflow: ipi-aws-ovn-hybrid
 - as: aws-e2e-olmv1-install
   cron: 0 9 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
@@ -118,7 +142,7 @@ tests:
     - ref: windows-conf-operator-olmv1
 - always_run: false
   as: vsphere-disconnected-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-dis-2
     env:
@@ -133,19 +157,7 @@ tests:
     workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
-  steps:
-    cluster_profile: openshift-org-azure
-    env:
-      COMPUTE_NODE_REPLICAS: "1"
-      CONTROL_PLANE_REPLICAS: "1"
-      WINDOWS_SERVER_VERSION: "2019"
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: ipi-azure-ovn-hybrid
-- always_run: false
-  as: azure-e2e-operator-2025
-  cron: 0 2 * * 1
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -157,9 +169,9 @@ tests:
     workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: gcp-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -170,8 +182,15 @@ tests:
 - always_run: false
   as: gcp-e2e-operator-2025
   cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -182,7 +201,7 @@ tests:
     workflow: ipi-gcp-ovn-hybrid
 - always_run: false
   as: vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -190,6 +209,13 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-operator-fips
   cron: 0 9 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -198,8 +224,32 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: vsphere-e2e-operator-2025
+  cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-ccm-install
   cron: 38 14 * * 2
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -207,7 +257,7 @@ tests:
     workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -292,7 +342,7 @@ tests:
     workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: platform-none-vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -300,7 +350,7 @@ tests:
     workflow: windows-e2e-operator-test-platform-none-vsphere
 - always_run: false
   as: vsphere-proxy-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -308,7 +358,7 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-elastic
     post:
@@ -327,18 +377,32 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.21
-      SOURCE_BRANCH: release-4.21
+      DESTINATION_BRANCH: community-5.0
+      SOURCE_BRANCH: release-5.0
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator
   cluster: build01
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: nutanix
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_REPLICAS: "1"
+      SCAN_NAMESPACE: openshift-windows-machine-config-operator
+    test:
+    - ref: openshift-windows-install-wmco
+    - ref: tls-scanner-run
+    workflow: ipi-aws-ovn-hybrid
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -4,9 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+
+if test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found, so infra-manager is preferred."
+  exit 0
+
+fi
 
 export HOME=/tmp
 
@@ -15,7 +29,7 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
-# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
 # release:initial image, once that, use 'oc get istag release:inital' to workaround it.
 echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
 if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
@@ -25,8 +39,8 @@ elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
   tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
   echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
 fi
-# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
-# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
 # higher priority than RELEASE_IMAGE_LATEST
 TESTING_RELEASE_IMAGE=""
 if [[ -n ${tmp_release_image_initial:-} ]]; then
@@ -36,39 +50,17 @@ else
 fi
 echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
-# check if OCP version will be equal to or greater than the minimum version
-# $1 - the minimum version to be compared with
-# return 0 if OCP version >= the minimum version, otherwise 1
-function version_check() {
-  local -r minimum_version="$1"
-  local ret
+dir=$(mktemp -d)
+pushd "${dir}"
 
-  dir=$(mktemp -d)
-  pushd "${dir}"
+cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+KUBECONFIG="" oc registry login --to pull-secret
+ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+rm pull-secret
 
-  cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
-  KUBECONFIG="" oc registry login --to pull-secret
-  ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-  rm pull-secret
+echo "[DEBUG] current OCP version: '${ocp_version}'"
 
-  echo "[DEBUG] minimum OCP version: '${minimum_version}'"
-  echo "[DEBUG] current OCP version: '${ocp_version}'"
-  curr_x=$(echo "${ocp_version}" | cut -d. -f1)
-  curr_y=$(echo "${ocp_version}" | cut -d. -f2)
-  min_x=$(echo "${minimum_version}" | cut -d. -f1)
-  min_y=$(echo "${minimum_version}" | cut -d. -f2)
-
-  if [ ${curr_x} -gt ${min_x} ] || ( [ ${curr_x} -eq ${min_x} ] && [ ${curr_y} -ge ${min_y} ] ); then
-    echo "[DEBUG] version_check result: ${ocp_version} >= ${minimum_version}"
-    ret=0
-  else
-    echo "[DEBUG] version_check result: ${ocp_version} < ${minimum_version}"
-    ret=1
-  fi
-
-  popd
-  return ${ret}
-}
+popd
 
 function short_wait()
 {
@@ -141,15 +133,16 @@ EOF
 }
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
-if version_check "4.11"; then
-  GCLOUD_SDK_VERSION="447"
+if version_ge "${ocp_version}" "4.11"; then
+  GCLOUD_SDK_VERSION="563"
 else
   GCLOUD_SDK_VERSION="256"
 fi
-if ! gcloud --version; then
+gcloud version
+if ! gcloud version | grep -q "Google Cloud SDK ${GCLOUD_SDK_VERSION}"; then
   GCLOUD_TAR="google-cloud-sdk-${GCLOUD_SDK_VERSION}.0.0-linux-x86_64.tar.gz"
   GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
-  echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
+  echo "$(date -u --rfc-3339=seconds) - gcloud expected version not installed: installing from $GCLOUD_URL"
   pushd ${HOME}
   curl -O "$GCLOUD_URL"
   tar -xzf "$GCLOUD_TAR"
@@ -157,6 +150,8 @@ if ! gcloud --version; then
   popd
 fi
 gcloud version
+echo "$(date -u --rfc-3339=seconds) - Unset env var 'CLOUDSDK_PYTHON', use gcloud bundled-python3-unix instead"
+unset CLOUDSDK_PYTHON
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
   echo "Activating XPN service-account..."
@@ -179,8 +174,6 @@ cp -t "${dir}" \
 cp -t "${dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
-cp -t "${dir}" \
-    "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"/*
 tar -xzf "${SHARED_DIR}/.openshift_install_state.json.tgz"
 
 function backoff() {

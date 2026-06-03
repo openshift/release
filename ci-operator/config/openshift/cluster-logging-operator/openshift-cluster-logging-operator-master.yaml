@@ -1,8 +1,4 @@
 base_images:
-  go_builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -14,7 +10,7 @@ base_images:
   logging-vector:
     name: vector
     namespace: logging
-    tag: v0.47.0
+    tag: v0.54.0
   loki-operator:
     name: 5.y
     namespace: logging
@@ -31,40 +27,31 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
-- from: ubi9-minimal
-  inputs:
-    go_builder:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
-  to: cluster-logging-operator
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: ubi9-minimal
-  to: cluster-logging-operator-registry
-- dockerfile_literal: |
-    FROM loki-operator-src AS lo-src
-    FROM registry.redhat.io/ubi9/go-toolset:latest
-    ADD . /go/src/github.com/openshift/cluster-logging-operator
-    COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
-    WORKDIR /go/src/github.com/openshift/cluster-logging-operator
-    USER 0
-    RUN dnf install gettext -y
-    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-      && chmod 755 kubectl && mv kubectl /go/bin
-    RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
-    RUN go mod download
-    RUN make tools
-    RUN chmod -R 777 /go
-    RUN make bin/functional-benchmarker
-  inputs:
-    go_builder:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
-    loki-operator-src:
-      as:
-      - loki-operator-src
-  to: cluster-logging-operator-e2e
+  items:
+  - from: ubi9-minimal
+    to: cluster-logging-operator
+  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+    from: ubi9-minimal
+    to: cluster-logging-operator-registry
+  - dockerfile_literal: |
+      FROM src
+      COPY --from=loki-operator-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
+      RUN dnf install gettext -y
+      RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+        && chmod 755 kubectl && mv kubectl /go/bin
+      RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
+      RUN go mod download
+      RUN make tools
+      RUN chmod -R 777 /go
+      RUN make bin/functional-benchmarker
+    from: src
+    inputs:
+      loki-operator-src:
+        as:
+        - loki-operator-src
+    to: cluster-logging-operator-e2e
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
@@ -122,7 +109,7 @@ tests:
       cli: latest
       commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
         LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e
+        make test-e2e IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry

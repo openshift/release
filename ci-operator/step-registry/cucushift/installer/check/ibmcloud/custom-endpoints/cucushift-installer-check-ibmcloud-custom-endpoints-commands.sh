@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 DEFAULT_PRIVATE_ENDPOINTS="${SHARED_DIR}/eps_default.json"
 
 function get_service_endpoint() {
@@ -15,18 +21,6 @@ function get_service_endpoint() {
     echo "${service_endpoint}"
 }
 
-function isPreVersion() {
-  local required_ocp_version="$1"
-  local isPre
-  version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-  echo "get ocp version: ${version}"
-
-  isPre=0
-  if [ -n "${version}" ] && [ "$(printf '%s\n' "${required_ocp_version}" "${version}" | sort --version-sort | head -n1)" = "${required_ocp_version}" ]; then
-    isPre=1
-  fi
-  return $isPre
-}
 
 function check_ep_names() {
     local isPreVer="$1"
@@ -87,8 +81,12 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+echo "get ocp version: ${version}"
 isPreVer="True"
-isPreVersion "4.17" || isPreVer="False"
+if ! version_lt "${version}" "4.17"; then
+    isPreVer="False"
+fi
 echo "is Pre 4.17 version: ${isPreVer}"
 
 ret=0

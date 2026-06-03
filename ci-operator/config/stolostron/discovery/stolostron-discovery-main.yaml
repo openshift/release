@@ -14,16 +14,17 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  to: discovery-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  to: discovery-operator-tests
-- dockerfile_path: build/Dockerfile.testserver.prow
-  to: discovery-testserver
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: discovery-operator
+  - dockerfile_path: build/Dockerfile.test.prow
+    to: discovery-operator-tests
+  - dockerfile_path: build/Dockerfile.testserver.prow
+    to: discovery-testserver
 promotion:
   to:
-  - name: "2.17"
+  - name: "5.0"
     namespace: stolostron
 resources:
   '*':
@@ -76,11 +77,11 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: backplane-fast-forward
+- as: backplane-fast-forward-5-0
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.17
+      DESTINATION_BRANCH: backplane-5.0
     workflow: ocm-ci-fastforward
 - as: latest-image-mirror
   postsubmit: true

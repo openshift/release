@@ -51,6 +51,9 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -357,6 +360,16 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f60-longduration-part3-3
   cron: 14 4 16 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-hive-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
@@ -365,16 +378,6 @@ tests:
       TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-qe-longrun
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-f60-netobserv
-  cron: 12 1 5 1,3,5,7,9,11 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6i.2xlarge
-    test:
-    - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-imdsv2-f60
   cron: 26 1 16 2,4,6,8,10,12 *
@@ -516,6 +519,15 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
 - as: aws-ipi-pri-shared-vpc-phz-sts-f60-longduration-cloud
   cron: 30 17 24 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: aws-qe
     env:
@@ -1036,6 +1048,16 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-f60-longduration-part3-3
   cron: 9 8 2 1,3,5,7,9,11 *
+  reporter_config:
+    channel: '#forum-prow-hive-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -1065,6 +1087,15 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-fullyprivate-proxy-f60-longduration-cloud
   cron: 15 1 12 1,3,5,7,9,11 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: azure-qe
     env:
@@ -1409,10 +1440,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
-- as: baremetalds-ipi-ovn-ipv4-fips-f60
+- as: metal-ds-ipi-ovn-ipv4-fips-f360
   capabilities:
   - intranet
-  cron: 4 21 13 2,4,6,8,10,12 *
+  cron: 53 10 28 3 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1423,10 +1454,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv4-fips-f60-destructive
+- as: metal-ds-ipi-ovn-ipv4-fips-f360-destructive
   capabilities:
   - intranet
-  cron: 48 10 9 1,3,5,7,9,11 *
+  cron: 15 17 25 9 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1437,10 +1468,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv6-fips-f60
+- as: metal-ds-ipi-ovn-ipv6-fips-f360
   capabilities:
   - intranet
-  cron: 31 7 4 1,3,5,7,9,11 *
+  cron: 25 17 16 3 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1453,10 +1484,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-ipv6-fips-f60-destructive
+- as: metal-ds-ipi-ovn-ipv6-fips-f360-destructive
   capabilities:
   - intranet
-  cron: 11 8 10 2,4,6,8,10,12 *
+  cron: 4 5 15 1 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1469,10 +1500,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-dualstack-fips-f60
+- as: metal-ds-ipi-ovn-dualstack-fips-f360
   capabilities:
   - intranet
-  cron: 13 19 7 2,4,6,8,10,12 *
+  cron: 25 14 16 8 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1483,10 +1514,10 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-dualstack-fips-f60-destructive
+- as: metal-ds-ipi-ovn-dualstack-fips-f360-destructive
   capabilities:
   - intranet
-  cron: 31 17 17 1,3,5,7,9,11 *
+  cron: 53 12 12 12 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1587,6 +1618,16 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi-disk-encryption
 - as: gcp-ipi-filestore-csi-f60-longduration-part3-3
   cron: 14 18 9 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-hive-qe-ci'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
@@ -1602,7 +1643,9 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      COMPUTE_DISK_TYPE: pd-standard
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-48-x86-64-202210040145
+      CONTROL_PLANE_DISK_TYPE: pd-ssd
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-48-x86-64-202210040145
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
@@ -1613,7 +1656,9 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      COMPUTE_DISK_TYPE: pd-ssd
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-48-x86-64-202210040145
+      CONTROL_PLANE_DISK_TYPE: pd-ssd
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-48-x86-64-202210040145
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
@@ -1689,6 +1734,15 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-proxy-private-f60-longduration-cloud
   cron: 2 12 7 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: gcp-qe
     test:
@@ -1874,6 +1928,15 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
 - as: ibmcloud-ipi-mini-perm-f60-longduration-cloud
   cron: 26 17 3 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -1953,6 +2016,15 @@ tests:
 - as: nutanix-ipi-proxy-fips-f60-longduration-cloud
   cluster: build01
   cron: 41 6 24 1,3,5,7,9,11 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: nutanix-qe-dis
     env:
@@ -2012,6 +2084,15 @@ tests:
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-ovn-ipsec-f60-longduration-cloud
   cron: 0 4 14 2,4,6,8,10,12 *
+  reporter_config:
+    channel: '#forum-prow-long-duration-cloudinfra-testcases'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: vsphere-elastic
     test:

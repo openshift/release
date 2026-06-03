@@ -15,18 +15,21 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
-- dockerfile_path: Dockerfile.base
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes-microshift
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: 4.18-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
@@ -192,7 +195,7 @@ tests:
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
@@ -473,7 +476,7 @@ tests:
 - always_run: true
   as: e2e-gcp-ovn-techpreview
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -482,7 +485,7 @@ tests:
   as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -639,6 +642,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -667,6 +696,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -693,6 +748,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -726,6 +807,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale

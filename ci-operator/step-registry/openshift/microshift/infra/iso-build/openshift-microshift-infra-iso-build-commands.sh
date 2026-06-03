@@ -63,13 +63,21 @@ download_brew_rpms() {
     fi
 
     # Download the latest RPMs from brew: latest release (ec, rc and zstream), nightly, Y-1 zstream and Y-2 zstream
-    y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "ec" || echo "WARNING: Failed to download EC RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "rc" || echo "WARNING: Failed to download RC RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || ( echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 2))" && return 1 )
+    # Extract version variables from common_versions.sh to handle cross-major boundaries (e.g. 5.0 -> Y-1=4.22, Y-2=4.21)
+    eval "$(grep -E '^export (MAJOR_VERSION|MINOR_VERSION|PREVIOUS_MAJOR_VERSION|PREVIOUS_MINOR_VERSION|YMINUS2_MAJOR_VERSION|YMINUS2_MINOR_VERSION)=' ./test/bin/common_versions.sh | sed 's/^export /local /')"
+    # Default major versions to 4 for branches that predate the cross-major version split
+    local MAJOR_VERSION="${MAJOR_VERSION:-4}"
+    local PREVIOUS_MAJOR_VERSION="${PREVIOUS_MAJOR_VERSION:-4}"
+    local YMINUS2_MAJOR_VERSION="${YMINUS2_MAJOR_VERSION:-4}"
+    local release_y="${MAJOR_VERSION}.${MINOR_VERSION}"
+    local release_y1="${PREVIOUS_MAJOR_VERSION}.${PREVIOUS_MINOR_VERSION}"
+    local release_y2="${YMINUS2_MAJOR_VERSION}.${YMINUS2_MINOR_VERSION}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y}" "${out_path}" "ec" || echo "WARNING: Failed to download EC RPMs for ${release_y}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y}" "${out_path}" "rc" || echo "WARNING: Failed to download RC RPMs for ${release_y}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y}" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for ${release_y}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for ${release_y}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y1}" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for ${release_y1}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "${release_y2}" "${out_path}" "zstream" || ( echo "WARNING: Failed to download zstream RPMs for ${release_y2}" && return 1 )
 
     popd &>/dev/null
     return 0

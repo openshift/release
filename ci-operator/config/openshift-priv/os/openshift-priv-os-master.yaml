@@ -3,6 +3,10 @@ base_images:
     name: rhel-coreos-base
     namespace: coreos
     tag: "9.8"
+  rhel-coreos-base-10:
+    name: rhel-coreos-base
+    namespace: coreos
+    tag: "10.2"
 build_root:
   image_stream_tag:
     name: coreos-assembler
@@ -10,40 +14,73 @@ build_root:
     tag: latest
 canonical_go_repository: github.com/openshift/os
 images:
-- build_args:
-  - name: OPENSHIFT_CI
-    value: "1"
-  dockerfile_path: Containerfile
-  inputs:
-    rhel-coreos-base:
-      as:
-      - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
-  to: rhel-coreos
-- build_args:
-  - name: OPENSHIFT_CI
-    value: "1"
-  dockerfile_path: extensions/Containerfile
-  inputs:
-    rhel-coreos:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-  to: rhel-coreos-extensions
+  items:
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    - name: IMAGE_NAME
+      value: openshift/ose-rhel-coreos-9
+    - name: IMAGE_CPE
+      value: cpe:/a:redhat:openshift:4.22::el9
+    dockerfile_path: Containerfile
+    inputs:
+      rhel-coreos-base:
+        as:
+        - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+        - ${IMAGE_FROM}
+    to: rhel-coreos
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    dockerfile_path: extensions/Containerfile
+    inputs:
+      rhel-coreos:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+    to: rhel-coreos-extensions
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    - name: IMAGE_NAME
+      value: openshift/ose-rhel-coreos-10
+    - name: IMAGE_CPE
+      value: cpe:/a:redhat:openshift:4.22::el10
+    dockerfile_path: Containerfile
+    inputs:
+      rhel-coreos-base-10:
+        as:
+        - ${IMAGE_FROM}
+    to: rhel-coreos-10
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    dockerfile_path: extensions/Containerfile
+    inputs:
+      rhel-coreos-10:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+    to: rhel-coreos-10-extensions
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - excluded_images:
     - rhel-coreos
     - rhel-coreos-extensions
-    name: 4.22-priv
+    - rhel-coreos-10
+    - rhel-coreos-10-extensions
+    name: 5.0-priv
     namespace: ocp-private
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
+      name: 5.0-priv
       namespace: ocp-private
 resources:
   '*':

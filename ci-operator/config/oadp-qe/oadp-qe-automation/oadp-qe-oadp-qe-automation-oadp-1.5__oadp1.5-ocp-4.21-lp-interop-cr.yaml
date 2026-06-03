@@ -21,22 +21,26 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.17
 images:
-- context_dir: .
-  dockerfile_path: dockerfiles/testing/interop/Dockerfile
-  inputs:
-    mtc-python-client:
-      paths:
-      - destination_dir: mtc-python-client.tar.gz
-        source_path: /mtc-python-client.tar.gz
-    oadp-apps-deployer:
-      paths:
-      - destination_dir: oadp-apps-deployer.tar.gz
-        source_path: /oadp-apps-deployer.tar.gz
-    oadp-e2e-qe:
-      paths:
-      - destination_dir: oadp-e2e-qe.tar.gz
-        source_path: /oadp-e2e-qe.tar.gz
-  to: oadp-runner
+  items:
+  - context_dir: .
+    dockerfile_path: dockerfiles/testing/interop/Dockerfile
+    inputs:
+      mtc-python-client:
+        paths:
+        - destination_dir: mtc-python-client.tar.gz
+          source_path: /mtc-python-client.tar.gz
+      oadp-apps-deployer:
+        paths:
+        - destination_dir: oadp-apps-deployer.tar.gz
+          source_path: /oadp-apps-deployer.tar.gz
+      oadp-e2e-qe:
+        paths:
+        - destination_dir: oadp-e2e-qe.tar.gz
+          source_path: /oadp-e2e-qe.tar.gz
+    to: oadp-runner
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -51,6 +55,16 @@ resources:
 tests:
 - as: oadp-interop-aws
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#oadp-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -84,8 +98,8 @@ tests:
           {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"}
         ]
       RE_TRIGGER_ON_FAILURE: "false"
-      REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: OADP-lp-interop
+      STORAGE_CLASS: odf-operator-ceph-rbd-virtualization
       USER_TAGS: |
         scenario oadp
     test:

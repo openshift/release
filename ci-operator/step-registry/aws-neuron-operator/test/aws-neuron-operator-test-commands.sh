@@ -109,9 +109,12 @@ echo "Running tests with labels: ${ECO_TEST_LABELS}"
 
 # Run test suites in explicit order: vllm -> metrics -> upgrade
 # Each suite gets its own jUnit report for granular results.
+# The vLLM workload is kept alive through the metrics phase so neuron-monitor
+# has an active Neuron runtime and emits neuroncore_utilization_ratio.
 TEST_EXIT_CODE=0
 
 echo "=== Phase 1: vLLM inference tests ==="
+export ECO_SKIP_VLLM_CLEANUP=true
 ginkgo --label-filter="${ECO_TEST_LABELS} && vllm" \
     --timeout=1h \
     --v \
@@ -138,13 +141,16 @@ ginkgo --label-filter="${ECO_TEST_LABELS} && upgrade" \
     ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
 dump_debug_info "phase3-upgrade"
 
+echo "=== Cleanup: removing test namespaces ==="
+oc delete namespace neuron-vllm-test --wait=true --timeout=5m 2>/dev/null || true
+
 # Write operator version after tests (operator is deployed during test execution)
-NEURON_CSV=$(oc get csv -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -i neuron | head -1 || echo "")
-if [[ -n "${NEURON_CSV}" ]]; then
-    NEURON_OPERATOR_VERSION=$(oc get csv -A "${NEURON_CSV}" -o jsonpath='{.spec.version}' 2>/dev/null || echo "unknown")
-else
+NEURON_OPERATOR_VERSION=$(oc get csv -A -o json 2>/dev/null \
+    | jq -r '[.items[] | select(.metadata.name | test("neuron";"i"))] | .[0].spec.version // empty' || true)
+if [[ -z "${NEURON_OPERATOR_VERSION}" ]]; then
     NEURON_OPERATOR_VERSION="${ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE##*:}"
 fi
+NEURON_OPERATOR_VERSION="${NEURON_OPERATOR_VERSION:-unknown}"
 echo "${NEURON_OPERATOR_VERSION}" > "${ARTIFACT_DIR}/operator.version"
 echo "Neuron Operator Version: ${NEURON_OPERATOR_VERSION}"
 

@@ -6,27 +6,24 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: openshift/catalogd.Dockerfile
-  to: olm-catalogd
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/catalogd.Dockerfile
+    to: olm-catalogd
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
 promotion:
   to:
-  - excluded_images:
-    - e2e-test-registry
-    name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -53,7 +50,9 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: commitchecker --start ${PULL_BASE_SHA:-main}
+  commands: |
+    commitchecker --start "$(git merge-base ${PULL_BASE_SHA:-main} ${PULL_PULL_SHA:-HEAD})" \
+                  --end "${PULL_PULL_SHA:-HEAD}"
   container:
     from: commitchecker
 - as: check-sync-pr-valid
@@ -79,18 +78,14 @@ tests:
     - as: upstream-e2e
       cli: latest
       commands: make -C openshift test-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- always_run: false
+- always_run: true
   as: openshift-e2e-aws-techpreview
-  optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -100,10 +95,6 @@ tests:
       cli: latest
       commands: |
         make -C openshift test-e2e
-        make -C openshift test-experimental-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:
@@ -146,6 +137,7 @@ tests:
         make verify
         make build
         make verify-metadata
+        make verify-images-json
       from: src
       resources:
         requests:
@@ -168,7 +160,7 @@ tests:
   run_if_changed: ^openshift/tests-extension/(test/qe/testdata/|pkg/bindata/qe/)
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch

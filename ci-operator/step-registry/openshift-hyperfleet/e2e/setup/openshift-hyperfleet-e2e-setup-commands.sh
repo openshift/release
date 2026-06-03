@@ -22,16 +22,54 @@ hyperfleet-credential-provider generate-kubeconfig \
   --cluster-name="$CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig" 
 
+# Resolve Gangway-overridable params (prefix is required for ci-operator to
+# inject overrides; bare names are used by downstream scripts and deploy-clm.sh).
+NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
+
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 
-# copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
-cp -r /e2e/ /tmp/
+# Export chart parameters for the deployment
+export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
+export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_PATH="${API_CHART_PATH:-charts}"
+export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
+export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
+export SENTINEL_CHART_REPO="${SENTINEL_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-sentinel.git}"
+export SENTINEL_CHART_REF="${SENTINEL_CHART_REF:-main}"
+export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
+
+# Export image parameters for the deployment
+export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
+export API_IMAGE_REPO="${API_IMAGE_REPO:-ci/hyperfleet-api}"
+export API_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
+export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
+export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
+
+# Use ref-specific deploy scripts if E2E_REF is set (RC/release testing)
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
+if [ -n "$E2E_REF" ]; then
+  log "=== Cloning E2E deploy scripts from ref: ${E2E_REF} ==="
+  git clone --branch "$E2E_REF" --depth 1 \
+    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
+  mkdir -p /tmp/e2e
+  cp -r /tmp/e2e-src/deploy-scripts /tmp/e2e/deploy-scripts
+  cp -r /tmp/e2e-src/testdata /tmp/e2e/testdata
+  cp -r /tmp/e2e-src/configs /tmp/e2e/configs
+  rm -rf /tmp/e2e-src
+  log "=== E2E deploy scripts ready ==="
+else
+  cp -r /e2e/ /tmp/
+fi
+
 cd "/tmp/e2e/deploy-scripts/"
 cp .env.example .env
 source .env
-./deploy-clm.sh --action install --namespace $NAMESPACE_NAME
+./deploy-clm.sh --action install --namespace $NAMESPACE_NAME --debug-log-dir ${ARTIFACT_DIR}
 
 log "=== Checking all deployed resources ==="
 kubectl get all -n $NAMESPACE_NAME > "${ARTIFACT_DIR}/all-resources.txt"
@@ -64,14 +102,36 @@ export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
 echo "${MAESTRO_URL}" > "${SHARED_DIR}/maestro_url"
 
 
-log "=== Checking Hyperfleet API accessibility ==="
-if ! curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/; then
-  log "ERROR: Hyperfleet API is not accessible at ${HYPERFLEET_API_URL}"
+wait_for_api() {
+  local url="$1"
+  local name="$2"
+  local max_attempts="${API_RETRY_ATTEMPTS:-30}"
+  local wait_seconds="${API_RETRY_INTERVAL:-10}"
+
+  log "=== Waiting for ${name} to become accessible at ${url} ==="
+  for attempt in $(seq 1 "$max_attempts"); do
+    if curl -sf --connect-timeout 5 --max-time 10 -X GET "${url}" > /dev/null 2>&1; then
+      log "SUCCESS: ${name} is accessible (attempt ${attempt}/${max_attempts})"
+      return 0
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, retrying in ${wait_seconds}s..."
+      sleep "$wait_seconds"
+    else
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, no retries remaining"
+    fi
+  done
+
+  log "ERROR: ${name} is not accessible at ${url} after ${max_attempts} attempts"
+  log "Final attempt output for diagnostics:"
+  curl --connect-timeout 5 --max-time 10 -X GET "${url}" 2>&1 || true
+  return 1
+}
+
+if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
   exit 1
 fi
 
-log "=== Checking Maestro API accessibility ==="
-if ! curl -f -X GET ${MAESTRO_URL}/api/maestro/v1/consumers; then
-  log "ERROR: Maestro API is not accessible at ${MAESTRO_URL}"
+if ! wait_for_api "${MAESTRO_URL}/api/maestro/v1/consumers" "Maestro API"; then
   exit 1
 fi

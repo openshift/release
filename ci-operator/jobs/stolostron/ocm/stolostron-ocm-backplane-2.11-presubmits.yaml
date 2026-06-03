@@ -5,11 +5,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -21,6 +26,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e
@@ -41,6 +47,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -58,6 +67,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -76,11 +91,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -131,11 +151,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/integration
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -195,11 +220,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -259,11 +289,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -323,11 +358,16 @@ presubmits:
     branches:
     - ^backplane-2\.11$
     - ^backplane-2\.11-
-    cluster: build04
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.addon
+      - build/Dockerfile.placement
+      - build/Dockerfile.registration
+      - build/Dockerfile.registration-operator
+      - build/Dockerfile.work
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

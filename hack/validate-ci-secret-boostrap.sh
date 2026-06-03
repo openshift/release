@@ -7,7 +7,7 @@ cd $(dirname $0)/..
 BOOTSTRAP_BINARY=${BOOTSTRAP_BINARY:-/usr/bin/ci-secret-bootstrap}
 
 if [[ ! -x ${BOOTSTRAP_BINARY} ]]; then
-  cd ../ci-tools && go build -race=true -o ${BOOTSTRAP_BINARY} ./cmd/ci-secret-bootstrap && cd -
+  cd ../ci-tools && go build -mod=mod -race=true -o ${BOOTSTRAP_BINARY} ./cmd/ci-secret-bootstrap && cd -
 fi
 
 exec ${BOOTSTRAP_BINARY} \
@@ -16,4 +16,7 @@ exec ${BOOTSTRAP_BINARY} \
 		--vault-prefix=kv \
 		--config=core-services/ci-secret-bootstrap/_config.yaml \
 		--generator-config=core-services/ci-secret-generator/_config.yaml \
+		--enable-gsm=true \
+		--gsm-config=core-services/ci-secret-bootstrap/gsm-config.yaml \
+		--gsm-project-config=core-services/ci-secret-bootstrap/gsm-project-config.yaml \
 		--validate-only

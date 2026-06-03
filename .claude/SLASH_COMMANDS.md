@@ -375,6 +375,56 @@ tests:
 # - Real examples to copy from
 ```
 
+---
+
+### `/test-repo-files` - Validate Repo File URLs
+
+**Purpose**: Validate that `core-services/release-controller/_repos/ocp-*.repo` files have correct mirror2 and CDN URLs after editing.
+
+**Why it exists**: Repo files define RPM sources for CI builds. Incorrect baseurls (e.g., wrong S3 paths or missing arch-prefixed paths) cause build failures that are hard to debug. This command catches broken URLs before merging.
+
+#### Basic Usage
+
+```bash
+/test-repo-files [file-pattern]
+```
+
+#### Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `file-pattern` | No | modified files | Version or filename pattern (e.g., `4.22`, `ocp-4.22-rhel9`) |
+
+#### Examples
+
+```bash
+# Test all repo files modified vs main branch
+/test-repo-files
+
+# Test all 4.22 repo files
+/test-repo-files 4.22
+
+# Test a specific repo file
+/test-repo-files ocp-4.22-rhel98
+```
+
+#### Validation Steps
+
+1. **mirror2 paths**: Checks `mirror2.openshift.com` baseurls return 401 (auth required = exists), not 404
+2. **CDN paths**: Checks `cdn.redhat.com` baseurls via `rhsm-pulp.corp.redhat.com` return 200 (requires VPN)
+3. **dnf wrapper test** (optional): Runs `dnf-wrapper-test` container against the repo file to verify no 404 errors
+
+#### Sample Output
+
+```
+=== ocp-4.22-rhel9.repo ===
+mirror2 paths: 15/15 OK (all 401)
+CDN paths:      8/8 OK (all 200)
+dnf wrapper:   PASS (0 paths returned 404)
+```
+
+---
+
 ## Integration with Development Workflow
 
 1. **Discover** components: `/step-finder <query>`

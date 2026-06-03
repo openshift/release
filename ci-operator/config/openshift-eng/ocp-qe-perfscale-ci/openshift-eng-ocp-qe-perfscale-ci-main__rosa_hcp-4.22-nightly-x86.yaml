@@ -26,10 +26,19 @@ resources:
 tests:
 - always_run: false
   as: control-plane-24nodes
-  cron: 0 2 * * 3
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.xlarge
@@ -53,9 +62,19 @@ tests:
     workflow: rosa-aws-sts-hcp-mp
 - always_run: false
   as: node-density-heavy-24nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.xlarge
@@ -81,7 +100,7 @@ tests:
   as: node-density-24nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.2xlarge
@@ -104,7 +123,7 @@ tests:
   as: node-density-cni-24nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.xlarge
@@ -121,8 +140,8 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts-hcp
-- always_run: false
-  as: control-plane-24nodes-onperfsector
+- as: control-plane-24nodes-onperfsector
+  cron: 0 2,14 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -149,10 +168,7 @@ tests:
     test:
     - ref: rosa-cluster-credentials-hypershift-mgmt
     - chain: openshift-qe-hypershift-infra
-    - ref: openshift-qe-cluster-density-v2
-    - ref: openshift-qe-node-density
-    - ref: openshift-qe-node-density-cni
-    - ref: openshift-qe-crd-scale
+    - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts-hcp-mp
 - always_run: false
   as: control-plane-120nodes-onperfsector
@@ -556,9 +572,19 @@ tests:
     - ref: openshift-qe-crd-scale
 - always_run: false
   as: data-path-9nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.xlarge
@@ -583,7 +609,7 @@ tests:
   as: control-plane-3nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
       COMPUTE_MACHINE_TYPE: m6i.xlarge

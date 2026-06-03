@@ -59,6 +59,18 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
   # Hopefully the entire hostname (including the BASE_DOMAIN) is less than 255 bytes.
   # Also, the CLUSTER_NAME seems to be truncated at 21 characters long.
   case "${LEASED_RESOURCE}" in
+    "dal10-powervs-3-quota-slice-0")
+      CLUSTER_NAME="p-dal10-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-1")
+      CLUSTER_NAME="p-dal10-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-2")
+      CLUSTER_NAME="p-dal10-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-3")
+      CLUSTER_NAME="p-dal10-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "lon04-powervs-6-quota-slice-0")
       CLUSTER_NAME="p-lon04-0-${CLUSTER_NAME_MODIFIER}"
     ;;
@@ -95,6 +107,12 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
     "fran-powervs-8-quota-slice-3")
       CLUSTER_NAME="p-fran-3-${CLUSTER_NAME_MODIFIER}"
     ;;
+    "sao04-powervs-9-quota-slice-0")
+      CLUSTER_NAME="p-sao04-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "sao04-powervs-9-quota-slice-1")
+      CLUSTER_NAME="p-sao04-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "mad02-powervs-5-quota-slice-0")
       CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
     ;;
@@ -128,9 +146,28 @@ POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
 PERSISTENT_VPC=""
 case "${LEASED_RESOURCE}" in
-   "dal10")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10")
+   "dal10-powervs-3-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-0")
       POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-1")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-2")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-3")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
       VPCREGION=us-south
    ;;
    "fran-powervs-8-quota-slice-0")
@@ -159,6 +196,18 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=eu-de
       POWERVS_ZONE=eu-de-2
       VPCREGION=eu-de
+   ;;
+   "sao04-powervs-9-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-0")
+      POWERVS_REGION=sao
+      POWERVS_ZONE=sao04
+      VPCREGION=br-sao
+   ;;
+   "sao04-powervs-9-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-1")
+      POWERVS_REGION=sao
+      POWERVS_ZONE=sao04
+      VPCREGION=br-sao
    ;;
    "lon04-powervs-6-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-0")

@@ -4,8 +4,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_path: Containerfile
-  to: nvidia-ci
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
 resources:
   '*':
     limits:
@@ -18,6 +20,21 @@ tests:
   as: nvidia-network-operator-legacy-sriov-rdma
   capabilities:
   - intranet
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   restrict_network_access: false
   steps:
     env:
@@ -94,6 +111,21 @@ tests:
   as: nvidia-network-operator-shared-device-eth-rdma
   capabilities:
   - intranet
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   restrict_network_access: false
   steps:
     env:

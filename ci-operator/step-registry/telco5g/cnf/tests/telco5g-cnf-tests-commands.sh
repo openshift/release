@@ -332,6 +332,86 @@ fi
 }
 
 
+function create_tests_temp_skip_list_23 {
+# List of temporarly skipped tests for 4.23
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
+function create_tests_temp_skip_list_5 {
+# List of temporarly skipped tests for 5.0
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
 function is_bm_node {
     node=$1
 
@@ -454,7 +534,7 @@ function check_commit_message_for_prs {
     if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
         # Get the commit message from Github of current PR if exists
         API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
-        COMMIT_MESSAGE=$(curl -s "$API_PR_URL" | jq -r '.body')
+        COMMIT_MESSAGE=$(curl -s --retry 5 --retry-delay 10 "$API_PR_URL" | jq -r '.body')
         # Check if we have Depends-On: in commit message
         if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
             # Extract the pull request URL with org and repo from commit message
@@ -560,14 +640,14 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.22" ]]; then
+if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.21"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
     export TARGET_RELEASE=$CNF_BRANCH
-    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
@@ -606,6 +686,9 @@ create_tests_skip_list_file
 if [[ "$CNF_BRANCH" == *"4."* ]]; then
     function_version="${CNF_BRANCH//release-4./}"
     skip_function_name="create_tests_temp_skip_list_${function_version}"
+elif [[ "$CNF_BRANCH" == *"5."* ]]; then
+    function_version=5
+    skip_function_name="create_tests_temp_skip_list_5"
 else
     # In case of master branch
     skip_function_name=create_tests_temp_skip_list_22
@@ -671,6 +754,30 @@ val_status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
+    echo "Wait until number of nodes matches number of machines"
+    for _ in $(seq 30); do
+        nodes="$(oc get nodes --no-headers | wc -l)"
+        machines="$(oc get machines -A --no-headers | wc -l)"
+        [ "$machines" -le "$nodes" ] && break
+        sleep 30
+    done
+    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
+    [ "$machines" -le "$nodes" ]
+fi
+
+echo "Wait for MachineConfigPools to finish updating (verifies node reboots are complete)"
+oc wait mcp --all --for='condition=UPDATED=True' --timeout=30m || echo "WARNING: not all MachineConfigPools have UPDATED=True after 30m"
+oc wait mcp --all --for='condition=UPDATING=False' --timeout=30m || echo "WARNING: some MachineConfigPools still UPDATING after 30m"
+
+echo "Wait for nodes to be up and ready"
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || echo "WARNING: not all nodes are Ready after 10m"
+
+echo "Wait for cluster operators to be deployed and ready"
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m || echo "WARNING: some cluster operators still Progressing after 15m"
+oc wait clusteroperators --all --for=condition=Available=true --timeout=15m || echo "WARNING: not all cluster operators are Available after 15m"
+oc wait clusteroperators --all --for=condition=Degraded=false --timeout=15m || echo "WARNING: some cluster operators are Degraded after 15m"
+
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
@@ -681,32 +788,6 @@ if [[ ${val_status} -ne 0 ]]; then
     echo "Validations failed with status code $val_status"
     status=${val_status}
 fi
-
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
-    echo "Wait until number of nodes matches number of machines"
-    # Wait until number of nodes matches number of machines
-    # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-    for _ in $(seq 30); do
-        nodes="$(oc get nodes --no-headers | wc -l)"
-        machines="$(oc get machines -A --no-headers | wc -l)"
-        [ "$machines" -le "$nodes" ] && break
-        sleep 30
-    done
-
-
-    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
-    [ "$machines" -le "$nodes" ]
-
-fi
-echo "Wait for nodes to be up and ready"
-# Wait for nodes to be ready
-# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-
-echo "Wait for cluster operators to be deployed and ready"
-# Waiting for clusteroperators to finish progressing
-# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
@@ -719,7 +800,16 @@ set +e
 set -x
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed"
+  rm -rf ${SHARED_DIR}/telco5gci
+  [[ ${attempt} -lt 5 ]] && sleep 10
+done
+if [[ ! -d ${SHARED_DIR}/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
 
 # Check if telco5gci pull request exists and checkout the pull request branch if so
 pushd ${SHARED_DIR}/telco5gci

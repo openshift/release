@@ -16,22 +16,26 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- context_dir: .
-  dockerfile_path: cnf-tests/Dockerfile.openshift
-  from: base
-  to: cnf-tests
-- context_dir: tools/s2i-dpdk/
-  dockerfile_path: Dockerfile
-  from: base-9
-  to: dpdk
-- context_dir: .
-  dockerfile_path: ztp/resource-generator/Containerfile
-  from: os-min8
-  to: ztp-site-generator
+  items:
+  - context_dir: .
+    dockerfile_path: cnf-tests/Dockerfile.openshift
+    from: base
+    to: cnf-tests
+  - context_dir: tools/s2i-dpdk/
+    dockerfile_path: Dockerfile
+    from: base-9
+    to: dpdk
+  - context_dir: .
+    dockerfile_path: ztp/resource-generator/Containerfile
+    from: os-min8
+    to: ztp-site-generator
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 promotion:
   to:
   - name: "4.16"
     namespace: ocp-kni
+prowgen:
+  disable_sparse_checkout: true
 releases:
   initial:
     integration:
@@ -52,14 +56,14 @@ tests:
   commands: make ci-job
   container:
     from: src
-  skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - as: ztp-ci
   commands: make ztp-ci-job
   container:
     from: src
   run_if_changed: ^ztp
 - as: e2e-aws-ci-tests
-  skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+  skip_if_only_changed: ^ztp|^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -84,6 +88,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ran-profile
   optional: true
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -109,7 +114,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: security
   optional: true
-  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     env:
       PROJECT_NAME: cnf-features-deploy
@@ -121,6 +126,7 @@ tests:
   - intranet
   optional: true
   restrict_network_access: false
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -135,6 +141,7 @@ tests:
   - intranet
   optional: true
   restrict_network_access: false
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     env:
       E2E_TESTS_CONFIG: |

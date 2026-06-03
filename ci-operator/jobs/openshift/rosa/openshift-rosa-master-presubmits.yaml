@@ -1,11 +1,11 @@
 presubmits:
   openshift/rosa:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -15,6 +15,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-rosa-master-build
     rerun_command: /test build
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
     spec:
       containers:
       - args:
@@ -71,11 +72,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )build,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/commits
     decorate: true
     decoration_config:
@@ -85,6 +86,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-rosa-master-commits
     rerun_command: /test commits
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
     spec:
       containers:
       - args:
@@ -141,11 +143,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )commits,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/coverage
     decorate: true
     decoration_config:
@@ -155,6 +157,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-rosa-master-coverage
     rerun_command: /test coverage
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
     skip_report: true
     spec:
       containers:
@@ -223,11 +226,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/e2e-presubmits-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/variant: e2e-presubmits
       ci.openshift.io/generator: prowgen
@@ -269,9 +276,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -287,11 +291,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-hcp-advanced
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -362,9 +370,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -380,11 +385,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-hcp-arm
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -454,9 +463,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -472,11 +478,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-hcp-private-link
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -546,9 +556,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -564,11 +571,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-shared-vpc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -638,9 +649,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -656,11 +664,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-sts-advanced
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -731,9 +743,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -749,11 +758,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-sts-private-link
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -823,9 +836,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -841,11 +851,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-presubmits-pr-rosa-sts-shared-vpc
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
@@ -915,9 +929,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -933,11 +944,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/images-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.e2e
     labels:
       ci-operator.openshift.io/variant: images
       ci.openshift.io/generator: prowgen
@@ -979,9 +994,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -997,11 +1009,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/images-release-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - images/Dockerfile.release
     labels:
       ci-operator.openshift.io/variant: images-release
       ci.openshift.io/generator: prowgen
@@ -1043,9 +1059,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1057,11 +1070,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images-release-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1071,6 +1084,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-rosa-master-lint
     rerun_command: /test lint
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
     spec:
       containers:
       - args:
@@ -1127,11 +1141,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build10
+    cluster: build11
     context: ci/prow/test
     decorate: true
     decoration_config:
@@ -1141,6 +1155,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-rosa-master-test
     rerun_command: /test test
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
     spec:
       containers:
       - args:

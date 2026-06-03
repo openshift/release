@@ -4,31 +4,32 @@ build_root:
     namespace: coreos
     tag: latest
 images:
-- dockerfile_literal: |
-    FROM overridden
-    WORKDIR /src
-    # Tell the build scripts that we have setup a directory for unprivileged build
-    ENV COSA_DIR=/tmp/cosa
-    RUN mkdir -p "${COSA_DIR}"
-    # Copy the source code
-    COPY . .
-    # We need to make sure that root can read / write to the COSA_DIR so that
-    # when this container is actually run, we have permissions to read and
-    # write to the COSA_DIR to allow the Kola tests to run.
-    USER root
-    RUN chgrp -Rf root "${COSA_DIR}" && \
-      chmod -Rf g+w "${COSA_DIR}"
-    # Go back to unprivileged user for COSA
-    USER builder
-    WORKDIR /tmp/cosa
-  from: root
-  to: build-image
+  items:
+  - dockerfile_literal: |
+      FROM overridden
+      WORKDIR /src
+      # Tell the build scripts that we have setup a directory for unprivileged build
+      ENV COSA_DIR=/tmp/cosa
+      RUN mkdir -p "${COSA_DIR}"
+      # Copy the source code
+      COPY . .
+      # We need to make sure that root can read / write to the COSA_DIR so that
+      # when this container is actually run, we have permissions to read and
+      # write to the COSA_DIR to allow the Kola tests to run.
+      USER root
+      RUN chgrp -Rf root "${COSA_DIR}" && \
+        chmod -Rf g+w "${COSA_DIR}"
+      # Go back to unprivileged user for COSA
+      USER builder
+      WORKDIR /tmp/cosa
+    from: root
+    to: build-image
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-  rhcos-9-build-test-metal:
+  rhcos-9-build-test:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -36,7 +37,7 @@ resources:
       devices.kubevirt.io/kvm: "1"
       ephemeral-storage: 40Gi
       memory: 3Gi
-  rhcos-9-build-test-qemu:
+  rhcos-10-build-test:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -44,7 +45,7 @@ resources:
       devices.kubevirt.io/kvm: "1"
       ephemeral-storage: 40Gi
       memory: 3Gi
-  rhcos-10-build-test-metal:
+  scos-9-build-test:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -52,39 +53,7 @@ resources:
       devices.kubevirt.io/kvm: "1"
       ephemeral-storage: 40Gi
       memory: 3Gi
-  rhcos-10-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
-  scos-9-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
-  scos-9-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
-  scos-10-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
-  scos-10-build-test-qemu:
+  scos-10-build-test:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -100,75 +69,39 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-9-build-test-qemu
+- as: rhcos-9-build-test
   capabilities:
   - kvm
   commands: |
-    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-9-build-test-qemu
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-9-build-test
   container:
     from: build-image
   secret:
     mount_path: /var/run/secrets/ci-pull-credentials
     name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-9-build-test-metal
+- as: rhcos-10-build-test
   capabilities:
   - kvm
   commands: |
-    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-10-build-test
   container:
     from: build-image
   secret:
     mount_path: /var/run/secrets/ci-pull-credentials
     name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-10-build-test-qemu
+- as: scos-9-build-test
   capabilities:
   - kvm
-  commands: |
-    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-10-build-test-qemu
-  container:
-    from: build-image
-  secret:
-    mount_path: /var/run/secrets/ci-pull-credentials
-    name: ci-pull-credentials
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-10-build-test-metal
-  capabilities:
-  - kvm
-  commands: |
-    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-10-build-test-metal
-  container:
-    from: build-image
-  secret:
-    mount_path: /var/run/secrets/ci-pull-credentials
-    name: ci-pull-credentials
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: scos-9-build-test-qemu
-  capabilities:
-  - kvm
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-qemu
+  commands: /src/ci/prow-entrypoint.sh scos-9-build-test
   container:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: scos-9-build-test-metal
+- as: scos-10-build-test
   capabilities:
   - kvm
-  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-metal
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: scos-10-build-test-qemu
-  capabilities:
-  - kvm
-  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: scos-10-build-test-metal
-  capabilities:
-  - kvm
-  commands: /src/ci/prow-entrypoint.sh scos-10-build-test-metal
+  commands: /src/ci/prow-entrypoint.sh scos-10-build-test
   container:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

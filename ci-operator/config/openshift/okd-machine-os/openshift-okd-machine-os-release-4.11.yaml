@@ -4,20 +4,21 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.15-openshift-4.8
 images:
-- dockerfile_path: Dockerfile.ci
-  to: cosa-build
-- inputs:
-    cosa-build:
-      paths:
-      - destination_dir: .
-        source_path: /tmp/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
-  to: machine-os-content
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cosa-build
+  - inputs:
+      cosa-build:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
+    to: machine-os-content
 promotion:
   to:
   - excluded_images:
@@ -44,7 +45,7 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-aws
   steps:
@@ -58,7 +59,7 @@ tests:
     workflow: openshift-e2e-ovirt-minimal
 - as: e2e-gcp-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-aws-crun

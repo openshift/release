@@ -22,18 +22,19 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: cerberus/Dockerfile_prow
-  from: cerberus.prow
-  to: cerberus-main-prow-419
-- dockerfile_path: Dockerfile
-  from: krkn.prow
-  to: prow-scripts-419
-- dockerfile_literal: |-
-    FROM ocp-qe-perfscale-ci
-    RUN ls
-    RUN cp oc /bin
-  from: ocp-qe-perfscale-ci
-  to: perfscale-observer
+  items:
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-419
+  - dockerfile_path: Dockerfile
+    from: krkn.prow
+    to: prow-scripts-419
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -56,6 +57,16 @@ resources:
 tests:
 - always_run: false
   as: krkn-hub-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -74,6 +85,16 @@ tests:
     workflow: redhat-chaos-installer-aws
 - always_run: false
   as: krkn-hub-node-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -92,6 +113,16 @@ tests:
     workflow: redhat-chaos-installer-aws
 - always_run: false
   as: gcp-virt
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: gcp-chaos
     env:
@@ -110,14 +141,25 @@ tests:
     - ref: openshift-qe-virt-density
     - ref: redhat-chaos-kubevirt-outage
     workflow: ipi-gcp
-- as: krkn-hub-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CD_V2_EXTRA_FLAGS: ""
       CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "false"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
@@ -135,14 +177,25 @@ tests:
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-udn
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CD_V2_EXTRA_FLAGS: ""
       CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "False"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "false"
@@ -159,8 +212,18 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-tests-aws-ipsec
-  cron: 0 4 5 * *
+- always_run: false
+  as: krkn-hub-tests-aws-ipsec
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -177,8 +240,18 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-aws-ipsec
-  cron: 0 4 29 * *
+- always_run: false
+  as: krkn-hub-node-tests-aws-ipsec
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -195,14 +268,25 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-tests-udn-aws-ipsec
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CD_V2_EXTRA_FLAGS: ""
       CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "false"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "true"
@@ -220,14 +304,25 @@ tests:
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: krkn-hub-node-tests-udn-aws-ipsec
-  cron: 0 4 * * 1
+- always_run: false
+  as: krkn-hub-node-tests-udn-aws-ipsec
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       CD_V2_EXTRA_FLAGS: ""
       CDV2_ITERATION_MULTIPLIER: "3"
+      ES_RUN_TAG: udn
       GC: "False"
       PROFILE_TYPE: reporting
       SPOT_INSTANCES: "false"
@@ -244,8 +339,18 @@ tests:
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     workflow: redhat-chaos-installer-aws-ipsec
-- as: gcp-fipsetcd-krkn-hub-tests
-  cron: 0 4 28 * *
+- always_run: false
+  as: gcp-fipsetcd-krkn-hub-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: gcp-chaos
     env:
@@ -261,6 +366,16 @@ tests:
     workflow: redhat-chaos-installer-gcp-ipi-ovn-etcd-encryption-fips
 - always_run: false
   as: gcp-fipsetcd-krkn-hub-node-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: gcp-chaos
     env:
@@ -276,6 +391,16 @@ tests:
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
 - always_run: false
   as: vsphere-krkn-hub-tests-10nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
@@ -293,6 +418,16 @@ tests:
     workflow: openshift-qe-installer-vsphere-ipi-ovn
 - always_run: false
   as: vsphere-krkn-hub-node-tests-10nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
@@ -315,8 +450,18 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-vsphere-ipi-ovn
-- as: krkn-hub-tests-13nodes
-  cron: 0 4 1,15 * 1
+- always_run: false
+  as: krkn-hub-tests-13nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -334,8 +479,18 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws
-- as: krkn-hub-node-tests-13nodes
-  cron: 0 4 3,17 * 1
+- always_run: false
+  as: krkn-hub-node-tests-13nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -355,6 +510,16 @@ tests:
     workflow: redhat-chaos-installer-aws
 - always_run: false
   as: krkn-hub-tests-37nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -375,6 +540,16 @@ tests:
     workflow: redhat-chaos-installer-aws
 - always_run: false
   as: krkn-hub-node-tests-37nodes
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -395,6 +570,16 @@ tests:
     workflow: redhat-chaos-installer-aws
 - always_run: false
   as: krkn-hub-syn-flood
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -407,8 +592,18 @@ tests:
     - ref: redhat-chaos-observer-start
     - chain: redhat-chaos-syn-flood
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-azure-multiarch
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-node-tests-azure-multiarch
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -444,8 +639,18 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-multiarch
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure-multiarch
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -477,8 +682,18 @@ tests:
     - chain: workers-scale
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure
-- as: krkn-hub-tests-azure-node
-  cron: 29 5 26 * *
+- always_run: false
+  as: krkn-hub-tests-azure-node
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -496,8 +711,18 @@ tests:
     - chain: redhat-chaos-krkn-hub-worker-node-tests
     - ref: redhat-chaos-power-outage
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-azure
-  cron: 29 5 25 * 2
+- always_run: false
+  as: krkn-hub-tests-azure
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: azure-qe
     env:
@@ -514,8 +739,18 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-azure-ipi-ovn-ipsec
-- as: krkn-hub-tests-compact
-  cron: 0 4 2 * *
+- always_run: false
+  as: krkn-hub-tests-compact
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -530,8 +765,18 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws-compact
-- as: krkn-hub-node-tests-compact
-  cron: 0 4 1 * *
+- always_run: false
+  as: krkn-hub-node-tests-compact
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: aws-chaos
     env:
@@ -548,6 +793,16 @@ tests:
     workflow: redhat-chaos-installer-aws-compact
 - always_run: false
   as: krkn-hub-tests-ibmcloud
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
@@ -568,6 +823,16 @@ tests:
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
 - always_run: false
   as: krkn-hub-node-tests-ibmcloud
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe

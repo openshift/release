@@ -145,7 +145,7 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.16
       MCE_VERSION: "2.6"
     workflow: hypershift-mce-agent-disconnected-conformance
-- as: e2e-agent-connected-ovn-ipv4-metal-oadp
+- as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
   capabilities:
   - intranet
   cron: 16 18 15 5 *
@@ -162,6 +162,7 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+      HYPERSHIFT_NP_AUTOREPAIR: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.16
       MCE_VERSION: "2.6"
       OADP_OPERATOR_SUB_CHANNEL: stable-1.4
@@ -238,6 +239,16 @@ tests:
     workflow: hypershift-mce-kubevirt-baremetalds-disconnected-conformance
 - as: e2e-ibmz-ovn-conformance
   cron: 2 12 23 8 *
+  reporter_config:
+    channel: '#ibmz-prowci-notifier'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -256,6 +267,7 @@ tests:
     cluster_profile: openshift-org-aws
     dependencies:
       HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:416-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:416-latest
     env:
       MCE_VERSION: "2.6"
       TEST_SUITE: openshift/conformance/parallel/minimal

@@ -5,13 +5,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-live-migration-sdn-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -95,13 +99,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-live-migration-sdn-ovn-rollback
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -186,13 +194,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-sdn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -276,13 +288,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-sdn-multitenant
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -366,13 +382,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-sdn-serial
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -456,13 +476,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build06
+    cluster: build11
     context: ci/prow/e2e-aws-sdn-upgrade
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -553,10 +577,14 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-sdn-release-4.15-e2e-gcp-sdn
@@ -636,13 +664,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build07
+    cluster: build11
     context: ci/prow/images
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -699,13 +731,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build07
+    cluster: build11
     context: ci/prow/security
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -719,6 +755,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -740,6 +777,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -760,6 +800,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -778,13 +824,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build07
+    cluster: build11
     context: ci/prow/unit
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -849,13 +899,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build07
+    cluster: build11
     context: ci/prow/verify
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -920,13 +974,17 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build07
+    cluster: build11
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/kube-proxy/Dockerfile.rhel
+      - images/sdn/Dockerfile.rhel
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen

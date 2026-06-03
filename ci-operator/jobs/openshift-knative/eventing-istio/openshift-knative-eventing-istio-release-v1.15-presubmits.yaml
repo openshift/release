@@ -5,11 +5,13 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build11
+    cluster: build10
     context: ci/prow/414-e2e-tests
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -89,11 +91,13 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build09
+    cluster: build03
     context: ci/prow/414-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
@@ -148,11 +152,13 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build09
+    cluster: build03
     context: ci/prow/420-e2e-tests
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -166,6 +172,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-tests
@@ -187,6 +194,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -207,6 +217,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -228,11 +244,13 @@ presubmits:
     branches:
     - ^release-v1\.15$
     - ^release-v1\.15-
-    cluster: build09
+    cluster: build03
     context: ci/prow/420-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen

@@ -1,11 +1,34 @@
+base_images:
+  monitoring-console-plugin:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-console-plugin
+  monitoring-plugin:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-plugin
+  monitoring-ui-tests-runner:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-ui-tests-runner
+  observability-bundle:
+    name: observability-bundle
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-health-analyzer
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-health-analyzer
+promotion:
+  to:
+  - namespace: osa
+    tag: latest
+    tag_by_commit: true
 resources:
   '*':
     limits:
@@ -35,9 +58,36 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.21"
+  optional: true
+  reporter_config:
+    channel: '#cluster-health-analyzer-qe-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :x: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     test:
     - ref: cluster-health-analyzer
+    workflow: generic-claim
+- always_run: false
+  as: e2e-incidents-ui
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-incidents-ui-custom-cha
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

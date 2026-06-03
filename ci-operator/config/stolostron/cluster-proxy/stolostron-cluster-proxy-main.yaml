@@ -9,14 +9,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: ./cmd/pure.Dockerfile
-  from: base
-  to: cluster-proxy
-promotion:
-  to:
-  - disabled: true
-    name: "2.17"
-    namespace: stolostron
+  items:
+  - dockerfile_path: ./cmd/pure.Dockerfile
+    from: base
+    to: cluster-proxy
 resources:
   '*':
     requests:
@@ -42,8 +38,9 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: sonar-pre-submit
   commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
+    export HOME="/tmp"
+    export GOPATH="${HOME}/go"
+    export GOCACHE="${GOPATH}/pkg/cache"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -53,8 +50,9 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export XDG_CACHE_HOME="/tmp"
+    export HOME="/tmp"
+    export GOPATH="${HOME}/go"
+    export GOCACHE="${GOPATH}/pkg/cache"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -87,7 +85,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.17
+      DESTINATION_BRANCH: backplane-5.0
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
