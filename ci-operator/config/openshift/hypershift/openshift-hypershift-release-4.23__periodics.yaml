@@ -81,6 +81,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
+  n1minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -267,6 +272,16 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-v2-self-managed
+  cron: 30 3 * * *
+  steps:
+    cluster_profile: hypershift-azure
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-e2e-v2-self-managed
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *
   steps:
