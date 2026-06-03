@@ -73,16 +73,47 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   BMC_NETWORK="${2}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
-  for ip in "${IP_ARRAY[@]}"; do
-    # TODO: change to firewalld or nftables
-    if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-      iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+
+  LOCK="/tmp/firewall_file.lock"
+  LOCK_FD=200
+  exec 200>"$LOCK"
+
+  cleanup() {
+    echo "Releasing lock"
+    exec 200>&- || true
+  }
+
+  trap cleanup EXIT INT TERM
+
+  echo "Acquiring lock $LOCK_FD ($LOCK) (waiting up to 5 minutes)"
+  flock -w 300 $LOCK_FD
+  echo "Lock acquired $LOCK_FD ($LOCK)"
+
+  add_rule_safely() {
+    local err_msg
+    echo "+ firewall-cmd $*"
+    set +o errexit
+    err_msg=$(firewall-cmd "$@" 2>&1)
+    local exit_code=$?
+    set -o errexit
+
+    if [ $exit_code -eq 0 ] || [[ "$err_msg" == *"NOT_SET"* ]]; then
+      return 0
     fi
-    iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    
+    echo "ERROR: add_rule_safely failed with exit code $exit_code: $err_msg" >&2
+    return $exit_code
+  }
+  
+  for ip in "${IP_ARRAY[@]}"; do
+    if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
+      add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+    fi
+    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
-    iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
+    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   fi
 EOF
 
