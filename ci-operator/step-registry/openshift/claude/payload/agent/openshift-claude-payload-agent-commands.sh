@@ -76,7 +76,13 @@ echo ""
 
 while true; do
     POLL_COUNT=$((POLL_COUNT + 1))
-    RELEASE_JSON=$(curl -sf "${API_URL}")
+    RELEASE_JSON=$(curl -sf "${API_URL}" || true)
+    if [[ -z "${RELEASE_JSON}" ]]; then
+        echo "  Warning: Failed to fetch release API. Retrying next poll..."
+        sleep ${POLL_INTERVAL}
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+        continue
+    fi
     PENDING=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Pending")] | length')
     FAILED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed")] | length')
     SUCCEEDED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Succeeded")] | length')
@@ -163,18 +169,6 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
-# Create payload snapshot deterministically (no tokens spent)
-echo ""
-echo "=== Creating payload snapshot ==="
-SNAPSHOT_SCRIPT="/opt/ai-helpers/plugins/ci/skills/payload-snapshot/scripts/payload_snapshot.py"
-SNAPSHOT_DIR="${WORKDIR}/snapshot"
-PHASE_SNAPSHOT_START=$(date +%s)
-python3 "${SNAPSHOT_SCRIPT}" "${PAYLOAD_TAG}" --output-dir "${SNAPSHOT_DIR}"
-PHASE_SNAPSHOT_DURATION=$(( $(date +%s) - PHASE_SNAPSHOT_START ))
-echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s at ${SNAPSHOT_DIR}/${PAYLOAD_TAG}"
-echo "Archiving payload snapshot to artifacts..."
-tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
-
 # Ensure reports and session logs are copied to artifacts even if the script exits early
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
@@ -194,6 +188,18 @@ copy_reports() {
     fi
 }
 trap copy_reports EXIT TERM INT
+
+# Create payload snapshot deterministically (no tokens spent)
+echo ""
+echo "=== Creating payload snapshot ==="
+SNAPSHOT_SCRIPT="/opt/ai-helpers/plugins/ci/skills/payload-snapshot/scripts/payload_snapshot.py"
+SNAPSHOT_DIR="${WORKDIR}/snapshot"
+PHASE_SNAPSHOT_START=$(date +%s)
+python3 "${SNAPSHOT_SCRIPT}" "${PAYLOAD_TAG}" --output-dir "${SNAPSHOT_DIR}"
+PHASE_SNAPSHOT_DURATION=$(( $(date +%s) - PHASE_SNAPSHOT_START ))
+echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s"
+echo "Archiving payload snapshot to artifacts..."
+tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 
 # Install the must-gather plugin for analyzing must-gather archives
 echo "Installing must-gather plugin..."
@@ -216,7 +222,7 @@ timeout 3600 claude \
     --output-format stream-json \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DIR}/${PAYLOAD_TAG}" \
+    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DIR}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
