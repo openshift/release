@@ -21,7 +21,8 @@ echo 'Deprovisioning HAProxy'
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" << 'EOF'
-set -o nounset
+set -euo pipefail
+
 CLUSTER_NAME="${1}"
 
 devices=(eth1.br-ext eth2.br-int)
