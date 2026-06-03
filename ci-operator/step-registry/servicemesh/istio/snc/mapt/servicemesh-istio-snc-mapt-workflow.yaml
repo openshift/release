@@ -1,18 +1,5 @@
 workflow:
   as: servicemesh-istio-snc-mapt
-  env:
-  - name: MAISTRA_BUILDER_IMAGE
-    default: ""
-    documentation: Builder image used by pre-test setup steps (e.g., servicemesh-sail-operator-copy-src).
-  - name: MAISTRA_NAMESPACE
-    default: "ossm-tests"
-    documentation: Kubernetes namespace where the privileged test pod is created.
-  - name: MAISTRA_SC_POD
-    default: "ossm-unit-gencheck-test-pod"
-    documentation: Name of the privileged pod used to run tests inside the SNC cluster.
-  - name: SPOT_INCREASE_RATE
-    default: "60"
-    documentation: Spot instance bid increase rate percentage passed to the create step.
   steps:
     pre:
     - ref: servicemesh-istio-snc-mapt-create
@@ -20,6 +7,11 @@ workflow:
     - ref: servicemesh-sail-operator-copy-src
     post:
     - ref: servicemesh-istio-snc-mapt-destroy
+    env:
+      MAISTRA_BUILDER_IMAGE: "" # value defined in config steps env
+      MAISTRA_NAMESPACE: "maistra-e2e-test"
+      MAISTRA_SC_POD: "maistra-e2e-test-sc-pod"
+      SPOT_INCREASE_RATE: "80"
   documentation: |-
     Infrastructure workflow for creating and destroying an OpenShift Single Node Cluster (SNC) using MAPT (Multi Architecture Provisioning Tool) for OpenShift Service Mesh (OSSM) Istio testing.
     This workflow provides the environment setup for privileged tests that require kernel modules, Docker socket access, and system administration capabilities.

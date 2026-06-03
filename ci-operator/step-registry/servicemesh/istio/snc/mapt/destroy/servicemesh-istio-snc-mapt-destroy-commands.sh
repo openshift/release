@@ -82,9 +82,9 @@ CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID:-unknown}"
 
 echo "[INFO] READ Reading dynamic S3 bucket name from shared directory..."
 if [[ ! -f "${SHARED_DIR}/mapt-s3-bucket-name" ]]; then
-  echo "[ERROR] ERROR Bucket name file not found at ${SHARED_DIR}/mapt-s3-bucket-name"
-  echo "[ERROR] ERROR Cannot proceed with cleanup without bucket name"
-  exit 1
+  echo "[WARN] WARN Bucket name file not found at ${SHARED_DIR}/mapt-s3-bucket-name"
+  echo "[WARN] WARN Create step likely did not complete — nothing to clean up"
+  exit 0
 fi
 
 DYNAMIC_BUCKET_NAME=$(cat "${SHARED_DIR}/mapt-s3-bucket-name")

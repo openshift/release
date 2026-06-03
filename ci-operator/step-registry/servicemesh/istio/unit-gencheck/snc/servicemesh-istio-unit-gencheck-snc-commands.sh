@@ -32,7 +32,7 @@ else
   exit 1
 fi
 
-CONTAINER_NAME="testpod"
+CONTAINER_NAME="testpmd"
 
 echo "[SUCCESS] !!!! Retrieved pod configuration:"
 echo "[INFO] NOTE Namespace: ${NAMESPACE}"
