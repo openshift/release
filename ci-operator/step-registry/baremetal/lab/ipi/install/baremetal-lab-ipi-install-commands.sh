@@ -257,6 +257,48 @@ if [[ "$ENABLE_CAPI" == "true" ]]; then
     sed -i 's/watchAllNamespaces: false/watchAllNamespaces: true/' "${INSTALL_DIR}/openshift/99_baremetal-provisioning-config.yaml"
 fi
 
+# Patch worker BMH manifests to use the specified CoreOS stream.
+# This controls which IPA (kernel/initrd/rootfs) version is used
+# during PXE boot for worker nodes.
+if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
+    if [[ ! "${WORKER_COREOS_STREAM}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        echo "[ERROR] Invalid WORKER_COREOS_STREAM: ${WORKER_COREOS_STREAM}"
+        exit 1
+    fi
+    esc_stream="$(printf '%s' "${WORKER_COREOS_STREAM}" | sed 's/[\/&]/\\&/g')"
+    for bmh_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_hosts-*.yaml; do
+        if ! grep -q 'installer.openshift.io/role: control-plane' "${bmh_file}"; then
+            sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${bmh_file}"
+            echo -e "${bmh_file} updated -------"
+            grep "${esc_stream}" "${bmh_file}"
+        fi
+    done
+    # Patch worker MachineSet hostSelector to match the new stream
+    for ms_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+        sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${WORKER_COREOS_STREAM}/" "${ms_file}"
+    done
+    # Set the worker MachineConfigPool to use the specified stream for
+    # the on-disk OS. Requires the OSStreams feature gate (TechPreviewNoUpgrade).
+    cat > "${INSTALL_DIR}/openshift/99_worker-osimagestream.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  labels:
+    machineconfiguration.openshift.io/mco-built-in: ""
+    pools.operator.machineconfiguration.openshift.io/worker: ""
+  name: worker
+spec:
+  machineConfigSelector:
+    matchLabels:
+      machineconfiguration.openshift.io/role: worker
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/worker: ""
+  osImageStream:
+    name: ${WORKER_COREOS_STREAM}
+EOF
+fi
+
 ### Inject customized manifests
 echo -e "\n[INFO] The following manifests will be included at installation time:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
