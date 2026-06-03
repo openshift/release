@@ -29,7 +29,7 @@ eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden--UploadAttachment.sh"
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden.sh"
 )"
 eval "$(
     typeset -a _fURL=()
@@ -602,8 +602,19 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -f "${KUBECONFIG}" ]
 
 # Upload `KUBECONFIG` to BitWarden.
-[ -z "${BW__OBJ_NAME}" ] || Vault--BitWarden--UploadAttachment \
-    "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW "${KUBECONFIG}"
+[ -z "${BW__OBJ_NAME}" ] || {
+    Vault--BitWarden--UploadAttachment \
+        "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
+        "${KUBECONFIG}"
+    Vault--BitWarden--UpdateCustomField \
+        "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
+        cred.OCP <(
+            jq -cnj \
+                --arg usr kubeadmin \
+                --rawfile pwd <(set +x; printf '%s' "$(cat "${KUBEADMIN_PASSWORD_FILE}")") \
+                '{usr: $usr, pwd: $pwd}'
+        )
+}
 
 # Ensure Nodes readiness before Day-2 customization.
 oc wait node --all --for=condition=Ready --timeout=300s
