@@ -50,9 +50,9 @@ mkdir -p "${REPORT_DIR}"
 
 cleanup() {
     echo "Collecting artifacts..."
-    for f in classifications.json report.md; do
-        if [ -f "${WORKDIR}/artifacts/activity-type-classifier/${f}" ]; then
-            cp "${WORKDIR}/artifacts/activity-type-classifier/${f}" "${REPORT_DIR}/"
+    for f in classifications.json report.md issues.json; do
+        if [ -f "${WORKDIR}/.work/activity-type-classifier/${f}" ]; then
+            cp "${WORKDIR}/.work/activity-type-classifier/${f}" "${REPORT_DIR}/"
         fi
     done
     [ -f "/tmp/claude-sankey-output.json" ] && cp /tmp/claude-sankey-output.json "${REPORT_DIR}/" || true
@@ -60,26 +60,13 @@ cleanup() {
 }
 trap cleanup EXIT TERM INT
 
-# Clone and install skill so Claude discovers it naturally
-echo "Cloning classifier skill from ${CLASSIFIER_REPO}..."
-git clone --depth 1 --branch "${CLASSIFIER_BRANCH}" "${CLASSIFIER_REPO}" /tmp/classifier-skill
-SKILL_SRC="/tmp/classifier-skill/activity-type-classifier/.claude/skills/classifying-activity-types"
-
-if [ ! -f "${SKILL_SRC}/SKILL.md" ]; then
-    echo "ERROR: SKILL.md not found at ${SKILL_SRC}/SKILL.md"
-    exit 1
-fi
-
-mkdir -p "${WORKDIR}/.claude/skills"
-cp -r "${SKILL_SRC}" "${WORKDIR}/.claude/skills/classifying-activity-types"
-echo "Skill installed to ${WORKDIR}/.claude/skills/classifying-activity-types/"
+echo "Using built-in jira@ai-helpers plugin (categorize-activity-types skill)"
 
 cd "${WORKDIR}"
-mkdir -p artifacts/activity-type-classifier
+mkdir -p .work/activity-type-classifier
 
 AUTONOMOUS_OVERRIDES="You are running autonomously in CI. Apply the following overrides:
 - Max issues: Process at most ${SANKEY_MAX_ISSUES} issues per run.
-- Artifact paths: Save classifications.json to artifacts/activity-type-classifier/classifications.json and report.md to artifacts/activity-type-classifier/report.md
 - No interactive prompts: Do not use AskUserQuestion or wait for input.
 - Error handling: Log errors and continue processing remaining issues.
 - Dry run mode: ${SANKEY_DRY_RUN}. When dry run is true, do NOT apply any updates to Jira (skip Phase 4 entirely). Classify issues and generate the report and classifications.json showing what WOULD be set, but do not call jira_update_issue. When dry run is false, apply updates immediately without asking for user confirmation.
@@ -87,13 +74,18 @@ AUTONOMOUS_OVERRIDES="You are running autonomously in CI. Apply the following ov
 
 PROCESS_START=$(date +%s)
 
+DRY_RUN_FLAG=""
+if [[ "${SANKEY_DRY_RUN}" == "true" ]]; then
+    DRY_RUN_FLAG="--dry-run"
+fi
+
 echo "Starting Claude classification..."
 set +e
 claude \
-    -p "/classifying-activity-types Classify ${SANKEY_PROJECT_KEY} ${SANKEY_ISSUE_TYPE}s without activity types. Process at most ${SANKEY_MAX_ISSUES} issues." \
+    -p "/jira:batch-categorize-activity-types ${SANKEY_PROJECT_KEY} --type ${SANKEY_ISSUE_TYPE} --limit ${SANKEY_MAX_ISSUES} ${DRY_RUN_FLAG}" \
     --append-system-prompt "${AUTONOMOUS_OVERRIDES}" \
     --allowedTools "mcp__jira__* Bash Read Write Grep Glob Skill" \
-    --max-turns 50 \
+    --max-turns 100 \
     --model "${CLAUDE_MODEL}" \
     --output-format stream-json \
     --verbose \
