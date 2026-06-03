@@ -4,9 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
-cd /tmp/otel-tests 
-git checkout rhosdt-3.9
+if [[ -z "${OTEL_TESTS_BRANCH:-}" ]]; then
+  echo "ERROR: OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+  exit 1
+fi
+
+git clone https://github.com/os-observability/opentelemetry-operator.git /tmp/otel-tests
+cd /tmp/otel-tests
+git checkout "${OTEL_TESTS_BRANCH}"
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
@@ -77,13 +82,13 @@ tests/e2e-prometheuscr \
 tests/e2e-sidecar || any_errors=true
 
 # Set the operator environment variables for metadata filters tests.
-OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator-system | grep "opentelemetry-operator" | awk '{print $1}')
+oc -n opentelemetry-operator-system patch csv $OTEL_CSV_NAME --type=json -p '[
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"ANNOTATIONS_FILTER","value":".*filter.out,config.*.gke.io.*"}},
   {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"LABELS_FILTER","value":".*filter.out"}}
 ]'
 sleep 60
-if oc -n openshift-opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+if oc -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
     echo "Operator deployment updated successfully for metadata filters, continuing script execution..."
 else
     echo "Operator deployment update for metadata filters failed, exiting with error."
@@ -98,6 +103,15 @@ chainsaw test \
 --report-format "XML" \
 --test-dir \
 tests/e2e-metadata-filters || any_errors=true
+
+# Execute TLS profile tests
+chainsaw test \
+--quiet \
+--report-name "junit_otel_e2e_tls_profile" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-openshift-tls-profile || any_errors=true
 
 # Check if any errors occurred
 if $any_errors; then
