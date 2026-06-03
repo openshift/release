@@ -26,8 +26,20 @@ if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
   POOL_ID=$(jq -r '.pool_id // empty' "${WIF_CONFIG}")
   SERVICE_ACCOUNT=$(jq -r '.service_account // empty' "${WIF_CONFIG}")
   PROVIDER_ID=$(jq -r --arg iss "${OIDC_ISSUER}" '.issuer_map[$iss] // empty' "${WIF_CONFIG}")
-  if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${SERVICE_ACCOUNT}" || -z "${PROVIDER_ID}" ]]; then
-    echo "ERROR: Failed to derive WIF config from ${WIF_CONFIG} — cannot authenticate for cleanup"
+  if [[ -z "${PROJECT_NUMBER}" ]]; then
+    echo "ERROR: .project_number is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${POOL_ID}" ]]; then
+    echo "ERROR: .pool_id is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${SERVICE_ACCOUNT}" ]]; then
+    echo "ERROR: .service_account is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${PROVIDER_ID}" ]]; then
+    echo "ERROR: OIDC issuer '${OIDC_ISSUER}' not found in .issuer_map of ${WIF_CONFIG} — cannot authenticate for cleanup"
     exit 1
   fi
   cat > "${SHARED_DIR}/wif-cred.json" <<EOF
@@ -47,7 +59,15 @@ if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
 EOF
   echo "WIF credential re-derived successfully"
 fi
-gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
+if ! gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"; then
+  echo "ERROR: WIF login failed — cannot authenticate for cleanup"
+  echo "  project_number, pool_id, service_account, and issuer_map must all be correct"
+  if [[ -n "${OIDC_ISSUER:-}" ]]; then
+    echo "  OIDC issuer detected: ${OIDC_ISSUER}"
+    echo "  WIF provider mapped: ${PROVIDER_ID}"
+  fi
+  exit 1
+fi
 
 # Load cluster info from SHARED_DIR (written by provision step).
 # If SHARED_DIR files are missing (provision was aborted before the Secret was synced),
