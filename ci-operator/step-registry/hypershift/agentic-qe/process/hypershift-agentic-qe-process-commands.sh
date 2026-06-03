@@ -45,8 +45,8 @@ fi
 PR_NUMBER="8454"
 SKIP_AUTH_CHECK="true"
 
-REPO_ORG="${REPO_OWNER:-openshift}"
-REPO_NAME="${REPO_NAME:-hypershift}"
+REPO_ORG="openshift"
+REPO_NAME="hypershift"
 echo "Processing PR #${PR_NUMBER} from ${REPO_ORG}/${REPO_NAME}"
 
 # Verify the job was triggered by a core-approver
