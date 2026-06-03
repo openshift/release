@@ -99,5 +99,3 @@ cilium install \
     --set extraVolumes[0].configMap.name=cilium-cni-override \
     --set extraVolumeMounts[0].name=cni-override \
     --set extraVolumeMounts[0].mountPath=/etc/cilium-cni
-
-cilium status --namespace cilium --wait
