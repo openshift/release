@@ -64,6 +64,7 @@ function cleanup() {
 
     aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
     aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}" 2>/dev/null || echo "[WARN] WARN Bucket deletion failed or bucket already deleted"
+    rm -f "${SHARED_DIR}/mapt-s3-bucket-name" || true
 
     echo "[INFO] !!!! Emergency S3 bucket cleanup attempted"
   fi
@@ -133,6 +134,13 @@ echo "[SUCCESS] !!!! S3 bucket created: ${DYNAMIC_BUCKET_NAME}"
 echo "${DYNAMIC_BUCKET_NAME}" > "${SHARED_DIR}/mapt-s3-bucket-name"
 echo "[INFO] SAVE Saved bucket name to ${SHARED_DIR}/mapt-s3-bucket-name for cleanup"
 
+echo "[INFO] RESOURCE ======================================================"
+echo "[INFO] RESOURCE AWS resource identifiers (for manual cleanup if needed)"
+echo "[INFO] RESOURCE   MAPT project / EC2 instance name : ${CORRELATE_MAPT}"
+echo "[INFO] RESOURCE   S3 state bucket                  : ${DYNAMIC_BUCKET_NAME}"
+echo "[INFO] RESOURCE   AWS region                       : ${AWS_REGION}"
+echo "[INFO] RESOURCE ======================================================"
+
 # Trap EXIT/ERR/INT/TERM to ensure MAPT infrastructure is destroyed on failure or cancellation
 trap cleanup EXIT ERR INT TERM
 
@@ -170,6 +178,8 @@ if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
 fi
 echo "[SUCCESS] !!!! OSSM Istio MAPT OpenShift SNC cluster created successfully"
 
+API_URL=$(grep -oP '(?<=server: ).*' "${SHARED_DIR}/kubeconfig" 2>/dev/null | head -1 || true)
+echo "[INFO] CLUSTER API server: ${API_URL}"
 echo "[INFO] SAVE Saving kubeconfig location for test step..."
 echo "[INFO] FILE Kubeconfig available at: ${SHARED_DIR}/kubeconfig"
 

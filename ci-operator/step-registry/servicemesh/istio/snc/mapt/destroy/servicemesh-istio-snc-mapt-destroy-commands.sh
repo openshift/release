@@ -89,7 +89,13 @@ fi
 
 DYNAMIC_BUCKET_NAME=$(cat "${SHARED_DIR}/mapt-s3-bucket-name")
 export DYNAMIC_BUCKET_NAME
-echo "[SUCCESS] !!!! Retrieved bucket name: ${DYNAMIC_BUCKET_NAME}"
+
+echo "[INFO] RESOURCE ======================================================"
+echo "[INFO] RESOURCE AWS resources targeted for cleanup"
+echo "[INFO] RESOURCE   MAPT project / EC2 instance name : ${CORRELATE_MAPT}"
+echo "[INFO] RESOURCE   S3 state bucket                  : ${DYNAMIC_BUCKET_NAME}"
+echo "[INFO] RESOURCE   AWS region                       : ${AWS_REGION}"
+echo "[INFO] RESOURCE ======================================================"
 
 export PULUMI_K8S_DELETE_UNREACHABLE=true
 echo "[INFO] **** Environment variable PULUMI_K8S_DELETE_UNREACHABLE set to true"

@@ -18,11 +18,14 @@ ref:
       cpu: "1"
       memory: 4Gi
   documentation: |-
-    Destroys the OpenShift Single Node Cluster (SNC) created for OSSM Istio testing with simplified cleanup approach.
-    Features quick, straightforward resource cleanup without complex versioning logic.
+    Destroys the OpenShift Single Node Cluster (SNC) created for OSSM Istio testing.
 
-    This step reads the dynamically created bucket name from ${SHARED_DIR}/mapt-s3-bucket-name and uses simple
-    force delete approach for S3 bucket cleanup, ensuring faster execution and zero leftover resources.
+    Reads the bucket name from ${SHARED_DIR}/mapt-s3-bucket-name (written by the create step).
+    If the file is absent (create never completed), the step logs a warning and exits 0 cleanly.
+
+    S3 cleanup uses paginated listing of all object versions and delete markers
+    (NextKeyMarker/NextVersionIdMarker) to handle versioned buckets with >1000 objects,
+    followed by aws s3 rb to remove the bucket. On MAPT destroy failure, best-effort
+    bucket cleanup is still attempted before exiting with a non-zero status.
 
     Uses AWS credentials from the existing vault system (cluster-secrets-ossm-aws).
-    Reduced grace period compared to EKS approach due to simplified cleanup strategy.

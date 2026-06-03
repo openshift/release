@@ -55,7 +55,7 @@ if ! oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' | 
   exit 1
 fi
 
-if ! oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].ready}' | grep -q "true"; then
+if ! oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath="{.status.containerStatuses[?(@.name==\"${CONTAINER_NAME}\")].ready}" | grep -q "true"; then
   echo "[ERROR] ERROR Pod ${POD_NAME} container is not ready"
   oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
   exit 1
