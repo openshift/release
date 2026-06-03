@@ -201,6 +201,9 @@ echo "Snapshot created in ${PHASE_SNAPSHOT_DURATION}s"
 echo "Archiving payload snapshot to artifacts..."
 tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 
+SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print -quit)")
+echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
+
 # Install the must-gather plugin for analyzing must-gather archives
 echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
@@ -222,7 +225,7 @@ timeout 3600 claude \
     --output-format stream-json \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DIR}" \
+    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
