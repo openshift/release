@@ -1,4 +1,8 @@
 base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   sippy-devcontainer:
     name: sippy
     namespace: ci
@@ -9,16 +13,29 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM nested-podman AS podman
       FROM src AS source
       FROM sippy-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils && dnf clean all
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
+          chmod +rx /entrypoint.sh
       COPY --from=source /go/src/github.com/openshift/sippy /workspace
       RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
+      ENV BUILDAH_ISOLATION=chroot
       USER vscode
       WORKDIR /workspace
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
     from: sippy-devcontainer
     inputs:
+      nested-podman:
+        as:
+        - nested-podman
       src:
         as:
         - src
