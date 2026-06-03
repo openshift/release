@@ -29,7 +29,11 @@ echo "[INFO] 🔍 Discovering orphaned EKS clusters..."
 ORPHANED_CLUSTERS=()
 
 # We need the Account ID to construct ARNs for EKS
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+if ! ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null); then
+  echo "[WARN] Unable to resolve AWS account ID; skipping AWS cleanup."
+  echo "aws-cleanup: 0 clusters processed, discovery failed" > "${ARTIFACT_DIR}/aws-cleanup-summary.txt"
+  exit 0
+fi
 
 mapfile -t CLUSTERS < <(aws eks list-clusters --query 'clusters[]' --output text | tr '\t' '\n' || true)
 
@@ -60,9 +64,19 @@ for cluster in "${CLUSTERS[@]}"; do
   # 3. If expirationDate tag exists
   if [[ -n "${EXPIRATION_DATE}" ]]; then
     EXP_TIME=$(date -d "${EXPIRATION_DATE}" +%s 2>/dev/null || echo "0")
-    if [[ ${CURRENT_TIME} -gt ${EXP_TIME} ]] && [[ ${EXP_TIME} -gt 0 ]]; then
+    if [[ ${EXP_TIME} -gt 0 ]] && [[ ${CURRENT_TIME} -gt ${EXP_TIME} ]]; then
       echo "[INFO] ⚠️ Found expired cluster: ${cluster} (launch-id: ${LAUNCH_ID}, expired at: ${EXPIRATION_DATE})"
       IS_ORPHAN=true
+    elif [[ ${EXP_TIME} -le 0 ]]; then
+      # expirationDate tag exists but failed to parse — fall back to createdAt age check
+      CREATED_AT=$(aws eks describe-cluster --name "${cluster}" --query 'cluster.createdAt' --output text 2>/dev/null || echo "0")
+      if [[ -n "${CREATED_AT}" ]] && [[ "${CREATED_AT}" != "0" ]]; then
+        CREATED_TIME=$(date -d "${CREATED_AT}" +%s 2>/dev/null || echo "0")
+        if [[ ${CREATED_TIME} -gt 0 ]] && [[ ${CREATED_TIME} -lt ${ONE_DAY_AGO} ]]; then
+          echo "[INFO] ⚠️ Found cluster with unparseable expirationDate older than 24h: ${cluster} (created at: ${CREATED_AT})"
+          IS_ORPHAN=true
+        fi
+      fi
     fi
   else
     # 4. If no expirationDate tag (legacy clusters)
