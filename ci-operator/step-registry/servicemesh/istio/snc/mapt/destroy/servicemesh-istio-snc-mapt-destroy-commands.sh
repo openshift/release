@@ -17,7 +17,7 @@ aws_validation() {
     exit 1
   fi
 
-  echo "Using credentials file: ${CRED_FILE}"
+  echo "AWS credentials file located"
 
   export AWS_SHARED_CREDENTIALS_FILE="${CRED_FILE}"
   AWS_REGION=${AWS_REGION:-"us-east-1"}

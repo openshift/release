@@ -14,12 +14,18 @@ workflow:
       SPOT_INCREASE_RATE: "80"
   documentation: |-
     Infrastructure workflow for creating and destroying an OpenShift Single Node Cluster (SNC) using MAPT (Multi Architecture Provisioning Tool) for OpenShift Service Mesh (OSSM) Istio testing.
-    This workflow provides the environment setup for privileged tests that require kernel modules, Docker socket access, and system administration capabilities.
 
     The workflow handles infrastructure lifecycle only - test execution is performed by separate test steps:
     - Pre phase: Creates unique S3 bucket, provisions spot OpenShift SNC cluster, sets up privileged pod environment, copies source code
-    - Post phase: Destroys SNC cluster and deletes the entire S3 bucket with simplified cleanup approach
+    - Post phase: Destroys SNC cluster and deletes the entire S3 bucket with paginated versioned-object cleanup
 
     The OpenShift SNC cluster provides native OpenShift tooling and authentication while using spot instances for 70-90% cost savings.
     No pre-existing S3 buckets are required - each job gets its own isolated state storage that is automatically cleaned up.
     Uses the existing OSSM AWS credentials from the vault system (cluster-secrets-ossm-aws) plus OpenShift pull secret.
+
+    Security note: The servicemesh-istio-e2e pre-step creates a privileged pod (privileged: true, SYS_ADMIN,
+    IPC_LOCK, runAsUser: 0) on the SNC cluster. These privileges are required for OSSM Istio testing:
+    - privileged/SYS_ADMIN: loading kernel modules and managing network namespaces for Istio's data plane
+    - IPC_LOCK: memory locking required for high-performance packet processing in tests
+    - runAsUser: 0: system-level resource access for build tooling and network configuration
+    The privileged pod runs inside a dedicated ephemeral OpenShift cluster, not on shared CI infrastructure.

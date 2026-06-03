@@ -16,13 +16,9 @@ function cleanup() {
 
     echo "[INFO] **** Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 
-    output=$(mapt aws openshift-snc destroy \
+    if mapt aws openshift-snc destroy \
       --project-name "${CORRELATE_MAPT}" \
-      --backed-url "s3://${DYNAMIC_BUCKET_NAME}" 2>&1)
-    exit_code=$?
-
-    echo "$output"
-    if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
+      --backed-url "s3://${DYNAMIC_BUCKET_NAME}" 2>&1; then
       echo "[SUCCESS] !!!! Successfully destroyed MAPT infrastructure during cleanup"
     else
       echo "[WARN] WARN MAPT destroy may have failed, but continuing with bucket cleanup"
@@ -86,7 +82,7 @@ aws_validation() {
     exit 1
   fi
 
-  echo "Using credentials file: ${CRED_FILE}"
+  echo "AWS credentials file located"
 
   export AWS_SHARED_CREDENTIALS_FILE="${CRED_FILE}"
   AWS_REGION=${AWS_REGION:-"us-east-1"}
@@ -178,8 +174,6 @@ if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
 fi
 echo "[SUCCESS] !!!! OSSM Istio MAPT OpenShift SNC cluster created successfully"
 
-API_URL=$(grep -oP '(?<=server: ).*' "${SHARED_DIR}/kubeconfig" 2>/dev/null | head -1 || true)
-echo "[INFO] CLUSTER API server: ${API_URL}"
 echo "[INFO] SAVE Saving kubeconfig location for test step..."
 echo "[INFO] FILE Kubeconfig available at: ${SHARED_DIR}/kubeconfig"
 
