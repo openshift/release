@@ -59,6 +59,26 @@ echo "Status: ${ISSUE_STATUS}"
 # Source is baked into the image at /workspace via ci-operator src input
 cd /workspace
 
+# Debug: show what's in the workspace
+echo "=== Debug: workspace contents ==="
+echo "PWD: $(pwd)"
+echo "whoami: $(whoami 2>/dev/null || echo 'unknown (uid '$(id -u)')')"
+echo "id: $(id)"
+ls -la
+echo "=== Debug: .git check ==="
+ls -la .git 2>/dev/null || echo ".git directory NOT found"
+git status 2>/dev/null || echo "git status failed"
+echo "=== Debug: key tools ==="
+which podman 2>/dev/null && podman --version || echo "podman not found"
+which go 2>/dev/null && go version || echo "go not found"
+which node 2>/dev/null && node --version || echo "node not found"
+which gh 2>/dev/null && gh --version || echo "gh not found"
+echo "=== Debug: environment ==="
+echo "HOME=${HOME}"
+echo "GOPATH=${GOPATH:-unset}"
+echo "PATH=${PATH}"
+echo "================================"
+
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 

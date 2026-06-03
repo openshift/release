@@ -9,18 +9,19 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM src AS source
       FROM sippy-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils && dnf clean all
-      COPY /src /workspace
+      COPY --from=source /go/src/github.com/openshift/sippy /workspace
       RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
       USER vscode
+      WORKDIR /workspace
     from: sippy-devcontainer
     inputs:
       src:
-        paths:
-        - destination_dir: src
-          source_path: /go/src/github.com/openshift/sippy
+        as:
+        - src
     to: sippy-ci-dev
 resources:
   '*':
