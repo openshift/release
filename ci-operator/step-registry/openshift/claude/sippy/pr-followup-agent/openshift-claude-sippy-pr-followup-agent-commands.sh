@@ -26,8 +26,7 @@ sippy_init() {
 
 GH_APP_DIR="/var/run/github-token"
 
-# Generate a GitHub App installation token for a given installation ID.
-# Returns the token on stdout. Does not configure gh/git.
+# Generate a GitHub App installation token via JWT for a given installation ID.
 _sippy_generate_token_for_installation() {
     local installation_id=$1
     set +x
@@ -52,35 +51,30 @@ _sippy_generate_token_for_installation() {
         | jq -r '.token'
 }
 
-# Generate a token for the fork (push access) and configure git credential helper.
-sippy_generate_github_token() {
+# Generate both tokens and configure auth:
+#   - GH_FORK_TOKEN: used by git credential helper for push operations
+#   - GITHUB_TOKEN: used by gh CLI for PR creation, comment replies, API calls
+# Call this once at startup and again before long operations to refresh expired tokens.
+sippy_generate_github_tokens() {
     set +x
-    local fork_installation_id
-    fork_installation_id=$(cat "${GH_APP_DIR}/installation-id")
-    local token
-    token=$(_sippy_generate_token_for_installation "${fork_installation_id}")
-    if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate fork installation token."
-        return 1
-    fi
-    echo "${token}" | gh auth login --with-token 2>/dev/null
-    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub App token generated (fork)."
-}
+    local fork_id upstream_id token
 
-# Generate a token for upstream (PR creation) and switch gh auth to it.
-sippy_generate_upstream_token() {
-    set +x
-    local upstream_installation_id
-    upstream_installation_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
-    local token
-    token=$(_sippy_generate_token_for_installation "${upstream_installation_id}")
+    fork_id=$(cat "${GH_APP_DIR}/installation-id")
+    token=$(_sippy_generate_token_for_installation "${fork_id}")
     if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate upstream installation token."
-        return 1
+        echo "ERROR: Failed to generate fork token."; return 1
     fi
-    echo "${token}" | gh auth login --with-token 2>/dev/null
-    echo "GitHub App token generated (upstream)."
+    export GH_FORK_TOKEN="${token}"
+
+    upstream_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
+    token=$(_sippy_generate_token_for_installation "${upstream_id}")
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate upstream token."; return 1
+    fi
+    export GITHUB_TOKEN="${token}"
+
+    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+    echo "GitHub tokens generated (fork: push, upstream: gh CLI)."
 }
 
 sippy_load_github_token() {
@@ -88,7 +82,7 @@ sippy_load_github_token() {
     for f in app-id installation-id openshift-installation-id private-key; do
         [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
     done
-    sippy_generate_github_token || exit 1
+    sippy_generate_github_tokens || exit 1
 }
 
 sippy_fetch_jira_issue() {
@@ -111,6 +105,7 @@ sippy_setup_workspace() {
     git config user.email "openshift-trt@redhat.com"
     git remote add fork "https://github.com/${SIPPY_FORK_REPO}.git"
     echo "Starting services..."
+    export SIPPY_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_SEED_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_PRODLIKE_DATABASE_DSN="postgresql://postgres@localhost:5432/prodlike?sslmode=disable"
     .devcontainer/init-services.sh
@@ -284,16 +279,19 @@ ${REVIEW_SUMMARY:-No reviews.}
 1. Read and understand each review comment.
 2. Explore the relevant code to understand the context.
 3. Address each comment by making the appropriate code changes.
-4. Run 'make test' and 'make lint' to verify your changes.
-5. Run e2e tests using the 'run_e2e' MCP tool. E2e tests MUST pass before pushing.
-6. Commit your fixes with a message referencing the review feedback.
-7. Push to the fork: git push fork HEAD
+4. For each comment you address, reply to it on the PR using:
+   gh api repos/openshift/sippy/pulls/${PR_NUM}/comments/COMMENT_ID/replies -f body='<your response>'
+   Explain what you changed and why. If a comment is not actionable, reply explaining why.
+5. Run 'make test' and 'make lint' to verify your changes.
+6. Run e2e tests using the 'run_e2e' MCP tool. E2e tests MUST pass before pushing.
+7. Commit your fixes with a message referencing the review feedback.
+8. Push to the fork: git push fork HEAD
 
 DO NOT push until e2e tests pass.
 
 ## Important
 - Address ALL review comments, not just some.
-- If a comment is already resolved or not actionable, explain why in the commit message.
+- Reply to EVERY review comment on the PR explaining how you addressed it.
 - Do not modify CI configuration or generated files.
 - Push to the 'fork' remote, NOT 'origin'.
 - Do NOT create new PRs. Your job is to push fixes to the existing PR branch.
@@ -310,7 +308,9 @@ DO NOT push until e2e tests pass.
 PROMPT_EOF
 
 echo "Invoking Claude to address review comments..."
-sippy_generate_github_token || echo "Warning: Failed to refresh token before Claude run."
+# Use upstream token so Claude can reply to PR comments on openshift/sippy.
+# Git push still works via the credential helper (configured during sippy_load_github_token).
+sippy_generate_github_tokens || echo "Warning: Failed to refresh tokens."
 sippy_run_claude "$(cat "${PROMPT_FILE}")" \
     "You hit the timeout. Please commit and push whatever fixes you have now: git push fork HEAD"
 

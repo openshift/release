@@ -26,8 +26,7 @@ sippy_init() {
 
 GH_APP_DIR="/var/run/github-token"
 
-# Generate a GitHub App installation token for a given installation ID.
-# Returns the token on stdout. Does not configure gh/git.
+# Generate a GitHub App installation token via JWT for a given installation ID.
 _sippy_generate_token_for_installation() {
     local installation_id=$1
     set +x
@@ -52,35 +51,30 @@ _sippy_generate_token_for_installation() {
         | jq -r '.token'
 }
 
-# Generate a token for the fork (push access) and configure git credential helper.
-sippy_generate_github_token() {
+# Generate both tokens and configure auth:
+#   - GH_FORK_TOKEN: used by git credential helper for push operations
+#   - GITHUB_TOKEN: used by gh CLI for PR creation, comment replies, API calls
+# Call this once at startup and again before long operations to refresh expired tokens.
+sippy_generate_github_tokens() {
     set +x
-    local fork_installation_id
-    fork_installation_id=$(cat "${GH_APP_DIR}/installation-id")
-    local token
-    token=$(_sippy_generate_token_for_installation "${fork_installation_id}")
-    if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate fork installation token."
-        return 1
-    fi
-    echo "${token}" | gh auth login --with-token 2>/dev/null
-    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub App token generated (fork)."
-}
+    local fork_id upstream_id token
 
-# Generate a token for upstream (PR creation) and switch gh auth to it.
-sippy_generate_upstream_token() {
-    set +x
-    local upstream_installation_id
-    upstream_installation_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
-    local token
-    token=$(_sippy_generate_token_for_installation "${upstream_installation_id}")
+    fork_id=$(cat "${GH_APP_DIR}/installation-id")
+    token=$(_sippy_generate_token_for_installation "${fork_id}")
     if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate upstream installation token."
-        return 1
+        echo "ERROR: Failed to generate fork token."; return 1
     fi
-    echo "${token}" | gh auth login --with-token 2>/dev/null
-    echo "GitHub App token generated (upstream)."
+    export GH_FORK_TOKEN="${token}"
+
+    upstream_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
+    token=$(_sippy_generate_token_for_installation "${upstream_id}")
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate upstream token."; return 1
+    fi
+    export GITHUB_TOKEN="${token}"
+
+    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+    echo "GitHub tokens generated (fork: push, upstream: gh CLI)."
 }
 
 sippy_load_github_token() {
@@ -88,7 +82,7 @@ sippy_load_github_token() {
     for f in app-id installation-id openshift-installation-id private-key; do
         [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
     done
-    sippy_generate_github_token || exit 1
+    sippy_generate_github_tokens || exit 1
 }
 
 sippy_fetch_jira_issue() {
@@ -111,6 +105,7 @@ sippy_setup_workspace() {
     git config user.email "openshift-trt@redhat.com"
     git remote add fork "https://github.com/${SIPPY_FORK_REPO}.git"
     echo "Starting services..."
+    export SIPPY_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_SEED_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_PRODLIKE_DATABASE_DSN="postgresql://postgres@localhost:5432/prodlike?sslmode=disable"
     .devcontainer/init-services.sh
@@ -227,6 +222,9 @@ sippy_address_reviews() {
 ${REVIEW_BODY}
 ${REVIEW_SUMMARY}
 
+For each comment you address, reply to it on the PR using: gh api repos/openshift/sippy/pulls/PULL_NUMBER/comments/COMMENT_ID/replies -f body='<your response>'
+Explain what you changed and why. If a comment is not actionable, reply explaining why.
+
 After fixing, run 'make test' and 'make lint' to verify. Then run e2e tests using the 'run_e2e' MCP tool — e2e tests MUST pass before pushing. Then push: git push fork HEAD" \
         --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
 }
@@ -310,7 +308,7 @@ echo "Branch pushed: ${BRANCH_NAME}"
 
 # Create PR using the upstream installation token (different from fork push token)
 echo "Switching to upstream token for PR creation..."
-sippy_generate_upstream_token || { echo "ERROR: Failed to generate upstream token."; exit 1; }
+sippy_generate_github_tokens || { echo "ERROR: Failed to refresh tokens."; exit 1; }
 
 echo "Creating PR..."
 PR_BODY_FILE="/workspace/artifacts/pr-description.md"
@@ -339,16 +337,13 @@ PR_URL=$(gh pr create \
 echo "PR created: ${PR_URL}"
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
 
-# Switch back to fork token for review comment operations
-sippy_generate_github_token || echo "Warning: Failed to refresh fork token."
-
 # Poll for review comments (e.g. CodeRabbit) for up to 1 hour after PR creation
 echo ""
 echo "=== Watching PR #${PR_NUM} for review comments (up to 1 hour) ==="
 REVIEW_ROUND=0
 
-# Refresh token before polling — the initial token may have expired during Claude's run
-sippy_generate_github_token || echo "Warning: Failed to refresh token before polling."
+# Refresh tokens before polling — initial tokens may have expired during Claude's run
+sippy_generate_github_tokens || echo "Warning: Failed to refresh tokens."
 
 for i in $(seq 1 6); do
     echo "Waiting 10 minutes before checking for comments (check $i/6)..."
@@ -366,7 +361,8 @@ for i in $(seq 1 6); do
     if [[ "${TOTAL_NEW}" -gt 0 ]]; then
         REVIEW_ROUND=$(( REVIEW_ROUND + 1 ))
         echo "Addressing review comments (round ${REVIEW_ROUND})..."
-        sippy_generate_github_token || echo "Warning: Failed to refresh token before review round."
+        # Refresh fork token for push, switch gh auth to upstream for PR comment replies
+        sippy_generate_github_tokens || echo "Warning: Failed to refresh tokens."
         sippy_address_reviews
     fi
 done
