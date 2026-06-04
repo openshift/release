@@ -312,6 +312,7 @@ echo "Creating PR..."
 PR_URL=$(gh pr create \
     --repo openshift/sippy \
     --head "${SIPPY_FORK_REPO%%/*}:${BRANCH_NAME}" \
+    --no-maintainer-edit \
     --title "${JIRA_ISSUE_KEY}: $(echo "${ISSUE_SUMMARY}" | head -c 60)" \
     --body "$(cat <<PR_BODY
 ## ${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}
