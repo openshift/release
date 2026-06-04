@@ -272,6 +272,10 @@ ${ISSUE_COMMENTS}
 8. Create a feature branch named '${JIRA_ISSUE_KEY}' (lowercase).
 9. Commit your changes with a meaningful commit message that references ${JIRA_ISSUE_KEY}.
 10. Push the branch to the fork: git push fork HEAD
+11. Write a PR description to /workspace/artifacts/pr-description.md. Include:
+    - A summary section describing what changed and why
+    - A test plan section listing what you verified (make test, make lint, e2e, etc.)
+    - Link to the Jira issue: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 Do NOT create a PR — the CI system will create the PR automatically after you push.
 
 ## Important
@@ -309,19 +313,25 @@ echo "Switching to upstream token for PR creation..."
 sippy_generate_upstream_token || { echo "ERROR: Failed to generate upstream token."; exit 1; }
 
 echo "Creating PR..."
+PR_BODY_FILE="/workspace/artifacts/pr-description.md"
+if [[ ! -s "${PR_BODY_FILE}" ]]; then
+    echo "Warning: Claude did not write a PR description. Using default."
+    cat > "${PR_BODY_FILE}" <<PR_DEFAULT
+## ${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}
+
+Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
+PR_DEFAULT
+fi
+# Append attribution footer
+printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n' >> "${PR_BODY_FILE}"
+
 PR_URL=$(gh pr create \
     --repo openshift/sippy \
     --head "${SIPPY_FORK_REPO%%/*}:${BRANCH_NAME}" \
     --no-maintainer-edit \
     --title "${JIRA_ISSUE_KEY}: $(echo "${ISSUE_SUMMARY}" | head -c 60)" \
-    --body "$(cat <<PR_BODY
-## ${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}
-
-Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
-
-Generated with [Claude Code](https://claude.com/claude-code)
-PR_BODY
-)" 2>&1) || {
+    --body-file "${PR_BODY_FILE}" \
+    2>&1) || {
     echo "ERROR: Failed to create PR: ${PR_URL}"
     exit 1
 }
