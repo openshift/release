@@ -36,6 +36,7 @@ export NAMESPACE=$TARGET_NAMESPACE
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 if [[ -n "${ALERTS_PATH:-}" && ! -f "$ALERTS_PATH" ]]; then
+  echo "WARNING: ALERTS_PATH '$ALERTS_PATH' not found, falling back to default" >&2
   export ALERTS_PATH="/home/krkn/kraken/config/alerts_openshift.yaml"
 fi
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
