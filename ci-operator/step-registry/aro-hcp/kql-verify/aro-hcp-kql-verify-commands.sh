@@ -8,6 +8,11 @@ CONTAINER_NAME="kusto-emulator-$$"
 EMULATOR_IMAGE="${KUSTO_EMULATOR_IMAGE:-mcr.microsoft.com/azuredataexplorer/kustainer-linux:latest}"
 READINESS_TIMEOUT=120
 
+# The kustainer image uses UID 65532 (nonroot) which exceeds the UID range
+# available in the CI pod's user namespace, causing lchown failures during
+# image layer unpacking. Allow podman to skip chown for these files.
+sed -i '/^\[storage\]/a ignore_chown_errors = "true"' /etc/containers/storage.conf
+
 podman run --userns=keep-id -e ACCEPT_EULA=Y -m 4G -d -p 127.0.0.1:8080:8080 \
   --name "${CONTAINER_NAME}" "${EMULATOR_IMAGE}" > /dev/null
 trap 'podman rm -f ${CONTAINER_NAME} > /dev/null 2>&1' EXIT
