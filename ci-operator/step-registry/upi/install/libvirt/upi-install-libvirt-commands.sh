@@ -57,6 +57,14 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+mkdir -p /tmp/bin
+if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE:-}" ]; then
+  echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
+  curl -o /tmp/openshift-client-linux.tar.gz -L "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/${OPENSHIFT_CLIENT_VERSION_OVERRIDE}/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz"
+  tar -xzvf /tmp/openshift-client-linux.tar.gz -C /tmp/bin oc && chmod u+x /tmp/bin/oc
+fi
+export PATH=/tmp/bin:$PATH
+
 # download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
