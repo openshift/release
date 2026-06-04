@@ -59,7 +59,8 @@ resolve_commit_sha() {
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
 
     log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
-    FBC_COMMIT_SHA=$(curl -sSf --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 10 --max-time 30 \
+    # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
+    FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 10 --max-time 30 \
         "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) || true
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
@@ -155,7 +156,8 @@ create_registries_conf() {
     local idms_file="${TMP_DIR}/idms-source.yaml"
     local registries_conf="${TMP_DIR}/registries.conf"
 
-    curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
+    # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
+    curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
         "$idms_url" -o "$idms_file" || {
         log "ERROR: Failed to fetch IDMS from $idms_url"
         exit 1
