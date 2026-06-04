@@ -394,7 +394,7 @@ export UPGRADE_FAILURE_TYPE="overall"
 # The cases are from existing general checkpoints enabled implicitly in upgrade step, which may be a possible UPGRADE_FAILURE_TYPE
 export IMPLICIT_ENABLED_CASES=""
 
-# Only perform RHEL worker upgrade for OCP 4.18 and below (RHEL workers deprecated in 4.19+)
+# Only perform RHEL worker upgrade for OCP 4.18 and below (RHEL workers support removed in 4.19+)
 if [[ "${TARGET_MAJOR_VERSION}" -eq "4" ]] && [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     run_command "oc get node -owide"
     rhel_repo
