@@ -32,26 +32,16 @@ images:
           chmod g+w /etc/passwd && \
           MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/s390x/clients && \
           CURL_FLAGS="--fail --show-error --location --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300" && \
-          curl ${CURL_FLAGS} ${MIRRORURL}/ocp/candidate/opm-linux-s390x-rhel9.tar.gz -o opm-linux.tar.gz && \
-          curl ${CURL_FLAGS} ${MIRRORURL}/ocp/candidate/sha256sum.txt -o opm-sha256sum.txt && \
-          grep "opm-linux-s390x-rhel9.tar.gz" opm-sha256sum.txt | sha256sum -c - && \
+          curl ${CURL_FLAGS} ${MIRRORURL}/ocp-dev-preview/candidate/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz && \
+          curl ${CURL_FLAGS} ${MIRRORURL}/ocp-dev-preview/candidate/sha256sum.txt -o opm-sha256sum.txt && \
+          grep "opm-linux-rhel9.tar.gz" opm-sha256sum.txt | sha256sum -c - && \
           tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && rm -f opm-linux.tar.gz opm-sha256sum.txt && \
           curl ${CURL_FLAGS} ${MIRRORURL}/ocp-dev-preview/latest/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
           curl ${CURL_FLAGS} ${MIRRORURL}/ocp-dev-preview/latest/sha256sum.txt -o oc-mirror-sha256sum.txt && \
           grep "oc-mirror.rhel9.tar.gz" oc-mirror-sha256sum.txt | sha256sum -c - && \
           tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && rm -f oc-mirror.tar.gz oc-mirror-sha256sum.txt && \
           curl ${CURL_FLAGS} ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-s390x.tar.gz -o opt-sdk.tar.gz && \
-          curl ${CURL_FLAGS} ${MIRRORURL}/operator-sdk/latest/sha256sum.txt -o opt-sdk-sha256sum.txt && \
-          grep "operator-sdk-linux-s390x.tar.gz" opt-sdk-sha256sum.txt | sha256sum -c - && \
-          tar -C /usr/bin/ -xzvf opt-sdk.tar.gz && rm -f opt-sdk.tar.gz opt-sdk-sha256sum.txt && \
-          KREW_ROOT="/usr/local/krew" && \
-          ARCH="s390x" && \
-          KREW_VERSION="v0.4.5" && \
-          KREW="krew-linux_${ARCH}" && \
-          pushd "$(mktemp -d)" && \
-          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/download/${KREW_VERSION}/${KREW}.tar.gz" && \
-          tar zxvf "${KREW}.tar.gz" && ./"${KREW}" install krew && \
-          popd && export PATH="$PATH:${KREW_ROOT}/bin:$HOME/.krew/bin" && \
+          tar -C /usr/bin/ -xzvf opt-sdk.tar.gz && rm -f opt-sdk.tar.gz && \
           yum clean all && \
           rm -rf /usr/bin/oc /usr/bin/kubectl /var/cache/yum/* /tmp/*
     from: tools
