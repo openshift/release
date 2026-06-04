@@ -14,7 +14,7 @@ SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
-BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_IP=10.6.105.154
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
@@ -68,7 +68,7 @@ if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
 else
     ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} "
 fi
-
+ADDITIONAL_ARG="--cluster-name cnfdu13 --force"
 # Choose topology for different job types:
 # Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
 # Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
