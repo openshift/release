@@ -14,14 +14,14 @@ export GOCACHE=/tmp/.cache/go-build
 mkdir -p /tmp/go/bin $GOCACHE \
   && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
-if [[ -z "${TEMPO_TESTS_BRANCH:-}" ]]; then
-  echo "ERROR: TEMPO_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH:-}" ]]; then
+  echo "ERROR: MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
   exit 1
 fi
 
 git clone https://github.com/os-observability/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout "${TEMPO_TESTS_BRANCH}"
+git checkout "${MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH}"
 make build
 
 #Enable user workload monitoring.
