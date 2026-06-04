@@ -5,8 +5,10 @@ set -o errexit
 set -o pipefail
 set -x
 
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 # Check if the system architecture is supported to perform the e2e installation
 arch=$(uname -m)

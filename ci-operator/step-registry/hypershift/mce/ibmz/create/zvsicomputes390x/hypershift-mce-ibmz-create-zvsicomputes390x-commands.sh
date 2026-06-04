@@ -14,8 +14,10 @@ hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
 export MGMT_CLUSTER_NAME
@@ -60,8 +62,10 @@ fi
 # Login to the IBM Cloud
 set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
+set +x
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
+set -x
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
