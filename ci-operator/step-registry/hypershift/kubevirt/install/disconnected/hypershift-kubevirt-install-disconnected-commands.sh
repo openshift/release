@@ -128,9 +128,10 @@ END
 
 pushd /home
 # try at least 3 times to be sure to get all the images...
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+for i in 1 2 3; do
+    echo "oc-mirror attempt ${i}/3"
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing || true
+done
 popd
 
 echo "6: Create imageconentsourcepolicy and catalogsource"

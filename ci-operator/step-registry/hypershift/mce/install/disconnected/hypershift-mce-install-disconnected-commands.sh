@@ -144,9 +144,10 @@ END
 pushd /home
 # cleanup leftovers from previous executions
 rm -rf oc-mirror-workspace
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+for i in 1 2 3; do
+    echo "oc-mirror attempt ${i}/3"
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls || true
+done
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"
