@@ -108,6 +108,7 @@ sippy_setup_workspace() {
     export SIPPY_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_SEED_DATABASE_DSN="postgresql://postgres@localhost:5432/postgres?sslmode=disable"
     export SIPPY_PRODLIKE_DATABASE_DSN="postgresql://postgres@localhost:5432/prodlike?sslmode=disable"
+    export REDIS_URL="redis://localhost:6379"
     .devcontainer/init-services.sh
     echo "Running post-create setup..."
     .devcontainer/post-create.sh
