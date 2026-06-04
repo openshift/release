@@ -48,6 +48,11 @@ ssh -o ServerAliveInterval=60 \
 
 cd /eco-ci-cd
 
+# Write PTP_CONFIGS to a YAML file so Ansible parses it as a list of dicts.
+# Passing it inline via --extra-vars "key='[...]'" causes Ansible to treat the
+# single-quoted value as a plain string, not a list.
+printf 'ptp_cycle_configs: %s\n' "${PTP_CONFIGS}" > /tmp/ptp_cycle_configs.yml
+
 echo "Run eco-gotests PTP suite — all cycles"
 ansible-playbook -vv ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
   -i ./inventories/ocp-deployment/build-inventory.py \
@@ -61,8 +66,8 @@ ansible-playbook -vv ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
     test_timeout=10m \
     mirror_registry=${MIRROR_REGISTRY} \
     pull_container_image=true \
-    additional_test_env_variables='-e ECO_TEST_TRACE=true -e ECO_VERBOSE_SCRIPT=true' \
-    ptp_cycle_configs='${PTP_CONFIGS}'"
+    additional_test_env_variables='-e ECO_TEST_TRACE=true -e ECO_VERBOSE_SCRIPT=true'" \
+  --extra-vars "@/tmp/ptp_cycle_configs.yml"
 
 echo "Run eco-gotests PTP — all cycles via generated script on bastion"
 ssh -o ServerAliveInterval=60 \
