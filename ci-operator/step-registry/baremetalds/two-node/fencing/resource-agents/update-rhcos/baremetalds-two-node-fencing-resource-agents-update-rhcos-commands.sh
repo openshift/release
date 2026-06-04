@@ -39,12 +39,34 @@ oc_debug_with_retry() {
 }
 
 if [[ "${RESOURCE_AGENT_SOURCE}" == "RHCOS" ]]; then
+ echo "--- Diagnostic: cluster state ---"
+ echo "Nodes:"
+ oc get nodes -o wide 2>/dev/null || true
+ echo ""
+ echo "MachineConfigPools:"
+ oc get mcp 2>/dev/null || true
+ echo ""
+ echo "Master MachineConfigs:"
+ oc get mc -l machineconfiguration.openshift.io/role=master --no-headers 2>/dev/null || true
+ echo ""
+ echo "MachineConfigs with 'fencing' in the name:"
+ oc get mc --no-headers 2>/dev/null | grep -i "fencing\|two-node" || echo "(none found)"
+ echo ""
+ echo "Rendered master MC extensions:"
+ oc get mc "$(oc get mcp master -o jsonpath='{.spec.configuration.name}' 2>/dev/null)" -o jsonpath='{.spec.extensions}' 2>/dev/null || true
+ echo ""
+ echo "--- End diagnostic ---"
+
  # Report installed resource-agents version on first healthy schedulable node. Must not fail.
  NODE=$(oc get nodes --no-headers | awk 'tolower($2) == "ready" {print $1; exit}')
  if [[ -z "${NODE}" ]]; then
   echo "No ready node found; skipping version report."
   exit 0
  fi
+ echo "Selected node: ${NODE}"
+ echo "rpm-ostree status on ${NODE}:"
+ oc_debug_with_retry "${NODE}" chroot /host rpm-ostree status 2>/dev/null || true
+ echo ""
  if ! oc_debug_with_retry "${NODE}" chroot /host rpm -q resource-agents; then
   echo "Could not get resource-agents version after retries; skipping."
  fi
