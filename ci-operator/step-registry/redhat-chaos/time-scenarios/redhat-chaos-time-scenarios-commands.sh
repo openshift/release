@@ -40,6 +40,9 @@ export CONTAINER_NAME=$CONTAINER_NAME
 export LABEL_SELECTOR=$LABEL_SELECTOR
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
+if [[ -n "${ALERTS_PATH:-}" && ! -f "$ALERTS_PATH" ]]; then
+  export ALERTS_PATH="/home/krkn/kraken/config/alerts_openshift.yaml"
+fi
 
 ./time-scenarios/prow_run.sh
 rc=$?

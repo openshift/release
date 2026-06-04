@@ -37,6 +37,9 @@ export KUBECONFIG=/tmp/config
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
+if [[ -n "${ALERTS_PATH:-}" && ! -f "$ALERTS_PATH" ]]; then
+  export ALERTS_PATH="/home/krkn/kraken/config/alerts_openshift.yaml"
+fi
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
