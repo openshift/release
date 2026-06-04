@@ -1,38 +1,47 @@
 base_images:
-  origin_scos-4.22_ovn-kubernetes:
-    name: scos-4.22
+  ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-5.0
+  origin_scos-5.0_ovn-kubernetes:
+    name: scos-5.0
     namespace: origin
     tag: ovn-kubernetes
-  origin_scos-4.22_tools:
-    name: scos-4.22
+  origin_scos-5.0_tools:
+    name: scos-5.0
     namespace: origin
     tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.25-openshift-5.0
 images:
   items:
   - build_args:
     - name: TAGS
       value: scos
     dockerfile_path: Dockerfile
-    from: origin_scos-4.22_tools
+    from: origin_scos-5.0_tools
     inputs:
-      origin_scos-4.22_ovn-kubernetes:
+      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      origin_scos-5.0_ovn-kubernetes:
         as:
         - ovnkube-trace
+        - registry.ci.openshift.org/ocp/4.22:ovn-kubernetes
     to: network-tools
 promotion:
   to:
-  - name: scos-4.22
+  - name: scos-5.0
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-4.22
+      name: scos-5.0
       namespace: origin
 resources:
   '*':
