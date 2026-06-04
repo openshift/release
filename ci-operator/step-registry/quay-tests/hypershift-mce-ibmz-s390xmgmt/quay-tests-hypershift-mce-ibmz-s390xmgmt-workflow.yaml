@@ -12,6 +12,10 @@ workflow:
     and httpd-vsi-key). Replace or mirror that Secret with your own API key material for your tenant.
 
     This workflow intentionally does not run hypershift-conformance or hypershift-mce-ibmz-test.
+
+    Draft/rehearsal PRs only: RUN_REHEARSAL_TESTS, TEST_IBM_PROVISIONING_RETRY, and
+    IBM_INSTANCE_CREATE_RETRY_SLEEP_SEC enable mock scripts and a one-shot simulated IBM
+    instance-create retry in the create step; remove these env entries before merging upstream.
   steps:
     pre:
       - ref: hypershift-mce-ibmz-create-s390xmgmt
@@ -19,6 +23,10 @@ workflow:
     post:
       - ref: hypershift-mce-ibmz-destroy-s390x-mgmt
     env:
+      # Draft/rehearsal only — remove before merging release PR to upstream.
+      RUN_REHEARSAL_TESTS: "1"
+      TEST_IBM_PROVISIONING_RETRY: "1"
+      IBM_INSTANCE_CREATE_RETRY_SLEEP_SEC: "5"
       CLUSTER_VERSION: "4.21"
       IC_CLI_VERSION: '2.36.0'
       OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"

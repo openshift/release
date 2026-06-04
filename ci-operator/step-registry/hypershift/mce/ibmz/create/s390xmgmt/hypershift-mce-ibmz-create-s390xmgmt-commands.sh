@@ -58,6 +58,21 @@ sed -i "s/^VSI_IMAGE_NAME=.*/VSI_IMAGE_NAME=\"$VSI_IMAGE_NAME\"/" "$VARS_FILE"
 sed -i "s/^ENABLE_NESTED_VIRT=.*/ENABLE_NESTED_VIRT=\"$ENABLE_NESTED_VIRT\"/" "$VARS_FILE"
 sed -i "s/^CREATE_STORAGE_CLASS=.*/CREATE_STORAGE_CLASS=\"$CREATE_STORAGE_CLASS\"/" "$VARS_FILE"
 
+# Draft/rehearsal-only: run mock unit tests (no IBM API). Set RUN_REHEARSAL_TESTS=1 in workflow env.
+if [[ "${RUN_REHEARSAL_TESTS:-}" == "1" ]]; then
+  echo "RUN_REHEARSAL_TESTS=1: running scripts/rehearsal-tests/run-all.sh"
+  chmod +x scripts/rehearsal-tests/*.sh scripts/test-create-instance-retry.sh 2>/dev/null || true
+  ./scripts/rehearsal-tests/run-all.sh
+fi
+
+# Rehearsal-only: inject one simulated IBM service_error so Prow logs prove retry logic.
+# Enable with TEST_IBM_PROVISIONING_RETRY=1 in workflow env (remove before merging release PR).
+if [[ "${TEST_IBM_PROVISIONING_RETRY:-}" == "1" ]]; then
+  export IBM_INSTANCE_CREATE_FAIL_ONCE=1
+  export IBM_INSTANCE_CREATE_RETRY_SLEEP_SEC="${IBM_INSTANCE_CREATE_RETRY_SLEEP_SEC:-5}"
+  echo "TEST_IBM_PROVISIONING_RETRY=1: will simulate one transient instance-create failure (grep IBM_PROVISIONING_RETRY in log)"
+fi
+
 # Run the create-cluster.sh script to create the OCP cluster in IBM cloud VPC
 if [[ -x ./create-cluster.sh ]]; then
     ./create-cluster.sh
