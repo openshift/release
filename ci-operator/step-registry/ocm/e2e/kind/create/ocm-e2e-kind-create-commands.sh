@@ -11,6 +11,10 @@ cd "$SHARED_DIR" || exit 1
 # Copy TF files to shared directory
 cp /opt/kind/*.tf .
 
+# TEMP FIX TO TEST
+rm kind.tf
+curl -O https://raw.githubusercontent.com/jacobbaungard/image-builder/refs/heads/terraform-aws-security-group-6/kind/kind.tf
+
 # Create an RSA key pair
 openssl genrsa -out "$PVT_KEY" 2048
 openssl rsa -pubout -in "$PVT_KEY" -out "$PUB_KEY"
