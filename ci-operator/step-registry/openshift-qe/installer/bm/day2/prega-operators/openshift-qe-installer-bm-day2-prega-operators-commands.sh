@@ -20,7 +20,7 @@ get_idms_manifest() {
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
-    curl -o /tmp/idms.yaml http://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+    curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
   scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
   echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
