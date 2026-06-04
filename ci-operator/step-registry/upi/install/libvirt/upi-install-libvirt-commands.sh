@@ -57,24 +57,17 @@ function qemu_img() {
     qemu-img "$@"
     return $?
   fi
-  if command -v sudo >/dev/null 2>&1; then
-    echo "Installing qemu-img for legacy libvirt-installer image"
-    sudo dnf install -y qemu-img
-    qemu-img "$@"
-    return $?
+  local qemu_bin="/tmp/bin/qemu-img"
+  if [[ ! -x "${qemu_bin}" ]]; then
+    echo "Extracting qemu-img from ocp/4.16:libvirt-installer"
+    oc image extract registry.ci.openshift.org/ocp/4.16:libvirt-installer \
+      --path="/usr/bin/qemu-img:${qemu_bin}" \
+      -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
+      --filter-by-os="linux/amd64" \
+      --confirm
+    chmod +x "${qemu_bin}"
   fi
-  if command -v podman >/dev/null 2>&1; then
-    echo "Using qemu-img from ocp/4.16:libvirt-installer via podman"
-    podman run --rm \
-      -v "${INSTALL_DIR}:${INSTALL_DIR}:rw,Z" \
-      --workdir "${INSTALL_DIR}" \
-      --entrypoint qemu-img \
-      registry.ci.openshift.org/ocp/4.16:libvirt-installer \
-      "$@"
-    return $?
-  fi
-  echo "qemu-img is required but not available and could not be installed"
-  return 1
+  "${qemu_bin}" "$@"
 }
 
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
