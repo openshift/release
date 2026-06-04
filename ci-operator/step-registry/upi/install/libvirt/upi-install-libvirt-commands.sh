@@ -52,6 +52,31 @@ function prepare_next_steps () {
   set -e
 }
 
+function qemu_img() {
+  if command -v qemu-img >/dev/null 2>&1; then
+    qemu-img "$@"
+    return $?
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    echo "Installing qemu-img for legacy libvirt-installer image"
+    sudo dnf install -y qemu-img
+    qemu-img "$@"
+    return $?
+  fi
+  if command -v podman >/dev/null 2>&1; then
+    echo "Using qemu-img from ocp/4.16:libvirt-installer via podman"
+    podman run --rm \
+      -v "${INSTALL_DIR}:${INSTALL_DIR}:rw,Z" \
+      --workdir "${INSTALL_DIR}" \
+      --entrypoint qemu-img \
+      registry.ci.openshift.org/ocp/4.16:libvirt-installer \
+      "$@"
+    return $?
+  fi
+  echo "qemu-img is required but not available and could not be installed"
+  return 1
+}
+
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   echo "Ignoring host encryption validation for FIPS testing..."
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
@@ -62,10 +87,6 @@ if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE:-}" ]; then
   echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
   curl -o /tmp/openshift-client-linux.tar.gz -L "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/${OPENSHIFT_CLIENT_VERSION_OVERRIDE}/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz"
   tar -xzvf /tmp/openshift-client-linux.tar.gz -C /tmp/bin oc && chmod u+x /tmp/bin/oc
-  if ! command -v qemu-img >/dev/null 2>&1; then
-    echo "Installing qemu-img for legacy libvirt-installer image"
-    dnf install -y qemu-img
-  fi
 fi
 export PATH=/tmp/bin:$PATH
 
@@ -259,7 +280,7 @@ else
     fi
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
-    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    qemu_img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
 
     # Create the new source volume
     echo "Creating source volume..."
