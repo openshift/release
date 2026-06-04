@@ -60,11 +60,15 @@ function qemu_img() {
   local qemu_bin="/tmp/bin/qemu-img"
   if [[ ! -x "${qemu_bin}" ]]; then
     echo "Extracting qemu-img from ocp/4.16:libvirt-installer"
+    local qemu_extract_dir="/tmp/qemu-img-extract"
+    rm -rf "${qemu_extract_dir}"
+    mkdir -p "${qemu_extract_dir}" /tmp/bin
     oc image extract registry.ci.openshift.org/ocp/4.16:libvirt-installer \
-      --path="/usr/bin/qemu-img:${qemu_bin}" \
+      --path="/usr/bin/qemu-img:${qemu_extract_dir}" \
       -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
       --filter-by-os="linux/amd64" \
       --confirm
+    cp "$(find "${qemu_extract_dir}" -name qemu-img -type f | head -1)" "${qemu_bin}"
     chmod +x "${qemu_bin}"
   fi
   "${qemu_bin}" "$@"
