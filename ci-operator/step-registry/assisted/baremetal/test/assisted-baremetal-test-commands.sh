@@ -74,17 +74,16 @@ secret_name_for_sa() {
   printf '%s%s\n' "$1" "${E2E_DOCKERCFG_SECRET_SUFFIX}"
 }
 
-# openshift-tests WaitForServiceAccount* checks mountable .secrets on each SA
-# (log: secrets () to include dockercfg), not imagePullSecrets alone.
-sa_has_mountable_dockercfg() {
+# openshift-tests WaitForServiceAccountWithSecret (origin framework.go) checks
+# imagePullSecrets whose names contain "-dockercfg-" (log text says "secrets ()" but
+# lists imagePullSecrets names).
+sa_has_openshift_dockercfg() {
   local ns="$1"
   local sa_name="$2"
-  local expected_secret sa_secrets s
-  expected_secret=$(secret_name_for_sa "${sa_name}")
-  sa_secrets=$(oc get sa "${sa_name}" -n "${ns}" -o jsonpath='{.secrets[*].name}' 2>/dev/null || true)
-  for s in ${sa_secrets}; do
-    [[ "${s}" == "${expected_secret}" ]] && return 0
-    [[ "${s}" == *dockercfg* || "${s}" == *dockerconfig* ]] && return 0
+  local sa_pull s
+  sa_pull=$(oc get sa "${sa_name}" -n "${ns}" -o jsonpath='{.imagePullSecrets[*].name}' 2>/dev/null || true)
+  for s in ${sa_pull}; do
+    [[ "${s}" == *-dockercfg-* ]] && return 0
   done
   return 1
 }
@@ -96,10 +95,10 @@ namespace_pull_secrets_ready() {
     if ! oc get sa "${sa}" -n "${ns}" >/dev/null 2>&1; then
       return 1
     fi
-    sa_has_mountable_dockercfg "${ns}" "${sa}" || return 1
+    sa_has_openshift_dockercfg "${ns}" "${sa}" || return 1
   done
   if oc get sa deployer -n "${ns}" >/dev/null 2>&1; then
-    sa_has_mountable_dockercfg "${ns}" deployer || return 1
+    sa_has_openshift_dockercfg "${ns}" deployer || return 1
   fi
   return 0
 }
@@ -144,7 +143,7 @@ ensure_sa_secrets_field() {
   local sa_name="$2"
   local secret_name
   secret_name=$(secret_name_for_sa "${sa_name}")
-  if sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
+  if sa_has_openshift_dockercfg "${ns}" "${sa_name}"; then
     return 0
   fi
   if oc get sa "${sa_name}" -n "${ns}" -o json | jq -e '.secrets != null' >/dev/null 2>&1; then
@@ -171,8 +170,8 @@ ensure_sa_pull_secret() {
     echo "skip ${ns}/${sa_name}: service account does not exist"
     return 0
   fi
-  if sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
-    echo "namespace ${ns}/${sa_name}: already has a mountable dockercfg secret"
+  if sa_has_openshift_dockercfg "${ns}" "${sa_name}"; then
+    echo "namespace ${ns}/${sa_name}: already has openshift-tests dockercfg imagePullSecret"
     return 0
   fi
 
@@ -204,8 +203,8 @@ ensure_sa_pull_secret() {
     return 1
   fi
 
-  if ! sa_has_mountable_dockercfg "${ns}" "${sa_name}"; then
-    log_banner "FAILED: ServiceAccount ${sa_name} in ${ns} still has no mountable dockercfg after ensure"
+  if ! sa_has_openshift_dockercfg "${ns}" "${sa_name}"; then
+    log_banner "FAILED: ServiceAccount ${sa_name} in ${ns} still has no -dockercfg- imagePullSecret after ensure"
     return 1
   fi
 
@@ -215,13 +214,16 @@ ensure_sa_pull_secret() {
 
 ensure_namespace_pull_secrets() {
   local ns="$1"
+  local quiet="${2:-false}"
   local sa failed=0
 
   if ! oc get namespace "${ns}" >/dev/null 2>&1; then
     return 0
   fi
 
-  describe_namespace_pull_state "${ns}"
+  if [[ "${quiet}" != "true" ]]; then
+    describe_namespace_pull_state "${ns}"
+  fi
 
   for sa in default builder; do
     if ! ensure_sa_pull_secret "${ns}" "${sa}"; then
@@ -240,13 +242,15 @@ ensure_namespace_pull_secrets() {
   fi
 
   if ! namespace_pull_secrets_ready "${ns}"; then
-    log_banner "FAILED: namespace ${ns} still missing mountable dockercfg on one or more ServiceAccounts"
+    log_banner "FAILED: namespace ${ns} still missing -dockercfg- imagePullSecrets on one or more ServiceAccounts"
     describe_namespace_pull_state "${ns}"
     return 1
   fi
 
-  log_banner "PASS: namespace ${ns} has mountable dockercfg on default/builder/deployer ServiceAccounts"
-  describe_namespace_pull_state "${ns}"
+  if [[ "${quiet}" != "true" ]]; then
+    log_banner "PASS: namespace ${ns} has dockercfg imagePullSecrets on default/builder/deployer ServiceAccounts"
+    describe_namespace_pull_state "${ns}"
+  fi
   return 0
 }
 
@@ -264,13 +268,6 @@ watch_e2e_test_namespaces() {
   while true; do
     while IFS= read -r ns; do
       [[ -z "${ns}" ]] && continue
-      case "${ns}" in
-        e2e-test-*)
-          ;;
-        *)
-          continue
-          ;;
-      esac
       if grep -qxF "${ns}" "${seen_file}" 2>/dev/null; then
         continue
       fi
@@ -281,12 +278,17 @@ watch_e2e_test_namespaces() {
       if ! oc get sa default -n "${ns}" >/dev/null 2>&1; then
         continue
       fi
-      if ensure_namespace_pull_secrets "${ns}"; then
+      if ensure_namespace_pull_secrets "${ns}" true; then
         echo "${ns}" >>"${seen_file}"
-        echo "watcher: provisioned dockercfg secrets in ${ns}"
+        echo "watcher: provisioned dockercfg for default/builder/deployer in ${ns}"
       fi
-    done < <(oc get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
-    sleep 1
+    done < <(oc get namespaces -o json 2>/dev/null | jq -r '
+      [.items[]
+        | select(.metadata.name | startswith("e2e-test-"))]
+      | sort_by(.metadata.creationTimestamp)
+      | reverse
+      | .[].metadata.name')
+    sleep 0.25
   done
 }
 
@@ -368,6 +370,7 @@ collect_oc() {
 oc_report="${debug_base}/oc-readiness.txt"
 : >"${oc_report}"
 collect_oc "${oc_report}" oc get co -o wide
+collect_oc "${oc_report}" oc get clusterversion version -o jsonpath='enabledCapabilities={.status.capabilities.enabledCapabilities}{"\n"}'
 collect_oc "${oc_report}" oc get clusteroperator image-registry -o yaml
 collect_oc "${oc_report}" oc get pods -n openshift-image-registry -o wide
 collect_oc "${oc_report}" oc get deployment -n openshift-image-registry -o wide
