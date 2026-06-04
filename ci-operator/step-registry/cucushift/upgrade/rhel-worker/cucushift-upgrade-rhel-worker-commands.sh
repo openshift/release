@@ -376,10 +376,12 @@ run_command "oc get machineconfig"
 
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+TARGET_MAJOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f1 -d.)"
 TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
+export TARGET_MAJOR_VERSION
 export TARGET_MINOR_VERSION
-echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
+echo -e "Target release version is: ${TARGET_VERSION}\nTarget major version is: ${TARGET_MAJOR_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
@@ -391,7 +393,9 @@ echo -e "The source release version is gotten from clusterversion resource, that
 export UPGRADE_FAILURE_TYPE="overall"
 # The cases are from existing general checkpoints enabled implicitly in upgrade step, which may be a possible UPGRADE_FAILURE_TYPE
 export IMPLICIT_ENABLED_CASES=""
-if [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+
+# Only perform RHEL worker upgrade for OCP 4.18 and below (RHEL workers support removed in 4.19+)
+if [[ "${TARGET_MAJOR_VERSION}" -eq "4" ]] && [[ "${TARGET_MINOR_VERSION}" -lt "19" ]] && [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     run_command "oc get node -owide"
     rhel_repo
     rhel_pre_upgrade
