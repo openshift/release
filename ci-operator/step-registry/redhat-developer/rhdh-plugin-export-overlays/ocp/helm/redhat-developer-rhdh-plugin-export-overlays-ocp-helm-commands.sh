@@ -189,7 +189,7 @@ export RHDH_VERSION INSTALLATION_METHOD
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     RHDH_VERSION="$(echo "$RELEASE_BRANCH_NAME" | cut -d'-' -f2)"
 else
-    RHDH_VERSION="1.11" # TODO: Change to "next" when RHIDP-12071 is fixed
+    RHDH_VERSION="1.11" # TODO: Change to "next" when RHIDP-12071 & RHDHBUGS-3052 is fixed
 fi
 INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
