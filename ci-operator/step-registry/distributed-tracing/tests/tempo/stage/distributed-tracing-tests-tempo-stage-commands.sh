@@ -14,9 +14,14 @@ export GOCACHE=/tmp/.cache/go-build
 mkdir -p /tmp/go/bin $GOCACHE \
   && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
-git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
+if [[ -z "${TEMPO_TESTS_BRANCH:-}" ]]; then
+  echo "ERROR: TEMPO_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+  exit 1
+fi
+
+git clone https://github.com/os-observability/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout rhosdt-3.9
+git checkout "${TEMPO_TESTS_BRANCH}"
 make build
 
 #Enable user workload monitoring.
@@ -45,6 +50,9 @@ fi
 # Unset environment variable which conflicts with Chainsaw
 unset NAMESPACE
 
+# Initialize a variable to keep track of errors
+any_errors=false
+
 # Execute Tempo e2e tests
 chainsaw test \
 --quiet \
@@ -57,6 +65,26 @@ tests/e2e \
 tests/e2e-openshift \
 tests/e2e-openshift-serverless \
 tests/e2e-openshift-ossm \
-tests/e2e-long-running \
 tests/e2e-openshift-object-stores \
-tests/operator-metrics
+tests/e2e-long-running \
+tests/e2e-openshift-tshirt-sizes \
+tests/operator-metrics || any_errors=true
+
+# Execute TLS profile tests last: they patch the cluster-wide APIServer resource,
+# triggering node-level TLS reconciliation that would disrupt concurrently running tests.
+chainsaw test \
+--quiet \
+--config .chainsaw-openshift.yaml \
+--report-name "junit_tempo_e2e_tls_profile" \
+--report-path "$ARTIFACT_DIR" \
+--report-format "XML" \
+--test-dir \
+tests/e2e-openshift-tls-profile || any_errors=true
+
+# Check if any errors occurred
+if $any_errors; then
+  echo "Tests failed, check the logs for more details."
+  exit 1
+else
+  echo "All the tests passed."
+fi
