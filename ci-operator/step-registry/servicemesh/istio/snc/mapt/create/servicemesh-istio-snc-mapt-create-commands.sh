@@ -140,7 +140,7 @@ echo "[INFO] RESOURCE ======================================================"
 # Trap EXIT/ERR/INT/TERM to ensure MAPT infrastructure is destroyed on failure or cancellation
 trap cleanup EXIT ERR INT TERM
 
-OCP_VERSION=${OCP_VERSION:-"4.20.0"}
+OCP_VERSION=${OCP_VERSION:-"4.21.14"}
 CPU=${CPU:-"8"}
 MEMORY=${MEMORY:-"32"}
 SPOT=${SPOT:-"true"}
