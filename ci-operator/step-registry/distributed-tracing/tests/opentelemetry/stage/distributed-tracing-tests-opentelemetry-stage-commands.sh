@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
+git clone https://github.com/os-observability/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3.9
+git checkout rhosdt-3.10
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
