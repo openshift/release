@@ -2,15 +2,13 @@
 
 set -euo pipefail
 
-# Load GCP credentials from cluster profile
-GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
 CI_FOLDER_ID="$(<"${CLUSTER_PROFILE_DIR}/ci-folder-id")"
 BILLING_ACCOUNT_ID="$(<"${CLUSTER_PROFILE_DIR}/billing-account-id")"
 GCP_REGION="${GKE_REGION:-us-central1}"
 RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
 
-# Authenticate with GCP (before set -x to avoid exposing credentials path)
-gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
+# Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step
+gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
 gcloud --version
 
