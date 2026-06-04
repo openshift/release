@@ -251,7 +251,7 @@ ${ISSUE_COMMENTS}
 8. Create a feature branch named '${JIRA_ISSUE_KEY}' (lowercase).
 9. Commit your changes with a meaningful commit message that references ${JIRA_ISSUE_KEY}.
 10. Push the branch to the fork: git push fork HEAD
-11. Create a PR from the fork using: gh pr create --repo openshift/sippy --head ${SIPPY_FORK_REPO##*/}:${JIRA_ISSUE_KEY} --title '${JIRA_ISSUE_KEY}: <brief description>' --body '<description of changes>'
+11. Create a PR from the fork using: gh pr create --repo openshift/sippy --head ${SIPPY_FORK_REPO%%/*}:${JIRA_ISSUE_KEY} --title '${JIRA_ISSUE_KEY}: <brief description>' --body '<description of changes>'
 
 ## Important
 - Always create a regular PR (not a draft) so CI tests run automatically.
