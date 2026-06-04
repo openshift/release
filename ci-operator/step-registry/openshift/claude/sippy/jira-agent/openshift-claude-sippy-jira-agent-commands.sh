@@ -26,13 +26,13 @@ sippy_init() {
 
 GH_APP_DIR="/var/run/github-token"
 
-# Generate a GitHub App installation token via JWT.
-# Installation tokens expire after 1 hour — call this before any push/PR operation.
-sippy_generate_github_token() {
+# Generate a GitHub App installation token for a given installation ID.
+# Returns the token on stdout. Does not configure gh/git.
+_sippy_generate_token_for_installation() {
+    local installation_id=$1
     set +x
-    local app_id installation_id private_key_file
+    local app_id private_key_file
     app_id=$(cat "${GH_APP_DIR}/app-id")
-    installation_id=$(cat "${GH_APP_DIR}/installation-id")
     private_key_file="${GH_APP_DIR}/private-key"
 
     local now iat exp header payload signature jwt
@@ -45,26 +45,47 @@ sippy_generate_github_token() {
     signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${private_key_file}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
     jwt="${header}.${payload}.${signature}"
 
-    local token
-    token=$(curl -sf -X POST \
+    curl -sf -X POST \
         -H "Authorization: Bearer ${jwt}" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/app/installations/${installation_id}/access_tokens" \
-        | jq -r '.token')
+        | jq -r '.token'
+}
 
+# Generate a token for the fork (push access) and configure git credential helper.
+sippy_generate_github_token() {
+    set +x
+    local fork_installation_id
+    fork_installation_id=$(cat "${GH_APP_DIR}/installation-id")
+    local token
+    token=$(_sippy_generate_token_for_installation "${fork_installation_id}")
     if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate GitHub App installation token."
+        echo "ERROR: Failed to generate fork installation token."
         return 1
     fi
-
     echo "${token}" | gh auth login --with-token 2>/dev/null
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub App token generated."
+    echo "GitHub App token generated (fork)."
+}
+
+# Generate a token for upstream (PR creation) and switch gh auth to it.
+sippy_generate_upstream_token() {
+    set +x
+    local upstream_installation_id
+    upstream_installation_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
+    local token
+    token=$(_sippy_generate_token_for_installation "${upstream_installation_id}")
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate upstream installation token."
+        return 1
+    fi
+    echo "${token}" | gh auth login --with-token 2>/dev/null
+    echo "GitHub App token generated (upstream)."
 }
 
 sippy_load_github_token() {
     set +x
-    for f in app-id installation-id private-key; do
+    for f in app-id installation-id openshift-installation-id private-key; do
         [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
     done
     sippy_generate_github_token || exit 1
@@ -247,19 +268,17 @@ ${ISSUE_COMMENTS}
    - 'sippy_serve' starts the API server (builds automatically)
    - 'sippy_ng_start' starts the React frontend dev server
    - 'run_e2e' runs the end-to-end test suite
-7. Run e2e tests using the 'run_e2e' MCP tool. E2e tests MUST pass before creating a PR.
+7. Run e2e tests using the 'run_e2e' MCP tool. E2e tests MUST pass before pushing.
 8. Create a feature branch named '${JIRA_ISSUE_KEY}' (lowercase).
 9. Commit your changes with a meaningful commit message that references ${JIRA_ISSUE_KEY}.
 10. Push the branch to the fork: git push fork HEAD
-11. Create a PR from the fork using: gh pr create --repo openshift/sippy --head ${SIPPY_FORK_REPO%%/*}:${JIRA_ISSUE_KEY} --title '${JIRA_ISSUE_KEY}: <brief description>' --body '<description of changes>'
+Do NOT create a PR — the CI system will create the PR automatically after you push.
 
 ## Important
-- Always create a regular PR (not a draft) so CI tests run automatically.
-- The PR title MUST start with '${JIRA_ISSUE_KEY}: '.
 - If you cannot solve the issue, explain why in detail.
 - Do not modify CI configuration or generated files.
 - Push to the 'fork' remote, NOT 'origin'. A fork remote is pre-configured.
-- The PR MUST be created against openshift/sippy (upstream), NOT against the fork. If PR creation fails, do NOT retry against the fork or any other repo. Just report the error.
+- Do NOT create a PR. Just push your branch. The PR is created automatically.
 - PostgreSQL is available at localhost:5432 (user: postgres, no password, trust auth).
 - Redis is available at localhost:6379.
 - The sippy-dev MCP server provides tools for running the app locally: sippy_serve, sippy_stop, sippy_ng_start, run_e2e, and regression_cache.
@@ -277,15 +296,40 @@ echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 sippy_run_claude "$(cat "${PROMPT_FILE}")" \
     "You hit the timeout. Please wrap up immediately: commit whatever you have, push, and create the PR now."
 
-# Check if a PR was created against upstream (not the fork)
-PR_URL=$(grep -o 'https://github.com/openshift/sippy/pull/[0-9]*' /workspace/artifacts/claude-output.log | head -1 || echo "")
-if [[ -z "${PR_URL}" ]]; then
-    echo "ERROR: No upstream PR was created. Check the Claude output log for details."
+# Check if Claude pushed a branch
+BRANCH_NAME=$(cd /workspace && git branch --show-current 2>/dev/null || echo "")
+if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" ]]; then
+    echo "ERROR: Claude did not create a feature branch."
     exit 1
 fi
+echo "Branch pushed: ${BRANCH_NAME}"
 
+# Create PR using the upstream installation token (different from fork push token)
+echo "Switching to upstream token for PR creation..."
+sippy_generate_upstream_token || { echo "ERROR: Failed to generate upstream token."; exit 1; }
+
+echo "Creating PR..."
+PR_URL=$(gh pr create \
+    --repo openshift/sippy \
+    --head "${SIPPY_FORK_REPO%%/*}:${BRANCH_NAME}" \
+    --title "${JIRA_ISSUE_KEY}: $(echo "${ISSUE_SUMMARY}" | head -c 60)" \
+    --body "$(cat <<PR_BODY
+## ${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}
+
+Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
+
+Generated with [Claude Code](https://claude.com/claude-code)
+PR_BODY
+)" 2>&1) || {
+    echo "ERROR: Failed to create PR: ${PR_URL}"
+    exit 1
+}
+
+echo "PR created: ${PR_URL}"
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
-echo "PR created: ${PR_URL} (#${PR_NUM})"
+
+# Switch back to fork token for review comment operations
+sippy_generate_github_token || echo "Warning: Failed to refresh fork token."
 
 # Poll for review comments (e.g. CodeRabbit) for up to 1 hour after PR creation
 echo ""

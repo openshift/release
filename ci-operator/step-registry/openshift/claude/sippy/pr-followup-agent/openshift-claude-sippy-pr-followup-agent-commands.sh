@@ -26,13 +26,13 @@ sippy_init() {
 
 GH_APP_DIR="/var/run/github-token"
 
-# Generate a GitHub App installation token via JWT.
-# Installation tokens expire after 1 hour — call this before any push/PR operation.
-sippy_generate_github_token() {
+# Generate a GitHub App installation token for a given installation ID.
+# Returns the token on stdout. Does not configure gh/git.
+_sippy_generate_token_for_installation() {
+    local installation_id=$1
     set +x
-    local app_id installation_id private_key_file
+    local app_id private_key_file
     app_id=$(cat "${GH_APP_DIR}/app-id")
-    installation_id=$(cat "${GH_APP_DIR}/installation-id")
     private_key_file="${GH_APP_DIR}/private-key"
 
     local now iat exp header payload signature jwt
@@ -45,26 +45,47 @@ sippy_generate_github_token() {
     signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${private_key_file}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
     jwt="${header}.${payload}.${signature}"
 
-    local token
-    token=$(curl -sf -X POST \
+    curl -sf -X POST \
         -H "Authorization: Bearer ${jwt}" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/app/installations/${installation_id}/access_tokens" \
-        | jq -r '.token')
+        | jq -r '.token'
+}
 
+# Generate a token for the fork (push access) and configure git credential helper.
+sippy_generate_github_token() {
+    set +x
+    local fork_installation_id
+    fork_installation_id=$(cat "${GH_APP_DIR}/installation-id")
+    local token
+    token=$(_sippy_generate_token_for_installation "${fork_installation_id}")
     if [[ -z "${token}" || "${token}" == "null" ]]; then
-        echo "ERROR: Failed to generate GitHub App installation token."
+        echo "ERROR: Failed to generate fork installation token."
         return 1
     fi
-
     echo "${token}" | gh auth login --with-token 2>/dev/null
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(gh auth token)"; }; f'
-    echo "GitHub App token generated."
+    echo "GitHub App token generated (fork)."
+}
+
+# Generate a token for upstream (PR creation) and switch gh auth to it.
+sippy_generate_upstream_token() {
+    set +x
+    local upstream_installation_id
+    upstream_installation_id=$(cat "${GH_APP_DIR}/openshift-installation-id")
+    local token
+    token=$(_sippy_generate_token_for_installation "${upstream_installation_id}")
+    if [[ -z "${token}" || "${token}" == "null" ]]; then
+        echo "ERROR: Failed to generate upstream installation token."
+        return 1
+    fi
+    echo "${token}" | gh auth login --with-token 2>/dev/null
+    echo "GitHub App token generated (upstream)."
 }
 
 sippy_load_github_token() {
     set +x
-    for f in app-id installation-id private-key; do
+    for f in app-id installation-id openshift-installation-id private-key; do
         [[ -f "${GH_APP_DIR}/${f}" ]] || { echo "ERROR: GitHub App credential ${f} not found."; exit 1; }
     done
     sippy_generate_github_token || exit 1
