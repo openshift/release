@@ -4,14 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -z "${OTEL_TESTS_BRANCH:-}" ]]; then
-  echo "ERROR: OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH:-}" ]]; then
+  echo "ERROR: MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
   exit 1
 fi
 
 git clone https://github.com/os-observability/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests
-git checkout "${OTEL_TESTS_BRANCH}"
+git checkout "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH}"
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
