@@ -52,40 +52,10 @@ function prepare_next_steps () {
   set -e
 }
 
-function qemu_img() {
-  if command -v qemu-img >/dev/null 2>&1; then
-    qemu-img "$@"
-    return $?
-  fi
-  local qemu_bin="/tmp/bin/qemu-img"
-  if [[ ! -x "${qemu_bin}" ]]; then
-    echo "Extracting qemu-img from ocp/4.16:libvirt-installer"
-    local qemu_extract_dir="/tmp/qemu-img-extract"
-    rm -rf "${qemu_extract_dir}"
-    mkdir -p "${qemu_extract_dir}" /tmp/bin
-    oc image extract registry.ci.openshift.org/ocp/4.16:libvirt-installer \
-      --path="/usr/bin/qemu-img:${qemu_extract_dir}" \
-      -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
-      --filter-by-os="linux/amd64" \
-      --confirm
-    cp "$(find "${qemu_extract_dir}" -name qemu-img -type f | head -1)" "${qemu_bin}"
-    chmod +x "${qemu_bin}"
-  fi
-  "${qemu_bin}" "$@"
-}
-
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   echo "Ignoring host encryption validation for FIPS testing..."
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
-
-mkdir -p /tmp/bin
-if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE:-}" ]; then
-  echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
-  curl -o /tmp/openshift-client-linux.tar.gz -L "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/${OPENSHIFT_CLIENT_VERSION_OVERRIDE}/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz"
-  tar -xzvf /tmp/openshift-client-linux.tar.gz -C /tmp/bin oc && chmod u+x /tmp/bin/oc
-fi
-export PATH=/tmp/bin:$PATH
 
 # download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
@@ -277,7 +247,7 @@ else
     fi
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
-    qemu_img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
 
     # Create the new source volume
     echo "Creating source volume..."
