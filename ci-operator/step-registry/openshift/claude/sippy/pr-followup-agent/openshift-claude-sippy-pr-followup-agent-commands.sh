@@ -275,6 +275,7 @@ DO NOT push until e2e tests pass.
 - If a comment is already resolved or not actionable, explain why in the commit message.
 - Do not modify CI configuration or generated files.
 - Push to the 'fork' remote, NOT 'origin'.
+- Do NOT create new PRs. Your job is to push fixes to the existing PR branch.
 - PostgreSQL is available at localhost:5432 (user: postgres, no password, trust auth).
 - Redis is available at localhost:6379.
 - The sippy-dev MCP server provides tools: sippy_serve, sippy_stop, sippy_ng_start, run_e2e.

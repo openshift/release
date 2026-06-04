@@ -259,6 +259,7 @@ ${ISSUE_COMMENTS}
 - If you cannot solve the issue, explain why in detail.
 - Do not modify CI configuration or generated files.
 - Push to the 'fork' remote, NOT 'origin'. A fork remote is pre-configured.
+- The PR MUST be created against openshift/sippy (upstream), NOT against the fork. If PR creation fails, do NOT retry against the fork or any other repo. Just report the error.
 - PostgreSQL is available at localhost:5432 (user: postgres, no password, trust auth).
 - Redis is available at localhost:6379.
 - The sippy-dev MCP server provides tools for running the app locally: sippy_serve, sippy_stop, sippy_ng_start, run_e2e, and regression_cache.
@@ -276,12 +277,11 @@ echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 sippy_run_claude "$(cat "${PROMPT_FILE}")" \
     "You hit the timeout. Please wrap up immediately: commit whatever you have, push, and create the PR now."
 
-# Check if a PR was created
+# Check if a PR was created against upstream (not the fork)
 PR_URL=$(grep -o 'https://github.com/openshift/sippy/pull/[0-9]*' /workspace/artifacts/claude-output.log | head -1 || echo "")
 if [[ -z "${PR_URL}" ]]; then
-    echo "Warning: No PR URL found in output."
-    echo "=== Sippy Jira Agent Complete ==="
-    exit 0
+    echo "ERROR: No upstream PR was created. Check the Claude output log for details."
+    exit 1
 fi
 
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
