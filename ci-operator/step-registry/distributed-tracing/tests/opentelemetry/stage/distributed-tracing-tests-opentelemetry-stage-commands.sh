@@ -4,8 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Support both OTEL_TESTS_BRANCH and MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH
+# The MULTISTAGE_PARAM_OVERRIDE_ prefix is required for Gangway API overrides
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH:-}" ]]; then
+  OTEL_TESTS_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH}"
+fi
+
 if [[ -z "${OTEL_TESTS_BRANCH:-}" ]]; then
-  echo "ERROR: OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+  echo "ERROR: OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options (use MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH for Gangway)."
   exit 1
 fi
 

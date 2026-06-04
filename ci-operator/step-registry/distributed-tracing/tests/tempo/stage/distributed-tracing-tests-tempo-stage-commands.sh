@@ -14,8 +14,14 @@ export GOCACHE=/tmp/.cache/go-build
 mkdir -p /tmp/go/bin $GOCACHE \
   && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
+# Support both TEMPO_TESTS_BRANCH and MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH
+# The MULTISTAGE_PARAM_OVERRIDE_ prefix is required for Gangway API overrides
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH:-}" ]]; then
+  TEMPO_TESTS_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH}"
+fi
+
 if [[ -z "${TEMPO_TESTS_BRANCH:-}" ]]; then
-  echo "ERROR: TEMPO_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+  echo "ERROR: TEMPO_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options (use MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH for Gangway)."
   exit 1
 fi
 
