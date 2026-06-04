@@ -393,16 +393,24 @@ tests:
             ),
             "</testsuite>"
           ' "$RESULT_JSON" > "${ARTIFACT_DIR}/junit_results.xml"
-          FAIL_COUNT=$(jq '
+          BLOCK_FAIL_COUNT=$(jq '
             (. // []) |
             def pass:
               .result == "passed" or
               ((.output // "") | contains("SUCCESS! -- 1 Passed"));
-            [.[] | select(pass | not)] | length
+            [.[] | select((.lifecycle // "blocking") == "blocking") | select(pass | not)] | length
+          ' "$RESULT_JSON")
+          INFORM_FAIL_COUNT=$(jq '
+            (. // []) |
+            def pass:
+              .result == "passed" or
+              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+            [.[] | select((.lifecycle // "blocking") == "informing") | select(pass | not)] | length
           ' "$RESULT_JSON")
           TOTAL=$(jq '(. // []) | length' "$RESULT_JSON")
-          echo "Results: $((TOTAL - FAIL_COUNT)) passed, ${FAIL_COUNT} failed"
-          [[ $FAIL_COUNT -gt 0 ]] && exit 1
+          PASS_COUNT=$((TOTAL - BLOCK_FAIL_COUNT - INFORM_FAIL_COUNT))
+          echo "Results: ${PASS_COUNT} passed, ${BLOCK_FAIL_COUNT} blocking failures, ${INFORM_FAIL_COUNT} informing failures (non-terminal)"
+          [[ $BLOCK_FAIL_COUNT -gt 0 ]] && exit 1
         fi
       credentials:
       - mount_path: /tmp/credentials/hiveci-aws-creds
