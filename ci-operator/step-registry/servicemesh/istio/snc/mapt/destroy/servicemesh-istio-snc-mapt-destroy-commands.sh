@@ -33,36 +33,28 @@ purge_and_delete_bucket() {
   local rb_rc=0
 
   echo "[INFO] **** Removing all object versions and delete markers from S3 bucket: ${bucket}..."
+  # Loop until no versioned objects remain (each pass deletes one page of up to 1000)
   while true; do
-    if [[ -n "${key_marker}" ]]; then
-      page=$(aws s3api list-object-versions \
-        --bucket "${bucket}" \
-        --key-marker "${key_marker}" \
-        --version-id-marker "${version_marker}" \
-        --output json 2>/dev/null || echo '{}')
-    else
-      page=$(aws s3api list-object-versions \
-        --bucket "${bucket}" \
-        --output json 2>/dev/null || echo '{}')
-    fi
+    local _versions _dmarkers
+    _versions=$(aws s3api list-object-versions \
+      --bucket "${bucket}" \
+      --output text \
+      --query 'Versions[*].[Key,VersionId]' 2>/dev/null || true)
+    _dmarkers=$(aws s3api list-object-versions \
+      --bucket "${bucket}" \
+      --output text \
+      --query 'DeleteMarkers[*].[Key,VersionId]' 2>/dev/null || true)
 
-    echo "${page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
-    while IFS= read -r row; do
-      local key version_id
-      key="$(echo "${row}" | base64 -d | jq -r '.Key')"
-      version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+    [[ -z "${_versions}" && -z "${_dmarkers}" ]] && break
+
+    printf '%s\n%s\n' "${_versions}" "${_dmarkers}" | \
+    while IFS=$'\t' read -r key version_id; do
+      [[ -z "${key}" || -z "${version_id}" ]] && continue
       aws s3api delete-object \
         --bucket "${bucket}" \
         --key "${key}" \
         --version-id "${version_id}" >/dev/null 2>&1 || true
     done
-
-    next_key=$(echo "${page}" | jq -r '.NextKeyMarker // empty')
-    if [[ -z "${next_key}" ]]; then
-      break
-    fi
-    key_marker="${next_key}"
-    version_marker=$(echo "${page}" | jq -r '.NextVersionIdMarker // empty')
   done
 
   echo "[INFO] **** Removing any remaining objects from S3 bucket: ${bucket}..."
@@ -77,10 +69,9 @@ echo "[INFO] AUTH Loading AWS credentials from vault..."
 aws_validation
 echo "[SUCCESS] !!!! AWS credentials loaded successfully"
 
-echo "[INFO] TAG Setting CORRELATE_MAPT..."
-CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID:-unknown}"
+echo "[INFO] READ Reading shared artifacts from create step..."
+echo "[INFO] SHARED_DIR contents: $(ls "${SHARED_DIR}" 2>/dev/null | tr '\n' ' ')"
 
-echo "[INFO] READ Reading dynamic S3 bucket name from shared directory..."
 if [[ ! -f "${SHARED_DIR}/mapt-s3-bucket-name" ]]; then
   echo "[WARN] WARN Bucket name file not found at ${SHARED_DIR}/mapt-s3-bucket-name"
   echo "[WARN] WARN Create step likely did not complete — nothing to clean up"
@@ -89,6 +80,14 @@ fi
 
 DYNAMIC_BUCKET_NAME=$(cat "${SHARED_DIR}/mapt-s3-bucket-name")
 export DYNAMIC_BUCKET_NAME
+
+if [[ -f "${SHARED_DIR}/mapt-correlate-id" ]]; then
+  CORRELATE_MAPT=$(cat "${SHARED_DIR}/mapt-correlate-id")
+  echo "[INFO] TAG Loaded CORRELATE_MAPT from shared dir: ${CORRELATE_MAPT}"
+else
+  CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID:-unknown}"
+  echo "[WARN] WARN mapt-correlate-id not found; falling back to BUILD_ID: ${CORRELATE_MAPT}"
+fi
 
 echo "[INFO] RESOURCE ======================================================"
 echo "[INFO] RESOURCE AWS resources targeted for cleanup"
@@ -116,7 +115,7 @@ if mapt aws openshift-snc destroy \
     exit 1
   fi
 
-  rm -f "${SHARED_DIR}/mapt-s3-bucket-name" || true
+  rm -f "${SHARED_DIR}/mapt-s3-bucket-name" "${SHARED_DIR}/mapt-correlate-id" || true
 
   echo "[SUCCESS] !!!! OSSM Istio MAPT SNC cleanup completed successfully"
 else

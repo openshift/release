@@ -26,41 +26,32 @@ function cleanup() {
 
     echo "[INFO] **** Emergency cleanup: Deleting S3 bucket: ${DYNAMIC_BUCKET_NAME}..."
 
-    local _km="" _vm="" _page _nk
+    # Loop until no versioned objects remain (each pass deletes one page of up to 1000)
     while true; do
-      if [[ -n "${_km}" ]]; then
-        _page=$(aws s3api list-object-versions \
-          --bucket "${DYNAMIC_BUCKET_NAME}" \
-          --key-marker "${_km}" \
-          --version-id-marker "${_vm}" \
-          --output json 2>/dev/null || echo '{}')
-      else
-        _page=$(aws s3api list-object-versions \
-          --bucket "${DYNAMIC_BUCKET_NAME}" \
-          --output json 2>/dev/null || echo '{}')
-      fi
+      _versions=$(aws s3api list-object-versions \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --output text \
+        --query 'Versions[*].[Key,VersionId]' 2>/dev/null || true)
+      _dmarkers=$(aws s3api list-object-versions \
+        --bucket "${DYNAMIC_BUCKET_NAME}" \
+        --output text \
+        --query 'DeleteMarkers[*].[Key,VersionId]' 2>/dev/null || true)
 
-      echo "${_page}" | jq -r '(.Versions[]?, .DeleteMarkers[]?) | @base64' | \
-      while IFS= read -r row; do
-        key="$(echo "${row}" | base64 -d | jq -r '.Key')"
-        version_id="$(echo "${row}" | base64 -d | jq -r '.VersionId')"
+      [[ -z "${_versions}" && -z "${_dmarkers}" ]] && break
+
+      printf '%s\n%s\n' "${_versions}" "${_dmarkers}" | \
+      while IFS=$'\t' read -r key version_id; do
+        [[ -z "${key}" || -z "${version_id}" ]] && continue
         aws s3api delete-object \
           --bucket "${DYNAMIC_BUCKET_NAME}" \
           --key "${key}" \
           --version-id "${version_id}" >/dev/null 2>&1 || true
       done
-
-      _nk=$(echo "${_page}" | jq -r '.NextKeyMarker // empty')
-      if [[ -z "${_nk}" ]]; then
-        break
-      fi
-      _km="${_nk}"
-      _vm=$(echo "${_page}" | jq -r '.NextVersionIdMarker // empty')
     done
 
     aws s3 rm "s3://${DYNAMIC_BUCKET_NAME}" --recursive 2>/dev/null || true
     aws s3 rb "s3://${DYNAMIC_BUCKET_NAME}" 2>/dev/null || echo "[WARN] WARN Bucket deletion failed or bucket already deleted"
-    rm -f "${SHARED_DIR}/mapt-s3-bucket-name" || true
+    rm -f "${SHARED_DIR}/mapt-s3-bucket-name" "${SHARED_DIR}/mapt-correlate-id" || true
 
     echo "[INFO] !!!! Emergency S3 bucket cleanup attempted"
   fi
@@ -128,7 +119,9 @@ aws s3api put-bucket-tagging \
 echo "[SUCCESS] !!!! S3 bucket created: ${DYNAMIC_BUCKET_NAME}"
 
 echo "${DYNAMIC_BUCKET_NAME}" > "${SHARED_DIR}/mapt-s3-bucket-name"
+echo "${CORRELATE_MAPT}"    > "${SHARED_DIR}/mapt-correlate-id"
 echo "[INFO] SAVE Saved bucket name to ${SHARED_DIR}/mapt-s3-bucket-name for cleanup"
+echo "[INFO] SAVE Saved project name to ${SHARED_DIR}/mapt-correlate-id for cleanup"
 
 echo "[INFO] RESOURCE ======================================================"
 echo "[INFO] RESOURCE AWS resource identifiers (for manual cleanup if needed)"
