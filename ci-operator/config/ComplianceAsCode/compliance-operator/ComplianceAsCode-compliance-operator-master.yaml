@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -53,6 +57,10 @@ releases:
     integration:
       include_built_images: true
       name: "4.17"
+      namespace: ocp
+  latest-4-22:
+    integration:
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -119,6 +127,34 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-deployment
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-compliance
+    test:
+    - as: test
+      cli: latest-4-22
+      commands: make e2e-deployment
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-ovn-tls-13
 - as: e2e-rosa
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
