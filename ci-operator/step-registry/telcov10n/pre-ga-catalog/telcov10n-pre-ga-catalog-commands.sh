@@ -289,7 +289,7 @@ IEOF
   # Get list of available timestamped tags from mirror site
   # This is more efficient than brute-force checking all possible timestamps
   echo "Fetching available tags from mirror site..." >&2
-  local available_tags=$(curl -sSL "${catalog_soruces_url}" 2>/dev/null | grep -oP '(?<=href=")[^"]+' | grep "^${query_tag}" | sort -r)
+  local available_tags=$(curl -sSLk --retry 5 --retry-delay 30 --retry-all-errors "${catalog_soruces_url}" 2>/dev/null | grep -oP "${query_tag%-}-"'\d+T\d+' | sort -ru)
 
   if [ -z "${available_tags}" ]; then
     echo "WARNING: No timestamped tags found on mirror site for pattern ${query_tag}*" >&2
@@ -358,14 +358,14 @@ echo "Checking if selected catalog exists on mirror site"
 echo "=============================================================================="
 
 # Check if version exists on mirror
-status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
+status_code=$(curl -sSLk -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
 
 if [ "$status_code" -ne 200 ]; then
   echo "ERROR: Selected version ${version_tag} not found on mirror (HTTP ${status_code})"
   echo "Mirror may not be ready yet"
   echo ""
   echo "Available versions on mirror site:"
-  curl -sSL "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
+  curl -sSLk "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
   exit 1
 fi
 
@@ -381,7 +381,7 @@ cd ${info_dir}
 download_url="${catalog_soruces_url}/${version_tag}"
 
 echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
-yaml_files=$(curl -sSL ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
+yaml_files=$(curl -sSLk ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
 
 if [ -z "$yaml_files" ]; then
   echo "ERROR: No YAML files found in ${version_tag}"
@@ -389,11 +389,11 @@ if [ -z "$yaml_files" ]; then
 
   echo "Trying other version build"
   _version=$( echo $version_tag | cut -d"-" -f1 )
-  all_version_folder=$(curl -s $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
+  all_version_folder=$(curl -sk $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
 
   for folder in $all_version_folder
   do
-    yaml_files=$(curl -sSL ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
+    yaml_files=$(curl -sSLk ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
     if [[ ! -z $yaml_files ]]
     then
       echo "Found files in build: $folder"
@@ -412,7 +412,7 @@ fi
 echo "Downloading files..."
 for f in $yaml_files; do
   set -x
-  curl -sSLO ${download_url}/${f}
+  curl -sSLkO ${download_url}/${f}
   set +x
 done
 
