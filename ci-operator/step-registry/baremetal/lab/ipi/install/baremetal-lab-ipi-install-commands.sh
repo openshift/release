@@ -285,15 +285,20 @@ http_proxy=${proxy} https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${
   oinst create cluster &
 
 if ! wait $!; then
-  exit 1
+  echo -e "\n[INFO] Waiting for install-complete timed out. Install is still running....."
+  NO_END_TIME=true
+else
+  date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+  NO_END_TIME=false
 fi
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again....."
+echo -e "\n[INFO] Launching 'wait-for install-complete' step again....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
+elif [ "${NO_END_TIME}" = "true" ]; then
+  date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 fi
 
 # Additional check to wait for all the nodes to be ready. Especially important
