@@ -380,6 +380,7 @@ CONFIG = {
         'libvirt-s390x-amd64-0-0': 1
     },
     'libvirt-s390x-vpn-quota-slice': {},
+    'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -687,6 +688,11 @@ for i in range(3):
         CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
+
+# Orange zone (OZ) M83 LPARs lnxocp11-14: four concurrent clusters per LPAR
+for i in range(4):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
 
 for i in range(3):
     for j in range(4):
