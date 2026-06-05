@@ -220,7 +220,7 @@ if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "
   TITLE_PREFIX=$(IFS=" + "; echo "${FAILURES[*]}")
   HOLD_REASON="/hold"
   for step in "${STEPS[@]}"; do
-    HOLD_REASON="${HOLD_REASON}\n${step}"
+    HOLD_REASON="${HOLD_REASON}"$'\n'"${step}"
   done
 
   echo "🚨 ${TITLE_PREFIX}, holding PR #${PR_NUM}"
