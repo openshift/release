@@ -55,9 +55,40 @@ function show_results() {
     "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt
 }
 
+function extract_container_logs() {
+  show_reader "Extracting container logs from OPCT archive"
+  local container_logs_dir="${ARTIFACT_DIR}/container-logs"
+  mkdir -p "${container_logs_dir}"
+
+  if [[ -z "${RESULT_FILE:-}" ]]; then
+    show_msg "# WARNING: RESULT_FILE is not set, skipping container log extraction."
+    return 0
+  fi
+
+  # Extract podLogs from the OPCT archive to a temporary directory.
+  local tmp_podlogs="/tmp/opct-podlogs"
+  mkdir -p "${tmp_podlogs}"
+  tar xf "${RESULT_FILE}" -C "${tmp_podlogs}" --wildcards '*/podLogs/*/logs/tests.txt' 2>/dev/null || true
+
+  # Copy each tests.txt log file, using the pod directory name as a prefix
+  # to distinguish between multiple conformance pods.
+  find "${tmp_podlogs}" -name 'tests.txt' -path '*/podLogs/*/logs/*' | while read -r logfile; do
+    local pod_dir
+    pod_dir=$(basename "$(dirname "$(dirname "${logfile}")")")
+    cp -v "${logfile}" "${container_logs_dir}/${pod_dir}-tests.txt"
+  done
+
+  local log_count
+  log_count=$(find "${container_logs_dir}" -name '*-tests.txt' 2>/dev/null | wc -l)
+  show_msg "Extracted ${log_count} container log(s) to ${container_logs_dir}"
+
+  rm -rf "${tmp_podlogs}"
+}
+
 collect_inspect || true
 retrieve_artifact || true
 show_results || true
+extract_container_logs || true
 
 # Check if job is running in OPCT workflow in allowed job ref to skip upload results to
 # OPCT storage.
