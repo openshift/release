@@ -82,6 +82,22 @@ function extract_container_logs() {
   log_count=$(find "${container_logs_dir}" -name '*-tests.txt' 2>/dev/null | wc -l)
   show_msg "Extracted ${log_count} container log(s) to ${container_logs_dir}"
 
+  # Redact potentially sensitive data from extracted logs, following the
+  # same patterns used by other CI steps (e.g. baremetalds-devscripts-gather).
+  if [[ ${log_count} -gt 0 ]]; then
+    find "${container_logs_dir}" -name '*-tests.txt' -exec sed -i '
+      /auths/ s/.*/*** PULL_SECRET ***/;
+      s/password: .*/password: REDACTED/;
+      s/password=.*/password=REDACTED/;
+      s/token: .*/token: REDACTED/;
+      s/token=.*/token=REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/Bearer .*/Bearer REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' {} +
+    show_msg "Redacted sensitive patterns from extracted logs"
+  fi
+
   rm -rf "${tmp_podlogs}"
 }
 
