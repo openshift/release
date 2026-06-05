@@ -80,7 +80,7 @@ tests:
       env:
       - default: "false"
         name: DRY_RUN
-      - default: 360m
+      - default: 420m
         name: OCP_VIRT_VALIDATION_TIMEOUT
       - default: ocs-storagecluster-ceph-rbd-virtualization
         name: STORAGE_CLASS
@@ -95,7 +95,7 @@ tests:
         requests:
           cpu: 100m
           memory: 600Mi
-      timeout: 6h30m0s
+      timeout: 7h30m0s
     - as: run-validation-checkup-disconnected
       cli: latest
       commands: |
@@ -104,7 +104,6 @@ tests:
         export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
         export OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n ${TARGET_NAMESPACE} $CSV_NAME -o json | jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
         export OCP_VIRT_VALIDATION_IMAGE=$(echo "$OCP_VIRT_VALIDATION_IMAGE" | sed "s|registry.redhat.io/container-native-virtualization|quay.io/openshift-virtualization/konflux-builds/v${CNV_VERSION//./-}|")
-        curl -sL https://gist.github.com/rlobillo/cd80d9d750c739876796b1d2269ced89/raw/ | git apply -
         make ci-validate-disconnected
       env:
       - default: "4.22"
@@ -130,7 +129,7 @@ tests:
           memory: 600Mi
       timeout: 10h0m0s
     workflow: ipi-azure
-  timeout: 18h0m0s
+  timeout: 19h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-cnv
