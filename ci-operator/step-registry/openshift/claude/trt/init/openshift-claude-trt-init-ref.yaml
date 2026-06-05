@@ -1,0 +1,34 @@
+ref:
+  as: openshift-claude-trt-init
+  from: sippy-agentic-dev
+  commands: openshift-claude-trt-init-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: JIRA_ISSUE_KEY
+    default: "TRT-2660"
+    documentation: |-
+      Jira issue key to process. Required.
+      Set via Gangway: MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY.
+      TODO: Remove default before merge — set only for rehearsal testing.
+  - name: UPSTREAM_REPO
+    documentation: |-
+      Upstream GitHub repo (e.g., "openshift/sippy").
+  - name: FORK_REPO
+    documentation: |-
+      Fork repo to push branches to (e.g., "openshift-trt/sippy").
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 5m0s
+  grace_period: 1m0s
+  documentation: |-
+    Pre-step for TRT agentic workflows. Validates credentials,
+    applies Gangway overrides, fetches the Jira issue, and writes
+    a common shell library to SHARED_DIR for use by subsequent steps.

@@ -1,0 +1,40 @@
+ref:
+  as: openshift-claude-trt-jira-solver
+  from: sippy-agentic-dev
+  commands: openshift-claude-trt-jira-solver-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: UPSTREAM_REPO
+  - name: FORK_REPO
+  - name: SETUP_SCRIPT
+    default: "hack/agentic_setup.sh"
+  - name: ALLOWED_TOOLS
+    default: "Bash Read Write Edit Grep Glob WebFetch WebSearch"
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 2h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Solves a Jira issue using Claude. Reads issue data and common
+    functions from SHARED_DIR (written by openshift-claude-trt-init).
+    Runs repo-specific setup, invokes Claude, creates PR, polls for
+    review comments.
