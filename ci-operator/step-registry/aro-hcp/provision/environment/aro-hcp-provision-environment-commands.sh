@@ -100,13 +100,7 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.svc.aks.systemAgentPool.vmSize = \"Standard_D4ds_v6\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.svc.aks.userAgentPool.vmSize = \"Standard_D8ds_v6\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.svc.aks.infraAgentPool.vmSize = \"Standard_D4ds_v6\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.systemAgentPool.vmSize = \"Standard_D4ds_v6\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.vmSize = \"Standard_D16ds_v6\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.infraAgentPool.vmSize = \"Standard_D4ds_v6\"
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
