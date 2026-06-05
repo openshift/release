@@ -28,8 +28,6 @@ aws_validation() {
 # objects, then removes the bucket. Returns the exit code of aws s3 rb.
 purge_and_delete_bucket() {
   local bucket="${1}"
-  local key_marker="" version_marker=""
-  local page next_key
   local rb_rc=0
 
   echo "[INFO] **** Removing all object versions and delete markers from S3 bucket: ${bucket}..."
