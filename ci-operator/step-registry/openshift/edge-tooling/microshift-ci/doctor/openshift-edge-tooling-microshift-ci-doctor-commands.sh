@@ -11,6 +11,7 @@ mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
 CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
+CLAUDE_CLOSE_STALE_BUGS_LOG="${WORKDIR}/claude-close-stale-bugs.log"
 CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
 CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
 MCP_JIRA_LOG="${WORKDIR}/mcp-jira.log"
@@ -48,7 +49,7 @@ atexit_handler() {
     fi
 
     # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
+    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -282,6 +283,18 @@ timeout 900 claude \
     -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
     --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
+
+# Close stale bugs that are no longer linked to current failures (10m and 20 turns).
+echo "Running Claude to close stale bugs..."
+CLAUDE_RC=0
+timeout 600 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 20 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:close-stale-bugs --close" \
+    --verbose 2>&1 | tee "${CLAUDE_CLOSE_STALE_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "close-stale-bugs" 10
 
 # Run bug fix for test bugs (15m and 50 turns).
 # Dry-run mode only.

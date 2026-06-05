@@ -113,21 +113,12 @@ periodics:
       - error
       report_template: |-
         :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.{{"\n"}}
-        {{- $base := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
-        {{- define "msReport" -}}<{{.}}microshift-ci-doctor-report.html|View report>{{end -}}
-        {{- define "msBugs" -}}<{{.}}analyze-ci-create-bugs-merged.txt|View bugs>{{end -}}
-        {{- define "msPRs" -}}<{{.}}report-fix-test-bugs.txt|View PRs>{{end -}}
-        {{- range $i := 3 -}}
-          {{- if $i -}} | {{end -}}
-          {{- if eq $i 0 -}}
-            {{- template "msReport" $base -}}
-          {{- else if eq $i 1 -}}
-            {{- template "msBugs" $base -}}
-          {{- else -}}
-            {{- template "msPRs" $base -}}
-          {{- end -}}
-        {{- end -}}
-        | <{{.Status.URL}}|View logs> |
+        {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
+        {{- $rp := printf "%s%s" $ab "microshift-ci-doctor-report.html" -}}
+        {{- $bg := printf "%s%s" $ab "analyze-ci-create-bugs-merged.txt" -}}
+        {{- $st := printf "%s%s" $ab "report-close-stale-bugs.txt" -}}
+        {{- $pr := printf "%s%s" $ab "report-fix-test-bugs.txt" -}}
+        | <{{$rp}}|Report> | <{{$bg}}|Bugs(+)> | <{{$st}}|Bugs(-)> | <{{$pr}}|PRs> | <{{.Status.URL}}|Logs> |
   spec:
     containers:
     - args:
