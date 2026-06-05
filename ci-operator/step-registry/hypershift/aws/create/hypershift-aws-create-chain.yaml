@@ -89,6 +89,9 @@ chain:
     - name: CNI_PROVIDER
       default: ""
       documentation: "The CNI provider to use for the cluster. Supported values: cilium"
+    - name: HYPERSHIFT_SEPARATE_INFRA_CREATE
+      default: "false"
+      documentation: "If true, create infrastructure and IAM separately using 'hypershift create infra aws' and 'hypershift create iam aws' before creating the cluster"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -117,6 +120,58 @@ chain:
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      INFRA_ID="${CLUSTER_NAME}"
+
+      # If separate infra creation is enabled, create infrastructure and IAM first
+      if [[ "${HYPERSHIFT_SEPARATE_INFRA_CREATE}" == "true" ]]; then
+        echo "$(date) Creating AWS infrastructure separately for cluster ${CLUSTER_NAME}"
+
+        # Create infrastructure
+        /usr/bin/hypershift create infra aws \
+          --name "${CLUSTER_NAME}" \
+          --aws-creds="${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
+          --base-domain "${DOMAIN}" \
+          --infra-id "${INFRA_ID}" \
+          --region "${HC_REGION}" \
+          --output-file "${SHARED_DIR}/aws_infra_output.json"
+
+        echo "$(date) Creating AWS IAM resources separately"
+
+        # Install jq for parsing infrastructure output
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -o /tmp/jq
+          chmod +x /tmp/jq
+          export PATH="/tmp:${PATH}"
+        fi
+
+        # Extract zone IDs from infrastructure output
+        PUBLIC_ZONE_ID="$(jq -er '.publicZoneID // empty' "${SHARED_DIR}/aws_infra_output.json")"
+        PRIVATE_ZONE_ID="$(jq -er '.privateZoneID // empty' "${SHARED_DIR}/aws_infra_output.json")"
+        LOCAL_ZONE_ID="$(jq -r '.localZoneID // ""' "${SHARED_DIR}/aws_infra_output.json")"
+
+        # Create IAM resources
+        # Note: OIDC provider settings are auto-discovered from the management cluster
+        IAM_COMMAND=(
+          /usr/bin/hypershift create iam aws
+          --infra-id "${INFRA_ID}"
+          --aws-creds="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
+          --region "${HC_REGION}"
+          --public-zone-id "${PUBLIC_ZONE_ID}"
+          --private-zone-id "${PRIVATE_ZONE_ID}"
+          --output-file "${SHARED_DIR}/aws_iam_output.json"
+        )
+
+        # Add local zone ID if it exists (for private clusters)
+        if [[ -n "${LOCAL_ZONE_ID}" ]]; then
+          IAM_COMMAND+=(--local-zone-id "${LOCAL_ZONE_ID}")
+        fi
+
+        "${IAM_COMMAND[@]}"
+
+        echo "$(date) Infrastructure and IAM created separately, proceeding with cluster creation"
+      fi
+
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       COMMAND=(
         /usr/bin/hypershift create cluster aws
@@ -207,6 +262,12 @@ chain:
           COMMAND+=(--additional-tags="${TAG}=${VALUE}")
         done < "${hosted_cluster_info_file}"
         cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
+      fi
+
+      # If infrastructure was created separately, add the JSON files to the command
+      if [[ "${HYPERSHIFT_SEPARATE_INFRA_CREATE}" == "true" ]]; then
+        COMMAND+=(--infra-json "${SHARED_DIR}/aws_infra_output.json")
+        COMMAND+=(--iam-json "${SHARED_DIR}/aws_iam_output.json")
       fi
 
       # Execute the command
