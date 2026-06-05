@@ -1,0 +1,829 @@
+---
+description: Debug CI job failures using /pj-rehearse iterative testing
+args: "[job_name] [org] [repo]"
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Glob
+  - AskUserQuestion
+  - Bash(make update)
+  - Bash(git *)
+  - Bash(.claude/scripts/monitor-rehearsal.sh *)
+  - Bash(.claude/scripts/analyze-prowjob.sh *)
+  - Bash(.claude/scripts/prow-fetch.sh *)
+  - Bash(.claude/scripts/trigger-rehearsal.sh *)
+  - Bash(ps aux | grep *)
+  - Bash(kill *)
+  - Bash(sleep *)
+  - Bash(date)
+  - Bash(wc *)
+  - Bash(grep *)
+  - Bash(jq *)
+---
+
+# PJ-Rehearse Debug - Iterative CI Job Debugging
+
+Debug and fix CI job configuration issues using /pj-rehearse for rapid iteration.
+
+**Arguments**: 
+- `job_name` (optional): Specific job to debug (e.g., "azure-ipi-coco")
+- `org` (optional): GitHub organization (default: "openshift")
+- `repo` (optional): Repository name (will search if not provided)
+
+## Overview
+
+This skill provides a systematic workflow for debugging CI job failures in the openshift/release repository:
+
+1. **Identify** the failing job configuration and related files
+2. **Analyze** error patterns in Prow build logs
+3. **Fix** issues based on common patterns (base images, network access, environment variables)
+4. **Test** changes using /pj-rehearse
+5. **Monitor** long-running rehearsals with background scripts
+6. **Iterate** until the job passes
+
+**Use cases:**
+- New step-registry components failing in rehearsals
+- Configuration changes causing unexpected failures
+- Base image or tool availability issues
+- Network restriction debugging
+- Environment variable and secret issues
+
+## Mandatory Wrapper Usage
+
+**CRITICAL:** This skill MUST use wrapper scripts for all Prow and GitHub access. Direct `curl` and `gh` commands are NOT allowed.
+
+**Required wrappers (pre-approved in allowed-tools):**
+
+**`.claude/scripts/prow-fetch.sh`** - For ALL Prow, GCS, and GitHub API access:
+```bash
+# Get PR checks (wraps gh pr checks internally)
+.claude/scripts/prow-fetch.sh pr-checks <PR> [PATTERN]
+
+# Fetch any Prow/GCS URL
+.claude/scripts/prow-fetch.sh <URL>
+
+# Fetch build logs
+.claude/scripts/prow-fetch.sh build-log <PR> <JOB_ID> <STEP_NAME>
+
+# Fetch job results
+.claude/scripts/prow-fetch.sh finished <PR> <JOB_ID>
+.claude/scripts/prow-fetch.sh started <PR> <JOB_ID>
+```
+
+**`.claude/scripts/monitor-rehearsal.sh`** - For monitoring rehearsals:
+```bash
+.claude/scripts/monitor-rehearsal.sh <PR> <SHORT_JOB_NAME> [DURATION_HOURS] [CHECK_INTERVAL] [STEP_NAME] [ARTIFACT_WAIT] [CONTINUE_AFTER_STEP]
+```
+
+**`.claude/scripts/analyze-prowjob.sh`** - For analyzing failures:
+```bash
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL>
+```
+
+**`.claude/scripts/trigger-rehearsal.sh`** - For triggering rehearsals:
+```bash
+.claude/scripts/trigger-rehearsal.sh <PR> <JOB_NAME>
+# Example: .claude/scripts/trigger-rehearsal.sh 79244 periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco
+```
+
+**Why wrappers are required:**
+- ❌ **Direct curl**: `curl https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/...` → triggers permission prompts
+- ❌ **Direct gh**: `gh pr checks`, `gh api` → triggers api.github.com permission prompts
+- ✅ **Wrapper**: `.claude/scripts/prow-fetch.sh <URL>` → pre-approved, no prompts
+
+**Examples of correct usage:**
+
+✅ **Correct:**
+```bash
+.claude/scripts/prow-fetch.sh pr-checks 79244 azure-ipi-coco
+.claude/scripts/prow-fetch.sh "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/.../finished.json"
+```
+
+❌ **WRONG (triggers prompts):**
+```bash
+gh pr checks 79244 --repo openshift/release
+curl https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/.../finished.json
+curl https://api.github.com/repos/openshift/release/issues/79244/comments
+gh api repos/openshift/release/issues/79244/comments
+```
+
+**Enforcement:**
+- Wrapper scripts are the ONLY approved way to access Prow/GitHub
+- `gh` commands are NOT in allowed-tools (removed)
+- Direct `curl` to prow/gcsweb/api.github.com is NOT allowed
+- Violating this will trigger permission prompts and break autonomous iteration
+
+## Autonomous Iteration Mode
+
+**AUTONOMOUS EXECUTION:** This skill automatically executes the full debug cycle:
+
+**Iteration Loop (automatic):**
+1. **Analyze** failure from previous rehearsal (or initial failure)
+2. **Make changes** to step scripts, configs, or manifests
+3. **Regenerate** with `make update` (if needed)
+4. **Commit** changes with descriptive message
+5. **Wait** for any running rehearsal to complete
+6. **Push** changes to current branch: `git push origin HEAD`
+7. **Trigger** new rehearsal: `.claude/scripts/trigger-rehearsal.sh <PR> <JOB_NAME>`
+8. **Monitor** until step completes (or full job if needed)
+9. **Evaluate** results and decide: iterate or **WAIT FOR USER**
+
+**CRITICAL:** After each iteration completes (success or failure), the skill will:
+- ✅ Report findings
+- ✅ Show what was changed
+- ✅ Display logs/errors
+- ⏸️ **WAIT FOR USER** before triggering next rehearsal
+- User can say "continue" to iterate, or give new instructions
+
+**Success Criteria (when to stop iterating):**
+- ✅ Step completes successfully (no errors in build log)
+- ✅ Step validation passes (e.g., kbs-client connects, pods ready)
+- ✅ Integration works (INITDATA/TRUSTEE_URL for CoCo tests)
+- ✅ Full test passes if integration validation is needed
+
+**Failure Patterns (when to iterate):**
+- ❌ Pod/deployment fails to become ready
+- ❌ Missing commands/tools in container
+- ❌ Network connectivity failures
+- ❌ Certificate/authentication issues
+- ❌ Configuration errors (missing env vars, wrong paths)
+- ❌ Timeout waiting for resources
+
+**Iteration Guidelines:**
+- **Maximum 5 iterations** before asking user for guidance
+- **Always wait** for rehearsal completion before pushing next change
+- **Monitor step-only** for quick feedback (use `CONTINUE_AFTER_STEP=false`)
+- **Monitor full job** when validating integration (default behavior)
+- **Commit each fix** separately with clear description of what changed
+- **Use polling loops** instead of `oc wait` for better diagnostics
+
+**When to ask user:**
+- After 5 failed iterations (may need different approach)
+- Encountering unexpected errors not matching common patterns
+- Need to make architectural decisions (e.g., HTTP vs HTTPS)
+- Clarification needed on requirements or expected behavior
+
+## Workflow
+
+### 1. Initial Setup
+
+If no branch exists for this work:
+```bash
+git checkout main && git pull && git checkout -b debug-<job-name>
+```
+
+Replace `<job-name>` with a descriptive name for the issue you're debugging.
+
+### 2. Locate Configuration Files
+
+Find the relevant files for your job:
+
+**CI configuration** (source of truth - edit these):
+```bash
+# Find config file
+find ci-operator/config/<org>/<repo> -name "*.yaml" | grep -v "__periodics"
+
+# Example: ci-operator/config/openshift/my-repo/openshift-my-repo-main.yaml
+```
+
+**Step registry** (reusable test components):
+```bash
+# Find step definitions
+find ci-operator/step-registry -name "*<step-name>*"
+
+# Example: ci-operator/step-registry/my-component/install/
+#   - my-component-install-ref.yaml (metadata)
+#   - my-component-install-commands.sh (script)
+```
+
+**Generated jobs** (auto-generated - don't edit):
+```bash
+# View generated jobs (for reference only)
+find ci-operator/jobs/<org>/<repo> -name "*.yaml"
+```
+
+### 3. Analyze the Failure
+
+Common failure patterns:
+- **Base image issues**: `from: cli` vs `from: tools` vs `from_image:` 
+- **Network restrictions**: `restrict_network_access: true` blocks external downloads
+- **Missing tools**: cli image has oc/kubectl, tools image has additional utilities
+- **Environment variables**: Check defaults vs overrides in test config
+- **Workflow chain order**: Ensure dependencies run before dependents
+
+### 4. Make Fixes
+
+**CRITICAL**: DO NOT push commits while a rehearsal cluster is running!
+
+- Pushing to the PR branch **immediately aborts the running rehearsal**
+- The cluster is terminated and all test progress is lost
+- This happens even for documentation-only changes
+- Always verify no rehearsal is running before pushing
+
+**Check if rehearsal is running before pushing:**
+```bash
+# Check for active rehearsal
+gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+
+# Check Prow job state
+curl -sS "<gcs-url>/<job-id>/prowjob.json" | jq -r '.status.state'
+# States: pending, running → DO NOT PUSH
+# States: success, failure, aborted → Safe to push
+```
+
+Apply fixes based on error analysis (see Common Debugging Patterns below):
+
+**Base image issues:**
+```yaml
+# Wrong - uses non-existent tag
+from_image:
+  namespace: ocp
+  name: cli
+  tag: latest
+
+# Right - references base_images definition
+from: cli
+```
+
+**Missing commands:**
+```yaml
+# If you need git, make, go, python:
+from: tools
+
+# If you only need oc/kubectl:
+from: cli
+```
+
+**Network restrictions:**
+```yaml
+# Allow network access (requires network-access-rehearsals-ok label)
+restrict_network_access: false
+```
+
+**Environment variables:**
+```yaml
+# In step ref:
+env:
+  - name: MY_VAR
+    default: "default_value"
+    
+# In CI config test:
+env:
+  MY_VAR: "override_value"
+```
+
+### 5. Generate and Commit
+
+```bash
+make update
+git add ci-operator/config ci-operator/jobs ci-operator/step-registry
+git commit -m "Fix {{job_name}}: <describe what you fixed>"
+```
+
+### 6. Create/Update PR
+
+First time:
+```bash
+gh auth setup-git
+git push -u origin debug-{{job_name}}
+gh pr create --repo openshift/release --title "Fix {{job_name}}" --body "Fixes:\n- <list changes>"
+```
+
+Updates:
+```bash
+git push
+```
+
+### 7. Wait for Rehearsal Notification
+
+Poll for REHEARSALNOTIFIER comment on the PR:
+```bash
+gh pr view <PR_NUMBER> --repo openshift/release --json comments --jq '.comments[] | select(.author.login == "openshift-ci-robot") | select(.body | contains("REHEARSALNOTIFIER")) | .body'
+```
+
+Extract the rehearsable job name from the table in the comment.
+
+### 8. Trigger Rehearsal
+
+Post comment on PR:
+```bash
+gh pr comment <PR_NUMBER> --repo openshift/release --body "/pj-rehearse <job-name>"
+```
+
+### 9. Monitor Results
+
+**For quick jobs (< 30 minutes):**
+```bash
+gh pr checks <PR_NUMBER> --repo openshift/release
+```
+
+**For long-running jobs (> 30 minutes):**
+
+Use the standardized monitor script:
+
+```bash
+# Monitor full job completion (default)
+.claude/scripts/monitor-rehearsal.sh <PR_NUMBER> <SHORT_JOB_NAME>
+
+# Examples:
+# Full job completion
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco
+
+# Two-phase: Monitor step, then full job (RECOMMENDED for debugging)
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120 true
+
+# Monitor step only (exits when step succeeds)
+.claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 3 300 "install-trustee-operator" 120 false
+
+# Run in background
+.claude/scripts/monitor-rehearsal.sh 79244 aws-ipi-coco &
+
+# Parameters:
+#   PR_NUMBER: GitHub PR number (required)
+#   SHORT_JOB_NAME: Part of job name to grep (e.g., "azure-ipi-coco") (required)
+#   DURATION_HOURS: Monitoring duration in hours (default: 3)
+#   CHECK_INTERVAL: Seconds between checks (default: 300 = 5 minutes)
+#   STEP_NAME: Optional - monitor specific step (e.g., "install-trustee-operator")
+#   ARTIFACT_WAIT: Seconds to wait after step success for artifacts (default: 60)
+#   CONTINUE_AFTER_STEP: Continue to full job after step succeeds (default: true)
+```
+
+**What the monitor does:**
+- **Default**: Waits for full job completion (pass, fail, aborted, or error)
+- **Two-phase mode** (RECOMMENDED): Validates step, then continues to full job
+  - Phase 1: Monitors step completion + artifact wait
+  - Phase 2: Continues to full job completion
+  - Reports both step success and final job results
+- **Step-only mode**: Exits when step succeeds (CONTINUE_AFTER_STEP=false)
+- Checks status every 5 minutes (configurable)
+- Auto-detects completion (pass/fail/aborted/error) and reports Prow URL
+- Automatically exits when rehearsal is aborted (e.g., when commits are pushed)
+- Times out after 3 hours (configurable)
+- Can run in foreground or background (&)
+
+**When to use two-phase monitoring:**
+- **Debugging installation steps** (e.g., trustee operator)
+  - Validates installation succeeds (Phase 1)
+  - Validates integration works (Phase 2: INITDATA, TRUSTEE_URL, tests)
+- Want faster feedback when step completes, but need full results
+- Debugging configuration integration issues
+
+**When to use step-only mode:**
+- Only care about step validation, not full test results
+- Need immediate feedback to iterate on step fixes quickly
+
+**Managing background monitors:**
+
+The monitor script automatically exits when rehearsals complete (pass, fail, aborted, or error states). However, if you manually interrupt rehearsals by pushing commits, orphaned monitors may continue running until timeout.
+
+```bash
+# Check running monitors
+ps aux | grep -E "monitor-rehearsal.sh.*<PR_NUMBER>" | grep -v grep
+
+# Check active rehearsals
+gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+
+# Kill orphaned monitors (when no matching cluster exists)
+kill <PID>
+
+# Example workflow:
+# 1. Check what's running
+ps aux | grep "monitor-rehearsal.sh.*79244" | grep -v grep
+# Output shows PIDs: 35703, 38822, 41883
+
+# 2. Check active rehearsals
+gh pr checks 79244 --repo openshift/release | grep rehearse
+# Output shows only 1 active rehearsal (Job ID: 2055361377505120256)
+
+# 3. Kill orphaned monitors from aborted rehearsals
+kill 35703 38822
+```
+
+**Best practices:**
+- Start only one monitor per active rehearsal
+- When a rehearsal is aborted (by pushing commits), the monitor will auto-exit within ~5 minutes (one check interval)
+- Periodically check for orphaned monitors: `ps aux | grep monitor-rehearsal | grep -v grep`
+- Monitors log to `/tmp/monitor-rehearsal-<JOB_ID>.log` - check logs to see what they're monitoring
+- If you manually abort a rehearsal, you don't need to kill the monitor - it will detect the abort and exit
+
+**Fetch artifacts with prow-fetch.sh:**
+
+Use the wrapper script to fetch data from **prow.ci.openshift.org** and **gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com** without repeated permission prompts:
+
+**RECOMMENDED:** Just copy/paste URLs from Prow UI or monitor output:
+
+```bash
+# Fetch any artifact URL (easiest - no job name lookup required)
+.claude/scripts/prow-fetch.sh https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-.../2056429033742143488/finished.json
+
+# Or from Prow view URLs
+.claude/scripts/prow-fetch.sh https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/...
+```
+
+**Convenience commands** (auto-lookup job name from job ID):
+
+```bash
+# Get PR check status (find job IDs)
+.claude/scripts/prow-fetch.sh pr-checks <PR_NUMBER> [PATTERN]
+
+# Fetch build log for a step
+.claude/scripts/prow-fetch.sh build-log <PR_NUMBER> <JOB_ID> <STEP_NAME>
+
+# Fetch finished.json (job result)
+.claude/scripts/prow-fetch.sh finished <PR_NUMBER> <JOB_ID>
+
+# Fetch started.json (job start info)
+.claude/scripts/prow-fetch.sh started <PR_NUMBER> <JOB_ID>
+
+# Fetch clone-records.json
+.claude/scripts/prow-fetch.sh clone-records <PR_NUMBER> <JOB_ID>
+```
+
+**Common examples:**
+
+```bash
+# Get job result (copy URL from monitor or Prow)
+.claude/scripts/prow-fetch.sh https://.../finished.json | jq -r '.result'
+
+# Or with convenience command
+.claude/scripts/prow-fetch.sh finished 79244 2056429033742143488 | jq -r '.result'
+
+# Get build log tail (will try multiple paths for step)
+.claude/scripts/prow-fetch.sh build-log 79244 2056429033742143488 install-trustee-operator | tail -100
+
+# Find job IDs
+.claude/scripts/prow-fetch.sh pr-checks 79244 azure-ipi-coco
+
+# Quiet mode (suppress informational messages)
+PROW_FETCH_QUIET=1 .claude/scripts/prow-fetch.sh finished 79244 2056429033742143488
+```
+
+**What the script does:**
+- Wraps curl to prow.ci.openshift.org and gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com
+- Wraps `gh pr checks` for getting PR status
+- **Eliminates repeated permission prompts** (script is pre-approved in allowed-tools)
+- Direct URL fetching (just paste URLs) requires no job name lookup
+- Convenience commands auto-lookup job name using `gh pr checks`
+- Environment variables:
+  - `PROW_FETCH_QUIET=1` - Suppress stderr messages (only output data)
+  - `PROW_FETCH_HEADERS=1` - Include HTTP headers in output
+
+**Note:** For `api.github.com` access, use `gh` commands directly (already pre-approved: `gh pr *`)
+
+**View logs if failed:**
+- Click through to Prow job URL in PR checks
+- Or use: `gh pr view <PR_NUMBER> --repo openshift/release --json statusCheckRollup`
+- Or use prow-fetch.sh as shown above
+
+**Analyze failure with prowjob-analyzer:**
+
+For deeper analysis of failed rehearsals (especially for sandboxed-containers-operator tests), use the prowjob-analyzer tool from https://github.com/openshift/sandboxed-containers-operator (devel branch - actively developed):
+
+**Quick Usage (Recommended):**
+
+Use the wrapper script that automatically manages the analyzer installation:
+
+```bash
+# Analyze a failed rehearsal
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL>
+
+# Get JSON output
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL> --json
+
+# Verbose output
+.claude/scripts/analyze-prowjob.sh <PROW_JOB_URL> --verbose
+```
+
+The script automatically:
+- Clones prowjob-analyzer to `~/.cache/prowjob-analyzer` (first run only)
+- Updates the cache daily
+- Runs the analyzer with all arguments passed through
+
+**Manual Usage (Alternative):**
+
+```bash
+# Clone the repo if not already available (use devel branch)
+git clone -b devel https://github.com/openshift/sandboxed-containers-operator.git /tmp/osc-analyzer
+
+# Run analysis on failed rehearsal
+cd /tmp/osc-analyzer
+python3 scripts/prowjob-analyzer/dig.py <PROW_JOB_URL>
+```
+
+**What prowjob-analyzer provides:**
+
+- **Metadata extraction**: Provider (AWS/Azure/GCP), OCP version, workload type (kata/peerpods/coco), Kata RPM version
+- **Failed step identification**: Accurately identifies which Prow step failed (not just grep through build-log.txt)
+- **Test result summary**: Lists failing tests if tests executed
+- **Pattern detection**: Recognizes common failure patterns (timeouts, OOM, network issues)
+- **Intelligent analysis**: Distinguishes between infrastructure failures (tests never ran) vs. test failures
+
+**Example:**
+```bash
+# Get Prow URL from rehearsal check
+PROW_URL=$(gh pr checks 79244 --repo openshift/release | grep azure-ipi-coco | awk '{print $4}')
+
+# Analyze the failed job
+.claude/scripts/analyze-prowjob.sh "$PROW_URL"
+
+# Or with JSON output for programmatic use
+.claude/scripts/analyze-prowjob.sh "$PROW_URL" --json
+```
+
+**Output includes:**
+- Job status (pass/fail/timeout)
+- Provider and OCP version
+- Which step(s) failed (e.g., `install-trustee-operator`, `ipi-install-install`, `openshift-extended-test`)
+- For test failures: List of failing tests with metadata (case ID, author, priority)
+- Links to relevant artifacts
+- Detected failure patterns
+
+**When to use:**
+- Rehearsal fails and you need to understand which component failed
+- Multiple tests failing - helps identify if it's infrastructure setup or actual test issues
+- Need to extract metadata for bug reports (OCP version, provider, workload type)
+- Want pattern recognition across multiple failures
+
+**For sandboxed-containers-operator debugging:**
+The prowjob-analyzer is specifically designed for OSC tests and understands:
+- Test execution flow (setup phase, node reboots, workload types)
+- Common failure patterns (RPM installation, operator installation, KataConfig creation)
+- First test root cause analysis (when 90%+ tests fail, first test contains the real error)
+
+See https://github.com/openshift/sandboxed-containers-operator/blob/devel/scripts/prowjob-analyzer/README.md for full documentation.
+
+### 10. Iterate
+
+If rehearsal fails:
+1. Analyze new errors
+2. Make additional fixes
+3. Run `make update`
+4. **CRITICAL**: Verify no cluster is running before pushing
+   ```bash
+   # Check for active rehearsal
+   gh pr checks <PR_NUMBER> --repo openshift/release | grep rehearse
+   ```
+   - Pushing while a cluster is running **KILLS THE CLUSTER IMMEDIATELY**
+   - The rehearsal is aborted and all test progress is lost
+   - This happens for ANY push, even documentation-only changes
+   - Must wait for rehearsal to complete (success, failure, or aborted state)
+5. Commit and push (only when no cluster is running)
+6. Wait for new REHEARSALNOTIFIER
+7. Trigger `/pj-rehearse` again
+
+Repeat until the job passes.
+
+**Rule: NEVER push while a cluster is running. Always wait for completion.**
+
+## Common Debugging Patterns
+
+### Network Restrictions Issue
+
+**Symptom**: Script fails to download files when `restrict_network_access: true`
+
+**Error examples**:
+```
+curl: (6) Could not resolve host
+fatal: unable to access 'https://github.com/...': Could not resolve host
+```
+
+**Solutions**:
+- Remove `restrict_network_access: true` if network is required for installation
+- Note: Rehearsals will require `network-access-rehearsals-ok` label from org member
+- Alternative: Pre-render manifests or vendor dependencies to avoid runtime downloads
+
+### Missing Command/Tool in Container
+
+**Symptom**: `command not found` errors in step execution
+
+**Error examples**:
+```
+bash: git: command not found
+bash: jq: command not found
+bash: python3: command not found
+```
+
+**Diagnosis**:
+```bash
+# Check what's in each base image:
+# cli: oc, kubectl (minimal)
+# tools: git, make, go, python, jq, and build tools
+# tests-private: openshift-tests and dependencies
+```
+
+**Solutions**:
+- **`from: cli`**: Only oc/kubectl - use for simple cluster operations
+- **`from: tools`**: Git, make, compilers - use for building/installing
+- **`from: tests-private`**: Test execution - use for running test suites
+- **Install in script**: Add installation steps if tool is small (e.g., `curl -o /tmp/tool`)
+- **Custom base image**: Define in `base_images:` if you need specific tooling
+
+### Base Image Selection Decision Tree
+
+1. **Need git, make, go, python?** → `from: tools`
+2. **Only need oc/kubectl?** → `from: cli`
+3. **Running openshift-tests?** → `from: tests-private`
+4. **Need specific version of a tool?** → Define custom `base_images:` entry
+
+### Environment Variable Issues
+
+**Where to set them**:
+- Step defaults: In `*-ref.yaml` under `env:`
+- Job overrides: In CI config under `tests: - steps: env:`
+- Shared/generated: Via separate env-cm or config step
+
+## Tips
+
+- Always run `make update` after editing configs
+- Check generated job files to verify changes
+- Use `/test <job-name>` to run full job after rehearsal passes
+- Search for similar working jobs as reference patterns
+- Read error logs carefully - they often contain the exact fix needed
+- Use `.claude/scripts/monitor-rehearsal.sh` for long-running jobs
+- Run monitors in background with `&` to continue working
+- Use GCS browser URLs to check artifacts and step logs directly with curl
+- For deep failure analysis, use `.claude/scripts/analyze-prowjob.sh <PROW_URL>`
+- Keep running monitors in sync with active rehearsals (ps aux | grep monitor-rehearsal)
+
+**CRITICAL - DO NOT PUSH WHILE CLUSTER IS RUNNING:**
+- Pushing to PR branch **kills the running cluster immediately**
+- Rehearsal is aborted and all test progress is lost
+- Happens for ANY push (even documentation, comments, or minor changes)
+- Always check `gh pr checks` before pushing
+- Wait for cluster to complete (success/failure/aborted) before pushing
+- Accumulate fixes locally and push when no cluster is running
+
+### Accessing Prow Logs and Artifacts
+
+**URLs you can freely access**:
+
+Prow provides two URL patterns for accessing build logs and artifacts:
+
+1. **Prow viewer** (web interface):
+   ```
+   https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/<PR>/<JOB_NAME>/<JOB_ID>/
+   ```
+
+2. **GCS browser** (direct artifact access):
+   ```
+   https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/<PR>/<JOB_NAME>/<JOB_ID>/
+   ```
+
+Both URLs provide access to:
+- `build-log.txt` - Full job execution log
+- `artifacts/` - Step-specific logs and output files
+- `started.json` - Job start time and commit info
+- `finished.json` - Job completion status and result
+- `prowjob.json` - Full Prow job definition and status
+
+**Example URLs**:
+```bash
+# Build log
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/build-log.txt
+
+# Job artifacts directory
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/artifacts/azure-ipi-coco/
+
+# Specific step logs
+https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/79244/rehearse-79244-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-coco/2055345638224171008/artifacts/azure-ipi-coco/sandboxed-containers-operator-install-trustee-operator/build-log.txt
+```
+
+### Analyzing Prow Build Logs
+
+**Finding the failure**:
+```bash
+# Get last 200 lines (usually contains the error)
+curl -sS "<gcs-url>/build-log.txt" | tail -200
+
+# Search for specific step
+curl -sS "<gcs-url>/build-log.txt" | grep -A 100 "Running step <step-name>"
+
+# Find error messages
+curl -sS "<gcs-url>/build-log.txt" | grep -i "error\|failed\|command not found"
+
+# Check if a specific step ran
+curl -sS "<gcs-url>/artifacts/azure-ipi-coco/" | grep -o "install-trustee-operator"
+
+# Get step-specific logs
+curl -sS "<gcs-url>/artifacts/azure-ipi-coco/<step-name>/build-log.txt" | tail -100
+```
+
+**Common error patterns**:
+- `command not found` → Wrong base image (need tools instead of cli)
+- `Could not resolve host` → Network restrictions blocking access
+- `image not found` → Invalid base image reference
+- `No such file or directory` → Path issue or missing SHARED_DIR file
+- `exit status 1` → Check preceding lines for actual error
+
+### Iterative Debugging Workflow
+
+1. **First rehearsal failure** → Identify error in build-log.txt
+2. **Fix the issue** → Edit config/step files
+3. **Commit and push** → Update PR
+4. **Wait for new REHEARSALNOTIFIER** → Bot updates rehearsable jobs list
+5. **Trigger new rehearsal** → `/pj-rehearse <job-name>`
+6. **Monitor progress** → Use background monitor for long jobs
+7. **Repeat until pass** → Each iteration fixes one issue
+
+### Multiple Issues in One Job
+
+Jobs may fail for multiple reasons - fix them one at a time:
+
+**Example scenario**:
+- **Iteration 1**: Network blocked → Fix: `restrict_network_access: false` → Retest
+- **Iteration 2**: Git missing → Fix: `from: tools` instead of `from: cli` → Retest
+- **Iteration 3**: Missing env var → Fix: Add to step env → Retest
+- **Iteration 4**: All pass! → Ready to merge
+
+After each fix, re-run rehearsal to discover the next issue.
+
+## Example Debugging Session
+
+**Scenario**: New installation step failing in rehearsal
+
+1. **Initial failure**: "command not found: git"
+   - **Analysis**: Script tries to `git clone` but git not available
+   - **Root cause**: Using `from: cli` (only has oc/kubectl)
+   - **Fix**: Change to `from: tools` (includes git)
+
+2. **After fix**: "Could not resolve host: github.com"
+   - **Analysis**: Network request blocked
+   - **Root cause**: Test has `restrict_network_access: true`
+   - **Fix**: Change to `restrict_network_access: false`
+   - **Note**: Rehearsal needs `network-access-rehearsals-ok` label
+
+3. **Success**: Installation completes, test passes
+
+This demonstrates the iterative process: each rehearsal reveals the next issue.
+
+## Autonomous Iteration Example
+
+**Scenario**: Trustee operator installation failing with certificate errors
+
+**Iteration 1: Base image fix**
+```
+Analysis: "git: command not found" in build log
+Fix: Change from: cli → from: tools
+Commit: "[DEBUG] Fix install-trustee-operator to use tools base image"
+Push: Wait for completion (no active cluster) → push → trigger rehearsal
+Monitor: .claude/scripts/monitor-rehearsal.sh 79244 azure-ipi-coco 2 300 "install-trustee-operator" 60 false
+Result: ✅ Git works now
+Status: ❌ New error - network access denied
+```
+
+**Iteration 2: Network access fix**
+```
+Analysis: "Could not resolve host" - network blocked
+Fix: Embed pre-rendered manifests to avoid network downloads
+Commit: "[DEBUG] Embed manifests to work with restrict_network_access"
+Push: Wait → push → trigger
+Monitor: Same command (step-only for quick feedback)
+Result: ✅ Manifests apply successfully
+Status: ❌ New error - SSL certificate verification failed
+```
+
+**Iteration 3: Certificate fix**
+```
+Analysis: kbs-client rejects self-signed certificate
+Fix: Use HTTP instead of HTTPS (route has insecureEdgeTerminationPolicy: Allow)
+Commit: "[DEBUG] Use HTTP for Trustee URL to avoid certificate issues"
+Push: Wait → push → trigger
+Monitor: Switch to full job: CONTINUE_AFTER_STEP=true (validate integration)
+Result: ✅ kbs-client connects successfully
+Status: ✅ Step passes, full job passes
+```
+
+**Iteration 4: Diagnostic improvements**
+```
+Analysis: Step succeeds but diagnostics could be better
+Fix: Replace oc wait with polling loops for better error messages
+Commit: "[DEBUG] Replace oc wait with polling loops for better diagnostics"
+Push: Wait → push → trigger
+Monitor: Full job
+Result: ✅ Better progress reporting, clearer errors
+Status: ✅ Complete - ready for review
+```
+
+**Autonomous workflow:**
+- 4 iterations total (under 5-iteration limit)
+- Each iteration: analyze → fix → commit → push when safe → test → evaluate
+- Progressed from "command not found" to working installation
+- Final result: step works + has good diagnostics
+- No user intervention needed during iteration
+
+**Key practices demonstrated:**
+- Commit each fix separately with clear description
+- Wait for rehearsal completion before pushing
+- Use step-only monitoring for quick fixes (iterations 1-2)
+- Use full job monitoring for integration validation (iteration 3)
+- Continue improving even after success (iteration 4)
+
+## Output
+
+Report:
+- Configuration files changed
+- Fixes applied
+- PR URL
+- Rehearsal job name
+- Current rehearsal status
