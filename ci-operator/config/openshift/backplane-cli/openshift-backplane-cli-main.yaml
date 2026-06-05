@@ -15,18 +15,24 @@ images:
     to: unused
   - dockerfile_literal: |
       FROM base
-      USER 0
+
       # Install required tools
       RUN dnf install -y which gawk tar gzip && \
           dnf clean all
+
       # Copy source code
-      COPY . /go/src/github.com/openshift/
+      COPY . /go/src/github.com/openshift/backplane-cli/
       WORKDIR /go/src/github.com/openshift/backplane-cli
+
+      # Grant read, write, and execute permissions to all users for repo directory
+      RUN chmod -R 777 /go/src/github.com/openshift/backplane-cli
+
+      # Trust this repo directory in git
+      RUN git config --system --add safe.directory /go/src/github.com/openshift/backplane-cli
+
       # Set environment variables for Go
       ENV HOME=/tmp/home
-      ENV GOPATH=/go
-      # Install golangci-lint
-      RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      ENV GOPATH=/tmp/go
     from: base
     inputs:
       src:
