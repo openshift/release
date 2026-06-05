@@ -101,7 +101,8 @@ for i in $(seq 1 6); do
             --allowedTools "${ALLOWED_TOOLS}" \
             --output-format stream-json \
             --max-turns 50 \
-            -p "/agentic-followup ${JIRA_ISSUE_KEY}" \
+            --append-system-prompt-file "/workspace/.apm/prompts/agentic-followup.prompt.md" \
+            -p "${JIRA_ISSUE_KEY}" \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
     fi
 done
