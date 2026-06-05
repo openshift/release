@@ -75,9 +75,7 @@ kind: OperatorGroup
 metadata:
   name: medik8s-og
   namespace: ${INSTALL_NAMESPACE}
-spec:
-  targetNamespaces:
-  - ${INSTALL_NAMESPACE}
+spec: {}
 EOF
 }
 
@@ -143,12 +141,12 @@ wait_for_csv() {
 
     log "Waiting for CSV ${csv} to reach Succeeded phase..."
     if oc wait --for=jsonpath='{.status.phase}'=Succeeded "csv/${csv}" \
-        -n "$INSTALL_NAMESPACE" --timeout=5m; then
+        -n "$INSTALL_NAMESPACE" --timeout=15m; then
         log "CSV ${csv} is Succeeded"
         return 0
     fi
 
-    log "ERROR: CSV ${csv} did not reach Succeeded within 5m"
+    log "ERROR: CSV ${csv} did not reach Succeeded within 15m"
     oc get csv "$csv" -n "$INSTALL_NAMESPACE" -o yaml || true
     return 1
 }

@@ -16,21 +16,25 @@ ref:
     documentation: |-
       Name of the transit encryption key to create in Vault for KMS encryption.
       This key will be used by the Kubernetes API server for encrypting secrets.
+  - name: VAULT_ENTERPRISE_NS
+    default: "admin"
+    documentation: |-
+      Vault Enterprise namespace where the transit engine, AppRole auth, and
+      policies will be created. Must match the VaultNamespace configured in the
+      KMS plugin (defaults to "admin" in library-go test helpers).
   documentation: |-
     Configures an already-installed Vault instance for Kubernetes KMS encryption.
 
     This step should run after etcd-encryption-vault-install.
 
     Configuration steps:
-    - Checks if Vault is already initialized
-    - Initializes Vault (if needed)
-    - Unseals Vault
-    - Enables transit secret engine
-    - Creates transit encryption key (name: ${VAULT_KMS_KEY_NAME})
-    - Enables AppRole authentication
-    - Creates KMS policy with encrypt/decrypt permissions
-    - Creates AppRole role (kms-plugin)
-    - Retrieves AppRole credentials
+    - Creates Vault Enterprise namespace (${VAULT_ENTERPRISE_NS})
+    - Enables transit secret engine in ${VAULT_ENTERPRISE_NS}
+    - Creates transit encryption key (name: ${VAULT_KMS_KEY_NAME}) in ${VAULT_ENTERPRISE_NS}
+    - Enables AppRole authentication in ${VAULT_ENTERPRISE_NS}
+    - Creates KMS policy with encrypt/decrypt permissions in ${VAULT_ENTERPRISE_NS}
+    - Creates AppRole role (kms-plugin) in ${VAULT_ENTERPRISE_NS}
+    - Retrieves AppRole credentials from ${VAULT_ENTERPRISE_NS}
     - Stores credentials in vault-credentials secret
 
     Prerequisites:
