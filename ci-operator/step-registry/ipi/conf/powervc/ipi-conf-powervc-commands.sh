@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.3.8"
+readonly POWERVC_TOOL_VERSION="v2.4.1"
 readonly YQ_VERSION="v4.53.2"
 
 # Global variables for cleanup
@@ -302,10 +302,11 @@ function verify_rhcos_image() {
 
 	# Verify image exists in PowerVC
 	log_info "Checking if ${RHCOS_IMAGE_NAME} exists in PowerVC..."
-	if ! openstack --os-cloud="${CLOUD}" image show "${RHCOS_IMAGE_NAME}" --format=shell --column=name &>/dev/null; then
-		log_error "RHCOS image '${RHCOS_IMAGE_NAME}' not found in PowerVC cloud '${CLOUD}'"
-		log_info "Available RHCOS images:"
-		openstack --os-cloud="${CLOUD}" image list --format=value | grep -i rhcos || log_warning "No RHCOS images found"
+	if ! PowerVC-Tool \
+		rhcos-exists \
+		--cloud "${CLOUD}" \
+		--imageName "${RHCOS_IMAGE_NAME}" \
+		--shouldDebug false; then
 		exit 1
 	fi
 
@@ -316,6 +317,15 @@ function verify_rhcos_image() {
 #######################################
 # Main execution starts here
 #######################################
+log_info "=== Checking for zone.tab ==="
+ls -l /usr/share/ || true
+ls -l /usr/share/zoneinfo/ || true
+
+if [ ! -f /usr/share/zoneinfo/zone.tab ]; then
+	log_error "The file /usr/share/zoneinfo/zone.tab is required for the openstack CLI"
+	exit 1
+fi
+
 log_info "=== PowerVC IPI Configuration Script Started ==="
 
 # Validate environment
