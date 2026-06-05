@@ -87,37 +87,53 @@ git checkout -b "$BRANCH" origin/"${DEFAULT_BRANCH}"
 # if there happens to be a merge conflict we can still push it and create a PR...
 if ! git merge "upstream/${UPSTREAM_BRANCH}"; then
   echo "⚠️  Merge conflict detected"
+
+  # Capture list of conflicted files for diagnostics
+  CONFLICTED_FILES=$(git diff --name-only --diff-filter=U)
+  echo "Conflicted files:"
+  echo "$CONFLICTED_FILES"
+
   git add -A
-  git commit -m "Merge upstream/${UPSTREAM_BRANCH} into ${DEFAULT_BRANCH} with conflicts ($(date +%m-%d-%Y))"
+  CONFLICT_MSG="Merge upstream/${UPSTREAM_BRANCH} into ${DEFAULT_BRANCH} with conflicts ($(date +%m-%d-%Y))
+
+Conflicted files:
+$CONFLICTED_FILES"
+  git commit -m "$CONFLICT_MSG"
   CONFLICT=true
 fi
 
-echo "🔧 Syncing openshift/go.mod with upstream dependencies…"
-pushd openshift > /dev/null
-if go mod tidy; then
-  popd > /dev/null
-  # Check if there are any changes to commit
-  if ! git diff --quiet openshift/go.mod openshift/go.sum; then
-    echo "   📝 Changes detected in openshift/go.mod, committing…"
-    git add openshift/go.mod openshift/go.sum
-    git commit -m "sync openshift/go.mod with upstream dependencies
+# Skip go mod tidy and test sync if there are conflicts - they should be run after manual resolution
+if [[ "${CONFLICT:-false}" == "true" ]]; then
+  echo "⚠️  Skipping go mod tidy and test sync due to merge conflicts"
+  echo "   These should be run manually after resolving conflicts"
+else
+  echo "🔧 Syncing openshift/go.mod with upstream dependencies…"
+  pushd openshift > /dev/null
+  if go mod tidy; then
+    popd > /dev/null
+    # Check if there are any changes to commit
+    if ! git diff --quiet openshift/go.mod openshift/go.sum; then
+      echo "   📝 Changes detected in openshift/go.mod, committing…"
+      git add openshift/go.mod openshift/go.sum
+      git commit -m "sync openshift/go.mod with upstream dependencies
 
 - go mod tidy
 
 Automated sync after downstream merge to keep openshift/go.mod
 in sync with transitive dependencies from go-controller and test/e2e."
-    echo "   ✅ openshift/go.mod synced successfully"
-    GO_MOD_SYNCED=true
+      echo "   ✅ openshift/go.mod synced successfully"
+      GO_MOD_SYNCED=true
+    else
+      echo "   ℹ️  No changes needed in openshift/go.mod"
+    fi
   else
-    echo "   ℹ️  No changes needed in openshift/go.mod"
+    popd > /dev/null
+    echo "   ⚠️  go mod tidy failed in openshift/"
+    GO_MOD_FAILED=true
   fi
-else
-  popd > /dev/null
-  echo "   ⚠️  go mod tidy failed in openshift/"
-  GO_MOD_FAILED=true
 fi
 
-if [[ "${GO_MOD_FAILED:-false}" != "true" ]]; then
+if [[ "${GO_MOD_FAILED:-false}" != "true" ]] && [[ "${CONFLICT:-false}" != "true" ]]; then
   echo "🧪 Syncing test annotations with upstream changes…"
   pushd openshift > /dev/null
   if go mod vendor; then
@@ -161,6 +177,9 @@ if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
 fi
 if [[ "${TEST_ANNOTATIONS_SYNCED:-false}" == "true" ]]; then
   PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of test annotations with upstream test changes (\`go mod vendor\` + \`update-tests-annotation.sh\`)."
+fi
+if [[ "${CONFLICT:-false}" == "true" ]]; then
+  PR_BODY="${PR_BODY}"$'\n\n'"**⚠️  Merge Conflicts Detected**"$'\n\n'"The following files have conflicts:"$'\n\n'"<details><summary>Click to expand</summary>"$'\n\n'"<pre>${CONFLICTED_FILES}</pre></details>"
 fi
 # Make it a draft if we detected conflicts or go mod failures (keeps Prow from auto-running presubmits).
 DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]] && echo true || echo false )
@@ -206,16 +225,22 @@ if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "
 
   echo "🚨 ${TITLE_PREFIX}, holding PR #${PR_NUM}"
   NEW_TITLE="${TITLE_PREFIX}! ${PR_TITLE}"
-  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X PATCH -d "{\"title\":\"${NEW_TITLE}\"}" \
+  TITLE_PAYLOAD=$(jq -nc --arg title "$NEW_TITLE" '{title: $title}')
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X PATCH -d "$TITLE_PAYLOAD" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/pulls/${PR_NUM}"
-  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d "{\"body\":\"${HOLD_REASON}\"}" \
+  COMMENT_PAYLOAD=$(jq -nc --arg body "$HOLD_REASON" '{body: $body}')
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d "$COMMENT_PAYLOAD" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
 else
   echo "💬 Posting /ok-to-test and payload commands…"
+  OK_TO_TEST_BODY="/ok-to-test
+/payload ${RELEASE} ci blocking
+/payload ${RELEASE} nightly blocking"
+  OK_TO_TEST_PAYLOAD=$(jq -nc --arg body "$OK_TO_TEST_BODY" '{body: $body}')
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-       -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
+       -d "$OK_TO_TEST_PAYLOAD" \
        "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
 fi
 
