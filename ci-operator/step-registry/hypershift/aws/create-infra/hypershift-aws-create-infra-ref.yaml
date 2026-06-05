@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-aws-create-infra
+  from: hypershift-operator
+  cli: latest
+  commands: hypershift-aws-create-infra-commands.sh
+  timeout: 20m0s
+  grace_period: 5m0s
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "Specifies the AWS region for the infrastructure. If intentionally left as an empty string, the region defaults to that of the management cluster."
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ""
+    documentation: "The cluster's FQDN will be a subdomain of the base domain."
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra."
+  documentation: |-
+    The hypershift-aws-create-infra step creates AWS infrastructure resources (VPC, subnets, NAT gateway,
+    security groups, Route53 zones) separately from the HostedCluster using the 'hypershift create infra aws' command.
+    This enables testing infrastructure creation as a distinct step that can be validated independently.
+
+    Outputs:
+    - ${SHARED_DIR}/aws_infra_output.json - Infrastructure resource IDs (VPC, subnets, security groups, zones)
+    - ${SHARED_DIR}/infra-id - Infrastructure ID for resource tagging

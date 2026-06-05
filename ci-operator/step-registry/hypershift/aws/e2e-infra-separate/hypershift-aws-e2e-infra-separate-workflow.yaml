@@ -1,0 +1,39 @@
+workflow:
+  as: hypershift-aws-e2e-infra-separate
+  documentation: |-
+    The HyperShift AWS e2e infra-separate workflow tests AWS infrastructure creation
+    as a distinct step from cluster creation. This workflow:
+
+    1. Creates AWS infrastructure (VPC, subnets, NAT gateway, security groups, zones) separately
+    2. Creates AWS IAM resources (roles, policies, instance profiles) separately
+    3. Creates the HostedCluster using the pre-created infrastructure and IAM resources
+    4. Runs e2e tests against the cluster
+    5. Destroys the infrastructure
+
+    This pattern enables validation of infrastructure provisioning independently from
+    cluster creation, supporting the migration of test OCP-42866 "AWS infrastructure
+    creation as separate step" from openshift-tests-private.
+
+    The workflow uses the 3-tier nested management cluster pattern:
+    - Root cluster (pre-existing shared)
+    - Nested management cluster (ephemeral)
+    - Guest HostedCluster (created with separate infrastructure)
+
+    Administrative access to the control plane is provided via the `KUBECONFIG` environment variable.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running HyperShift
+    in the `osd-hypershift` AWS account and is destroyed after tests complete.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-aws-create-infra
+    - ref: hypershift-aws-create-iam
+    - ref: hypershift-aws-create-cluster-byoi
+    test:
+    - ref: hypershift-aws-run-e2e-nested
+    post:
+    - chain: hypershift-aws-destroy-infra-separate
+    - chain: hypershift-destroy-nested-management-cluster

@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-aws-create-iam
+  from: hypershift-operator
+  cli: latest
+  commands: hypershift-aws-create-iam-commands.sh
+  timeout: 15m0s
+  grace_period: 5m0s
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "Specifies the AWS region for the IAM resources."
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account for IAM resources."
+  documentation: |-
+    The hypershift-aws-create-iam step creates AWS IAM resources (roles, policies, instance profiles)
+    separately from the HostedCluster using the 'hypershift create iam aws' command.
+    This step depends on hypershift-aws-create-infra having run first to provide infrastructure IDs.
+
+    Requires:
+    - ${SHARED_DIR}/aws_infra_output.json - Infrastructure resource IDs from create-infra step
+    - ${SHARED_DIR}/infra-id - Infrastructure ID
+
+    Outputs:
+    - ${SHARED_DIR}/aws_iam_output.json - IAM resource identifiers (role ARNs, instance profiles)

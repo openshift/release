@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-aws-destroy-infra
+  from: hypershift-operator
+  cli: latest
+  commands: hypershift-aws-destroy-infra-commands.sh
+  timeout: 25m0s
+  grace_period: 5m0s
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "Specifies the AWS region where infrastructure was created."
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account."
+  documentation: |-
+    The hypershift-aws-destroy-infra step destroys AWS infrastructure resources (VPC, subnets, NAT gateway,
+    security groups, Route53 zones, IAM resources) that were created separately via the
+    hypershift-aws-create-infra and hypershift-aws-create-iam steps.
+
+    This step uses the 'hypershift destroy infra aws' command to clean up all infrastructure
+    resources tagged with the infrastructure ID.
+
+    Requires:
+    - ${SHARED_DIR}/infra-id - Infrastructure ID
+    - ${SHARED_DIR}/aws_infra_output.json - Infrastructure resource IDs (optional, for validation)
