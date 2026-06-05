@@ -71,16 +71,24 @@ images:
     from: ocp-qe-perfscale-ci
     to: perfscale-observer
 releases:
+  intermediate:
+    prerelease:
+      architecture: multi
+      product: ocp
+      relative: 1
+      version_bounds:
+        lower: 5.0.0-0
+        stream: 5-dev-preview
+        upper: 5.1.0-0
   latest:
     release:
       architecture: multi
       channel: candidate
       version: "4.22"
   target:
-    candidate:
+    release:
       architecture: multi
-      product: ocp
-      stream: nightly
+      channel: candidate
       version: "5.0"
 resources:
   '*':
@@ -99,7 +107,6 @@ tests:
       OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     observers:
       enable:
-      - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
     test:
     - chain: openshift-qe-cluster-density-v2
@@ -116,7 +123,6 @@ tests:
       ENABLE_OTA_TEST: OCP-23799
     observers:
       enable:
-      - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
     test:
     - chain: openshift-qe-cluster-density-v2
@@ -140,7 +146,6 @@ tests:
       ENABLE_OTA_TEST: OCP-53907
     observers:
       enable:
-      - redhat-chaos-cerberus
       - redhat-chaos-node-disruptions-worker-outage-observer
     test:
     - ref: ipi-install-heterogeneous
@@ -159,11 +164,20 @@ tests:
     cluster_profile: gcp-qe
     observers:
       enable:
-      - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
     test:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
+    - as: set-upgrade-releases
+      commands: echo "${INTERMEDIATE_RETARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: INTERMEDIATE_RETARGET
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: cucushift-upgrade-retarget
     workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
