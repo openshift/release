@@ -49,16 +49,16 @@ if [[ "${RESOURCE_AGENT_SOURCE}" == "RHCOS" ]]; then
  echo "Master MachineConfigs:"
  oc get mc -l machineconfiguration.openshift.io/role=master --no-headers 2>/dev/null || true
  echo ""
- echo "MachineConfigs with 'fencing' in the name:"
- oc get mc --no-headers 2>/dev/null | grep -i "fencing\|two-node" || echo "(none found)"
+ echo "Infrastructure topology:"
+ oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' 2>/dev/null || true
  echo ""
- echo "Rendered master MC extensions:"
- oc get mc "$(oc get mcp master -o jsonpath='{.spec.configuration.name}' 2>/dev/null)" -o jsonpath='{.spec.extensions}' 2>/dev/null || true
+ echo "Etcd members:"
+ oc get etcd cluster -o jsonpath='{.status.members}' 2>/dev/null || true
  echo ""
  echo "--- End diagnostic ---"
 
- # Report installed resource-agents version on first healthy schedulable node. Must not fail.
- NODE=$(oc get nodes --no-headers | awk 'tolower($2) == "ready" {print $1; exit}')
+ # Report installed resource-agents version on a control-plane node.
+ NODE=$(oc get nodes --no-headers -l node-role.kubernetes.io/master | awk '{print $1; exit}')
  if [[ -z "${NODE}" ]]; then
   echo "No ready node found; skipping version report."
   exit 0
