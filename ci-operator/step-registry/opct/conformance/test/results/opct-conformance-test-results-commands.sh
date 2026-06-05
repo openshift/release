@@ -65,14 +65,14 @@ function extract_container_logs() {
     return 0
   fi
 
-  # Extract podLogs from the OPCT archive to a temporary directory.
+  # Extract podlogs from the OPCT archive to a temporary directory.
   local tmp_podlogs="/tmp/opct-podlogs"
   mkdir -p "${tmp_podlogs}"
-  tar xf "${RESULT_FILE}" -C "${tmp_podlogs}" --wildcards '*/podLogs/*/logs/tests.txt' 2>/dev/null || true
+  tar xvf "${RESULT_FILE}" -C "${tmp_podlogs}" --wildcards '*podlogs/*/logs/tests.txt' 2>/dev/null || true
 
   # Copy each tests.txt log file, using the pod directory name as a prefix
   # to distinguish between multiple conformance pods.
-  find "${tmp_podlogs}" -name 'tests.txt' -path '*/podLogs/*/logs/*' | while read -r logfile; do
+  find "${tmp_podlogs}" -name 'tests.txt' -path '*podlogs/*/logs/*' | while read -r logfile; do
     local pod_dir
     pod_dir=$(basename "$(dirname "$(dirname "${logfile}")")")
     cp -v "${logfile}" "${container_logs_dir}/${pod_dir}-tests.txt"
