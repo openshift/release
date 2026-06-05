@@ -97,12 +97,11 @@ for i in $(seq 1 6); do
 
         timeout 1800 claude \
             --model "${CLAUDE_MODEL}" \
-            --continue \
             --allowedTools "${ALLOWED_TOOLS}" \
             --output-format stream-json \
             --max-turns 50 \
             --append-system-prompt-file "/workspace/.apm/prompts/agentic-followup.prompt.md" \
-            -p "${JIRA_ISSUE_KEY}" \
+            -p "Address the review comments for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}." \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
     fi
 done

@@ -48,7 +48,7 @@ timeout 5400 claude \
     --output-format stream-json \
     --max-turns 100 \
     --append-system-prompt-file "/workspace/.apm/prompts/agentic-solve.prompt.md" \
-    -p "${JIRA_ISSUE_KEY}" \
+    -p "Solve Jira issue ${JIRA_ISSUE_KEY}" \
     --verbose 2>&1 | tee /workspace/artifacts/claude-output.log || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
