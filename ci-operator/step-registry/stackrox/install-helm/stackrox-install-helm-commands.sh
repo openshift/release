@@ -245,8 +245,7 @@ function install_secured_cluster_with_helm() {
   /tmp/helm/linux-amd64/helm upgrade --install --namespace stackrox --create-namespace stackrox-secured-cluster-services "${SCRATCH}/secured-cluster-services" \
   --values "${SCRATCH}/helm-init-bundle-values.yaml" \
   --set clusterName=remote \
-  --set imagePullSecrets.allowNone=true \
-  --set runtimeDataControl.excludeOpenshift=true
+  --set imagePullSecrets.allowNone=true
 }
 
 echo '>>> Begin setup'
