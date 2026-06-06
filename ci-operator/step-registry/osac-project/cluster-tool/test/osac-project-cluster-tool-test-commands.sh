@@ -4,8 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+MAKE_TARGET="${MAKE_TARGET:-test-vmaas}"
+TEST="${TEST:-}"
+
 echo "************ cluster-tool vmaas test ************"
-echo "Running ALL vmaas tests sequentially"
+echo "Running: make ${MAKE_TARGET} TEST=${TEST}"
 echo "OSAC_TEST_IMAGE: ${OSAC_TEST_IMAGE}"
 echo "E2E_NAMESPACE: ${E2E_NAMESPACE}"
 echo "E2E_VM_TEMPLATE: ${E2E_VM_TEMPLATE}"
@@ -31,6 +34,8 @@ timeout -s 9 60m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s \
     "${OSAC_TEST_IMAGE}" \
     "${KUBECONFIG_PATH}" \
     "${REMOTE_RESULTS_DIR}" \
+    "${MAKE_TARGET}" \
+    "${TEST}" \
     <<'REMOTE_EOF' || TEST_EXIT=$?
 set -euo pipefail
 
@@ -40,6 +45,8 @@ CLUSTER_TEMPLATE="$3"
 TEST_IMAGE="$4"
 KUBECONFIG_PATH="$5"
 RESULTS_DIR="$6"
+MAKE_TARGET="$7"
+TEST="${8:-}"
 
 mkdir -p "${RESULTS_DIR}"
 
@@ -76,7 +83,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
     -e OSAC_CLUSTER_TEMPLATE="${CLUSTER_TEMPLATE}" \
     -e OSAC_PULL_SECRET_PATH=/root/pull-secret \
     "${TEST_IMAGE}" \
-    pytest tests/vmaas/ -v --junitxml=/tmp/test-results/junit_vmaas.xml
+    make "${MAKE_TARGET}" TEST="${TEST}"
 
 echo "Tests completed."
 REMOTE_EOF
