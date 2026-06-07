@@ -80,12 +80,12 @@ cd /eco-ci-cd
 METRICS_FILE="/tmp/metrics/ran-metrics.txt"
 
 echo "Collecting metrics"
-ansible-playbook ./playbooks/ran/collect-metrics.yml \
+ansible-playbook ./playbooks/collect-metrics.yml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "ran_hub_kubeconfig=${HUB_KUBECONFIG} \
-    ran_ci_lane='${REPORTER_LAUNCH_NAME}' \
-    ran_output_file=${METRICS_FILE} \
-    ran_metrics_list=${RAN_METRICS_LIST}" || true
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
+    ci_lane='${REPORTER_LAUNCH_NAME}' \
+    output_file=${METRICS_FILE} \
+    metrics_list=${RAN_METRICS_LIST}" || true
 
 REPORTS_PORTAL_ATTRIBUTES=""
 if [[ -f "${METRICS_FILE}" ]]; then
