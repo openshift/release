@@ -405,7 +405,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
 # always run test from latest upstream
-git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/yaronh12/ptp-operator.git -b ts2phc-gm-deletion-tests-coverage ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 

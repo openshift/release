@@ -298,7 +298,7 @@ log_chronyd_status() {
   KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
 }
 
-
+SKIP_OCP_INSTALL="true"
 #Set status and run playbooks
 status=0
 
