@@ -30,7 +30,8 @@ if [[ -f "${SHARED_DIR}/versions.txt" ]]; then
     done < "${SHARED_DIR}/versions.txt"
 fi
 
-MESSAGE="${EMOJI} *${JOB_NAME}* — ${RESULT}\n<${JOB_URL}|View logs>"
+LABEL="${NOTIFY_LABEL:-${JOB_NAME}}"
+MESSAGE="${EMOJI} *${LABEL}* — ${RESULT}\n<${JOB_URL}|View logs>"
 if [[ -n "${VERSIONS}" ]]; then
     MESSAGE="${MESSAGE}\n\n*Versions:*\n\`\`\`${VERSIONS}\n\`\`\`"
 fi
