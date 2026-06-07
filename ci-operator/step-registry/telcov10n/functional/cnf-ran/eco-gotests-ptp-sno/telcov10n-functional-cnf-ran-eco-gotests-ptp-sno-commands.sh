@@ -70,8 +70,8 @@ ansible-playbook -vv ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
   --extra-vars "@/tmp/ptp_cycle_configs.yml"
 
 echo "Run eco-gotests PTP — all cycles via generated script on bastion"
-ssh -o ServerAliveInterval=60 \
-  -o ServerAliveCountMax=3 \
+ssh -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=120 \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null "${BASTION_USER}@${BASTION_IP}" \
   -i "${PROJECT_DIR}/temp_ssh_key" \
