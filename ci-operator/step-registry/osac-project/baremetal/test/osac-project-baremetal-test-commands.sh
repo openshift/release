@@ -57,8 +57,10 @@ podman run --authfile "${PULL_SECRET_PATH}" --rm --network=host \
 REMOTE_EOF
 
 if [[ "${TEST_EXIT}" -ne 0 ]]; then
+    echo "FAILED" > "${SHARED_DIR}/test-result"
     echo "Some tests failed (exit code: ${TEST_EXIT})"
     exit "${TEST_EXIT}"
 fi
 
+echo "PASSED" > "${SHARED_DIR}/test-result"
 echo "All tests passed."
