@@ -1,0 +1,72 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  ubi-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make binary
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator
+  - dockerfile_path: bundle.Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator-bundle
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
+    with: pipeline:oran-o2ims-operator
+promotion:
+  to:
+  - name: "4.20"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: make ci-job
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (?i)(\.md|\.markdown|^hack/.*markdown.*|^.markdown.*)$
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift-kni
+  repo: oran-o2ims

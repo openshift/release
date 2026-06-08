@@ -1,0 +1,27 @@
+ref:
+  as: vsphere-provision-bastionhost
+  from: upi-installer
+  grace_period: 10m
+  commands: vsphere-provision-bastionhost-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: BASTION_OVA_URI
+    default: "https://rhcos.mirror.openshift.com/art/storage/prod/streams/4.12/builds/412.86.202212081411-0/x86_64/rhcos-412.86.202212081411-0-vmware.x86_64.ova"
+    documentation: |-
+      ova image for bastion host. The default rhcos image value is gotten from 4.12.0-rc.8 installer
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "no"
+    documentation: |-
+      Register DNS for mirror registry.
+  credentials:
+  - namespace: test-credentials
+    name: ci-route-53
+    mount_path: /var/run/vault/vsphere
+  - namespace: test-credentials
+    name: qe-proxy-creds
+    mount_path: /var/run/vault/proxy
+  documentation: |-
+    Create a bastion host on vSphere for proxy and mirror registry.

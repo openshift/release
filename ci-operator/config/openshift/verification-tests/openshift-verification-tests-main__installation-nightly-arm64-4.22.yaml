@@ -1,0 +1,108 @@
+base_images:
+  ansible:
+    name: "4.22"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tools:
+    name: "4.22"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      cpu: "1"
+      memory: 4Gi
+    requests:
+      cpu: 400m
+      memory: 800Mi
+tests:
+- as: aws-ipi-mini-perm-f14
+  capabilities:
+  - arm64
+  cron: 16 15 13,27 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    node_architecture_overrides:
+      ipi-conf-aws-user-min-permissions: arm64
+      ipi-deprovision-deprovision: arm64
+      ipi-install-install: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-mini-perm-f14
+  capabilities:
+  - arm64
+  cron: 47 15 3,19 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    node_architecture_overrides:
+      ipi-deprovision-deprovision: arm64
+      ipi-install-install: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: gcp-ipi-mini-perm-f14
+  capabilities:
+  - arm64
+  cron: 46 2 2,16 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      OCP_ARCH: arm64
+    node_architecture_overrides:
+      ipi-deprovision-deprovision: arm64
+      ipi-install-install: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: verification-tests
+  variant: installation-nightly-arm64-4.22

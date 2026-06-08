@@ -1,0 +1,24 @@
+workflow:
+  as: hypershift-review-agent
+  steps:
+    pre:
+      - ref: hypershift-review-agent-setup
+    test:
+      - ref: hypershift-review-agent-process
+    post:
+      - ref: hypershift-review-agent-report
+  documentation: |-
+    HyperShift Review Agent workflow for automated PR review comment handling,
+    rebase management, and CI failure fixing.
+
+    This workflow:
+    1. Setup: Verifies Claude Code CLI is available and configures git credentials
+    2. Process: For each agent-created PR, detects and handles three independent concerns:
+       a. Rebase: Detects when a PR branch is behind its base and rebases automatically
+       b. Reviews: Addresses pending review comments using /utils:address-reviews
+       c. CI Fixes: Detects failing verify/unit/lint checks and invokes Claude to
+          reproduce and fix failures locally (Go, make, and build tools are available)
+    3. Report: Generates HTML report with per-phase token usage, cost estimates, and action badges
+
+    PRs are identified by being created from the hypershift-community fork by the jira-agent app.
+    The workflow skips PRs that need none of the three actions.

@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/assisted-service
+images:
+  items:
+  - dockerfile_path: Dockerfile.assisted-service.ocp
+    from: base
+    to: agent-installer-api-server
+promotion:
+  to:
+  - name: 4.11-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.11-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: push-pr-image
+  optional: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: agent-installer-api-server
+    test:
+    - ref: assisted-baremetal-images-publish
+zz_generated_metadata:
+  branch: release-4.11
+  org: openshift-priv
+  repo: assisted-service

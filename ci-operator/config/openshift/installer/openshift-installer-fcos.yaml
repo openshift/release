@@ -1,0 +1,139 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: origin
+    tag: base
+  rhel-7:
+    name: "4.6"
+    namespace: ocp
+    tag: base-7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.14-openshift-4.6
+images:
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: installer
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    from: base
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: rhel-7
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: base
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    from: base
+    to: baremetal-installer
+promotion:
+  to:
+  - name: "4.6"
+    namespace: origin
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
+  container:
+    from: src
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-vsphere-upi
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-vsphere-upi
+- always_run: false
+  as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+zz_generated_metadata:
+  branch: fcos
+  org: openshift
+  repo: installer

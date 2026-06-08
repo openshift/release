@@ -1,0 +1,95 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/ci-chat-bot/ci-chat-bot
+    to: ci-chat-bot
+  - dockerfile_path: images/Dockerfile.python
+    to: rosa-cleanup
+  - dockerfile_literal: |-
+      FROM pipeline:govulncheck
+      COPY ci-chat-bot /workdir
+      WORKDIR /workdir
+    from: govulncheck
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/ci-chat-bot
+    to: govulncheck-src
+promotion:
+  to:
+  - excluded_images:
+    - rosa-cleanup
+    - govulncheck-src
+    namespace: ci
+    tag: latest
+  - excluded_images:
+    - ci-chat-bot
+    - govulncheck-src
+    namespace: continuous-release-jobs
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
+- as: vendor
+  commands: make validate-vendor
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: govulncheck
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 14Gi
+        requests:
+          cpu: 500m
+          memory: 11Gi
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift/ci-chat-bot
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ci-chat-bot

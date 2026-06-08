@@ -1,0 +1,37 @@
+ref:
+  as: upi-conf-vsphere-platform-external
+  from: upi-installer
+  grace_period: 10m
+  commands: upi-conf-vsphere-platform-external-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: vsphere-vmc
+      mount_path: /var/run/vault/vsphere
+    - namespace: test-credentials
+      name: ci-ibmcloud
+      mount_path: /var/run/vault/ibmcloud
+    - namespace: test-credentials
+      name: vsphere-ibmcloud-config
+      mount_path: /var/run/vault/vsphere-ibmcloud-config
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: PATCH_INFRA_MANIFEST
+      default: "false"
+    - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+      default: "true"
+      documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+    - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+      default: ""
+      documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: |-
+    This step creates the files necessary to deploy a vSphere UPI cluster with platform `External` specified.
+    It requires an existing install-config.yaml for the `None` platform to exist in the shared directory to deploy a cluster to the vSphere CI project.
+    It uses this install-config.yaml to generate the govc.sh, Ignition, metadata.json, and kubeconfig files with the modifications required to support the vSphere UPI workflow.
+    These files are copied to the shared directory for future consumption.
+    This step mostly replicates `upi-conf-vsphere` and is intended to be used as `upi-conf-vsphere` replacement.

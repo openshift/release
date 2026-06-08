@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    to: unused
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: ocm-agent-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: ocm-agent-codecov-token
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-binary-build
+  container:
+    from: src
+  run_if_changed: ^(test/e2e/.*|go\.mod|go\.sum)$
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ocm-agent

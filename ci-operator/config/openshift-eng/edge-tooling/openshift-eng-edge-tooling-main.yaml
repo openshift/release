@@ -1,0 +1,119 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: images/Containerfile.markdownlint
+    from: root
+    to: markdownlint-cli2
+  - dockerfile_path: images/Containerfile.ci
+    from: claude-ai-helpers
+    to: edge-tooling-ai-helpers
+promotion:
+  to:
+  - additional_images:
+      edge-tooling-ai-helpers: edge-tooling-ai-helpers
+      markdownlint-cli2: markdownlint-cli2
+    excluded_images:
+    - '*'
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: markdownlint
+  commands: make lint-markdown
+  container:
+    clone: true
+    from: markdownlint-cli2
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^\.markdown.*)$
+- as: shellcheck
+  commands: make lint-shellcheck
+  container:
+    clone: true
+    from: shellcheck
+  run_if_changed: .sh$
+- always_run: false
+  as: skills-lint
+  commands: make lint-all-skills
+  container:
+    clone: true
+    from: root
+  run_if_changed: (SKILL\.md|^scripts/lint-skills\.py|^Makefile|^plugins/.*/skills/)
+- as: ocp-ci-monitor
+  cron: 0 7 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+  steps:
+    workflow: openshift-edge-tooling-ci-monitor
+- as: microshift-ci-doctor
+  cron: 0 8,14 * * 1-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.{{"\n"}}
+      {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
+      {{- $rp := printf "%s%s" $ab "microshift-ci-doctor-report.html" -}}
+      {{- $bg := printf "%s%s" $ab "analyze-ci-create-bugs-merged.txt" -}}
+      {{- $st := printf "%s%s" $ab "report-close-stale-bugs.txt" -}}
+      {{- $pr := printf "%s%s" $ab "report-fix-test-bugs.txt" -}}
+      | <{{$rp}}|Report> | <{{$bg}}|Bugs(+)> | <{{$st}}|Bugs(-)> | <{{$pr}}|PRs> | <{{.Status.URL}}|Logs> |
+  steps:
+    workflow: openshift-edge-tooling-microshift-ci-doctor
+- as: lvms-ci-doctor
+  cron: 30 3 * * 2
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |
+      :robot_face: *LVMS CI Doctor* ended with *{{.Status.State}}*.
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/lvms-ci-doctor/openshift-edge-tooling-lvms-ci-doctor/artifacts/lvm-operator-ci-doctor-report.html|View report> | <{{.Status.URL}}|View logs> |
+  steps:
+    workflow: openshift-edge-tooling-lvms-ci-doctor
+- as: pr-notifier
+  cron: 0 7 * * 0-5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+  restrict_network_access: false
+  steps:
+    env:
+      FORBIDDEN_LABELS: jira/invalid-bug
+      GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements,openshift/lvm-operator
+      REQUIRED_LABELS: lgtm,approved,verified
+    workflow: openshift-edge-tooling-gh-notifier
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: edge-tooling

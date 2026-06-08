@@ -1,0 +1,965 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.4"
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 16Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: src
+- as: sync-upstream-envoy-2.3
+  commands: |
+    ./tools/automator-main.sh \
+    --org=maistra \
+    --repo=envoy \
+    --branch=maistra-2.3 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge" \
+    --modifier=merge_upstream_envoy_2_3 \
+    --merge-repository=https://github.com/envoyproxy/envoy \
+    --merge-branch=release/v1.22 \
+    --merge-failure-notify=@maistra/envoy \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  reporter_config:
+    channel: '#istio-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+- as: sync-upstream-envoy-2.4
+  commands: |
+    ./tools/automator-main.sh \
+    --org=maistra \
+    --repo=envoy \
+    --branch=maistra-2.4 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge" \
+    --modifier=merge_upstream_envoy_2_4 \
+    --merge-repository=https://github.com/envoyproxy/envoy \
+    --merge-branch=release/v1.24 \
+    --merge-failure-notify=@maistra/envoy \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  reporter_config:
+    channel: '#istio-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+- as: sync-upstream-istio-2.4
+  commands: |
+    ./tools/automator-main.sh \
+    --org=maistra \
+    --repo=istio \
+    --branch=maistra-2.4 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge" \
+    --modifier=merge_upstream_istio_1_16 \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=release-1.16 \
+    --merge-failure-notify=@maistra/release-managers-2-4 \
+    --merge-strategy=merge \
+    --fetch-tags
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  reporter_config:
+    channel: '#istio-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+- as: update-istio-builder-image
+  commands: |
+    export NEW_IMAGE_MASTER=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_24=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.24/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_26=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.26/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_27=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.27/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_28=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.28/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    ./tools/automator-main.sh \
+    --org=openshift \
+    --repo=release \
+    --branch=main \
+    --token-path=/creds-github/token \
+    '--title=Update maistra/istio builder image' \
+    --modifier=update_istio_builder_image_master \
+    '--cmd=sed -i -e "s|\(registry.istio.io/testing/build-tools\):master.*|\1:$NEW_IMAGE_MASTER|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.24.*|\1:$NEW_IMAGE_1_24|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.26.*|\1:$NEW_IMAGE_1_26|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.27.*|\1:$NEW_IMAGE_1_27|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.28.*|\1:$NEW_IMAGE_1_28|" core-services/image-mirroring/_config.yaml ci-operator/config/openshift-service-mesh/sail-operator/*' \
+    '--body=cc @jwendell, @FilipB'
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+- as: test-infra-build-containers-2-3
+  run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.3
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-2-3
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-3
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_2.3.push"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-2-4
+  run_if_changed: ^docker/maistra-builder_2\.4\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-4
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.4
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-2-4
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.4\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-4
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_2.4.push"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-2-5
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.5
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 4h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-2-5
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-5
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_2.5.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 4h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-2-6
+  run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-6
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.6
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 4h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-2-6
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:2.6
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-6
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_2.6.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 4h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-0
+  run_if_changed: ^docker/maistra-builder_3\.0\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.0
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.0
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-0
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.0\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.0
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-0
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.0.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-1
+  run_if_changed: ^docker/maistra-builder_3\.1\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.1
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-1
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.1
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-1
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.1\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.1
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-1
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.1.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-2
+  run_if_changed: ^docker/maistra-builder_3\.2\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.2
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-2
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.2
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-2
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.2\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.2
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-2
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.2.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-3
+  run_if_changed: ^docker/maistra-builder_3\.3\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.3
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-3
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.3\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-3
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.3.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-4
+  run_if_changed: ^docker/maistra-builder_3\.4\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-4
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.4
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-4
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.4\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-4
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.4.push_multi"
+      credentials:
+      - mount_path: /quay-secret
+        name: quay-pass
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+zz_generated_metadata:
+  branch: main
+  org: maistra
+  repo: test-infra

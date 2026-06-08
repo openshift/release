@@ -1,0 +1,409 @@
+presubmits:
+  openshift-kni/performance-addon-operators:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/ci
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-ci
+    rerun_command: /test ci
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/ci-index
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/ci-ppc
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-ci-ppc
+    optional: true
+    rerun_command: /test ci-ppc
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-ppc
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-ppc,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/ci-tools
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-ci-tools
+    optional: true
+    rerun_command: /test ci-tools
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-tools
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-tools,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/e2e-render-cmd
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-e2e-render-cmd
+    optional: true
+    rerun_command: /test e2e-render-cmd
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e-render-cmd
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-render-cmd,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.11$
+    - ^release-4\.11-
+    cluster: build06
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift-ci/Dockerfile.bundle.upstream.dev
+      - openshift-ci/Dockerfile.deploy
+      - openshift-ci/Dockerfile.index-gen.ci
+      - openshift-ci/Dockerfile.index.ci
+      - openshift-ci/Dockerfile.must-gather
+      - openshift-ci/Dockerfile.src.ci
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-performance-addon-operators-release-4.11-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)

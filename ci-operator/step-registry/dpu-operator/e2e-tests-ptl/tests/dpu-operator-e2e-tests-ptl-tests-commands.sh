@@ -1,0 +1,1 @@
+../../e2e-tests-workflow/tests/dpu-operator-e2e-tests-workflow-tests-commands.sh

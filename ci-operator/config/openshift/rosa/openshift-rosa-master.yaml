@@ -1,0 +1,70 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    unset GOFLAGS
+    make lint
+  container:
+    from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
+- as: build
+  commands: |
+    unset GOFLAGS
+    make
+  container:
+    from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
+- as: test
+  commands: |
+    make test verify
+  container:
+    from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
+- as: commits
+  commands: |
+    make commits/check
+  container:
+    from: src
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton)(?:/|$)
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: rosa

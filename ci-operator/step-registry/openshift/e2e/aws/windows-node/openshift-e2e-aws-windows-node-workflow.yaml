@@ -1,0 +1,25 @@
+workflow:
+  as: openshift-e2e-aws-windows-node
+  steps:
+    env:
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_TARGET_NAMESPACES: '!install'
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf
+      - ref: ovn-conf-hybrid-manifest
+      - chain: ipi-install
+      - ref: operatorhub-subscribe
+      - ref: windows-conf-operator
+      - ref: ipi-conf-aws-windows-machineset
+    test:
+      - ref: openshift-e2e-test
+    post:
+      - chain: ipi-aws-post
+  documentation: |-
+    The Openshift E2E Windows Node workflow executes the common end-to-end test
+    suite using an AWS IPI cluster with Windows nodes. The Windows Machine Config Operator
+    is installed as an optional operator via OperatorHub with the provided package and channel.
+

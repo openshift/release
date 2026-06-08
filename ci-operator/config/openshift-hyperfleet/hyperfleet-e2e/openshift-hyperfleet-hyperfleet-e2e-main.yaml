@@ -1,0 +1,25 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    go install -mod=mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    unset GOFLAGS
+    make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e

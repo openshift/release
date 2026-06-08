@@ -1,0 +1,262 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - additional_images:
+      cluster-api-actuator-pkg: src
+    name: "4.14"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-vsphere-operator
+  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-azure-operator
+  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- always_run: false
+  as: e2e-gcp-operator
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make -C /go/src/github.com/openshift/cluster-api-actuator-pkg
+        test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-openstack-operator
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-aws-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-operator-periodic
+  cron: 18 0 27 12 *
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-vsphere-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator-periodic
+  cron: 56 10 8 1 *
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-azure-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-azure-operator-periodic
+  cron: 9 8 3 4 *
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- always_run: false
+  as: e2e-gcp-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-periodic
+  cron: 29 21 21 10 *
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-openstack-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-operator-periodic
+  minimum_interval: 72h
+  reporter_config:
+    channel: '#shiftstack-bot'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: cluster-api-actuator-pkg

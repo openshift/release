@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+remote_machineset_name="remote-worker"
+remote_worker_number="${REMOTEWORKER_NUMBER}"
+
+# Get the reserved network from reserved_networks.json (created by RESERVE_EXTRA_NETWORK)
+if [[ -f "${SHARED_DIR}/reserved_networks.json" ]]; then
+  # Extract the first reserved portgroup name (we only need one for remote workers)
+  remote_network_name=$(jq -r '.[]' "${SHARED_DIR}/reserved_networks.json" | head -n1)
+  echo "Using reserved network: ${remote_network_name}"
+else
+  # Fallback to legacy vsphere_extra_portgroup_1 for backward compatibility
+  declare vsphere_extra_portgroup_1
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/vsphere_context.sh"
+  remote_network_name="${vsphere_extra_portgroup_1}"
+  echo "Using legacy extra portgroup: ${remote_network_name}"
+fi
+
+if [[ -z "${remote_network_name}" ]]; then
+   echo "No reserved network found! Either RESERVE_EXTRA_NETWORK or VSPHERE_EXTRA_LEASED_RESOURCE must be configured."
+   exit 1
+fi
+
+# Get machineset name to generate a generic template
+ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)
+
+# Get a templated json from worker machineset, change machineset name and network
+# and pass it to oc to create a new machine set
+oc get machineset "$ref_machineset_name" -n openshift-machine-api -o json |
+  jq --arg remote_machineset_name "${remote_machineset_name}" \
+    --arg remote_worker_number "${remote_worker_number}" \
+    --arg remote_network_name "${remote_network_name}" \
+    '
+      .metadata.name = $remote_machineset_name |
+      .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $remote_machineset_name |
+      .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $remote_machineset_name |
+      .spec.replicas = ($remote_worker_number|tonumber) |
+      .spec.template.spec.providerSpec.value.network.devices[0].networkName = $remote_network_name |
+      del(.status) |
+      del(.metadata.selfLink) |
+      del(.metadata.uid)
+     ' | oc create -f -
+
+echo "Waiting for remote worker nodes to come up"
+while [[ $(oc -n openshift-machine-api get machineset/${remote_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${remote_worker_number}" ]]; do echo -n "." && sleep 5; done

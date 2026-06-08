@@ -1,0 +1,84 @@
+ref:
+  as: ipi-conf-vsphere-check-vcm
+  from: upi-installer
+  commands: ipi-conf-vsphere-check-vcm-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: NETWORK_TYPE
+    default: ""
+    documentation: "Specifies the type of network required by the job.  Allowed values are single-tenant, multi-tenant, nested-multi-tenant, and disconnected."
+  - name: MULTI_NIC_IPI
+    default: ""
+    documentation: "When non-empty, two portgroups will be attached to IPI provisioned nodes."
+  - name: VSPHERE_MULTI_NETWORKS
+    default: ""
+    documentation: "When non-empty, failureDomains will have different networks"
+  - name: POPULATE_LEGACY_SPEC
+    default: ""
+    documentation: when defined, the legacy platform spec will be populated.
+  - name: POOLS
+    default: ""
+    documentation: A space separated list of pools for which leases are to be acquired. If not defined, the vsphere-capacity-manager will allocate from an available pool.  This field is not to be used with POOL_COUNT.
+  - name: POOL_COUNT
+    default: "1"
+    documentation: The number of pools to requests.  Use this to allow VCM to select the specified number of pools.  This field is not to be used with POOL.
+  - name: POOL_SELECTOR
+    default: ""
+    documentation: |-
+      Specifies the poolSelector to configure for the leases used by this job. Supports multiple
+      key=value pairs separated by commas (e.g., "vcf=true,region=us-east"). Each pair will be
+      added as a label selector for pool matching.
+  - name: OPENSHIFT_REQUIRED_CORES
+    default: ""
+    documentation: The number of vCPUs assigned to the job.
+  - name: OPENSHIFT_REQUIRED_MEMORY
+    default: ""
+    documentation: The amount of memory assigned to the job.
+  - name: DEFAULT_NETWORK_TYPE
+    default: "multi-tenant"
+    documentation: The network type. If not defined, the default is "multi-tenant".
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      the number of the master nodes for ipi on vsphere cluster. Minimum required 3. Single Node is not
+      supported in vSphere.
+  - name: COMPUTE_NODE_REPLICAS
+    default: "2"
+    documentation: |-
+      the number of the worker nodes for ipi on vsphere cluster.
+  - name: RESERVE_EXTRA_NETWORK
+    default: ""
+    documentation: |-
+      When set to "true", requests an additional network portgroup that won't be attached to nodes
+      initially but can be reserved for later use (e.g., for remote workers). The reserved networks
+      are stored in ${SHARED_DIR}/reserved_networks.json.
+
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-vmc
+    mount_path: /var/run/vault/vsphere
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  - namespace: test-credentials
+    name: ci-ibmcloud
+    mount_path: /var/run/vault/ibmcloud
+  - namespace: test-credentials
+    name: ci-ibmcloud-2
+    mount_path: /var/run/vault/ibmcloud-2
+  - namespace: test-credentials
+    name: ci-ibmcloud8
+    mount_path: /var/run/vault/vsphere8-secrets
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-ci
+    mount_path: /var/run/vault/vsphere-ibmcloud-ci
+  - namespace: test-credentials
+    name: devqe-secrets
+    mount_path: /var/run/vault/devqe-secrets
+  documentation: >-
+    Using the LEASED_RESOURCE (port group) and the secrets from the vSphere cluster profile,
+    confirm there is no pre-existing virtual machines attached to the leased resource.
+    If virtual machines exist remove them.

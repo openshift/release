@@ -1,0 +1,42 @@
+presubmits:
+  openshift/ci-vm-operator:
+  - agent: kubernetes
+    always_run: true
+    cluster: build13
+    context: ci/prow/build
+    decorate: true
+    name: pull-ci-vm-operator-build
+    rerun_command: /test build
+    spec:
+      containers:
+      - args:
+        - build
+        command:
+        - make
+        image: quay-proxy.ci.openshift.org/openshift/ci:openshift_release_golang-1.10
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test( | .* )build,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    cluster: build13
+    context: ci/prow/unit
+    decorate: true
+    name: pull-ci-vm-operator-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - test
+        command:
+        - make
+        image: quay-proxy.ci.openshift.org/openshift/ci:openshift_release_golang-1.10
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

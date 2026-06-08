@@ -1,0 +1,310 @@
+chain:
+  as: hypershift-aws-create
+  steps:
+  - as: create-hostedcluster
+    cli: latest
+    env:
+    - name: GUEST_FEATURE_SET
+      default: ""
+      documentation: |
+        This field sets the cluster feature set. This is used to enable custom features such as tech preview features
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ""
+      documentation: "Specifies the cluster SDN provider."
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: ""
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    - name: HYPERSHIFT_AWS_REGION
+      default: "us-east-1"
+      documentation: |
+        Specifies the AWS region for the cluster. If intentionally left as an empty string, 
+        the region defaults to that of the management cluster.
+    - name: HYPERSHIFT_HC_ZONES
+      default: "us-east-1a"
+      documentation: |
+        Specifies the AWS AZs to create the NodePools. If intentionally left as an empty string,  
+        it defaults to an AZ utilized by the management cluster.
+    - name: ENDPOINT_ACCESS
+      default: "Public"
+      documentation: "Access for control plane endpoints (Public, PublicAndPrivate, Private)"
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra args to pass to the create cluster aws command"
+    - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: PUBLIC_ONLY
+      default: "false"
+      documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
+    - name: HYPERSHIFT_HC_RELEASE_IMAGE
+      default: ""
+      documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: "SingleReplica"
+      documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+    - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+      default: "SingleReplica"
+      documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+    - name: HYPERSHIFT_INSTANCE_TYPE
+      default: "m5.xlarge"
+      documentation: "Instance type for the cluster nodes"
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Sets hostname to opinionated values in the specified domain for services with publishing type LoadBalancer or Route"
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+      default: "false"
+      documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+    - name: HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE
+      default: "false"
+      documentation: "If set to true, it sets the --node-upgrade-type flag to InPlace"
+    - name: HYPERSHIFT_SHARED_VPC
+      default: "false"
+      documentation: "If set to true, it sets the --vpc-owner-aws-creds as ${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+    - name: HYPERSHIFT_DISK_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable OS disk encryption by specifying --root-volume-kms-key="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_ETCD_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: "Set dynamic dns for kube-apiserver"
+    - name: HYPERSHIFT_AUTONODE
+      default: "false"
+      documentation: "If set to true, it sets the --auto-node flag to true"
+    - name: HC_DISABLED_CAPS
+      default: ""
+      documentation: "Disabling Capabilities in Hosted Cluster,format: 'Console,ImageRegistry...' detail see https://issues.redhat.com/browse/MGMT-20628"
+    - name: ADDITIONAL_CA_BUNDLE_FILE
+      default: ""
+      documentation: "The additional ca bundle file name in the shared directory"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
+    commands: |-
+      set -exuo pipefail
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+
+      support_np_skew() {
+        curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+        local extra_flags=""
+        extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+        extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+        extra_flags+="&& oc apply -f /tmp/hc.yaml"
+        echo "$extra_flags"
+      }
+      
+      HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
+      HC_ZONES="${HYPERSHIFT_HC_ZONES}"
+      if [[ -z "$HC_ZONES" ]]; then
+        HC_ZONES="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')"
+      fi
+      
+      if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+      fi
+      DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
+      RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+      COMMAND=(
+        /usr/bin/hypershift create cluster aws
+        --name ${CLUSTER_NAME}
+        --infra-id ${CLUSTER_NAME}
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}
+        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT}
+        --instance-type ${HYPERSHIFT_INSTANCE_TYPE}
+        --base-domain ${DOMAIN}
+        --endpoint-access ${ENDPOINT_ACCESS}
+        --region ${HC_REGION}
+        --zones ${HC_ZONES}
+        --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY}
+        --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}
+        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}
+        --release-image ${RELEASE_IMAGE}
+        --annotations=hypershift.openshift.io/skip-release-image-validation=true
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+        --auto-node=${HYPERSHIFT_AUTONODE}
+      )
+      
+      if [[ $HYPERSHIFT_SHARED_VPC == "true" ]]; then
+          COMMAND+=(--vpc-owner-aws-creds="${CLUSTER_PROFILE_DIR}/.awscred_shared_account")
+      fi
+      
+      if [[ $ENABLE_ICSP == "true" ]]; then
+        COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+      fi
+
+      if [[ $PUBLIC_ONLY == "true" ]]; then
+        COMMAND+=(--public-only)
+      fi
+      
+      if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+        COMMAND+=(--feature-set=TechPreviewNoUpgrade)
+      fi
+      
+      if [[ $HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE == "true" ]]; then
+        COMMAND+=(--node-upgrade-type=InPlace)
+      fi
+
+      if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
+        COMMAND+=(--network-type="${HYPERSHIFT_NETWORK_TYPE}")
+      fi
+
+      if [[ -n $EXTRA_ARGS ]]; then
+        COMMAND+=(${EXTRA_ARGS})
+      fi
+      
+      if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
+        COMMAND+=(--root-volume-kms-key="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
+      fi
+      
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+        COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
+      fi
+      
+      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
+        COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+      fi
+
+      if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
+        COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
+      fi
+
+      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+        "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+        exit 0
+      fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/aws-load-balancer-health-probe-mode=ServiceNodePort)
+      fi
+      
+      # Disabling Hosted Cluster capabilities
+      if [[ -n "$HC_DISABLED_CAPS" ]]; then
+        COMMAND+=(--disable-cluster-capabilities "$HC_DISABLED_CAPS")
+      fi
+
+      # add cluster-info tags if exists
+      hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
+      if [[ -f "${hosted_cluster_info_file}" ]] ; then
+        while read -r TAG VALUE
+        do
+          printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"
+          COMMAND+=(--additional-tags="${TAG}=${VALUE}")
+        done < "${hosted_cluster_info_file}"
+        cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
+      fi
+
+      # Execute the command
+      # When using np_skew (different release images), we need eval to properly handle shell operators
+      if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+        eval "${COMMAND[*]} $(support_np_skew)"
+      else
+        "${COMMAND[@]}"
+      fi
+
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+      # In case of BYO CNI, the HC will never be ready before CNI components are up and running
+      if [[ "$HYPERSHIFT_NETWORK_TYPE" == "Other" ]]; then
+        echo "Waiting for nodes to join the hosted cluster"
+        if [[ "$ENDPOINT_ACCESS" == "Private" ]]; then
+          # With Private access the cluster is not yet accessible (the Proxy bastion
+          # node was not yet configured). Let's sleep for a little longer than the usual wait
+          # time for nodes to join.
+          sleep 300
+        else
+          num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          export num_nodes_expected
+          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+          set +e
+          timeout 25m bash -c '
+            while true; do
+              num_nodes=$(oc get nodes --no-headers | wc -l)
+              if (( num_nodes == num_nodes_expected )); then
+                break
+              fi
+              echo "$num_nodes/$num_nodes_expected have joined the HC"
+              sleep 15s
+            done
+          '
+        fi
+      else
+        set +e
+        export CLUSTER_NAME
+        timeout 25m bash -c '
+          until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+            sleep 15
+          done
+        '
+      fi
+
+      if [[ $? -ne 0 ]]; then
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="1">
+        <testcase name="hosted cluster version rollout succeeds">
+          <failure message="hosted cluster version rollout never completed">
+            <![CDATA[
+      error: hosted cluster version rollout never completed, dumping relevant hosted cluster condition messages
+      Degraded: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="Degraded")].message}')
+      ClusterVersionSucceeding: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")].message}')
+            ]]>
+          </failure>
+        </testcase>
+      </testsuite>
+      EOF
+        exit 1
+      else
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="0">
+        <testcase name="hosted cluster version rollout succeeds">
+          <system-out>
+            <![CDATA[
+      info: hosted cluster version rollout completed successfully
+            ]]>
+          </system-out>
+        </testcase>
+      </testsuite>
+      EOF
+      fi
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 35m0s
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      name: hypershift-ci-jobs-awscreds
+      namespace: test-credentials
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+    - name: "release:latest"
+      env: NODEPOOL_RELEASE_IMAGE_LATEST
+    - name: hypershift-operator
+      env: HYPERSHIFT_RELEASE_LATEST

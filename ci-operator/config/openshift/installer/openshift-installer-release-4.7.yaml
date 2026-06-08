@@ -1,0 +1,326 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  rhel-7:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-1.15-openshift-4.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.14-openshift-4.7
+images:
+  items:
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: installer
+  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+    from: installer
+    to: installer-artifacts
+  - dockerfile_path: images/libvirt/Dockerfile.ci
+    from: base
+    to: libvirt-installer
+  - dockerfile_path: images/installer/Dockerfile.upi.ci
+    from: rhel-7
+    to: upi-installer
+  - dockerfile_path: images/openstack/Dockerfile.ci
+    from: base
+    to: openstack-installer
+  - dockerfile_path: images/baremetal/Dockerfile.ci
+    from: base
+    to: baremetal-installer
+  - dockerfile_path: images/installer/Dockerfile.ci
+    from: base
+    to: ovirt-installer
+  skip_if_only_changed: ^docs/
+promotion:
+  to:
+  - name: "4.7"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  ovirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  skip_if_only_changed: ^docs/
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+  skip_if_only_changed: ^docs/
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+  skip_if_only_changed: ^docs/
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
+  container:
+    from: src
+  skip_if_only_changed: ^docs/
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^docs/
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-proxy
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-aws-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-sharednetwork
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp
+- always_run: false
+  as: e2e-gcp-byo-vpc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-byo-vpc
+- always_run: false
+  as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-azure-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-e2e-azure-sharednetwork
+- always_run: false
+  as: e2e-aws-upgrade
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-upgrade-aws-latestinstaller
+- always_run: false
+  as: e2e-gcp-upi
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-upi
+- always_run: false
+  as: e2e-gcp-upi-xpn
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-upi-xpn
+- always_run: false
+  as: e2e-aws-workers-rhel7
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- always_run: false
+  as: e2e-aws-disruptive
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-disruption
+- always_run: false
+  as: e2e-gcp-upgrade
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-upgrade-gcp-latestinstaller
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  skip_if_only_changed: ^docs/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- always_run: false
+  as: e2e-vsphere
+  optional: true
+  run_if_changed: (^(data/.*|pkg.*)/vsphere)|(^vendor/github.com/vmware/)
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-vsphere-upi
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-upi
+- always_run: false
+  as: e2e-crc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-crc
+- always_run: false
+  as: e2e-libvirt
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-libvirt
+- always_run: false
+  as: e2e-metal-assisted
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-ovirt
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal-release-4.6-4.7
+- always_run: false
+  as: e2e-aws-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: installer

@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-azure-kas-dns-update
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  timeout: 15m
+  grace_period: 5m
+  commands: hypershift-azure-kas-dns-update-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: DNS_ZONE_RG_NAME
+      default: "os4-common"
+      documentation: "dns zone resource group"
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: |-
+        Set custom DNS name for kube-apiserver.
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: If true, use hypershift azure credentials.
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-aro-azurecreds
+      name: hypershift-aro-azurecreds
+      namespace: test-credentials
+  documentation: |-
+    Updates Azure DNS CNAME record to point custom KAS DNS name to the actual Route hostname.
+    This step should run after cluster creation when using --kas-dns-name with pre-existing DNS records.

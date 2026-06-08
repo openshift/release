@@ -1,0 +1,109 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    to: aws-account-operator
+  - dockerfile_literal: |
+      FROM src
+      RUN PREK_VERSION="$(tr -d '[:space:]' < .prek-version 2>/dev/null || true)" \
+        && PREK_VERSION="${PREK_VERSION:-v0.3.9}" \
+        && curl -fsSL "https://github.com/j178/prek/releases/download/${PREK_VERSION}/prek-x86_64-unknown-linux-gnu.tar.gz" \
+        | tar xzf - --strip-components=1 -C /usr/local/bin/ prek-x86_64-unknown-linux-gnu/prek
+    from: src
+    to: prek-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: validate
+  commands: make validate
+  container:
+    from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: prek
+  commands: |
+    export PREK_HOME=/tmp/prek
+    cd /go/src/github.com/openshift/aws-account-operator
+    git init
+    git add -A
+    if [ -x hack/ci.sh ]; then
+      ./hack/ci.sh
+    else
+      prek run --all-files
+    fi
+  container:
+    from: prek-runner
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: false
+  as: integration-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 15m0s
+    version: "4.16"
+  max_concurrency: 1
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo -e "\nStarting Integration Test\n"
+        make prow-ci-entrypoint
+      credentials:
+      - mount_path: /tmp/secret/aao-aws-creds
+        name: aao-aws-creds
+        namespace: test-credentials
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: aws-account-operator
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      timeout: 2h0m0s
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: aws-account-operator

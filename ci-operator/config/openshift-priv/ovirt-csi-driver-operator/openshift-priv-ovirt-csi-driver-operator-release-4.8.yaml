@@ -1,0 +1,55 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.15-openshift-4.8
+canonical_go_repository: github.com/ovirt/csi-driver-operator
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: ovirt-csi-driver-operator
+promotion:
+  to:
+  - name: 4.8-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.8-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.8-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-ovirt
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-csi-release-4.8
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: ovirt-csi-driver-operator

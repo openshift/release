@@ -1,0 +1,24 @@
+workflow:
+  as: opct-test-platform-external-vsphere
+  steps:
+    pre:
+      - chain: opct-pre-init
+      - chain: upi-vsphere-platform-external-ovn-pre
+      - chain: opct-pre
+    test:
+      - chain: opct-conformance-test
+    post:
+      - chain: gather
+      - chain: opct-post
+      - ref: upi-deprovision-vsphere
+      - ref: upi-deprovision-vsphere-dns
+      - ref: ipi-deprovision-vsphere-lease
+    env:
+      OPCT_CLI_IMAGE: "quay.io/opct/opct:v0.6.5"
+      DEFAULT_NETWORK_TYPE: "single-tenant"
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: true
+  documentation: |-
+    The OPCT workflow installs OpenShift on vSphere using platform type None, then
+    the run test steps using conformance workflow using OPCT, gather's the results archive, and
+    performs environment cleanup.
+    The OPCT_CLI_IMAGE and OPCT_DEV_EXTRA_CMD must be removed when OPCT v0.5 will be released.

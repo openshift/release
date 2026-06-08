@@ -1,0 +1,35 @@
+ref:
+  as: quay-tests-deploy-quay-aws-s3
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-tests-deploy-quay-aws-s3-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 4h0m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-aws-secret
+    mount_path: /var/run/quay-qe-aws-secret
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  documentation: |-
+    Deploy Quay Operator and Quay
+  env:
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.12"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAY_EXTRA_CONFIG
+    documentation: |-
+      Additional Quay configuration YAML merged on top of the default config.
+      Values provided here override defaults. Supports flat keys and nested
+      structures. Example: "FEATURE_QUOTA_MANAGEMENT: false"
+    default: ""

@@ -1,0 +1,33 @@
+ref:
+  as: ibm-fusion-access-prepare-nodes
+  from: cli
+  commands: ibm-fusion-access-prepare-nodes-commands.sh
+  timeout: 15m0s
+  grace_period: 15s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Prepare worker nodes for IBM Storage Scale deployment.
+
+    Labels worker nodes with scale.spectrum.ibm.com/role=storage, creates
+    required directories, and places lxtrace dummy files for RHCOS compatibility.
+
+    Directory preparation (on each worker node):
+    - /var/lib/firmware - Required by mmbuildgpl for kernel module compilation
+    - /var/mmfs/etc - IBM Storage Scale configuration directory
+    - /var/mmfs/tmp/traces - IBM Storage Scale trace/log directory
+    - /var/mmfs/pmcollector - IBM Storage Scale performance monitoring directory
+
+    Red Hat CoreOS's minimal, immutable filesystem lacks these directories that
+    standard Linux systems provide by default. Without them, mmbuildgpl enters
+    CrashLoopBackOff and deployment fails.
+
+    lxtrace workaround (IBM Storage Scale v5.2.3.1 on RHCOS):
+    Creates dummy lxtrace files in /var/lib/firmware to satisfy the buildgpl
+    script's rsync requirement when KMM is not fully supported and the operator
+    falls back to buildgpl. Can be removed when using versions with proper
+    KMM/Driver Toolkit support.
+
+    Must run before [create-cluster](../create-cluster/README.md).

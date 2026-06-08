@@ -1,0 +1,107 @@
+{
+  "name": "4.13.0-0.nightly",
+  "to": "release",
+  "message": "This release contains official image builds of all code in release-4.13 (main) branches, and is updated after those builds are synced to quay.io.",
+  "mirrorPrefix": "4.13-art-latest",
+  "expires": "126h",
+  "maxUnreadyReleases": 1,
+  "minCreationIntervalSeconds": 21600,
+  "referenceMode": "source",
+  "pullSecretName": "source",
+  "alternateImageRepository": "quay.io/openshift-release-dev/dev-release",
+  "alternateImageRepositorySecretName": "release-controller-quay-mirror-secret",
+  "check": {
+    "OCP and Origin images should match": {
+      "consistentImages": {
+        "parent": "4.13.0-0.ci"
+      }
+    }
+  },
+  "publish": {
+    "issues": {
+      "verifyIssues": {
+        "previousReleaseTag": {
+          "namespace": "ocp",
+          "name": "release",
+          "tag": "4.12.0-rc.0"
+        }
+      }
+    },
+    "tag": {
+      "tagRef": {
+        "name": "4.13"
+      }
+    }
+  },
+  "verify": {
+    "aws-sdn-upgrade-4.13-micro": {
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-e2e-aws-sdn-upgrade"
+      },
+      "upgrade": true,
+      "maxRetries": 3
+    },
+    "azure-ovn-upgrade-4.13-micro": {
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-ci-4.13-e2e-azure-ovn-upgrade"
+      },
+      "upgrade": true,
+      "maxRetries": 3
+    },
+    "driver-toolkit": {
+        "maxRetries": 2,
+        "prowJob": {
+            "name": "periodic-ci-openshift-release-main-nightly-4.13-e2e-aws-driver-toolkit"
+        }
+    },
+    "gcp-ovn-rt-upgrade-4.13-minor": {
+      "disabled": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-ci-4.13-upgrade-from-stable-4.12-e2e-gcp-ovn-rt-upgrade"
+      },
+      "upgrade": true,
+      "maxRetries": 3,
+      "upgradeFrom": "PreviousMinor"
+    },
+    "install-analysis-all": {
+      "disabled": true,
+      "maxRetries": 2,
+      "multiJobAnalysis": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-install-analysis-all"
+      }
+    },
+    "aws-sdn-serial": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-e2e-aws-sdn-serial"
+      }
+    },
+    "metal-ipi-ovn-ipv6": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-e2e-metal-ipi-ovn-ipv6"
+      }
+    },
+    "metal-ipi-sdn-bm": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-e2e-metal-ipi-sdn-bm"
+      }
+    },
+    "claude-payload-agent": {
+      "async": true,
+      "optional": true,
+      "multiJobAnalysis": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-claude-payload-agent-no-slack"
+      }
+    },
+    "fips-scan": {
+      "maxRetries": 2,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.13-fips-payload-scan"
+      }
+    }
+  }
+}

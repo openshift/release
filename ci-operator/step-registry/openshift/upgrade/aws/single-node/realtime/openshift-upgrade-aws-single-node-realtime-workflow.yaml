@@ -1,0 +1,23 @@
+workflow:
+  as: openshift-upgrade-aws-single-node-realtime
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-cpu-partitioning
+    - ref: single-node-conf-aws
+    - chain: ipi-install-stableinitial
+    - ref: single-node-conf-realtime
+    test:
+    - ref: single-node-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade-conformance
+  documentation: |-
+    The Openshift upgrade AWS single node realtime workflow executes the upgrade end-to-end test suite on AWS with a single-node cluster running the realtime kernel configuration and Loki as log collector, exercising an upgrade during the process.

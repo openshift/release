@@ -1,0 +1,27 @@
+build_root:
+  project_image:
+    dockerfile_path: containerfiles/Containerfile.ci
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN make setup_molecule USE_VENV=no
+    from: src
+    to: ci-framework-image
+  skip_if_only_changed: ^renovate.json|^README.md
+promotion:
+  to:
+  - namespace: openstack-k8s-operators
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openstack-k8s-operators
+  repo: ci-framework

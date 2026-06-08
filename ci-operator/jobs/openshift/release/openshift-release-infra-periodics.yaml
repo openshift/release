@@ -1,0 +1,4132 @@
+periodics:
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: aws
+    job-type: build
+  name: release-openshift-origin-assemble
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --target=[release:initial]
+      - --target=[release:latest]
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      env:
+      - name: NAMESPACE
+      - name: RELEASE_IMAGE_LATEST
+      - name: RELEASE_IMAGE_INITIAL
+      - name: BRANCH
+        value: "4.5"
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: osd
+    job-type: launch
+  name: release-openshift-origin-installer-launch-osd-ephemeral
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: COMPUTE_MACHINE_TYPE
+        value: m5.xlarge
+      - name: OSD_CLUSTER_VERSION
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: osd-ephemeral
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            cli:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: cli
+            ocm-cli:
+              name: ocm-cli
+              namespace: ci
+              tag: latest
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: osd-ephemeral
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                CLUSTER_VERSION: "$(OSD_CLUSTER_VERSION)"
+                COMPUTE_NODES: "2"
+              post:
+              - ref: osd-delete-delete
+              pre:
+              - ref: openshift-cluster-bot-rbac
+              - ref: osd-create-create
+              test:
+              - as: wait
+                commands: cp /tmp/secret/kubeconfig /tmp/admin.kubeconfig; sleep $(CLUSTER_DURATION) & wait
+                from: cli
+                resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: e2e
+            steps:
+              cluster_profile: osd-ephemeral
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                CLUSTER_VERSION: "$(OSD_CLUSTER_VERSION)"
+                COMPUTE_NODES: "2"
+                TEST_TYPE: suite
+              post:
+              - ref: osd-delete-delete
+              pre:
+              - ref: openshift-cluster-bot-rbac
+              - ref: osd-create-create
+              test:
+              - ref: openshift-e2e-test
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-osd-ephemeral
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: aws
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-4
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws
+          - as: launch-proxy
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-proxy
+          - as: launch-ovn
+            steps:
+              cluster_profile: aws-4
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws-ovn-hybrid
+          - as: launch-shared-vpc
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: aws-3
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
+          - as: launch-fips
+            steps:
+              cluster_profile: aws-4
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FIPS_ENABLED: "true"
+              pre:
+              - chain: ipi-aws-pre
+              - ref: fips-check
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
+          - as: launch-single-node
+            steps:
+              cluster_profile: aws-5
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-single-node
+          - as: launch-cgroupsv2
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-cgroupsv2
+          - as: launch-techpreview
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
+          - as: launch-devpreview
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
+          - as: launch-sdn
+            steps:
+              cluster_profile: aws-3
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-sdn
+          - as: upgrade
+            steps:
+              cluster_profile: aws-4
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: aws-2
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-2-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: aws-qe
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-qe-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.16"
+      - name: CLUSTER_TYPE
+        value: aws-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: cucushift-installer-rehearse-aws-ipi-ovn
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cluster: build01
+    config-type: modern
+    job-architecture: amd64
+    job-env: azure-stackhub
+    job-type: launch
+  name: release-openshift-origin-installer-launch-azurestack-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLOUD_TYPE
+        value: azurestack
+      - name: CLUSTER_TYPE
+        value: azurestack-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-upi
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-upi
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azurestack-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: azure
+    job-type: launch
+  name: release-openshift-origin-installer-launch-azure-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLOUD_TYPE
+        value: azure
+      - name: CLUSTER_TYPE
+        value: azure4
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLOUD_TYPE)
+          - as: launch-ovn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLOUD_TYPE)-ovn-hybrid
+          - as: launch-shared-vpc
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-fips
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FIPS_ENABLED: "true"
+              pre:
+              - chain: ipi-$(CLOUD_TYPE)-pre
+              - ref: fips-check
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-sdn
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLOUD_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: arm64
+    job-env: azure
+    job-type: launch
+  name: release-openshift-origin-installer-launch-azure-arm64
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.14"
+      - name: CLOUD_TYPE
+        value: azure
+      - name: CLUSTER_TYPE
+        value: azure-arm64
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              dependencies:
+                OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+              env:
+                BASE_DOMAIN: ci.azure.devcluster.openshift.com
+                COMPUTE_NODE_TYPE: Standard_D4ps_v5
+                OCP_ARCH: arm64
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-ovn
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: azure-qe
+    job-type: launch
+  name: release-openshift-origin-installer-launch-azure-qe
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.16"
+      - name: CLUSTER_TYPE
+        value: azure-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: cucushift-installer-rehearse-azure-ipi-ovn
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: gcp
+    job-type: launch
+  name: release-openshift-origin-installer-launch-gcp-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)
+          - as: launch-ovn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid
+          - as: launch-private
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                PUBLISH: Internal
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-rt
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-realtime
+          - as: launch-shared-vpc
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-byo-vpc
+          - as: launch-single-node
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-single-node
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-fips
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FIPS_ENABLED: "true"
+              pre:
+              - chain: ipi-$(CLUSTER_TYPE)-pre
+              - ref: fips-check
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-virtualization-support
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                COMPUTE_NODE_TYPE: n2-standard-4
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build07
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: metal
+    job-type: launch
+  name: release-openshift-origin-installer-launch-metal
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: equinix-ocp-metal
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: DEVSCRIPTS_CONFIG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            dev-scripts:
+              name: test
+              namespace: ocp-kni
+              tag: dev-scripts
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-serial
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-sdn-serial-ipv4
+          - as: e2e
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-sdn-ipv4
+          - as: e2e-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-ovn-dualstack
+          - as: e2e-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-ovn-ipv6
+          - as: launch
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4
+                  NETWORK_TYPE=OpenShiftSDN
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv4
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ofcir-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ofcir-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-equinix-ocp-metal
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: vsphere02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+    config-type: modern
+    job-architecture: amd64
+    job-env: vsphere
+    job-type: launch
+  name: release-openshift-origin-installer-launch-vsphere-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: vsphere-elastic
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.16"
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-ovn
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn
+          - as: launch-upi
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-multi-zone
+            steps:
+              cluster_profile: vsphere-multizone-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
+          - as: launch-multi-zone-techpreview
+            steps:
+              cluster_profile: vsphere-multizone-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid-custom-vxlan-port
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-static-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+                NETWORK_TYPE: single-tenant
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-staticip
+          - as: launch-static
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                NETWORK_TYPE: single-tenant
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-staticip
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
+          - as: launch-dualstack
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
+          - as: launch-dualstack-primaryv6
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                IP_FAMILIES: DualStackIPv6Primary
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: vsphere02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-dis-2
+    config-type: modern
+    job-architecture: amd64
+    job-env: vsphere-dis
+    job-type: launch
+  name: release-openshift-origin-installer-launch-vsphere-dis-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: vsphere-dis-2
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.17"
+      - name: CLUSTER_TYPE
+        value: vsphere
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              leases:
+              - env: VSPHERE_BASTION_LEASED_RESOURCE
+                resource_type: vsphere-connected-2-quota-slice
+              workflow: cucushift-agent-vsphere-disconnected-install-compact
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cluster: build01
+    config-type: modern
+    job-architecture: amd64
+    job-env: nutanix
+    job-type: launch
+  name: release-openshift-origin-installer-launch-nutanix-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: nutanix
+      - name: CLUSTER_DURATION
+        value: "18000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: nutanix
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-ovn
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-nutanix
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: ovirt
+    job-release: "4.5"
+    job-type: launch
+  name: release-openshift-origin-installer-launch-ovirt
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.5"
+      - name: CLUSTER_TYPE
+        value: ovirt
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: ovirt
+              workflow: openshift-e2e-ovirt-clusterbot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-ovirt
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: assisted
+    job-type: launch
+  name: release-openshift-origin-installer-launch-assisted-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLOUD_TYPE
+        value: packet-edge
+      - name: CLUSTER_TYPE
+        value: packet-assisted
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            assisted-image-service:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-image-service
+            assisted-installer:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-installer
+            assisted-installer-agent:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-installer-agent
+            assisted-installer-controller:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-installer-controller
+            assisted-service:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-service
+            assisted-test-infra:
+              name: ocm-2.13
+              namespace: edge-infrastructure
+              tag: assisted-test-infra
+            dev-scripts:
+              name: test
+              namespace: ocp-kni
+              tag: dev-scripts
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLOUD_TYPE)
+          - as: launch-ovn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLOUD_TYPE)-ovn-hybrid
+          - as: launch-shared-vpc
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-fips
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FIPS_ENABLED: "true"
+              pre:
+              - chain: ipi-$(CLOUD_TYPE)-pre
+              - ref: fips-check
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-sdn
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLOUD_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: aws
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-fcos-installer-e2e-aws-upgrade-from-fcos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: aws
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+            latest:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: aws
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-next
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+            latest:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-fcos-installer-e2e-gcp-upgrade-from-fcos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-gcp-upgrade-from-scos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-gcp-upgrade-from-scos-next
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: hypershift
+    job-type: launch
+  name: release-openshift-origin-installer-launch-hypershift
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.8"
+      - name: CLUSTER_TYPE
+        value: hypershift
+      - name: HYPERSHIFT_NODE_COUNT
+        value: "2"
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            latest:
+              candidate:
+                product: ocp
+                stream: ci
+                version: "4.12"
+          resources:
+            '*':
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                HYPERSHIFT_HC_RELEASE_IMAGE: $(RELEASE_IMAGE_LATEST)
+                HYPERSHIFT_NODE_COUNT: 2
+                HYPERSHIFT_ZONES: "us-east-1a"
+                HYPERSHIFT_NAMESPACE: "cluster-bot"
+                HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+              test:
+              - ref: clusterbot-wait
+              cluster_profile: hypershift-aws
+              workflow: hypershift-aws-cluster
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-hypershift
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 7h0m0s
+  name: release-openshift-release-analysis-aggregator
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-analysis-aggregator
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: VERIFICATION_JOB_NAME
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: WORKING_DIR
+        value: $(ARTIFACT_DIR)/release-analysis-aggregator
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-analysis-aggregator
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                VERIFICATION_JOB_NAME: "$(VERIFICATION_JOB_NAME)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(WORKING_DIR)"
+              test:
+              - ref: openshift-release-analysis-aggregator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: aggregator
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: openstack
+    job-release: "4.12"
+    job-type: launch
+  name: release-openshift-origin-installer-launch-openstack
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.12"
+      - name: CLUSTER_TYPE
+        value: openstack
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            openstack-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: openstack-installer
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+              test:
+              - ref: clusterbot-wait
+          - as: launch-nfv
+            steps:
+              cluster_profile: openstack-nfv
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-nfv
+          - as: launch-ovn
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                NETWORK_TYPE: OVNKubernetes
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-proxy
+            steps:
+              cluster_profile: openstack-vh-mecha-central
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-proxy
+          - as: launch-techpreview
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-devpreview
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-upi
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-upi
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-openstack-vexxhost
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: arm64
+    job-env: aws
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-arm64
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.11"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-2
+              dependencies:
+                OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+              env:
+                BASE_DOMAIN: aws-2.ci.openshift.org
+                COMPUTE_NODE_TYPE: m6g.xlarge
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                OCP_ARCH: arm64
+              workflow: openshift-e2e-aws
+              test:
+              - ref: clusterbot-wait
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: hypershift-hosted
+    job-type: launch
+  name: release-openshift-origin-installer-launch-hypershift-hosted
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --target=launch
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.12"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+              workflow: hypershift-hostedcluster-workflow
+              test:
+              - ref: clusterbot-wait
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build10
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: multi
+    job-env: hypershift-hosted
+    job-type: launch
+  name: release-openshift-origin-installer-launch-hypershift-hosted-multi
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --target=launch
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.12"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+              workflow: hypershift-hostedcluster-workflow
+              test:
+              - ref: clusterbot-wait
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: hypershift-hosted-powervs
+    job-type: launch
+  name: release-openshift-origin-installer-launch-hypershift-powervs
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --target=launch
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.14"
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: hypershift-powervs-cb
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                PLATFORM: powervs
+                HYPERSHIFT_BASE_DOMAIN: hypershift.cis.ibm.net
+                HYPERSHIFT_NODE_COUNT: 2
+              workflow: hypershift-hostedcluster-workflow
+              test:
+              - ref: clusterbot-wait
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-hypershift-powervs-cb
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build07
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: metal-qe
+    job-type: launch
+  name: release-openshift-origin-installer-launch-metal-qe-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.16"
+      - name: CLUSTER_TYPE
+        value: equinix-ocp-metal-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              workflow: baremetal-lab-ipi
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-equinix-ocp-metal-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cloud-cluster-profile: oci-agent-qe
+    config-type: modern
+    job-architecture: amd64
+    job-env: oci
+    job-type: launch
+  name: release-openshift-origin-installer-launch-oci-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: oci-agent-qe
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.20"
+      - name: CLUSTER_TYPE
+        value: oci
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: cucushift-agent-oci
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-oci-agent-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

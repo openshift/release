@@ -1,0 +1,584 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+
+CONFIG="${SHARED_DIR}/install-config.yaml"
+
+# Temporarily commenting out this section (lines 11 - 50 below) until profiles are supported in powervs environment
+# if [[ -z "${SIZE_VARIANT}" ]]; then
+#    SIZE_VARIANT=default
+# fi
+#
+# workers=3
+# if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+#    workers=0
+# fi
+#
+# master_type=null
+# case "${SIZE_VARIANT}" in
+#    compact)
+#        master_type=bx2-8x32
+#        ;;
+#    default)
+#        master_type=bx2-4x16
+#        ;;
+#    large)
+#        master_type=bx2-16x64
+#        ;;
+#    xlarge)
+#        master_type=bx2-32x128
+#        ;;
+#    *)
+#        echo "Invalid 'SIZE_VARIANT', ${SIZE_VARIANT}."
+#	exit 1
+#	;;
+# esac
+
+# Select zone(s) based on REGION and ZONE_COUNT
+# TODO(cjschaef): Set the REGION from LEASED_RESOURCE, if possible
+#REGION="${LEASED_RESOURCE}"
+#REGION=lon
+#ZONES_COUNT=${ZONES_COUNT:-1}
+#R_ZONES=("${REGION}-1" "${REGION}-2" "${REGION}-3")
+#ZONES="${R_ZONES[*]:0:${ZONES_COUNT}}"
+#ZONES_STR="[ ${ZONES// /, } ]"
+#echo "Powervs region: ${REGION} (zones: ${ZONES_STR})"
+
+#Temporarily commented out the above lines as we are not using these properties for now. Will visit in later and set the profiles.
+
+# Populate install-config with Powervs Platform specifics
+# Note: we will visit this creation of install-config.yaml file section once the profile support is added to the powervs environment
+POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
+if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
+  # Hopefully the entire hostname (including the BASE_DOMAIN) is less than 255 bytes.
+  # Also, the CLUSTER_NAME seems to be truncated at 21 characters long.
+  case "${LEASED_RESOURCE}" in
+    "dal10-powervs-3-quota-slice-0")
+      CLUSTER_NAME="p-dal10-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-1")
+      CLUSTER_NAME="p-dal10-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-2")
+      CLUSTER_NAME="p-dal10-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-3")
+      CLUSTER_NAME="p-dal10-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon04-powervs-6-quota-slice-0")
+      CLUSTER_NAME="p-lon04-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon04-powervs-6-quota-slice-1")
+      CLUSTER_NAME="p-lon04-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon04-powervs-6-quota-slice-2")
+      CLUSTER_NAME="p-lon04-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon04-powervs-6-quota-slice-3")
+      CLUSTER_NAME="p-lon04-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon06-powervs-7-quota-slice-0")
+      CLUSTER_NAME="p-lon06-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon06-powervs-7-quota-slice-1")
+      CLUSTER_NAME="p-lon06-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon06-powervs-7-quota-slice-2")
+      CLUSTER_NAME="p-lon06-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "lon06-powervs-7-quota-slice-3")
+      CLUSTER_NAME="p-lon06-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-0")
+      CLUSTER_NAME="p-fran-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-1")
+      CLUSTER_NAME="p-fran-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-2")
+      CLUSTER_NAME="p-fran-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-3")
+      CLUSTER_NAME="p-fran-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "sao04-powervs-9-quota-slice-0")
+      CLUSTER_NAME="p-sao04-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "sao04-powervs-9-quota-slice-1")
+      CLUSTER_NAME="p-sao04-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-0")
+      CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-1")
+      CLUSTER_NAME="p-mad02-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-2")
+      CLUSTER_NAME="p-mad02-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-3")
+      CLUSTER_NAME="p-mad02-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    *)
+      CLUSTER_NAME="p-${LEASED_RESOURCE}-${CLUSTER_NAME_MODIFIER}"
+    ;;
+  esac
+else
+  CLUSTER_NAME="p-${LEASED_RESOURCE}"
+fi
+POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
+POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
+
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+PLATFORM_ARGS_COMPUTE=( )
+PLATFORM_ARGS_WORKER=( )
+POWERVS_ZONE=${LEASED_RESOURCE}
+PERSISTENT_TG=""
+PERSISTENT_VPC=""
+case "${LEASED_RESOURCE}" in
+   "dal10-powervs-3-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-0")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-1")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-2")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-3")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "fran-powervs-8-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-0")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-1
+      VPCREGION=eu-de
+      # Override sysType for this leased resource
+      PLATFORM_ARGS_COMPUTE+=( "sysType" "s1022" )
+      PLATFORM_ARGS_WORKER+=( "sysType" "s1022" )
+   ;;
+   "fran-powervs-8-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-2
+      VPCREGION=eu-de
+   ;;
+   "fran-powervs-8-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-2")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-1
+      VPCREGION=eu-de
+   ;;
+   "fran-powervs-8-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-3")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-2
+      VPCREGION=eu-de
+   ;;
+   "sao04-powervs-9-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-0")
+      POWERVS_REGION=sao
+      POWERVS_ZONE=sao04
+      VPCREGION=br-sao
+   ;;
+   "sao04-powervs-9-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-1")
+      POWERVS_REGION=sao
+      POWERVS_ZONE=sao04
+      VPCREGION=br-sao
+   ;;
+   "lon04-powervs-6-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-0")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon04
+      VPCREGION=eu-gb
+   ;;
+   "lon04-powervs-6-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-1")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon04
+      VPCREGION=eu-gb
+   ;;
+   "lon04-powervs-6-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-2")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon04
+      VPCREGION=eu-gb
+   ;;
+   "lon04-powervs-6-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-3")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon04
+      VPCREGION=eu-gb
+   ;;
+   "lon06-powervs-7-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-0")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-0"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-0"
+   ;;
+   "lon06-powervs-7-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-1")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-1"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-1"
+   ;;
+   "lon06-powervs-7-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-2")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-2"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-2"
+   ;;
+   "lon06-powervs-7-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06-3")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+      PERSISTENT_TG="tg-lon06-powervs-7-3"
+      PERSISTENT_VPC="vpc-lon06-powervs-7-3"
+   ;;
+   "mad02-powervs-5-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-0")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-1")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-2")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-3")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mon01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
+      POWERVS_REGION=mon
+      VPCREGION=ca-tor
+   ;;
+   "osa21")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
+      POWERVS_REGION=osa
+      VPCREGION=jp-osa
+   ;;
+   "sao01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
+      POWERVS_REGION=sao
+      VPCREGION=br-sao
+   ;;
+   "syd04")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD04")
+      POWERVS_REGION=syd
+      VPCREGION=au-syd
+   ;;
+   "syd05")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD05")
+      POWERVS_REGION=syd
+      VPCREGION=au-syd
+   ;;
+   "tor01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOR01")
+      POWERVS_REGION=tor
+      VPCREGION=ca-tor
+   ;;
+   "tok04")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOK04")
+      POWERVS_REGION=tok
+      VPCREGION=jp-tok
+   ;;
+   "wdc06")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC06")
+      POWERVS_REGION=wdc
+      VPCREGION=us-east
+      PERSISTENT_TG="tg-wdc06-powervs-4-0"
+      PERSISTENT_VPC="vpc-wdc06-powervs-4-0"
+   ;;
+   *)
+      # Default Region & Zone
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
+      POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
+      VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
+   ;;
+esac
+
+echo "POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}"
+echo "POWERVS_REGION=${POWERVS_REGION}"
+echo "POWERVS_ZONE=${POWERVS_ZONE}"
+echo "VPCREGION=${VPCREGION}"
+echo "PERSISTENT_TG=${PERSISTENT_TG}"
+echo "PERSISTENT_VPC=${PERSISTENT_VPC}"
+
+echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
+echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
+# Are we performing a Single Node OpenShift cluster deploy?
+if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
+  PLATFORM_ARGS_COMPUTE+=( "procType" "Dedicated" )
+  PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
+fi
+
+FILE=$(mktemp)
+
+trap '/bin/rm ${FILE}' EXIT
+
+cat << '___EOF___' > ${FILE}
+import sys
+import yaml
+
+nargs = len(sys.argv)
+if ((nargs % 2) == 0):
+	raise ValueError("Error: Usage: program key value [ key value ]*")
+
+# Remove the first argument
+nargs -= 1
+
+cfg = {}
+cfg["platform"] = {}
+cfg["platform"]["powervs"] = {}
+
+# Loop through key/value pairs
+index = 1
+while index < nargs:
+	key = sys.argv[index]
+	value = sys.argv[index+1]
+	try:
+		value = int(value)
+	except ValueError:
+		pass
+	cfg["platform"]["powervs"][key] = value
+	index += 2
+
+# Create YAML output
+output = yaml.safe_dump(cfg, default_flow_style=False)
+
+# Insert two spaces before every line in order to match outside spacing
+print('  '.join(('\n'+output).splitlines(True))[1:].rstrip())
+___EOF___
+
+pip3 install pyyaml==6.0 --user
+echo "PLATFORM_ARGS_COMPUTE=${PLATFORM_ARGS_COMPUTE[*]}"
+echo "PLATFORM_ARGS_WORKER=${PLATFORM_ARGS_WORKER[*]}"
+CONFIG_PLATFORM_COMPUTE=$(python3 ${FILE} "${PLATFORM_ARGS_COMPUTE[@]}")
+CONFIG_PLATFORM_WORKER=$(python3 ${FILE} "${PLATFORM_ARGS_WORKER[@]}")
+echo "CONFIG_PLATFORM_COMPUTE=${CONFIG_PLATFORM_COMPUTE}"
+echo "CONFIG_PLATFORM_WORKER=${CONFIG_PLATFORM_WORKER}"
+
+cat > "${SHARED_DIR}/powervs-conf.yaml" << EOF
+ARCH: ${ARCH}
+BRANCH: ${BRANCH}
+LEASED_RESOURCE: ${LEASED_RESOURCE}
+CLUSTER_NAME: ${CLUSTER_NAME}
+POWERVS_SERVICE_INSTANCE_ID: ${POWERVS_SERVICE_INSTANCE_ID}
+POWERVS_REGION: ${POWERVS_REGION}
+POWERVS_ZONE: ${POWERVS_ZONE}
+VPCREGION: ${VPCREGION}
+EOF
+
+if [ -n "${PERSISTENT_TG}" ]; then
+cat >> "${SHARED_DIR}/powervs-conf.yaml" << EOF
+TGNAME: ${PERSISTENT_TG}
+EOF
+fi
+
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${SHARED_DIR}/powervs-conf.yaml" << EOF
+VPCNAME: ${PERSISTENT_VPC}
+EOF
+fi
+
+export POWERVS_SHARED_CREDENTIALS_FILE
+
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 <= 14) { exit 0 } else { exit 1 } }'; then
+  # In 4.14 releases or earlier, the parameter is named serviceInstanceID and is a required
+  # parameter.
+  SERVICE_INSTANCE="serviceInstanceID"
+else
+  # In 4.15 releases or later, the parameter is named serviceInstanceGUID and is an optional
+  # parameter.
+  SERVICE_INSTANCE="serviceInstanceGUID"
+fi
+echo "SERVICE_INSTANCE=${SERVICE_INSTANCE}"
+
+cat > "${CONFIG}" << EOF
+apiVersion: v1
+baseDomain: ${BASE_DOMAIN}
+metadata:
+  name: ${CLUSTER_NAME}
+compute:
+- architecture: ppc64le
+  hyperthreading: Enabled
+  name: worker
+${CONFIG_PLATFORM_WORKER}
+  replicas: ${WORKER_REPLICAS}
+controlPlane:
+  architecture: ppc64le
+  hyperthreading: Enabled
+  name: master
+${CONFIG_PLATFORM_COMPUTE}
+  replicas: ${CONTROL_PLANE_REPLICAS}
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 192.168.124.0/24
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  powervs:
+    powervsResourceGroup: "${POWERVS_RESOURCE_GROUP}"
+    region: ${POWERVS_REGION}
+    ${SERVICE_INSTANCE}: "${POWERVS_SERVICE_INSTANCE_ID}"
+    userID: ${POWERVS_USER_ID}
+    zone: ${POWERVS_ZONE}
+    vpcRegion: ${VPCREGION}
+EOF
+
+if [ -n "${PERSISTENT_TG}" ]; then
+cat >> "${CONFIG}" << EOF
+    tgName: ${PERSISTENT_TG}
+EOF
+fi
+
+if [ -n "${PERSISTENT_VPC}" ]; then
+cat >> "${CONFIG}" << EOF
+    vpcName: ${PERSISTENT_VPC}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
+publish: External
+pullSecret: >
+  $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+sshKey: |
+  $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+EOF
+
+# Add the chrony config for ppc64le
+# Sets chrony server to clock.corp.redhat.com for both masters and workers.
+if [ "${ARCH}" = "ppc64le" ]; then
+  echo "Saving chrony worker yaml config..."
+  cat >> "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-chrony-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIG5vcnRoLWFtZXJpY2EucG9vbC5udHAub3JnIGlidXJzdApkcmlmdGZpbGUgL3Zhci9saWIvY2hyb255L2RyaWZ0Cm1ha2VzdGVwIDEuMCAzCnJ0Y3N5bmMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
+  echo "Saving chrony master yaml config..."
+  cat >> "${SHARED_DIR}/99-chrony-master.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-chrony-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIG5vcnRoLWFtZXJpY2EucG9vbC5udHAub3JnIGlidXJzdApkcmlmdGZpbGUgL3Zhci9saWIvY2hyb255L2RyaWZ0Cm1ha2VzdGVwIDEuMCAzCnJ0Y3N5bmMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        filesystem: root
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+fi
+
+echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
+read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
+echo "count = ${#PARAMETERS[*]}"
+for PARAMETER in "${PARAMETERS[@]}"; do
+  echo "Removing ${PARAMETER}"
+  sed -i '/'${PARAMETER}':/d' "${CONFIG}"
+done
+
+if [ -n "${FEATURE_SET}" ]; then
+  echo "Adding 'featureSet: ...' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+featureSet: ${FEATURE_SET}
+EOF
+fi
+
+# FeatureGates must be a valid yaml list.
+# E.g. ['Feature1=true', 'Feature2=false']
+# Only supported in 4.14+.
+if [ -n "${FEATURE_GATES}" ]; then
+  echo "Adding 'featureGates: ...' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+featureGates: ${FEATURE_GATES}
+EOF
+fi
+
+# If the branch is 4.18 or greater, then don't use the existing
+#   - Service Instance
+#   - Transit Gateway
+#   - Virtual Private Cloud
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+    echo "Removing existing service instance!"
+    sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
+    echo "Removing existing transit gateway!"
+    sed -i -e '/tgName/d' "${CONFIG}"
+    echo "Removing existing vpc!"
+    sed -i -e '/vpcName/d' "${CONFIG}"
+fi
+
+echo "tgName in ${CONFIG}:"
+grep tgName "${CONFIG}" || true
+echo "vpcName in ${CONFIG}:"
+grep vpcName "${CONFIG}" || true

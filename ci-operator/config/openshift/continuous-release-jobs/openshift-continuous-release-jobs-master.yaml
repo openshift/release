@@ -1,0 +1,48 @@
+base_images:
+  stream9:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: go/crt-admission-webhook-server/images/Dockerfile
+    from: stream9
+    to: crt-admission-webhook-server
+  - dockerfile_path: go/dpcr-bugzilla-updater/Dockerfile
+    from: stream9
+    to: dpcr-bugzilla-updater
+  - dockerfile_path: images/base/Dockerfile
+    from: stream9
+    to: continuous-release-jobs
+  - dockerfile_path: images/cluster-apply/Dockerfile
+    from: continuous-release-jobs
+    to: cluster-apply
+promotion:
+  to:
+  - excluded_images:
+    - crt-admission-webhook-server
+    namespace: continuous-release-jobs
+    tag: latest
+  - excluded_images:
+    - dpcr-bugzilla-updater
+    - cluster-apply
+    - continuous-release-jobs
+    namespace: crt-admission-webhooks
+    tag: latest
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: continuous-release-jobs

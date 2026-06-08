@@ -1,0 +1,120 @@
+base_images:
+  ocp_builder_rhel-8-base-nodejs-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-nodejs-openshift-4.13
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/console
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-8-base-nodejs-openshift-4.13
+    to: console-plugin-demo
+promotion:
+  to:
+  - additional_images:
+      console-tests: src
+    name: 4.13-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.13-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.13-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  analyze:
+    requests:
+      cpu: "1"
+      memory: 14Gi
+  console:
+    requests:
+      cpu: "2"
+      memory: 10Gi
+  frontend:
+    requests:
+      cpu: "2"
+      memory: 10Gi
+  test-bin:
+    requests:
+      cpu: "1"
+      memory: 10Gi
+test_binary_build_commands: |
+  ./build-frontend.sh
+  ./build-demos.sh
+tests:
+- as: backend
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    mkdir -p ${ARTIFACT_DIR} ${XDG_CACHE_HOME}
+    go install -mod= github.com/jstemmer/go-junit-report@latest
+    /home/prow/go/src/github.com/openshift/console/test-backend.sh
+  container:
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
+- as: frontend
+  commands: |
+    git config --global --add safe.directory /go/src/github.com/openshift/console
+    ./test-frontend.sh
+  container:
+    from: test-bin
+- as: analyze
+  commands: ./analyze.sh
+  container:
+    from: test-bin
+- as: e2e-gcp-console
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: CYPRESS_PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5h0m0s
+    workflow: ipi-gcp
+- as: ceph-storage-plugin
+  run_if_changed: frontend/packages/ceph-storage-plugin
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m4.2xlarge
+      ZONES_COUNT: "1"
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh ceph
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
+      from: pipeline:src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift-priv
+  repo: console

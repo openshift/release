@@ -1,0 +1,106 @@
+{
+  "name": "4.12.0-0.nightly",
+  "to": "release",
+  "message": "This release contains official image builds of all code in release-4.12 (main) branches, and is updated after those builds are synced to quay.io.",
+  "mirrorPrefix": "4.12-art-latest",
+  "expires": "126h",
+  "maxUnreadyReleases": 1,
+  "minCreationIntervalSeconds": 21600,
+  "referenceMode": "source",
+  "pullSecretName": "source",
+  "alternateImageRepository": "quay.io/openshift-release-dev/dev-release",
+  "alternateImageRepositorySecretName": "release-controller-quay-mirror-secret",
+  "check": {
+    "OCP and Origin images should match": {
+      "consistentImages": {
+        "parent": "4.12.0-0.ci"
+      }
+    }
+  },
+  "publish": {
+    "issues": {
+      "verifyIssues": {
+        "previousReleaseTag": {
+          "namespace": "ocp",
+          "name": "release",
+          "tag": "4.11.0-fc.0"
+        }
+      }
+    },
+    "tag": {
+      "tagRef": {
+        "name": "4.12"
+      }
+    }
+  },
+  "verify": {
+    "aws-sdn-upgrade-4.12-minor": {
+      "maxRetries": 3,
+      "upgrade": true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-upgrade-from-stable-4.11-e2e-aws-sdn-upgrade"
+      }
+    },
+    "aws-sdn-serial": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-e2e-aws-sdn-serial"
+      }
+    },
+    "azure-ovn-upgrade-4.12-micro": {
+      "maxRetries": 3,
+      "upgrade": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-ci-4.12-e2e-azure-ovn-upgrade"
+      }
+    },
+    "driver-toolkit": {
+        "maxRetries": 2,
+        "prowJob": {
+            "name": "periodic-ci-openshift-release-main-nightly-4.12-e2e-aws-driver-toolkit"
+        }
+    },
+    "gcp-sdn-upgrade-4.12-micro": {
+      "maxRetries": 3,
+      "upgrade": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-ci-4.12-e2e-gcp-sdn-upgrade"
+      }
+    },
+    "install-analysis-all": {
+      "disabled": true,
+      "maxRetries": 2,
+      "multiJobAnalysis": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-install-analysis-all"
+      }
+    },
+    "metal-ipi-sdn": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-e2e-metal-ipi-sdn-bm"
+      }
+    },
+    "metal-ipi-ovn-ipv6": {
+      "maxRetries": 3,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-e2e-metal-ipi-ovn-ipv6"
+      }
+    },
+    "claude-payload-agent": {
+      "async": true,
+      "optional": true,
+      "multiJobAnalysis": true,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-claude-payload-agent-no-slack"
+      }
+    },
+    "fips-scan": {
+      "maxRetries": 2,
+      "prowJob": {
+        "name": "periodic-ci-openshift-release-main-nightly-4.12-fips-payload-scan"
+      }
+    }
+  }
+}

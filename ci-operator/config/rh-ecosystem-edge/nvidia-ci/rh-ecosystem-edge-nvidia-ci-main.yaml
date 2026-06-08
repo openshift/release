@@ -1,0 +1,62 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.17-openshift-4.11
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+promotion:
+  to:
+  - name: latest
+    namespace: nvidia-ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: ./scripts/golangci-lint.sh
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/
+- as: mirror-vcsref-image
+  postsubmit: true
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
+  skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-ci
+    env:
+      IMAGE_REPO: nvidia-ci
+      IMAGE_TAG: latest
+    test:
+    - ref: assisted-baremetal-images-publish
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci

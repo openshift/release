@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: build-release-ci
+metadata:
+  name: build-release-ci
+parameters:
+- name: RELEASE_REF
+  displayName: Source Ref
+  description: Git reference to use for setup
+  value: master
+  required: false
+- name: RELEASE_URL
+  displayName: Source URL
+  description: Git source URL to use for setup
+  value: https://github.com/openshift/release.git
+  required: true
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: release-ci-binary
+    name: release-ci-binary
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release-ci:binary
+    source:
+      git:
+        ref: ${RELEASE_REF}
+        uri: ${RELEASE_URL}
+      contextDir: tools/build/release-ci-binaries-image
+      type: Git
+    strategy:
+      dockerStrategy:
+        noCache: true
+        env:
+        - name: RELEASE_REF
+          value: ${RELEASE_REF}
+        - name: RELEASE_URL
+          value: ${RELEASE_URL}
+        from:
+          kind: ImageStreamTag
+          name: origin-release:golang-1.8
+      type: Docker

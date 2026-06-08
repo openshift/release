@@ -1,0 +1,57 @@
+base_images:
+  base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift.rhel7
+    from: base
+    to: azure-disk-csi-driver
+promotion:
+  to:
+  - name: 4.12-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: unset KUBERNETES_SERVICE_HOST; make unit-test
+  container:
+    from: src
+- as: e2e-azure
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-e2e-azure
+- as: e2e-azure-csi
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-e2e-azure-csi
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: azure-disk-csi-driver

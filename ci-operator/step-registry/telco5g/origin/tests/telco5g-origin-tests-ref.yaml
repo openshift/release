@@ -1,0 +1,32 @@
+ref:
+  as: telco5g-origin-tests
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: telco5g-origin-tests-commands.sh
+  timeout: 3h45m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: cikey
+    mount_path: /var/run/ci-key
+  env:
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+      that are printed in Prow won't exactly match the list returned by openshift-tests.
+  - name: T5CI_VERSION
+    default: ""
+    documentation: Version of OCP cluster to install.
+  documentation: |-
+    Run features-deploy for telco5g and origin tests.

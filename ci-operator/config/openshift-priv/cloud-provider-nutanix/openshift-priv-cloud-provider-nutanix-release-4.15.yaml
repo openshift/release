@@ -1,0 +1,69 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+binary_build_commands: go build .
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
+images:
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    to: nutanix-cloud-controller-manager
+promotion:
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.15-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.15-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-nutanix
+  cluster: build01
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: e2e-nutanix-windows
+  cluster: build01
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: fmt
+  commands: test -z $(gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/"))
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift-priv
+  repo: cloud-provider-nutanix

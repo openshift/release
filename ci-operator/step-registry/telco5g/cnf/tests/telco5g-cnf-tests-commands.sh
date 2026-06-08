@@ -1,0 +1,840 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+
+function create_tests_skip_list_file {
+# List of test cases to ignore due to open bugs
+cat <<EOF >"${SKIP_TESTS_FILE}"
+
+# <feature> <test name>
+
+# SKIPTEST
+# bz### we can stop testing N3000
+# TESTNAME
+sriov "FPGA Programmable Acceleration Card N3000 for Networking"
+
+EOF
+}
+
+
+function create_tests_temp_skip_list_11 {
+# List of temporarly skipped tests for 4.11
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+EOF
+}
+
+
+function create_tests_temp_skip_list_12 {
+# List of temporarly skipped tests for 4.12
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+EOF
+}
+
+function create_tests_temp_skip_list_13 {
+# List of temporarly skipped tests for 4.13
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
+function create_tests_temp_skip_list_14 {
+# List of temporarly skipped tests for 4.14
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
+function create_tests_temp_skip_list_15 {
+# List of temporarly skipped tests for 4.15
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
+function create_tests_temp_skip_list_16 {
+# List of temporarly skipped tests for 4.16
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+
+fi
+}
+
+function create_tests_temp_skip_list_17 {
+# List of temporarly skipped tests for 4.17
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_18 {
+# List of temporarly skipped tests for 4.18
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_19 {
+# List of temporarly skipped tests for 4.19
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_20 {
+# List of temporarly skipped tests for 4.20
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
+function create_tests_temp_skip_list_21 {
+# List of temporarly skipped tests for 4.21
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_22 {
+# List of temporarly skipped tests for 4.22
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
+function create_tests_temp_skip_list_23 {
+# List of temporarly skipped tests for 4.23
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
+function create_tests_temp_skip_list_5 {
+# List of temporarly skipped tests for 5.0
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+
+function is_bm_node {
+    node=$1
+
+    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]] ; then
+        # Define thresholds
+        CPU_THRESHOLD=79
+        MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
+
+        echo "Checking if node $node is baremetal or virtual"
+
+        # Get the CPU and memory capacity
+        cpu=$(oc get $node -o jsonpath='{.status.capacity.cpu}')
+        memory=$(oc get $node -o jsonpath='{.status.capacity.memory}')
+
+        # Convert memory from Ki to Mi
+        memory=${memory%Ki}
+        memory=$((memory / 1024))
+
+        # Check if the node meets the criteria
+        if [[ $cpu -gt $CPU_THRESHOLD && $memory -gt $MEMORY_THRESHOLD ]]; then
+            echo "$node is a baremetal node with $cpu CPUs and $memory Mi of memory."
+            return 0
+        else
+            echo "$node is a virtual node with $cpu CPUs and $memory Mi of memory."
+            return 1
+        fi
+    else
+        machine=$(oc get "${node}" -o json | jq '.metadata.annotations' | grep "machine.openshift.io/machine" | cut -d ":" -f2 | tr -d '", ')
+        machine_ns=$(echo "${machine}" | cut -d "/" -f1)
+        machine_name=$(echo "${machine}" | cut -d "/" -f2)
+        bmh=$(oc get machine -n "${machine_ns}" "${machine_name}" -o json | jq '.metadata.annotations' | grep "metal3.io/BareMetalHost" | cut -d ":" -f2 | tr -d '", ')
+        bmh_ns=$(echo "${bmh}" | cut -d "/" -f1)
+        bmh_name=$(echo "${bmh}" | cut -d "/" -f2)
+        manufacturer=$(oc get bmh -n "${bmh_ns}" "${bmh_name}" -o json | jq '.status.hardware.systemVendor.manufacturer')
+        # if the system manufacturer is not Red Hat, that's a BM node
+        if [[ "${manufacturer}" != *"Red Hat"* ]]; then
+            return 0
+        fi
+        return 1
+    fi
+}
+
+function get_skip_tests {
+
+    skip_list=""
+    if [ -f "${SKIP_TESTS_FILE}" ]; then
+        rm -f feature_skip_list.txt
+        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > ${SHARED_DIR}/feature_skip_list.txt
+        skip_list=""
+        while read line;
+        do
+            test=$(echo "${line}" | cut -d " " -f2- | tr " " .)
+            if [ ! -z "${test}" ]; then
+                if [ "${skip_list}" == "" ]; then
+                    skip_list="${test}"
+                else
+                    skip_list="${skip_list} ${test}"
+                fi
+            fi
+        done < ${SHARED_DIR}/feature_skip_list.txt
+    fi
+
+    echo "${skip_list}"
+}
+
+# Checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# $3 - pull request number
+function checkout_pr_branch() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    local pr_number="$3"
+    # Fetch the pull request branch
+    git fetch --force origin --update-head-ok "pull/$pr_number/head:pr/$pr_number"
+    # Check out the pull request branch
+    git checkout "pr/$pr_number"
+    git reset --hard HEAD
+    set +x
+}
+
+# Check if we are running on a pull request and checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# PULL_URL - pull request URL the job is running on, from main.env file - calculated from CI environment variables
+# PR_URLS - additional pull request URLs.
+function check_for_pr() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    # Check if current org and repo are in PULL_URL
+    if [[ -n "${PULL_URL-}" && "${PULL_URL-}" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request number from the URL
+        pr_number=$(echo "${PULL_URL-}" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    # Check additional PRs from environment variable
+    elif [[ -n "$PR_URLS" && "$PR_URLS" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request URL with org and repo from PR_URLS list
+        TEST_CNF_TESTS_PR=$(echo "$PR_URLS" | grep -Eo "https://github.com/$org/$repo/\S+")
+        # Remove the first and last quotes from the URL
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR%\"}
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR#\"}
+        # Extract the pull request number from the URL
+        pr_number=$(echo "$TEST_CNF_TESTS_PR" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    else
+        echo "The given pull request URL doesn't match the expected repository and organization: PULL_URL=${PULL_URL-}"
+    fi
+    set +x
+    }
+
+# Check if we are running on a pull request and check commit message for Depends-On
+# If Depends-On is found, extract the pull request URL with org and repo from commit message
+# For example: Depends-On: https://github.com/openshift-kni/cnf-features-deploy/pull/1394
+function check_commit_message_for_prs {
+    set -x
+    EXTRACTED_PRS=""
+    # Check if we in CI mode
+    if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
+        # Get the commit message from Github of current PR if exists
+        API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
+        COMMIT_MESSAGE=$(curl -s --retry 5 --retry-delay 10 "$API_PR_URL" | jq -r '.body')
+        # Check if we have Depends-On: in commit message
+        if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
+            # Extract the pull request URL with org and repo from commit message
+            EXTRACTED_PRS=$(echo "$COMMIT_MESSAGE" | grep -oP 'Depends-On:\s*\S+' | sed "s/Depends-On:\s*//g" | xargs)
+            if [[ $EXTRACTED_PRS == *"https"* ]]; then
+                export PR_URLS="${PR_URLS} ${EXTRACTED_PRS}"
+                # Trim spaces from PR_URLS
+                export PR_URLS=${PR_URLS## }
+            fi
+        fi
+    fi
+}
+
+function sno_fixes {
+    echo "************ SNO fixes ************"
+    pushd $CNF_REPO_DIR
+    sed -i "s/role: worker-cnf/role: master/g" feature-configs/deploy/sctp/sctp_module_mc.yaml
+
+    popd
+}
+
+function get_time_left {
+    # Use it later for calculation of time left
+    # Keep in mind the step starts after image preparation in cluster
+    now=$(date +%s)
+    then=$(cat $SHARED_DIR/start_time)
+    minutes_passed=$(( (now - then) / 60 ))
+    # the job has 4 hours to run, leave 10 minutes for reports etc
+    time_left=$(( 215 - minutes_passed ))
+    echo $time_left
+}
+
+
+checkout_submodules(){
+  # Use it later to checkout submodules in cnf-features-deploy repo
+  submodule_path=$(git remote get-url origin)
+  local repo
+  local org
+  repo=$(echo "$submodule_path" | sed 's/.*\///' | sed 's/\.git//')
+  org=$(echo "$submodule_path" | cut -d'/' -f4)
+  check_for_pr $org $repo
+}
+
+[[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
+
+# Set go version
+if [[ "$T5CI_VERSION" == "4.12" ]]; then
+    source $HOME/golang-1.19
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
+    source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
+fi
+
+echo "Go version: $(go version)"
+
+export FEATURES_ENVIRONMENT=ci
+export HYPERSHIFT_ENVIRONMENT=false
+
+# if set - to run tests and/or validations
+export RUN_TESTS="${RUN_TESTS:-true}"
+export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
+
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov sctp}"
+elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov}"
+    export HYPERSHIFT_ENVIRONMENT=true
+    export FEATURES_ENVIRONMENT=hypershift-ci
+else
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
+fi
+export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
+export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
+
+export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
+export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
+export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
+
+export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
+export CNF_BRANCH="${CNF_BRANCH:-master}"
+# List of PRs to test
+export PR_URLS="${PR_URLS:-}"
+check_commit_message_for_prs || true  # Ignore errors, we don't want to fail the job if we can't get the commit message
+
+echo "************ telco5g cnf-tests commands ************"
+
+if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
+    readarray -t config <<< "${E2E_TESTS_CONFIG}"
+    for var in "${config[@]}"; do
+        if [[ ! -z "${var}" ]]; then
+            if [[ "${var}" == *"CNF_E2E_TESTS"* ]]; then
+                CNF_E2E_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+            elif [[ "${var}" == *"CNF_ORIGIN_TESTS"* ]]; then
+                CNF_ORIGIN_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+            fi
+        fi
+    done
+fi
+
+export CNF_E2E_TESTS
+export CNF_ORIGIN_TESTS
+
+if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
+    export CNF_BRANCH="master"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
+else
+    export CNF_BRANCH="release-${T5CI_VERSION}"
+    # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
+    export TARGET_RELEASE=$CNF_BRANCH
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
+fi
+
+CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
+
+# Check if cnf-features-deploy repository exists
+# If not, clone it
+if [[ ! -d "${CNF_REPO_DIR}" ]]; then
+    echo "cnf-features-deploy repository not found, cloning it to ${CNF_REPO_DIR}"
+    mkdir -p "$CNF_REPO_DIR"
+    echo "running on branch ${CNF_BRANCH}"
+    git clone -b "${CNF_BRANCH}" "${CNF_REPO}" $CNF_REPO_DIR
+fi
+
+pushd $CNF_REPO_DIR
+echo "******** Checking out pull request for repository cnf-features-deploy if exists"
+check_for_pr "openshift-kni" "cnf-features-deploy"
+if [[ "$T5CI_VERSION" != "4.12" ]] && [[ "$T5CI_VERSION" != "4.14" ]]; then
+    echo "Updating all submodules for >=4.15 versions"
+    # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
+    sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
+    make init-git-submodules
+    export -f checkout_submodules check_for_pr checkout_pr_branch
+    git submodule foreach --recursive "checkout_submodules"
+    git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
+fi
+popd
+
+echo "******** Patching OperatorHub to disable all default sources"
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+    oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+fi
+
+# Skiplist common for all releases
+create_tests_skip_list_file
+
+if [[ "$CNF_BRANCH" == *"4."* ]]; then
+    function_version="${CNF_BRANCH//release-4./}"
+    skip_function_name="create_tests_temp_skip_list_${function_version}"
+elif [[ "$CNF_BRANCH" == *"5."* ]]; then
+    function_version=5
+    skip_function_name="create_tests_temp_skip_list_5"
+else
+    # In case of master branch
+    skip_function_name=create_tests_temp_skip_list_22
+fi
+if declare -f "$skip_function_name" > /dev/null; then
+    echo "Executing $skip_function_name for skipping tests"
+    $skip_function_name
+else
+    echo "Function $skip_function_name does not exist. Exiting."
+    exit 1
+fi
+
+# Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
+if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
+elif [[ "$CNF_BRANCH" == *"4.14"* ]]; then
+    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+else
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json"
+fi
+cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
+
+export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
+
+skip_tests=$(get_skip_tests)
+
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
+    echo "******** For non-SNO jobs, get worker nodes"
+    worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
+    --selector='!node-role.kubernetes.io/master' -o name)
+    if [ -z "${worker_nodes}" ]; then
+        echo "[ERROR]: No worker nodes found in cluster"
+        exit 1
+    fi
+    # get BM workers for testing
+    test_nodes=""
+    for node in ${worker_nodes}; do
+        if is_bm_node "${node}"; then
+            test_nodes="${test_nodes} ${node}"
+        fi
+    done
+
+    if [ -z "${test_nodes}" ]; then
+        echo "[ERROR]: No BM worker nodes found in cluster"
+        exit 1
+    fi
+fi
+
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
+    echo "******** For SNO jobs, get master nodes"
+    test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
+    export ROLE_WORKER_CNF="master"
+    # Make local workarounds for SNO
+    echo "******** Running SNO fixes"
+    sno_fixes
+fi
+export CNF_NODES="${test_nodes}"
+
+pushd $CNF_REPO_DIR
+status=0
+val_status=0
+
+if [[ -n "$skip_tests" ]]; then
+    export SKIP_TESTS="${skip_tests}"
+fi
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
+    echo "Wait until number of nodes matches number of machines"
+    for _ in $(seq 30); do
+        nodes="$(oc get nodes --no-headers | wc -l)"
+        machines="$(oc get machines -A --no-headers | wc -l)"
+        [ "$machines" -le "$nodes" ] && break
+        sleep 30
+    done
+    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
+    [ "$machines" -le "$nodes" ]
+fi
+
+echo "Wait for MachineConfigPools to finish updating (verifies node reboots are complete)"
+oc wait mcp --all --for='condition=UPDATED=True' --timeout=30m || echo "WARNING: not all MachineConfigPools have UPDATED=True after 30m"
+oc wait mcp --all --for='condition=UPDATING=False' --timeout=30m || echo "WARNING: some MachineConfigPools still UPDATING after 30m"
+
+echo "Wait for nodes to be up and ready"
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || echo "WARNING: not all nodes are Ready after 10m"
+
+echo "Wait for cluster operators to be deployed and ready"
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m || echo "WARNING: some cluster operators still Progressing after 15m"
+oc wait clusteroperators --all --for=condition=Available=true --timeout=15m || echo "WARNING: not all cluster operators are Available after 15m"
+oc wait clusteroperators --all --for=condition=Degraded=false --timeout=15m || echo "WARNING: some cluster operators are Degraded after 15m"
+
+# if RUN_VALIDATIONS set, run validations
+if $RUN_VALIDATIONS; then
+    echo "************ Running validations ************"
+    PULL_URL="${PULL_URL-}" PR_URLS="${PR_URLS-}" FEATURES=$VALIDATIONS_FEATURES stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
+fi
+# set overall status to fail if validations failed
+if [[ ${val_status} -ne 0 ]]; then
+    echo "Validations failed with status code $val_status"
+    status=${val_status}
+fi
+
+# if validations passed and RUN_TESTS set, run the tests
+if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
+    echo "************ Running e2e tests ************"
+    FEATURES=$TEST_RUN_FEATURES stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
+fi
+popd
+
+set +e
+set -x
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed"
+  rm -rf ${SHARED_DIR}/telco5gci
+  [[ ${attempt} -lt 5 ]] && sleep 10
+done
+if [[ ! -d ${SHARED_DIR}/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
+
+# Check if telco5gci pull request exists and checkout the pull request branch if so
+pushd ${SHARED_DIR}/telco5gci
+check_for_pr "openshift-kni" "telco5gci"
+popd
+
+pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
+# Create HTML reports for humans/aliens
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.html
+ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.html
+# Run validation parser
+[[ -f ${SHARED_DIR}/cnf-validations-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-validations-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
+[[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
+# Create JSON reports for robots
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.json
+[[ -f ${ARTIFACT_DIR}/validation_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit.xml -o ${ARTIFACT_DIR}/validation_results.json
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.json
+
+junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
+
+[[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
+
+rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
+set +x
+set -e
+
+exit ${status}

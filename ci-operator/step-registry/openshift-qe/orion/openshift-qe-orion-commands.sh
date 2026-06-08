@@ -1,0 +1,355 @@
+#!/bin/bash
+set -x
+
+if [ ${RUN_ORION} == false ]; then
+  exit 0
+fi
+
+python --version
+pushd /tmp
+python -m virtualenv ./venv_qe
+source ./venv_qe/bin/activate
+
+if [[ $TAG == "latest" ]]; then
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+else
+    LATEST_TAG=$TAG
+fi
+git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
+pushd orion
+
+# Invoked from orion repo by the openshift-ci bot
+if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
+  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
+  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+  git switch ${PULL_NUMBER}
+fi
+
+pip install -q -r requirements.txt
+
+case "$ES_TYPE" in
+  qe)
+    ES_PASSWORD=$(<"/secret/qe/password")
+    ES_USERNAME=$(<"/secret/qe/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]]; then
+        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+        JIRA_URL=https://redhat.atlassian.net/
+        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        # We use orion's default JIRA project and components
+        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+    fi
+    ;;
+  quay-qe)
+    ES_PASSWORD=$(<"/secret/quay-qe/password")
+    ES_USERNAME=$(<"/secret/quay-qe/username")
+    ES_HOST=$(<"/secret/quay-qe/hostname")
+    ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    ;;
+  stackrox)
+    ES_SECRETS_PATH='/secret_stackrox'
+    ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
+    ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
+    if [ -e "${ES_SECRETS_PATH}/host" ]; then
+        ES_HOST=$(<"${ES_SECRETS_PATH}/host")
+    fi
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    ;;
+  *)
+    ES_PASSWORD=$(<"/secret/internal/password")
+    ES_USERNAME=$(<"/secret/internal/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    ;;
+esac
+
+export ES_SERVER
+
+pip install -q .
+
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
+if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    export ORION_CONFIG="examples/${scale_prefix}-${ORION_WORKLOAD_TYPE}.yaml"
+    echo "Auto-selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix, workload: $ORION_WORKLOAD_TYPE)"
+fi
+
+# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
+if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
+    # Get current worker count (excluding infra and workload nodes)
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    # Determine scale prefix based on worker count
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    # Select orion config based on UDN layer mode
+    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
+    else
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
+    fi
+    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+fi
+
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
+
+# Unset proxy so we can pip install, reach sippy, etc.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+fi
+
+EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+
+if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
+    EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
+elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
+    EXTRA_FLAGS+=" --output-format json"
+elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
+    EXTRA_FLAGS+=" --output-format text"
+else
+    echo "Unsupported format: ${OUTPUT_FORMAT}"
+    exit 1
+fi
+
+if [[ -n "$ORION_CONFIG" ]]; then
+    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+        fileBasename="$(basename ${ORION_CONFIG})"
+        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+        else
+            echo "Error: Failed to download $ORION_CONFIG" >&2
+            exit 1
+        fi
+    fi
+fi
+
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
+if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
+    ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
+    if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+        echo "Error: Failed to download $ACK_FILE" >&2
+        exit 1
+    fi
+    EXTRA_FLAGS+=" --ack $ackFilePath"
+fi
+
+if [ ${COLLAPSE} == "true" ]; then
+    EXTRA_FLAGS+=" --collapse"
+fi
+
+if [[ -n "${ORION_ENVS}" ]]; then
+    ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
+    IFS=',' read -r -a env_array <<< "$ORION_ENVS"
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      export "$env_key"="$env_value"
+    done
+fi
+
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${DISPLAY}" ]]; then
+    EXTRA_FLAGS+=" --display ${DISPLAY}"
+fi
+
+if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
+    EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
+fi
+
+# pull_number input variable is required and
+# it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
+pull_number='0'
+if [[ "${JOB_TYPE}" == "periodic" ]]; then
+    if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="(periodic OR pull)"
+    else
+        job_type="periodic"
+    fi
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a ci test triggered in PR against a pull request
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(periodic OR pull)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a rehearse job triggered from a PR
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(rehearse OR pull OR periodic)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
+    # Indicates a rehearsal in PR against openshift/release repo
+    job_type="(periodic OR rehearse)"
+fi
+
+set +e
+set -o pipefail
+export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
+export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{.data.install-config}' | yq -r '.fips // false')}"
+if [[ -n $pull_number ]]; then
+    export pull_number=${pull_number}
+fi
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
+orion_exit_status=$?
+set -e
+
+process_change_point() {
+
+    [[ -z "${CHANGE_POINT_REPOS}" ]] && return
+
+    GCS_BUCKET="gs://test-platform-results"
+    GCS_PATH=""
+
+    # Determine the path to prowjob.json based on prow ENV variables
+    case "${JOB_TYPE:-}" in
+        presubmit)
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && "${JOB_NAME}" != *rehearse* ]]; then
+                GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
+        periodic)
+            if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+                GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
+        *)
+            return
+            ;;
+    esac
+
+    [[ -z "$GCS_PATH" ]] && return
+
+    echo "Fetching prowjob.json from $GCS_BUCKET/$GCS_PATH"
+    gsutil -m cp -r "${GCS_BUCKET}/${GCS_PATH}" . || return
+
+    # Extract trigger repos from prowjob.json
+    repos=$(jq -r '
+        if (.spec.extra_refs // []) | length > 0 then
+            .spec.extra_refs[] | "\(.org)/\(.repo)"
+        elif (.spec.refs // null) != null then
+            "\(.spec.refs.org)/\(.spec.refs.repo)"
+        else
+            empty
+        end
+    ' prowjob.json) || return
+
+    OWNERS_FILE=owners.txt
+    : > "$OWNERS_FILE"
+
+    # Iterate over each repo to fetch OWNERS
+    for repo in $repos; do
+        org="${repo%%/*}"
+        name="${repo##*/}"
+
+        url="https://raw.githubusercontent.com/openshift/release/main/ci-operator/jobs/${org}/${name}/OWNERS"
+
+        echo "Fetching OWNERS for $repo"
+
+        curl -fsSL "$url" \
+            | yq -r '.approvers[], .reviewers[]' \
+            >> "$OWNERS_FILE" \
+            || echo "OWNERS not found for $repo"
+    done
+
+    sort -u "$OWNERS_FILE" -o "$OWNERS_FILE"
+
+    OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' "$OWNERS_FILE") || return
+
+    echo "Owners loaded as JSON array: $OWNERS_JSON"
+
+    for f in output*.json; do
+        [ -e "$f" ] || { echo "No output*.json files found"; return; }
+
+        echo "Processing file: $f"
+
+        jq --argjson owners "$OWNERS_JSON" '
+        map(
+            if .is_changepoint != true then
+                .
+            else
+                .github_context.repositories |=
+                    with_entries(
+                        .value.commits.items |=
+                            map(
+                                select(
+                                    (.commit_author.email // "" | ascii_downcase | contains($owners[]))
+                                    or
+                                    (.commit_author.name // "" | ascii_downcase | contains($owners[]))
+                                )
+                            )
+                        | .value.commits.count = (.value.commits.items | length)
+                    )
+            end
+        )
+        ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f" || return
+
+        echo "Updated $f"
+    done
+}
+process_change_point
+
+cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+# Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
+(
+    EXP_DIR="/tmp/orion-original-edivisive"
+    mkdir -p "$EXP_DIR"
+    pushd "$EXP_DIR"
+    git clone -q --branch orig-edivisive-exp $ORION_REPO --depth 1
+    pushd orion
+    pip install -q -r requirements.txt
+    pip install -q .
+
+
+    echo "Running experimental orion (original e-divisive)..."
+    # Strip JIRA flags for experimental run
+    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
+    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
+
+    # Copy all results except .xml files into the experimental artifacts subdirectory
+    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
+    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
+    popd
+    popd
+    echo "Experimental orion run complete."
+) || echo "Experimental orion block failed, continuing."
+
+if [ $orion_exit_status -eq 3 ]; then
+  echo "Orion returned exit code 3, which means there are no results to analyze."
+  echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
+
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
+  exit 0
+fi
+
+exit $orion_exit_status

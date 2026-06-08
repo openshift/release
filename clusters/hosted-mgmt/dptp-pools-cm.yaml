@@ -1,0 +1,129 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dptp-pools-cm
+subjects:
+- kind: ServiceAccount
+  name: dptp-pools-cm
+  namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dptp-pools-cm
+subjects:
+- kind: ServiceAccount
+  name: dptp-pools-cm
+  namespace: ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: dptp-pools-cm
+  name: dptp-pools-cm
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dptp-pools-cm
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dptp-pools-cm
+    spec:
+      containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-pools-cm_latest
+        name: dptp-pools-cm
+        args:
+        - --leader-election-namespace=ci
+        - --enable-controller=cluster_pools_pull_secret_provider
+        - --enable-controller=hypershift_namespace_reconciler
+        - --dry-run=false
+        ports:
+        - name: metrics
+          containerPort: 8080
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "250m"
+      serviceAccountName: dptp-pools-cm

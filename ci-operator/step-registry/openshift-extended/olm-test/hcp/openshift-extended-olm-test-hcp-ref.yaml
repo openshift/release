@@ -1,0 +1,55 @@
+ref:
+  as: openshift-extended-olm-test-hcp
+  from: tests
+  grace_period: 10m
+  commands: openshift-extended-olm-test-hcp-commands.sh
+  timeout: 6h
+  cli: latest
+  env:
+  - name: TEST_ARGS
+    default: ""
+    documentation: |-
+      Additional arguments to be passed to 'openshift-tests'
+  - name: SHARD_ARGS
+    default: ""
+    documentation: |-
+      Arguments to be passed to 'openshift-tests' regarding the sharding parameters of this run
+  - name: TEST_TYPE
+    default: "suite"
+    documentation: |
+      The type of test to perform.
+
+      * 'suite' - Run the test suite defined by TEST_SUITE. By default this executes the OpenShift parallel conformance suite.
+      * 'suite-conformance' - Runs the test suite defined by TEST_SUITE, then runs the product conformance
+                  suite to verify the cluster is still functional.
+      * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run. Use 'openshift-tests run --help' to list available suites.
+  - name: TEST_UPGRADE_SUITE
+    default: all
+    documentation: The test suite to run in upgrade tests.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+  - name: TEST_UPGRADE_OPTIONS
+    default: ""
+    documentation: Options controlling how an upgrade is performed.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 10Gi
+  documentation: |-
+    The OLM E2E HCP test step executes openshift-tests for HCP (Hosted Control Plane)
+    clusters like ROSA HCP. This step is specifically designed to skip machine/node count
+    validation checks that are not applicable to HCP environments where control plane nodes
+    are managed externally.
+
+    This step is optimized for ROSA HCP and AWS-based HCP clusters, supporting OLM testing
+    without the traditional Machine API dependency checks.

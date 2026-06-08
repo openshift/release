@@ -1,0 +1,49 @@
+ref:
+  as: upi-install-libvirt
+  from: libvirt-installer
+  grace_period: 30m
+  commands: upi-install-libvirt-commands.sh
+  env:
+  - name: ARCH
+  - name: BRANCH
+  - name: COMPUTE_COUNT
+    default: '2'
+  - name: CONTROL_COUNT
+    default: '3'
+  - name: DOMAIN_MEMORY
+    documentation: The memory to allocate for each guest, in MiB
+    default: '24567'
+  - name: DOMAIN_VCPUS
+    documentation: Number of VCPUs to allocate for each guest
+    default: '10'
+  - name: INSTALLER_TYPE
+    documentation: The type of installer to use for deployment. Supported values are [agent, default]
+    default: 'default'
+  - name: LIBVIRT_IMAGE_PATH
+    default: '/var/lib/libvirt/openshift-images'
+  - name: VIRT_INSTALL_OSINFO
+    default: 'rhel9-unknown'
+  - name: POOL_NAME
+    default: 'multiarch-ci-pool'
+  - name: HTTPD_POOL_NAME
+    default: 'httpd'
+  - name: VOLUME_CAPACITY
+    default: '60G'
+  - name: FIPS_ENABLED
+    default: 'false'
+  - name: ETCD_DISK_SPEED
+    default: 'standard'
+  - name: USE_EXTERNAL_DNS
+    default: 'false'
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: "true"
+    documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_TARGET
+  documentation: >-
+    The UPI libvirt install step runs the openshift-install in order to bring up an OpenShift cluster via a remote libvirt configuration with a fixed load balancer.

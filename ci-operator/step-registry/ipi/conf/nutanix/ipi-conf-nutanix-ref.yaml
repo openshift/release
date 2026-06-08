@@ -1,0 +1,45 @@
+ref:
+  as: ipi-conf-nutanix
+  from_image:
+    namespace: origin
+    name: centos
+    tag: '8'
+  commands: ipi-conf-nutanix-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: nutanix-pc
+    mount_path: /var/run/vault/nutanix
+  env:
+  - name: SIZE_VARIANT
+    default: ""
+    documentation: |-
+      The size of the cluster in one of our supported t-shirt values that is standard across all CI environments.
+
+      The sizes are:
+      * "" (default) - 4 vCPU, 16GB control plane nodes, default workers
+      * "compact" - 8 vCPU, 32GB control plane nodes, no workers
+  - name: RT_ENABLED
+    default: "false"
+    documentation: |-
+      This flag forces the installation of real-time kernel to worker nodes.
+  - name: LB_TYPE
+    default: OpenShiftManagedDefault
+    documentation: |-
+       There are two values: OpenShiftManagedDefault and UserManaged, if UserManaged will use external LB.
+  - name: API_CALL_TIMEOUT
+    default: ""
+    documentation: |-
+       Set prismAPICallTimeout
+  - name: OVERRIDE_RHCOS_IMAGE
+    default: ""
+    documentation: |-
+       Override the RHCOS image URL for Nutanix. If set, this will be used instead of the default image from the installer's embedded stream metadata.
+  documentation: >-
+    This step add platform specific details to the install-config.yaml file
+    to deploy to the Nutanix CI project. An existing install-config.yaml file
+    should already exist in the shared directory.
+    The resulting file remains in the shared directory for future consumption.

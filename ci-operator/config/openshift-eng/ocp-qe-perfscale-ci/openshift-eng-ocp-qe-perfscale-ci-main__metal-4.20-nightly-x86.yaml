@@ -1,0 +1,64 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: weekly-telco-core-cpt
+  capabilities:
+  - intranet
+  cron: 0 17 * * 4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "50"
+      EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=false --gc=true
+      ITERATIONS: "15"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      RUN_ORION: "true"
+      TELCO: "true"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-rds-core
+    - ref: openshift-qe-orion-rds-core
+    workflow: openshift-qe-installer-bm-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.20-nightly-x86

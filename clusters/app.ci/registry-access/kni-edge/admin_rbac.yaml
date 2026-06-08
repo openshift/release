@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Test infrastructure for KNI-EDGE
+    openshift.io/display-name: OCP KNI-EDGE QE
+  name: edge
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: edge
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: edge-image-puller-binding
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+- kind: ServiceAccount
+  namespace: edge
+  name: image-puller
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: edge-admins-binding
+  namespace: edge
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: edge-admins
+    namespace: edge
+  # Grants read access to the users of the Jenkins, who need access to the
+  # images from the registry.
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: kni-ci-user
+    namespace: edge

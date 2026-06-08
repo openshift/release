@@ -1,0 +1,93 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+images:
+  items:
+  - dockerfile_path: ./cmd/pure.Dockerfile
+    from: base
+    to: cluster-proxy
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit-test
+  commands: export XDG_CACHE_HOME="/tmp" && make test
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: integration
+  commands: export XDG_CACHE_HOME="/tmp" && make test-integration
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: sonar-pre-submit
+  commands: |
+    export HOME="/tmp"
+    export GOPATH="${HOME}/go"
+    export GOCACHE="${GOPATH}/pkg/cache"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export HOME="/tmp"
+    export GOPATH="${HOME}/go"
+    export GOCACHE="${GOPATH}/pkg/cache"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-proxy
+    env:
+      IMAGE_REPO: cluster-proxy
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-main
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-proxy
+    env:
+      IMAGE_REPO: cluster-proxy
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-5.0
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: cluster-proxy

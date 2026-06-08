@@ -1,0 +1,234 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dptp-controller-manager-app-ci
+rules:
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  verbs:
+  - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-controller-manager-app-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dptp-controller-manager-app-ci
+subjects:
+- kind: ServiceAccount
+  name: dptp-controller-manager
+  namespace: ci
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+  namespace: ci
+spec:
+  # By default up{job="*/dptp-controller-manager"}.
+  # We want up{job="dptp-controller-manager"} instead.
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  template:
+    metadata:
+      annotations:
+        ci-workload-autoscaler.openshift.io/scale: "false"
+      labels:
+        app: dptp-controller-manager
+    spec:
+      tolerations:
+      - key: manual-provision
+        operator: Exists
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
+        name: dptp-controller-manager
+        imagePullPolicy: Always
+        args:
+        - --leader-election-namespace=ci
+        - --release-repo-git-sync-path=/var/repo/release
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-token-path=/etc/github/oauth
+        - --github-hourly-tokens=4000
+        - --github-allowed-burst=2000
+        - --registry-cluster-name=app.ci
+        - --enable-controller=promotionreconciler
+        - --enable-controller=serviceaccount_secret_refresher
+        - --serviceAccountRefresherOptions.enabled-namespace=ci
+        - --serviceAccountRefresherOptions.enabled-namespace=bparees
+        - --serviceAccountRefresherOptions.ignore-service-account=ci/config-updater
+        - --serviceAccountRefresherOptions.ignore-service-account=ci/sync-rover-groups-updater
+        - --serviceAccountRefresherOptions.remove-old-secrets=true
+        - --enable-controller=testimagestreamimportcleaner
+        - --dry-run=false
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --kubeconfig-suffix=config
+        env:
+        - name: GOMAXPROCS
+          value: "1024"
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: oauth
+          mountPath: /etc/github
+          readOnly: true
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        - name: release
+          mountPath: /var/repo
+        - name: ci-secret-bootstrap
+          mountPath: /etc/ci-secret-bootstrap
+          readOnly: true
+        - name: secret-mirroring
+          mountPath: /etc/secret-mirroring
+          readOnly: true
+        resources:
+          limits:
+            memory: "48Gi"
+          requests:
+            memory: "24Gi"
+            cpu: "1"
+      serviceAccountName: dptp-controller-manager
+      volumes:
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-merge-robot
+      - name: kubeconfigs
+        secret:
+          secretName: dptp-controller-manager
+      - name: release
+        emptyDir: {}
+      - name: ci-secret-bootstrap
+        configMap:
+          name: ci-secret-bootstrap
+      - name: secret-mirroring
+        configMap:
+          name: secret-mirroring

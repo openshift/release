@@ -1,0 +1,180 @@
+#!/bin/bash
+
+# TODO: do here only the preliminary workarounds
+# so that we can have the cleanest possible set of
+# changes in the hypershift-kubevirt-create step
+
+set -exuo pipefail
+
+source "${SHARED_DIR}/packet-conf.sh"
+
+scp "${SSHOPTS[@]}" "/etc/quay-pull-credentials/registry_quay.json" "root@${IP}:/home/registry_quay.json"
+
+MCE=${MCE_VERSION:-""}
+REDHAT_OPERATORS_INDEX_TAG=${REDHAT_OPERATORS_INDEX_TAG:-"v4.21"}
+
+# shellcheck disable=SC2087
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$MCE" "$REDHAT_OPERATORS_INDEX_TAG" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+
+MCE="${1}"
+REDHAT_OPERATORS_INDEX_TAG="${2}"
+
+set -xeo pipefail
+
+if [ -f /root/config ] ; then
+source /root/config
+fi
+
+LOCALIMAGES=localimages
+
+### use candidate oc-mirror to mirror also the containerdisk image for RHCOS
+# TODO: move to dev-scripts repo (the selected OCP release image is already mirrored once there)
+# once the required change will land in the stable version of oc-mirror,
+# see: https://github.com/openshift-metal3/dev-scripts/blob/master/agent/01_agent_requirements.sh#L41
+
+mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+mirror_registry=${mirror_registry%%/*}
+if [[ $mirror_registry == "" ]] ; then
+  echo "Warning: Can not find the mirror registry, abort !!!"
+  exit 1
+fi
+echo "mirror registry is ${mirror_registry}"
+
+PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+
+LOCALPATH=ocp_release_kubevirt
+
+cat <<EOF2 >imageset_config.yaml
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  platform:
+    graph: true
+    release: ${PAYLOADIMAGE}
+    kubeVirtContainer: true
+EOF2
+
+wget https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients/ocp/candidate/oc-mirror.rhel9.tar.gz
+tar xvzf oc-mirror.rhel9.tar.gz
+chmod +x oc-mirror
+jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret > /home/oc_mirror_auth
+./oc-mirror version
+
+# mirror to disk first
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
+
+# push to the internal registry
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
+
+# apply IDMS
+cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
+oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
+
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29466
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29466"
+mkdir -p /home/idms
+mkdir -p /home/icsp
+for i in $(oc get imageContentSourcePolicy -o name); do oc get ${i} -o yaml > /home/icsp/$(basename ${i}).yaml ; done
+for f in /home/icsp/*; do oc adm migrate icsp ${f} --dest-dir /home/idms ; done
+oc apply -f /home/idms || true
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29110
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29110"
+oc rollout restart deployment/operator -n hypershift
+oc rollout status deployment/operator -n hypershift --timeout=180s
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29494
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29494"
+HO_OPERATOR_IMAGE="${PAYLOADIMAGE//@sha256:[^ ]*/@$(oc adm release info -a /tmp/.dockerconfigjson "$PAYLOADIMAGE" | grep hypershift | awk '{print $2}')}"
+echo "${HO_OPERATOR_IMAGE}" > /home/ho_operator_image
+###
+
+
+jq -s '.[0] * .[1]' /home/pull-secret /tmp/.dockerconfigjson > /home/pull-secret-mirror
+
+if [[ -z ${MCE} ]] ; then
+  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
+  CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
+  oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
+  echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
+fi
+
+# Only the redhat-operator-index is mirrored to the internal registry by openshift-metal3/dev-scripts
+# based on MIRROR_OLM_REMOTE_INDEX environment variable. For this specific testing in DISCONNECTED mode,
+# we redirect all the OLM catalogs to the same target to prevent excessive mirroring.
+for img in certified-operator-index community-operator-index redhat-marketplace-index; do
+  echo "Mirroring redhat-operator-index to ${img}"
+  oc image -a /home/pull-secret-mirror mirror \
+    ${mirror_registry}/olm-index/redhat-operator-index:${REDHAT_OPERATORS_INDEX_TAG} \
+    ${mirror_registry}/olm-index/${img}:${REDHAT_OPERATORS_INDEX_TAG}
+done
+
+echo "Workaround for https://issues.redhat.com/browse/OCPBUGS-74263"
+CLUSTER_VERSION=$(oc get clusterversion version -ojsonpath='{.status.desired.version}' | grep -oP '^\d+\.\d+')
+
+if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+  mirror_image="quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962"
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+  mirror_image="quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58"
+fi
+
+if [[ "${CLUSTER_VERSION}" == "4.21" || "${CLUSTER_VERSION}" == "4.22" ]]; then
+  oc adm release mirror \
+    --insecure=true --keep-manifest-list=true \
+    -a /home/oc_mirror_auth \
+    --from "${mirror_image}" \
+    --to ${mirror_registry}/${LOCALIMAGES}/local-release-image
+  
+  oc apply -f - <<END
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${mirror_registry}/${LOCALIMAGES}/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+END
+fi
+
+EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
+### workaround for https://issues.redhat.com/browse/CNV-38194
+echo "workaround for https://issues.redhat.com/browse/CNV-38194"
+scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+if [[ -z ${MCE} ]] ; then
+  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/capi_provider_kubevirt_image" "${SHARED_DIR}/capi_provider_kubevirt_image"
+fi
+###
+
+###
+# For some reason operator-ose-csi-external-snapshotter-rhel8 is not correctly appearing
+# in the ICSP/IDMS generated by oc-mirror, let's explicitly add it
+# TODO: investigate why and eventually file a bug
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: operator-ose-csi-external-snapshotter-rhel8
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - virthost.ostest.test.metalkube.org:5000/openshift4/ose-csi-external-snapshotter-rhel8
+    source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel8
+EOF
+sleep 120
+oc delete pods -n openshift-storage -l=app=csi-rbdplugin-provisioner
+oc delete pods -n openshift-storage -l=app=csi-cephfsplugin-provisioner

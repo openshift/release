@@ -1,0 +1,63 @@
+ref:
+  as: baremetal-lab-ipi-install
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-ipi-install-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 128Mi
+  timeout: 3h30m0s
+  grace_period: 600
+  env:
+  - name: INTERNAL_NET_IP
+    default: "192.168.80.1"
+    documentation: ""
+  - name: INTERNAL_NET_CIDR
+    default: "192.168.80.0/22"
+  - name: ipv6_enabled
+    default: "false"
+  - name: ipv4_enabled
+    default: "true"
+  - name: architecture
+    default: ""
+    documentation: ""
+  - name: masters
+    default: "3"
+    documentation: ""
+  - name: workers
+    default: "2"
+    documentation: ""
+  - name: ENABLE_CAPI
+    default: "false"
+  - name: ADDITIONAL_WORKERS
+    default: "0"
+  - name: ADDITIONAL_WORKER_ARCHITECTURE
+    default: ""
+  - name: ADDITIONAL_WORKERS_DAY2
+    default: "true"
+  - name: AUX_HOST
+    default: ""
+    documentation: |
+      The IP address or FQDN of the host that runs the infrastructure services (DHCP, PXE, DNS, Load Balancer).
+      The auxiliary host runs the VNFs needed for running the infrastructure and maintaining the persistent state 
+      to allow multiple clusters to run and install concurrently
+  - name: DISCONNECTED
+    default: "false"
+  - name: FIPS_ENABLED
+    default: "false"
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: MULTI_RELEASE_IMAGE
+  documentation: |-
+    The baremetal-lab-ipi-install will provision a UPI baremetal cluster, given the configuration assets
+    prepared in the earlier steps. 
+    The minimum requirement for this step to work is to run it after the chain baremetal-lab-ipi-conf.
+    Users that want implement their specific installation configuration should implement workflows that execute 
+    (1) the baremetal-lab-ipi-conf chain, 
+    (2) a set of custom chains/steps to either patch the install-config.yaml or define custom manifest_*.yaml files that will be included in install-dir/manifests, to be consumed by the installer,
+    (3) the baremetal-lab-ipi-install step.

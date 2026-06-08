@@ -1,0 +1,38 @@
+ref:
+  as: storage-conf-csi-azure-disk
+  # Canonical location of the CSI driver manifest
+  from: azure-disk-csi-driver-operator-test
+  commands: storage-conf-csi-azure-disk-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: TEST_CSI_DRIVER_MANIFEST
+    documentation: |-
+      The CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      The OCP specific CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: ENABLE_LONG_CSI_CERTIFICATION_TESTS
+    documentation: |-
+      Enable CSI certification test for SCSI LUN overflow that creates 260 volumes + pods.
+    default: "false"
+  - name: TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST
+    default: "volumeattributesclass.yaml"
+    documentation: |-
+      The VolumeAttributesClass manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: AZURE_DISK_SKU
+    default: ""
+    documentation: |-
+      The Azure Disk SKU type (e.g., UltraSSD_LRS, PremiumV2_LRS). When set to UltraSSD_LRS,
+      an UltraSSD-specific CSI driver manifest is used. Requires ultraSSDCapability to be
+      enabled on the cluster VMs.
+  documentation: |-
+    The csi-azure-disk step creates ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} and
+    ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST} for the Azure Disk CSI driver, which is
+    consumed by openshift-e2e-test step to run CSI driver certification suite.

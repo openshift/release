@@ -1,0 +1,187 @@
+base_images:
+  e2e-test-runner:
+    name: redhat-appstudio
+    namespace: ci
+    tag: e2e-test-runner
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
+    to: konflux-overlay-install
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: appstudio-hac-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-install-konflux
+    - ref: redhat-appstudio-hac-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+  steps:
+    test:
+    - ref: konflux-ci-install-konflux
+    - ref: redhat-appstudio-conformance-tests
+    workflow: redhat-appstudio-claim-failure-analysis
+- always_run: false
+  as: appstudio-operator-overlay-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  run_if_changed: ^components/konflux-operator/
+  steps:
+    test:
+    - ref: redhat-appstudio-operator-overlay-install
+    - ref: redhat-appstudio-operator-overlay-e2e
+    workflow: redhat-appstudio-claim-failure-analysis
+- as: konflux-openshift-upgrade-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 0 1 * * *
+  reporter_config:
+    channel: '#infra-deployments-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :greatsuccess: {{ else }}
+      :anger_meow: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
+  steps:
+    workflow: redhat-appstudio-openshift-upgrade
+- always_run: false
+  as: appstudio-upgrade-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-upgrade
+    workflow: redhat-appstudio-claim
+- always_run: false
+  as: appstudio-load-test
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-infra-dep
+    test:
+    - ref: redhat-appstudio-load-test-infra-deployments
+    workflow: redhat-appstudio-load-test
+- as: appstudio-e2e-tests-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 0 0 * * *
+  reporter_config:
+    channel: '#infra-deployments-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :success-kid: {{ else }}
+      :fuuuuuu: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
+  steps:
+    test:
+    - ref: konflux-ci-install-konflux
+    - ref: redhat-appstudio-conformance-tests
+    workflow: redhat-appstudio-claim-failure-analysis
+- always_run: false
+  as: konflux-e2e-v419-optional
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.19"
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-konflux-disaster-recovery
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.17"
+  optional: true
+  run_if_changed: ^components/disaster-recovery/.*
+  steps:
+    test:
+    - ref: redhat-appstudio-konflux-disaster-recovery
+    workflow: redhat-appstudio-claim-failure-analysis
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: infra-deployments

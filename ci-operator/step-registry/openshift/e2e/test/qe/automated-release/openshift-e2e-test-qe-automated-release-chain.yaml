@@ -1,0 +1,31 @@
+chain:
+  as: openshift-e2e-test-qe-automated-release
+  env:
+  - name: TEST_ADDITIONAL
+    default: "Network_Observability"
+    documentation: |-
+      Additional scenarios to execute
+  - name: TEST_FILTERS
+    default: "~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&"
+    documentation: |-
+      run parallel and serial cases, but disruptive case.
+  - name: TEST_IMPORTANCE
+    default: LEVEL0
+    documentation: |-
+      run LEVEL0 cases by default for Golang test
+  - name: E2E_RUN_TAGS
+    default: '@level0'
+    documentation: |-
+      run LEVEL0 cases by default for cucushift test
+  steps:
+  - chain: cucushift-installer-check-cluster-health
+  - ref: idp-htpasswd
+  - ref: fips-check-fips-or-die
+  - ref: fips-check-node-scan
+  - ref: cucushift-pre
+  - ref: openshift-extended-test
+  - ref: cucushift-e2e
+  - ref: openshift-extended-test-supplementary
+  - ref: openshift-e2e-test-qe-report
+  documentation: |-
+    Execute e2e tests from QE, which include golang (openshift-extended-test), cucushift (cucushift-e2e), ...(more to add)

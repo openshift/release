@@ -1,0 +1,1869 @@
+postsubmits:
+  red-hat-data-services/notebooks:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-base-rhel9-python-3-11-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=base-rhel9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-codeserver-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-codeserver-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-cuda-jupyter-min-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-cuda-jupyter-min-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-cuda-jupyter-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-jupyter-ds-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-jupyter-ds-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-jupyter-minimal-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-jupyter-pytorch-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-jupyter-trustyai-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-rocm-jupyter-minimal-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-rocm-jupyter-pyt-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=notebook-rocm-jupyter-tf-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-cuda-tensorflow-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-datascience-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-datascience-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-minimal-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-minimal-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-pytorch-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-rocm-pytorch-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2024b$
+    cluster: build06
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - base/c9s-python-3.11/Dockerfile
+      - base/rhel9-python-3.11/Dockerfile
+      - base/ubi9-python-3.11/Dockerfile
+      - codeserver/ubi9-python-3.11/Dockerfile
+      - cuda/c9s-python-3.11/Dockerfile
+      - cuda/ubi9-python-3.11/Dockerfile
+      - jupyter/datascience/ubi9-python-3.11/Dockerfile
+      - jupyter/minimal/ubi9-python-3.11/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/pytorch/ubi9-python-3.11/Dockerfile
+      - jupyter/rocm/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.11/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.11/Dockerfile
+      - rocm/ubi9-python-3.11/Dockerfile
+      - rstudio/c9s-python-3.11/Dockerfile
+      - runtimes/datascience/ubi9-python-3.11/Dockerfile
+      - runtimes/minimal/ubi9-python-3.11/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-pytorch/ubi9-python-3.11/Dockerfile
+      - runtimes/rocm-tensorflow/ubi9-python-3.11/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.11/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-red-hat-data-services-notebooks-release-2024b-runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
+    reporter_config:
+      slack:
+        channel: '#pr-review-ai-ide-team'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: "'\n  {{- $active_release := \"2024b\" -}}\n  {{- $previous_release
+          := \"2024a\" -}}\n  {{- $emoji := \"\" -}}\n  {{- $group_tag := \"\" -}}\n
+          \ {{- if and (ne .Spec.Refs.BaseRef $active_release) (ne .Spec.Refs.BaseRef
+          $previous_release) -}}\n      {{- $emoji = \":warning:\" -}}\n  {{- else
+          -}}\n    {{- $group_tag = \"<!subteam^S05UB882TDF> \" -}}\n    {{- if eq
+          .Status.State \"failure\" -}}\n      {{- $emoji = \":failed:\" -}}\n    {{-
+          else -}}\n      {{- $emoji = \":bangbang:\" -}}\n    {{- end -}}\n  {{-
+          end -}}\n\n  {{- printf \"%s\" $emoji}} {{ printf \"%s\" $group_tag }}<{{.Spec.Refs.BaseLink}}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}
+          [{{.Spec.Refs.BaseRef}}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> {{ printf \"%s\" $emoji -}}\n'     "
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=runtime-rocm-tensorflow-ubi9-python-3-11-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

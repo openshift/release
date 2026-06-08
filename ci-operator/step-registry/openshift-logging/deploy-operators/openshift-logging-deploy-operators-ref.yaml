@@ -1,0 +1,46 @@
+ref:
+  as: openshift-logging-deploy-operators
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: openshift-logging-deploy-operators-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+  env:
+  - name: CATALOGSOURCE_NAME
+    default: "qe-app-registry"
+    documentation: |-
+      The name of catalogsource which will be created for operator
+  - name: LOGGING_TEST_VERSION
+    default: ""
+    documentation: |-
+      The version of logging which will be tested, used for creating the ICSP and subscriptions. It's a required value.
+  - name: MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      The image used to create catalogsource.
+      The var can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE": "quay.io/example/logging-index:latest"
+        }
+      }
+  - name: MULTISTAGE_PARAM_OVERRIDE_LOGGING_BUNDLES
+    default: ""
+    documentation: |-
+      The bundle images used to install operators.
+      If MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE and MULTISTAGE_PARAM_OVERRIDE_LOGGING_BUNDLES are set, this parameter takes lower priority than MULTISTAGE_PARAM_OVERRIDE_LOGGING_INDEX_IMAGE.
+      The value can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LOGGING_BUNDLES": "quay.io/example/clo-bundle:latest,quay.io/example/lo-bundle:latest"
+        }
+      }
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Create catalogSources for openshift-logging operators testing.

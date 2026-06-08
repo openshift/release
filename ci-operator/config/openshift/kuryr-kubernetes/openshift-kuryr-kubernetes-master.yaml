@@ -1,0 +1,50 @@
+base_rpm_images:
+  rpm:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.25-openshift-4.23
+images:
+  items:
+  - dockerfile_path: openshift-kuryr-tester-rhel8.Dockerfile
+    from: src
+    optional: true
+    to: kuryr-tester
+  - dockerfile_path: openshift-kuryr-cni-rhel8.Dockerfile
+    from: rpm-os
+    to: kuryr-cni
+  - dockerfile_path: openshift-kuryr-controller-rhel8.Dockerfile
+    from: rpm-os
+    to: kuryr-controller
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-4-11-rhel8.ocp.svc > /etc/yum.repos.d/base-4-14-rhel8.repo
+      curl http://base-openstack-4-11.ocp.svc > /etc/yum.repos.d/base-openstack-4-14.repo
+    from: rpm
+    to: rpm-os
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: tools/build-rpm-rhel8.sh 4.14.0
+rpm_build_location: _output/RPMS/noarch
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: kuryr-kubernetes

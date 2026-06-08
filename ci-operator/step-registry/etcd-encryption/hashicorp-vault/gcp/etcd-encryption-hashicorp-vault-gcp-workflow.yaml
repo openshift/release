@@ -1,0 +1,39 @@
+workflow:
+  as: etcd-encryption-hashicorp-vault-gcp
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: etcd-encryption-vault-setup
+    test:
+    - ref: clusterbot-wait
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+  documentation: |-
+    Provisions a GCP cluster with HashiCorp Vault Enterprise installed and
+    configured for KMS encryption testing.
+
+    This workflow is designed for use with clusterbot to provide interactive access
+    to a cluster with Vault pre-installed and configured.
+
+    What's installed:
+    - OpenShift cluster on GCP (IPI)
+    - HashiCorp Vault Enterprise (via Helm) in namespace: vault-kms
+    - Vault initialized and configured with:
+      * Transit secret engine enabled
+      * KMS encryption key created
+      * AppRole authentication configured
+      * Credentials stored in vault-credentials secret
+
+    Access details:
+    - Vault service: vault.vault-kms.svc:8200
+    - Vault pod: vault-0
+    - Credentials secret: vault-credentials (namespace: vault-kms)
+
+    Vault installation uses the following environment variables with default values:
+    - VAULT_VERSION: 2.0.0-ent (Vault Enterprise version)
+    - VAULT_NAMESPACE: vault-kms (namespace for Vault installation)
+    - VAULT_KMS_KEY_NAME: kms-key (transit encryption key name)
+
+    Note: These Vault configuration values are not configurable via cluster-bot.

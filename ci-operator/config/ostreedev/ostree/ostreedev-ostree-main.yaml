@@ -1,0 +1,31 @@
+build_root:
+  image_stream_tag:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
+images:
+  items:
+  - dockerfile_path: ci/prow/Dockerfile
+    to: base-fcos-e2e
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  fcos-e2e:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
+tests:
+- as: fcos-e2e
+  commands: fcos-e2e
+  container:
+    from: base-fcos-e2e
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore)$
+zz_generated_metadata:
+  branch: main
+  org: ostreedev
+  repo: ostree

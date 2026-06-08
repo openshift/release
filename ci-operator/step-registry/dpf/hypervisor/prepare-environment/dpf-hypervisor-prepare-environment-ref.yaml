@@ -1,0 +1,32 @@
+ref:
+  as: dpf-hypervisor-prepare-environment
+  commands: dpf-hypervisor-prepare-environment-commands.sh
+  credentials:
+  - mount_path: /var/run/dpf-ci
+    name: dpf-ci
+    namespace: test-credentials
+  dependencies:
+  - env: SHARED_DIR
+    name: shared-tmp
+  documentation: |-
+    Prepare the testing environment on the hypervisor by copying the DPF 
+    automation code, extracting configuration from Vault, and setting up
+    all required secrets and environment variables.
+    
+    This step:
+    1. Creates unique working directory on hypervisor
+    2. Copies DPF automation repository to hypervisor
+    3. Extracts and deploys .env configuration from Vault
+    4. Copies OpenShift and DPF pull secrets
+    5. Makes scripts executable
+    6. Validates environment setup
+    
+    Required Vault secrets:
+    - /var/run/dpf-ci/env: Base64 encoded .env file
+    - /var/run/dpf-ci/openshift-pull-secret: OpenShift pull secret
+    - /var/run/dpf-ci/dpf-pull-secret: NVIDIA DPF pull secret
+  from: dpf-ci
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi

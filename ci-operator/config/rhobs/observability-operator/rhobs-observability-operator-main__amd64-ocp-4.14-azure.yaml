@@ -1,0 +1,59 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  observability-operator-test-harness:
+    name: observability-operator-test-harness
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4G
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coo-stage
+  cron: 30 0 * * 1
+  reporter_config:
+    channel: '#observability-operator-cicd'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:6f9055bc4350a2d6e4d3b33fe251926f0641bc05bdf2c2a36bb79a4e9fa3ad8c
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
+        ]
+    test:
+    - ref: rhobs-konflux-catalogsource
+    - ref: install-operators
+    - ref: rhobs-obo-test-harness
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator
+  variant: amd64-ocp-4.14-azure

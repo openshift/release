@@ -1,0 +1,79 @@
+ref:
+  as: hypershift-install
+  from: hypershift-operator
+  cli: latest
+  dependencies:
+  - env: HYPERSHIFT_RELEASE_LATEST
+    name: hypershift-operator
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "The AWS region of the cluster."
+  - name: HO_MULTI
+    default: "false"
+    documentation: "If true, HyperShift Operator image will be multi"
+  - name: ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK
+    default: "false"
+    documentation: "Whether to enable the self managed defaulting webhook or not"
+  - name: ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK
+    default: "false"
+    documentation: "Whether to enable the self managed validating webhook or not"
+  - name: ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE
+    default: "false"
+    documentation: "Whether to shorten the certificate rotation scale"
+  - name: CLOUD_PROVIDER
+    default: "AWS"
+    documentation: "The cloud provider of the cluster."
+  - name: AKS
+    default: "false"
+    documentation: "If true, the cluster is an AKS cluster."
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: ""
+    documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
+  - name: TECH_PREVIEW_NO_UPGRADE
+    default: "false"
+    documentation: "If true, the HyperShift operator runs with TechPreviewNoUpgrade features enabled"
+  - name: AUTH_THROUGH_CERTS
+    default: "false"
+    documentation: "If true, we specify the key vault user client id during HyperShift install."
+  - name: INSTALL_FROM_LATEST
+    default: "false"
+    documentation: "If true, the installation script will use the hypershift cli from HYPERSHIFT_RELEASE_LATEST instead of the cli in the step's 'from' image"
+  - name: ENABLE_SIZE_TAGGING
+    default: "false"
+    documentation: "If true, the installation will enable the HostedCluster size tagging controller"
+  - name: TEST_CPO_OVERRIDE
+    default: "0"
+    documentation: "If set to 1, the hypershift operator will honor CPO overrides for specific Z versions of OCP"
+  - name: AZURE_SELF_MANAGED
+    default: "false"
+    documentation: "If true, skip the --managed-service=ARO-HCP flag during hypershift install. Use for self-managed Azure E2E tests."
+  - name: AZURE_PRIVATE_CREDS_FILE
+    default: ""
+    documentation: "Path to Azure credentials file for managing Private Link Service resources. Falls back to SHARED_DIR/azure_private_link_creds_file if empty."
+  - name: AZURE_PLS_RESOURCE_GROUP
+    default: ""
+    documentation: "Azure resource group of the management cluster where Private Link Services reside. Falls back to SHARED_DIR/azure_pls_resource_group if empty."
+  commands: hypershift-install-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-pool-aws-credentials
+    name: hypershift-pool-aws-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-aks-e2e-dns-credentials
+    name: hypershift-aks-e2e-dns-credentials
+    namespace: test-credentials
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+    name: hypershift-ci-jobs-self-managed-azure
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-e2e
+    name: hypershift-ci-jobs-self-managed-azure-e2e
+    namespace: test-credentials
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m

@@ -1,0 +1,48 @@
+ref:
+  as: ipi-install-install-in-bastion
+  from: upi-installer
+  grace_period: 10m
+  commands: ipi-install-install-in-bastion-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+  - name: ATTACH_BASTION_SA
+    default: ""
+    documentation: The service-account to be attached to the bastion host, along with specifying scopes.
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: "Used to overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  - name: USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: "false"
+    documentation: "Use original payload image url from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE instead of a build farm imagestream url"
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: "true"
+    documentation: "Set to true to disable to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+  - name: OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+    default: ""
+    documentation: "Keep bootstrap resources after install. Warning: this should only be used for debugging purposes, and poses a risk to cluster stability."
+  - name: FIPS_ENABLED
+    default: "false"
+    documentation: "Indicates a FIPS-enabled cluster, to disable FIPS host checks in the installer."
+  - name: TF_LOG
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform components."
+  - name: TF_LOG_CORE
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform core library."
+  - name: TF_LOG_PROVIDER
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform provider libraries."
+  - name: USER_PROVISIONED_DNS
+    default: ""
+    documentation: |-
+      Allow users to select the user provisioned dns option for GCP installations during configuration.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR so that this step can pull in the manifests. Files with name manifest_(manifest_name).yml|yaml end up in $INSTALL_DIR/manifests, while files with name tls_(tls_asset_name).key|pub end up in $INSTALL_DIR/tls.

@@ -1,0 +1,50 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-edge-zone-rootvolume-provision
+  steps:
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-aws-pre-edge-zones-opt-in
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws
+  - ref: ipi-conf-aws-edge-zone
+  - ref: ipi-conf-aws-rootvolume
+  - ref: ipi-install-monitoringpvc
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: ipi-install-install-aws
+  - ref: health-check-node-count
+  - ref: cucushift-installer-check-aws-rootvolume
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource
+  - ref: storage-conf-storageclass-set-default-storageclass
+  - ref: cucushift-installer-check-aws-edge-zone
+  - chain: cucushift-installer-check
+  env:
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: "Instance type for control plane nodes"
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: "Instance type for compute nodes"
+  - name: ENABLE_AWS_EDGE_ZONE
+    default: "yes"
+  - name: EDGE_ZONE_TYPES
+    default: "local-zone"
+  - name: EDGE_NODE_WORKER_SCHEDULABLE
+    default: "no"
+  - name: EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP
+    default: "no"
+  - name: EDGE_NODE_WORKER_NUMBER
+    default: "1"
+  - name: EDGE_NODE_INSTANCE_TYPE
+    default: ""
+  - name: EXPECTED_COMPUTE_NODE_COUNT
+    default: "4"
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "gp2-csi"
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests with root volume configuration and edge zones.
+    Supports both standard compute pools and edge zone compute pools.
+    Root volume configuration can be set via defaultMachinePlatform or individual
+    compute/controlPlane/edge pool settings.

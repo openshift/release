@@ -1,0 +1,464 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+echo "TEST_TYPE=${TEST_TYPE}"
+echo "BRANCH=${BRANCH}"
+echo "ARCH=${ARCH}"
+
+
+# List of exclude tests from conformance/serial suite
+if [ "${TEST_TYPE}" == "conformance-serial" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-imageregistry][Serial][Suite:openshift/registry/serial] Image signature workflow can push a signed image to openshift registry and verify it [Suite:openshift/conformance/serial]"
+EOF
+fi
+if [ "${TEST_TYPE}" == "image-ecosystem" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-devex][Feature:ImageEcosystem][python][Slow] hot deploy for openshift python image Django example should work with hot deploy"
+EOF
+fi
+# DNS query is blocked on s390x yellow zone for 4.9 & above
+# Also adding some loadbalancer tests that won't function on s390x
+# Ephemeral-storage limit eviction is not reliably observed on s390x libvirt CI until
+# https://issues.redhat.com/browse/OCPBUGS-81118 and https://issues.redhat.com/browse/OCPBUGS-81119 are fixed.
+if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 9 )) { exit 0 } else {exit 1} }' && [ "${ARCH}" == "s390x" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Disabled:Broken] [Skipped:SingleReplicaTopology] [Suite:k8s]"
+"[sig-network] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Disabled:Broken] [Skipped:SingleReplicaTopology] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Services should be rejected for evicted pods (no endpoints exist)"
+"[sig-node] Pods Extended Pod Container lifecycle evicted pods should be terminal"
+EOF
+# List of exclude tests from conformance/parallel suite for 4.7 & 4.6
+elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug ensure it works with image streams [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc observe works as expected [Suite:openshift/conformance/parallel]"
+"[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early] [Suite:openshift/conformance/parallel]"
+"[sig-network] Internal connectivity for TCP and UDP on ports 9000-9999 is allowed [Suite:openshift/conformance/parallel]"
+"[sig-storage] CSI mock volume CSI FSGroupPolicy [LinuxOnly] should not modify fsGroup if fsGroupPolicy=None [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Services should be able to create a functioning NodePort service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] Secrets optional updates should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] clone repository using git:// protocol  should clone using git:// if no proxy is configured [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+"[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
+"[sig-arch] Managed cluster should have no crashlooping pods in core namespaces over four minutes [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] well-known endpoint should be reachable [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build can reference a cluster service  with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] custom build with buildah  being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+"[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Suite:openshift/conformance/parallel]"
+"[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with minimum ready seconds set should not transition the deployment to Complete before satisfied [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
+"[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should block multicast traffic in namespaces where it is disabled [Suite:openshift/conformance/parallel]"
+"[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-apps][Feature:Jobs] Users should be able to create and run a job in a user project [Suite:openshift/conformance/parallel]"
+"[sig-cli] Kubectl client Kubectl copy should copy a file from a running Pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-cli] oc rsh rsh specific flags should work well when access to a remote shell [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageInfo] Image info should display information about images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the Deployment gets the resolve-names annotation later [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the object has the resolve-names annotation [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLookup] Image policy should update standard Kube object image fields when local names are on [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageTriggers] Annotation trigger reconciles after the image is overwritten [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should change image reference for internal images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should preserve image reference for external images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should work when only imagestreams api is available [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Suite:openshift/conformance/parallel]"
+EOF
+elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the Deployment gets the resolve-names annotation later [Suite:openshift/conformance/parallel]"
+"[sig-cli] Kubectl client Kubectl copy should copy a file from a running Pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve the correct routes when running with the haproxy config manager [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:Jobs] Users should be able to create and run a job in a user project [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:LDAP] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build can reference a cluster service  with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc rsh rsh specific flags should work well when access to a remote shell [Suite:openshift/conformance/parallel]"
+"[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageInfo] Image info should display information about images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the object has the resolve-names annotation [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLookup] Image policy should update standard Kube object image fields when local names are on [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageTriggers] Annotation trigger reconciles after the image is overwritten [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should change image reference for internal images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should preserve image reference for external images [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should work when only imagestreams api is available [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
+"[sig-network] network isolation when using a plugin that isolates namespaces by default should allow communication from non-default to default namespace on a different node [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Suite:openshift/conformance/parallel]"
+"[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+
+# Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
+# Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
+elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
+"[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
+"[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
+"[sig-network] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Disabled:Broken] [Skipped:SingleReplicaTopology] [Suite:k8s]"
+"[sig-network] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Disabled:Broken] [Skipped:SingleReplicaTopology] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] [DRA] ResourceSlice Controller creates slices"
+EOF
+    # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
+    # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
+    # Skip the ResourceQuota testcase for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-65786. is fixed.
+    if [ "${INSTALLER}" == "powervs" ]; then
+       cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[bz-etcd][invariant] alert/etcdMemberCommunicationSlow should not be at or above info"
+"[sig-etcd] etcd should not log excessive took too long messages"
+"[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+       # Skip the PodObservedGenerationTracking test for 4.21 only until https://redhat.atlassian.net/browse/OCPBUGS-83561 is fixed
+       # This test has timeout issues while pulling non-existent image on PowerVS for 4.21 (fixed in 4.22 with K8s 1.35)
+       if [ "${BRANCH}" == "4.21" ]; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
+EOF
+       fi
+       # Skip the HAProxy router idled service test for versions below 4.22 until the fix is backported
+       # The test fails due to missing port 80 configuration, which was fixed in 4.22 by https://github.com/openshift/installer/pull/10548
+       # Backporting to all lower versions requires significant resources and is not feasible at this time
+       # Bug reference: https://redhat.atlassian.net/browse/OCPBUGS-85232
+       if echo "${BRANCH}" | awk -F. '{ if ((($1 == 4) && ($2 < 22))) { exit 0 } else { exit 1 } }'; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
+EOF
+       fi
+    fi
+else
+    echo "Executing all tests"
+fi
+
+# ^
+# NOTE: If you want to test for the master/main branch and also include an OpenShift range, then use the following test
+#
+# elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 17 && $2 <= 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+#
+
+# Skip the following tests for clusters with multi-architecture compute nodes
+#
+# The list of skipped tests is the result of the following regular expression against the
+# list of all available tests for provider_none and suite openshift/conformance/parallel
+#
+# TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+#        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+#        builds should succeed\| build can reference a cluster service\| custom build
+#        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+#        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+#        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+#        extract should extract\| Image info should display\| Image layer subresource\|
+#        oc tag should change image\| when installed on the cluster should\| OpenShift
+#        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+#        pod should start\| pod sysctls\| build volumes should mount given secrets
+#        and configmaps into the build pod
+HETEROGENEOUS_CLUSTER_TYPE_REGEX="^(libvirt-s390x-amd64|libvirt-amd64-s390x)$"
+if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HETEROGENEOUS_CLUSTER_TYPE_REGEX} ]]; then
+    echo "Adding excluded tests for multi-architecture compute clusters"
+    cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-api-machinery][Feature:ServerSideApply] Server-Side Apply should work for apps.openshift.io/v1, Resource=deploymentconfigs [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs adoption will orphan all RCs and adopt them back when recreated [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs generation should deploy based on a status version bump [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs ignores deployer and lets the config with a NewReplicationControllerCreated reason should let the deployment config with a NewReplicationControllerCreated reason [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs initially should not deploy if pods never transition to ready [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with cancellation after deployer pod succeeded [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with cancellation of running deployment [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with config change in case the deployment is still running [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs paused should disable actions on deployments [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs rolled back should rollback to an older deployment [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs should adhere to Three Laws of Controllers [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs should respect image stream tag reference policy resolve the image pull spec [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs viewing rollout history should print the rollout history [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when changing image change trigger should successfully trigger from an updated image [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when run iteratively should immediately start a new deployment [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when run iteratively should only deploy the last deployment [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [apigroup:apps.openshift.io][apigroup:authorization.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with custom deployments should run the custom deployment steps [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with enhanced status should include various info in status [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with env in params referencing the configmap should expand the config map key to a value [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with failing hook should get all logs from retried hooks [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with minimum ready seconds set should not transition the deployment to Complete before satisfied [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with multiple triggers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with revision history limits should never persist more old deployments than acceptable after being observed by the controller [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with test deployments should run a deployment to completion and then scale to zero [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs won't deploy RC with unresolved images when patched with empty image [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-arch] Managed cluster should expose cluster services outside the cluster [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-arch] [Conformance] FIPS TestFIPS [Suite:openshift/conformance/parallel/minimal]"
+"[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] Optimized image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service [apigroup:build.openshift.io] [Skipped:Disconnected] [Skipped:Proxy] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] custom build with buildah being created from new-build should complete build with custom builder image [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app should succeed with a --name of 58 characters [apigroup:build.openshift.io] [Skipped:Disconnected] [Skipped:Proxy] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app should succeed with an imagestream [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig buildconfigs should have a default history limit set when created via the group api [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune builds after a buildConfig change [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune canceled builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune completed builds based on the successfulBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune errored builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune failed builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and fail without a privileged SCC [apigroup:build.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] verify /run filesystem contents are writeable using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] verify /run filesystem contents do not have unexpected content using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][volumes] build volumes should mount given secrets and configmaps into the build pod for docker strategy builds [apigroup:image.openshift.io][apigroup:build.openshift.io][apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][volumes] build volumes should mount given secrets and configmaps into the build pod for source strategy builds [apigroup:image.openshift.io][apigroup:build.openshift.io][apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc can run inside of a busybox container [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug deployment configs from a build [apigroup:image.openshift.io][apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug dissect deployment config debug [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug does not require a real resource on the server [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug ensure debug does not depend on a container actually existing for the selected resource [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug ensure it works with image streams [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by all [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by checking previous scale [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by label [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by name [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc probe can ensure the probe command is functioning as expected on deploymentconfigs [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [apigroup:image.openshift.io] [Skipped:Disconnected] [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageInfo] Image info should display information about images [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should identify a deleted image as missing [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [apigroup:image.openshift.io][apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should change image reference for internal images [apigroup:build.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have important platform topology metrics [apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have non-Pod host cAdvisor metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should provide ingress metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should provide named network metrics [apigroup:project.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should start and expose a secured proxy and unsecured metrics [apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster shouldn't have failing rules evaluation [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early][apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have a runbook_url annotation if the alert is critical [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have a valid severity label [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have description and summary annotations [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should link to a valid URL if the runbook_url annotation is defined [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should link to an HTTP(S) location if the runbook_url annotation is defined [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][sig-builds][Feature:Builds] Prometheus when installed on the cluster should start and expose a secured proxy and verify build metrics [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should pass the gRPC interoperability tests [apigroup:route.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router][apigroup:route.openshift.io] The HAProxy router should pass the h2spec conformance tests [apigroup:authorization.openshift.io][apigroup:user.openshift.io][apigroup:security.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router][apigroup:route.openshift.io][apigroup:config.openshift.io] The HAProxy router should pass the http2 tests [apigroup:image.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network][Feature:EgressRouterCNI] should ensure ipv4 egressrouter cni resources are created [apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:EgressRouterCNI] when using openshift ovn-kubernetes should ensure ipv6 egressrouter cni resources are created [apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should enable openshift-monitoring to pull metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose a health check on the metrics port [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose the profiling endpoints [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:image.openshift.io] The HAProxy router should serve a route that points to two services and respect weights [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should respond with 503 to unrecognized hosts [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should serve routes that were created from an ingress [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should set Forwarded headers appropriately [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should override the route host for overridden domains with a custom value [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should override the route host with a custom value [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should run even if it has no access to update status [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should serve the correct routes when running with the haproxy config manager [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io][apigroup:operator.openshift.io] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:tuning] pod should start with all sysctl on whitelist [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:tuning] pod sysctls should not affect node [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+EOF
+fi
+
+if [ -f "${SHARED_DIR}/excluded_tests" ]; then
+    echo "Skipping following tests from suite..."
+    cat ${SHARED_DIR}/excluded_tests
+fi

@@ -1,0 +1,213 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+prowgen:
+  expose: true
+  private: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-sdl-check-images-vulnerabilities-quay318-konflux
+  cron: 0 0 6 * *
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-18@sha256:4049d1a0697014e3a2644666b1fa44550e3c263557ed04bcaceae5c844e0f83b
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-18@sha256:a0d973b46ce434c135c122d14effb35ea20cd5d81716cb259e0e267caa6c8d28
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-18@sha256:ad9b9cc3cd5bf3bf05b4e7f8f19977cca7f9ba24d51898400caad5ad78a8387b
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-18@sha256:992f2845f16eca02f8bc4fe62f5fa8795c2c4c969a8510009e75a3997881d15f
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-18@sha256:da729a9eb12d097f9735f476a9af185b1ae846e4a61e85089232ec024d121e2f
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-18@sha256:15bd781f076a586f754f21134ffb127fc3c296c25f0dd73b9d87ce3f177f4797
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-18@sha256:c84d858a1647063a4dc70d72354ef896570f3aa787b1ea21768e03c749c0e3b7
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay317-konflux
+  cron: 0 0 6 * *
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17@sha256:ac14db74c41b58dabf7f748d51e2d1025e21dc170269fb21f87869aebcc74163
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-17@sha256:64ad8608e5710cfe6d9ef7e0701c45a644d4d6e42307113c64ca7676bc27031c
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-17@sha256:f9a87c7d2e7e924353f30a2bab8801bf890576dace66c4bb2c35d99f1d13e2c1
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-17@sha256:e73a9048e4037757e1fd7ba1369b426fe23c968932b27433b768e9013fd476b8
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17@sha256:9de525b568fc35589eea8a75db784be918e0fce6ebef2a17c8143ace934ed9c1
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17@sha256:868c9b7e551424a28bf470ea11caa56f94df6912bdc285df4492a1966d81e39c
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17@sha256:6de67314c7ec0d3a288be134060ed0e07fcbb4cb2e1ec288e901e38d19a8b4e0
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay316
+  cron: 0 0 6 * *
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-16@sha256:1de08d2f364b49d4e4377379f10f3d65f6b6e821c5b7ca281a7a2edc798f7547
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-16@sha256:dae84e1342f684269281b3d3be135e1a93e779d21de81043675341be61a41af9
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-16@sha256:088d1289761cf9cc7f616a427ad63bf1f9c7f7a02e9573dc4e02687fdd30bf92
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-16@sha256:4c2599ea16dd1c026a2fc2755ce47c532dbb705eb059018f8a1461ef49b3bd16
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16@sha256:b7f3c11758af7668d865fc2ea5047cc85a1d2af78c4a8a062d029c5ab6cb4126
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-16@sha256:354494161fc317b8ebea76b52c041a69d36a29f56fbd364e37c5982717b739bb
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-16@sha256:416405a7481b7c906eb5d50cf30228afc0dd952da459aa4fe9140ac93753e2bb
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay315-konflux
+  cron: 0 0 6 * *
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-15@sha256:a4181a959889b6e59938f51c361385a0ec444bc86ebe90729d4ed96cd11c0243
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-15@sha256:f7655040da25be0c0de371ae8ae2717fda9ae0dff47287a62d251150af217115
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-15@sha256:fcfb5b32f3d470e25f86be573ec215bef9d365e0c7839b657c769a27b65e75c9
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-15@sha256:8de75eae48a5290d20444027f3746ba83c8be264283a2c39e8aed2c5818c67c2
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-15@sha256:ed4f1129cbd36f199c56212c7527f49826a18f0490ca5f1d58f52d2c1d1fc347
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-15@sha256:6e2382578be14da0d187625406e800f373dbb95fd32893a24bcce740be52a65b
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-15@sha256:fb16a99de5c7ca157085828bda6794503a15a0ae8d12436e963a1c33cc7403fd
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay314-konflux
+  cron: 0 12 * * 3
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-14@sha256:a98d17e60d59d46d528856edc5ffd61016e31658baffffe17cada399413ff42f
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-14@sha256:d45b9a8ec9115749a5a9ef61faed5fab112d0b8c57e4c9b1f0b49606711932eb
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-14@sha256:872d7f534d7a4c1f28fef820a799ccd1c37f610ab9b77ecd8f0ce72c036925d1
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-14@sha256:d5626720ee9e7e041fa4b1b15abab3f0a089ad234d54ee7e087cd9637fc51f51
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-14@sha256:66a18a08926eac32f4bf9d83c881f6098c137ded7bdc2d9e30bf9f476a5aed48
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-14@sha256:6b636b9830bcfc981117d3e2f449145f3f2a3a2dcba50614bbb5f99ca780afa6
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-14@sha256:011540273111dfa3a870318b81e37d3bd3f155ad28895fd7b78c4649d392779b
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay312-konflux
+  cron: 0 12 * * 6
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-12@sha256:4e092e2da14fcb38366750cd23bfd494a5202f5538810a198e59a8da036aa8d0
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-12@sha256:3470b377cacc4646d6e06497eb152016b025f6c3f5fd2ab77f3251eab99b3ce7
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-12@sha256:e4fb158b727e360e1f201c8a99ea2617523da8603f4e0d7eb173c114fb331bbb
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-12@sha256:84afd2c88e8f4b57b8234db3798692ae05a80b6a0393d4e8af0091f91b4fee49
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12@sha256:cf4cf550990a2f42a6f48e462b2153038a50ea119e447cd1a512bf27edfc5e6a
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-12@sha256:7729eee216854632c5b85f0ba968933c23d1da4e76d9bb893c533e6cc881682a
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-12@sha256:46c68105a034b9f0703e714249bd62abe9412a7fb1d69fa953f66fc0f00f63e6
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay311
+  cron: 0 12 * * 5
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-11@sha256:9c5b4854abef269b5d49a5654b32e57e7d246dd199675174df9214421c4380a4
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-11@sha256:9c5b4854abef269b5d49a5654b32e57e7d246dd199675174df9214421c4380a4
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-11@sha256:9c5b4854abef269b5d49a5654b32e57e7d246dd199675174df9214421c4380a4
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-11@sha256:c41f55884132e325a6257683c1c17a8889fb698f9c587fe92d7733450ca1f8a6
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11@sha256:5cdc4881f89dd6c931e4c42d5ee65a489a01fba1a9004bb79fededc90a33fea3
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-11@sha256:c41f55884132e325a6257683c1c17a8889fb698f9c587fe92d7733450ca1f8a6
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11@sha256:b8b04f787aade09de387ea363dc5044dda84f43451ff53ecb49ac00968d0922c
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay313-konflux
+  cron: 0 12 * * 4
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-13@sha256:a94b2865f6786fdea16738ad09a95bd16840aad68a9831cfac51264476f42e34
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-13@sha256:027769246fef365f0df1679e2d2f96cd2dcd3c4876ee5d68019eec2f3a69aa13
+      QUAY_BUILDER_QEMU_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-13@sha256:d3fd76c7f70608aa2c4dc9620bd550f05629b6d45fb94a1c97c33f00536019a0
+      QUAY_CLAIR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-13@sha256:2e213d564c46b962f9095ec17c2c09d1b14daff8ef6df2a568f19a223f71cad4
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-13@sha256:829f20b974e12f165a30c19d02ec72a610d03ae7fa63a8460f96d9d85d763c9b
+      QUAY_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-13@sha256:dffa380a2ff48ca1dc1876154458f63c92e4540b1463bff06dc375107c096f11
+      QUAY_OPERATOR_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-13@sha256:bbad761d667704c4421900c80d9731b04ef002cda63ac200109faf28423e99db
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay310
+  cron: 0 12 * * 5
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: quay-quay-bridge-operator-rhel8:v3.10.11-1
+      QUAY_BUILDER_IMAGE: quay-quay-builder-rhel8:v3.10.11-1
+      QUAY_BUILDER_QEMU_IMAGE: quay-quay-builder-qemu-rhcos-rhel8:v3.10.11-1
+      QUAY_CLAIR_IMAGE: quay-clair-rhel8:v3.10.11-1
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: quay-quay-container-security-operator-rhel8:v3.10.11-1
+      QUAY_IMAGE: quay-quay-rhel8:v3.10.11-5
+      QUAY_OPERATOR_IMAGE: quay-quay-operator-rhel8:v3.10.11-1
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay39
+  cron: 0 12 * * 5
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: quay-quay-bridge-operator-rhel8:v3.9.12-2
+      QUAY_BUILDER_IMAGE: quay-quay-builder-rhel8:v3.9.12-2
+      QUAY_BUILDER_QEMU_IMAGE: quay-quay-builder-qemu-rhcos-rhel8:v3.9.12-2
+      QUAY_CLAIR_IMAGE: quay-clair-rhel8:v3.9.12-2
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: quay-quay-container-security-operator-rhel8:v3.9.12-2
+      QUAY_IMAGE: quay-quay-rhel8:v3.9.12-7
+      QUAY_OPERATOR_IMAGE: quay-quay-operator-rhel8:v3.9.12-2
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-sdl

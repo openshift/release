@@ -1,0 +1,44 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+images:
+  items:
+  - build_args:
+    - name: BUILD_VERSION
+      value: v0.5.0
+    from: ubi9-minimal
+    to: logging-eventrouter
+promotion:
+  to:
+  - name: 6.y
+    namespace: logging
+  - namespace: logging
+    tag: v0.5.0
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: eventrouter

@@ -1,0 +1,512 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: deck
+  namespace: openshift
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: "The namespace. Must come from a var or it will get stripped off"
+  name: NAMESPACE
+  value: ci
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: deck
+    namespace: ${NAMESPACE}
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    port:
+      targetPort: 8080
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+- apiVersion: v1
+  kind: Route
+  metadata:
+    namespace: ${NAMESPACE}
+    name: prow
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    port:
+      targetPort: 8080
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+    labels:
+      app: prow
+      component: deck
+  spec:
+    selector:
+      app: prow
+      component: deck
+    ports:
+    - name: main
+      port: 80
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+    labels:
+      app: prow
+      component: deck
+  spec:
+    replicas: 2
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: deck
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck
+              topologyKey: kubernetes.io/hostname
+        serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        containers:
+        - name: deck
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260602-e7f2be80c
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --cookie-secret=/etc/cookie/cookie
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --tide-url=http://tide/
+          - --hook-url=http://hook-apps:8888/plugin-help
+          - --oauth-url=/github-login
+          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --spyglass=true
+          - --projected-token-file=/var/sa-token/token
+          - --rerun-creates-job=true
+          - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+          - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
+          - --kubeconfig-dir=/etc/build-farm-credentials
+          - --kubeconfig-suffix=config
+          - --tenant-id=GlobalDefaultID
+          - --tenant-id=gangway-api
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          ports:
+            - name: main
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: extensions
+            mountPath: /var/run/ko/static/extensions
+            readOnly: true
+          - name: oauth-config
+            mountPath: /etc/oauth
+            readOnly: true
+          - name: cookie-secret
+            mountPath: /etc/cookie
+            readOnly: true
+          - name: release
+            mountPath: /var/repo
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          resources:
+            requests:
+              memory: "20Gi"
+              cpu: "2"
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: config
+          configMap:
+            name: config
+        - name: extensions
+          configMap:
+            name: deck-extensions
+        - name: oauth-config
+          secret:
+            secretName: github-app-credentials
+        - name: cookie-secret
+          secret:
+            secretName: cookie
+        - name: release
+          emptyDir: {}
+        - name: build-farm-credentials
+          secret:
+            secretName: deck
+- apiVersion: v1
+  kind: Route
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: reencrypt
+    to:
+      kind: Service
+      name: deck-internal
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+    labels:
+      app: prow
+      component: deck-internal
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: deck-internal-tls
+  spec:
+    selector:
+      app: prow
+      component: deck-internal
+    ports:
+    - name: main
+      port: 443
+      targetPort: 8443
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+    labels:
+      app: prow
+      component: deck-internal
+  spec:
+    replicas: 2
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: deck-internal
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: deck-internal
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck-internal
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck-internal
+              topologyKey: kubernetes.io/hostname
+        serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:deck
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}'
+          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: deck-internal-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - name: deck
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260602-e7f2be80c
+          args:
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --oauth-url=/github-login
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --tide-url=http://tide/
+          - --hook-url=http://hook-apps:8888/plugin-help
+          - --hidden-only=true
+          - --spyglass=true
+          - --cookie-secret=/etc/proxy/secrets/session_secret
+          - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
+          - --projected-token-file=/var/sa-token/token
+          - --rerun-creates-job=true
+          - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+          - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
+          - --kubeconfig-dir=/etc/build-farm-credentials
+          - --kubeconfig-suffix=config
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: gce-sa-credentials-gcs-private
+            mountPath: /etc/gce-sa-credentials-gcs-private
+            readOnly: true
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: extensions
+            mountPath: /var/run/ko/static/extensions
+            readOnly: true
+          - name: oauth-config
+            mountPath: /etc/oauth
+            readOnly: true
+          - name: release
+            mountPath: /var/repo
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          resources:
+            requests:
+              memory: "20Gi"
+              cpu: "2"
+        volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: config
+          configMap:
+            name: config
+        - name: extensions
+          configMap:
+            name: deck-internal-extensions
+        - name: oauth-config
+          secret:
+            secretName: github-app-credentials-private
+        - name: gce-sa-credentials-gcs-private
+          secret:
+            secretName: gce-sa-credentials-gcs-private
+        - name: session-secret
+          secret:
+            secretName: deck-internal-session-secret
+        - name: deck-internal-tls
+          secret:
+            secretName: deck-internal-tls
+        - name: release
+          emptyDir: {}
+        - name: build-farm-credentials
+          secret:
+            secretName: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck-internal
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal-session-secret
+  stringData:
+    session_secret: "${SESSION_SECRET}="

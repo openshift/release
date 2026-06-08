@@ -1,0 +1,37 @@
+ref:
+  as: openstack-test-openstack-ote
+  from: tests
+  cli: latest
+  commands: openstack-test-openstack-ote-commands.sh
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 10Gi
+  env:
+  - name: OS_CLOUD
+    default: "openstack"
+    documentation: Name of cloud to use from ${SHARED_DIR}/clouds.yaml file
+  - name: OPENSTACK_TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+      that are printed in Prow won't exactly match the list returned by openshift-tests.
+  - name: CONFIG_TYPE
+    default: ''
+    documentation: |
+      The type of config for the environment to deploy.
+
+      * 'dualstack' - Configure the install-config to enable dualstack clusters.
+      * 'singlestackv6' - Configure the install-config to enable single-stack v6 clusters.
+  dependencies:
+  - name: "pipeline:openstack-tests"
+    env: OPENSTACK_TEST_IMAGE
+  documentation: |-
+    Runs the OpenShift OpenStack-specific tests using the OTE (OpenShift Tests Extension)
+    framework. The openstack-test extension is advertised as a non-payload extension
+    via ImageStreamTag annotations on the cluster under test, then discovered and run
+    by openshift-tests.

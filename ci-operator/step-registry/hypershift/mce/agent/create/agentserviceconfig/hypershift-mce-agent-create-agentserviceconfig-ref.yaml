@@ -1,0 +1,36 @@
+ref:
+  as: hypershift-mce-agent-create-agentserviceconfig
+  from: dev-scripts
+  cli: latest
+  commands: hypershift-mce-agent-create-agentserviceconfig-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  timeout: 30m0s
+  grace_period: 5m0s
+  env:
+  - name: AGENTSERVICECONFIG_CPU_ARCHITECTURE
+    default: "x86_64"
+    documentation: |-
+      AgentServiceConfig osImages cpuArchitecture
+      The possible values are x86_64, arm64, s390x or ppc64le. The default is x86_64.
+      For more information on these values refer to https://github.com/openshift/assisted-service/blob/master/data/default_os_images.json
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Should we work on top of a disconnected environment
+  - name: IP_STACK
+    default: v4
+    documentation: |-
+      Configures the IP_STACK for the devscripts cluster. The possible values are v4, v6 or
+      v4v6 for dual stack. The default is v4. For more information on these values refer to
+      https://github.com/openshift-metal3/dev-scripts/blob/master/config_example.sh
+  dependencies:
+    - name: "release:latest"
+      env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
+  documentation: |-
+    Configure Agent Service

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boskos-reaper
+  labels:
+    app: prow
+    component: boskos-reaper
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: boskos-reaper
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: boskos-reaper
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: boskos-reaper
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_reaper_latest
+        imagePullPolicy: Always
+        args:
+        - --boskos-url=http://boskos
+        - --resource-type-from-config=/etc/boskos-config/boskos.yaml
+        - --target-state=free
+        volumeMounts:
+        - name: boskos-config
+          mountPath: /etc/boskos-config
+          readOnly: true
+      volumes:
+      - name: boskos-config
+        configMap:
+          name: resources

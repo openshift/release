@@ -1,0 +1,145 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.17"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-multi
+  cron: 23 8 23 1 *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-ovn
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-metrics
+- as: e2e-aws-ovn-conformance-serial
+  cron: 57 3 20 12 *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance
+  cron: 47 22 8 5 *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      PUBLIC_ONLY: "true"
+    workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-proxy-conformance
+  cron: 9 20 27 2 *
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-conformance-proxy
+- as: e2e-powervs-ovn
+  cron: 20 4 1 3 *
+  steps:
+    cluster_profile: hypershift-powervs
+    workflow: hypershift-powervs-e2e
+- as: e2e-kubevirt-metal-ovn
+  capabilities:
+  - intranet
+  cron: 11 8 19 1 *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-kubevirt-metal-ovn-disconnected
+  capabilities:
+  - intranet
+  cron: 15 8 21 1 *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CCS_OPERATOR_CHANNELS: stable-4.15,stable-4.15,stable-4.15,stable-4.15
+      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+    workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
+- as: e2e-kubevirt-aws-ovn-csi
+  cron: 41 7 7 1 *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ODF_OPERATOR_CHANNEL: stable-4.17
+    workflow: hypershift-kubevirt-csi-e2e
+- as: e2e-kubevirt-aws-ovn
+  cron: 37 9 3 11 *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+      ODF_OPERATOR_CHANNEL: stable-4.17
+    workflow: hypershift-kubevirt-e2e-aws
+- as: e2e-kubevirt-azure
+  cron: 17 5 25 3 *
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      ODF_OPERATOR_CHANNEL: stable-4.17
+    workflow: hypershift-kubevirt-azure-conformance
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: hypershift
+  variant: periodics

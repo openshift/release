@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: go build -o cluster-api-provider-vsphere main.go
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-vsphere
+images:
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    from: base
+    to: vsphere-cluster-api-controllers
+promotion:
+  to:
+  - name: 4.14-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: openshift/unit-tests.sh
+  container:
+    from: src
+- always_run: false
+  as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-vsphere-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-serial
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: cluster-api-provider-vsphere

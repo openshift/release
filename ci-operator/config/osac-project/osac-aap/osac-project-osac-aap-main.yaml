@@ -1,0 +1,97 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  origin-cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  osac-installer:
+    name: latest
+    namespace: osac-project
+    tag: osac-installer
+  osac-test-infra:
+    name: latest
+    namespace: osac-project
+    tag: osac-test-infra
+binary_build_commands: git rev-parse HEAD^2 > /tmp/source-sha 2>/dev/null || git rev-parse
+  HEAD > /tmp/source-sha
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: osac-aap
+  - dockerfile_literal: |
+      FROM quay.io/centos/centos:stream9
+      RUN dnf install -y python3.12 python3.12-pip python3.12-devel \
+          systemd-libs systemd-devel gcc git-core bind-utils krb5-devel \
+          && dnf clean all
+      COPY execution-environment/requirements.txt /tmp/requirements.txt
+      RUN python3.12 -m pip install --no-cache-dir -r /tmp/requirements.txt
+      COPY collections/ /usr/share/ansible/collections/
+      COPY vendor/ /usr/share/ansible/collections/
+      COPY oc /usr/local/bin/oc
+      RUN ln -s /usr/local/bin/oc /usr/local/bin/kubectl
+    from: src
+    inputs:
+      origin-cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: osac-aap-pr
+  - dockerfile_literal: |
+      FROM osac-installer
+      COPY config/ /installer/base/osac-aap/config/
+      COPY source-sha /installer/.aap-source-sha
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/source-sha
+      osac-installer:
+        as:
+        - osac-installer
+    to: osac-installer-with-pr
+promotion:
+  to:
+  - excluded_images:
+    - osac-aap-pr
+    - osac-installer-with-pr
+    name: latest
+    namespace: osac-project
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-vmaas
+  capabilities:
+  - intranet
+  steps:
+    dependencies:
+      COMPONENT_IMAGE: osac-aap-pr
+      OSAC_INSTALLER_IMAGE: osac-installer-with-pr
+      OSAC_TEST_IMAGE: osac-test-infra
+    env:
+      COMPONENT_IMAGE_NAME: osac-aap
+    workflow: osac-project-cluster-tool-vmaas
+zz_generated_metadata:
+  branch: main
+  org: osac-project
+  repo: osac-aap

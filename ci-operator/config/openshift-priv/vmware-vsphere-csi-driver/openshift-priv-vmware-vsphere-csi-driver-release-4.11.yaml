@@ -1,0 +1,69 @@
+base_images:
+  base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/vsphere-csi-driver
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: vsphere-csi-driver
+  - dockerfile_path: Dockerfile.syncer.openshift
+    from: base
+    to: vsphere-csi-driver-syncer
+promotion:
+  to:
+  - name: 4.11-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.11-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.11-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-csi-migration
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-csi-migration
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.11
+  org: openshift-priv
+  repo: vmware-vsphere-csi-driver

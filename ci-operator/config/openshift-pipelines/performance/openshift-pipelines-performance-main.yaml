@@ -1,0 +1,2206 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM src
+      SHELL ["/bin/bash", "-c"]
+
+      # Workaround to resolve mirrorlist issue from broken links
+      RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+      RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+      RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+
+      # Install tools
+      RUN yum install -y httpd-tools parallel
+      RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-linux64 && chmod +x /usr/local/bin/jq
+      RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.42.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+      RUN curl -L https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+      RUN python3 -m pip install kubernetes
+      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
+    from: src
+    to: openshift-pipelines-performance-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+tests:
+- as: max-concurrency-downstream-nightly
+  cron: 0 1 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-ha-10
+  cron: 0 2 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-ha-10-state
+  cron: 0 3 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-qbt
+  cron: 0 4 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-ha-10-qbt
+  cron: 0 5 * * 2,5
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-ha-10
+  cron: 0 7 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-ha-10-state
+  cron: 0 8 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-qbt
+  cron: 0 9 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-19-ha-10-qbt
+  cron: 0 10 1,15 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20
+  cron: 0 6 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-ha-10
+  cron: 0 7 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-ha-10-state
+  cron: 0 8 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-qbt
+  cron: 0 9 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-20-ha-10-qbt
+  cron: 0 10 6,21 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21
+  cron: 0 6 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10
+  cron: 0 7 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10-state
+  cron: 0 8 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-qbt
+  cron: 0 9 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-21-ha-10-qbt
+  cron: 0 10 11,26 * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-22
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-22-ha-10
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-22-ha-10-state
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-22-qbt
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-pipelines1-22-ha-10-qbt
+  cron: 0 10 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-sign-tkn-bb
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-20-sign-tkn-bb
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-21-sign-tkn-bb
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-22-sign-tkn-bb
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-sign-tkn-bb-qbt
+  cron: 0 10 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-20-sign-tkn-bb-qbt
+  cron: 0 11 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-21-sign-tkn-bb-qbt
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-22-sign-tkn-bb-qbt
+  cron: 0 13 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-sign-tkn-bb-ha-10
+  cron: 0 14 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-20-sign-tkn-bb-ha-10
+  cron: 0 15 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-21-sign-tkn-bb-ha-10
+  cron: 0 16 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-22-sign-tkn-bb-ha-10
+  cron: 0 17 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-nightly-sign-tkn-bb-ha-10-qbt
+  cron: 0 18 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      NIGHTLY_BUILD: "true"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-20-sign-tkn-bb-ha-10-qbt
+  cron: 0 19 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-21-sign-tkn-bb-ha-10-qbt
+  cron: 0 20 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.21"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- as: max-concurrency-downstream-1-22-sign-tkn-bb-ha-10-qbt
+  cron: 0 21 * * *
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      DEPLOYMENT_VERSION: "1.22"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 500/20 1000/20
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: scaling-pipelines-downstream-1-12
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-11
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.11"
+      MUST_GATHER_TIMEOUT: 35m
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-upstream-stable
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: stable
+      MUST_GATHER_TIMEOUT: 35m
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-upstream-nightly
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: nightly
+      MUST_GATHER_TIMEOUT: 35m
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: max-concurrency-downstream-1-12
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-600-60
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 600/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-700-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 700/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-100
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-100
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-60
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-60
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-80
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-90
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-80
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-90
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-600-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 600/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-800-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 800/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-900-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 900/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1100-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1100/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1200-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1200/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1300-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1300/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-120
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/120
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-140
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/140
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-160
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/160
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-180
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/180
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-200
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/200
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-noreqlim
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_RESOURCES: ///
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-500m-1gi
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_RESOURCES: 500m/1Gi/500m/1Gi
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-2-4gi
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_RESOURCES: 2/4Gi/2/4Gi
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-60-ha-2
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "2"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-ha-2
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "2"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-80-ha-2
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "2"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-90-ha-2
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "2"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-100-ha-2
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "2"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-60-ha-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "4"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-ha-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "4"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-80-ha-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "4"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-90-ha-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "4"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-100-ha-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "4"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-60-ha-8
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "8"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-70-ha-8
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "8"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-80-ha-8
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "8"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-90-ha-8
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "8"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-12-1000-100-ha-8
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "8"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-60-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/60
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-70-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/70
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-80-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/80
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-90-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/90
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-100-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-120-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/120
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-140-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/140
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-160-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/160
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-180-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/180
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-200-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIOS: 1000/200
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-100-x-build
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: build
+      TEST_SCENARIOS: 100/10 100/20 100/30 100/40 100/50
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-50-signing-bigbang
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-bigbang
+      TEST_SCENARIOS: 1000/50
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-x-signing-ongoing
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-ongoing
+      TEST_SCENARIOS: 1000/10 1000/20 1000/40 1000/60 1000/80 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-bigbang-ha10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 2000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-bigbang
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-tr-tekton-bigbang
+      TEST_SCENARIOS: 2000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-ongoing-ha10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-tr-tekton-ongoing
+      TEST_SCENARIOS: 2000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-d-1-13-2000-100-sig-tr-tekton-ongoing
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-tr-tekton-ongoing
+      TEST_SCENARIOS: 2000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 1000/60 1000/70 1000/80 1000/90 1000/100
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-14-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.14"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-15-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_TYPE: downstream
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.20"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/12 200/14 200/16 200/18 200/20
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 1000/50 1000/100 1000/150 1000/200
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-14-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-15-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha-10-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-state-1-20-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-state-1-19-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_CONTROLLER_TYPE: statefulSets
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_VERSION: “1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-14-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-qbt-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.20"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-15-1000-x-math-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-14-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-15-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha10-qbt-cb
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CUSTOM_BUILD: "true"
+      CUSTOM_BUILD_TAG: “1.20"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_TYPE: downstream
+      MUST_GATHER_TIMEOUT: 35m
+      OCP_VERSION: ”4.19"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-19-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: "1.19"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-20-1000-x-math-ha10-qbt
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "10"
+      DEPLOYMENT_PIPELINES_KUBE_API_BURST: "50"
+      DEPLOYMENT_PIPELINES_KUBE_API_QPS: "50"
+      DEPLOYMENT_PIPELINES_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_VERSION: “1.20”
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: math
+      TEST_SCENARIOS: 200/10 200/20 200/30 200/40
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-14-1000-100-baseline-bigbang
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-tr-tekton-bigbang-with-baseline
+      TEST_SCENARIOS: 1000/100
+      WAIT_TIME: "1200"
+    workflow: openshift-pipelines-max-concurrency
+- always_run: false
+  as: max-concurrency-downstream-1-14-sig-tkn-pruner
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.14"
+      EVENT_TIMEOUT: "1200"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNE_PER_RESOURCE: "true"
+      PRUNER_KEEP: "15"
+      PRUNER_SCHEDULE: '* * * * *'
+      TEST_CONCURRENT: "60"
+      TEST_SCENARIO: signing-tr-tekton-with-pruner
+      TEST_TOTAL: "1000000"
+      WAIT_TIME: "600"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-14-vary-concur-simple-ha
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_ENABLE_TIME: "1800"
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNE_PER_RESOURCE: "true"
+      PRUNER_KEEP: "20"
+      PRUNER_SCHEDULE: '*/5 * * * *'
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "5"
+      TEST_NAMESPACE: "20"
+      TEST_SCENARIO: signing-tr-varying-concurrency
+      TEST_TOTAL: "1000000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-14-vary-concur-complex-ha
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_ENABLE_TIME: "1800"
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNE_PER_RESOURCE: "true"
+      PRUNER_KEEP: "20"
+      PRUNER_SCHEDULE: '*/5 * * * *'
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "10"
+      TEST_CONCURRENT: "5"
+      TEST_NAMESPACE: "20"
+      TEST_SCENARIO: signing-tr-varying-concurrency
+      TEST_TOTAL: "1000000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-14-vary-concur-with-chains
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_ENABLE_TIME: "0"
+      DEPLOYMENT_CHAINS_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_CHAINS_KUBE_API_BURST: "50"
+      DEPLOYMENT_CHAINS_KUBE_API_QPS: "50"
+      DEPLOYMENT_CHAINS_THREADS_PER_CONTROLLER: "32"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNE_PER_RESOURCE: "true"
+      PRUNER_KEEP: "20"
+      PRUNER_SCHEDULE: '*/5 * * * *'
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "10"
+      TEST_CONCURRENT: "5"
+      TEST_NAMESPACE: "20"
+      TEST_SCENARIO: signing-tr-varying-concurrency
+      TEST_TOTAL: "1000000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-14-vary-concur-without-chains
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_ENABLE_TIME: "false"
+      DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS: "5"
+      DEPLOYMENT_VERSION: "1.14"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNE_PER_RESOURCE: "true"
+      PRUNER_KEEP: "20"
+      PRUNER_SCHEDULE: '*/5 * * * *'
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "10"
+      TEST_CONCURRENT: "5"
+      TEST_NAMESPACE: "20"
+      TEST_SCENARIO: signing-tr-varying-concurrency
+      TEST_TOTAL: "1000000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-concur-60
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "60"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-60
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "60"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-concur-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "70"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-70
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "70"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-concur-80
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "80"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-80
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "80"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-concur-90
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "90"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-90
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "90"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-concur-100
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "100"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-concur-100
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "100"
+      TEST_NAMESPACE: "1"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-ns-3
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "3"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "140"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-3
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "3"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "140"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-ns-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "4"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "105"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-4
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "4"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "105"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-ns-5
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "84"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-5
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "84"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-ns-6
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "6"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "70"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-6
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "6"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "70"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-ns-7
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "7"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "60"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-ns-7
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "20"
+      TEST_NAMESPACE: "7"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "60"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-steps-1
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-1
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-steps-5
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "5"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-5
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "5"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-steps-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "10"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-10
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "10"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-default-steps-20
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "20"
+      TEST_CLUSTER_RESOLVER__TYPE: task
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: scaling-pipelines-downstream-1-15-cluster-resolver-steps-20
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.15"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "20"
+      TEST_CLUSTER_RESOLVER__TYPE: cluster
+      TEST_CONCURRENT: "10"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: cluster-resolver
+      TEST_TOTAL: "200"
+    workflow: openshift-pipelines-scaling-pipelines
+- always_run: false
+  as: tkn-res-downstream-1-20-s3-locust-2-lsr
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_WAIT_TIME: "0"
+      DEPLOYMENT_RESULTS_WATCHER_DISABLE_STORING_INCOMPLETE_RUNS: "true"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_BURST: "100"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_QPS: "50.0"
+      DEPLOYMENT_RESULTS_WATCHER_THREADINESS: "16"
+      DEPLOYMENT_VERSION: "1.20"
+      INSTALL_RESULTS: "true"
+      LOCUST_DURATION: 8m
+      LOCUST_SPAWN_RATE: "2"
+      LOCUST_USERS: "500"
+      LOCUST_WAIT_TIME: "1800"
+      LOCUST_WORKERS: "30"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNER_WAIT_TIME: "0"
+      RUN_LOCUST: "true"
+      STORE_LOGS_IN_S3: "true"
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "10"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "30"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: timebased-sign-pruner
+      TOTAL_TIMEOUT: "2700"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- always_run: false
+  as: tkn-res-downstream-1-21-s3-locust-2-lsr
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      CHAINS_WAIT_TIME: "0"
+      DEPLOYMENT_RESULTS_WATCHER_DISABLE_STORING_INCOMPLETE_RUNS: "true"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_BURST: "100"
+      DEPLOYMENT_RESULTS_WATCHER_KUBE_API_QPS: "50.0"
+      DEPLOYMENT_RESULTS_WATCHER_THREADINESS: "16"
+      DEPLOYMENT_VERSION: "1.21"
+      INSTALL_RESULTS: "true"
+      LOCUST_DURATION: 8m
+      LOCUST_SPAWN_RATE: "2"
+      LOCUST_USERS: "500"
+      LOCUST_WAIT_TIME: "1800"
+      LOCUST_WORKERS: "30"
+      MUST_GATHER_TIMEOUT: 35m
+      PRUNER_WAIT_TIME: "0"
+      RUN_LOCUST: "true"
+      STORE_LOGS_IN_S3: "true"
+      TEST_BIGBANG_MULTI_STEP__LINE_COUNT: "10"
+      TEST_BIGBANG_MULTI_STEP__STEP_COUNT: "1"
+      TEST_BIGBANG_MULTI_STEP__TASK_COUNT: "1"
+      TEST_CONCURRENT: "30"
+      TEST_NAMESPACE: "5"
+      TEST_SCENARIO: timebased-sign-pruner
+      TOTAL_TIMEOUT: "2700"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-pipelines
+  repo: performance

@@ -1,0 +1,87 @@
+base_images:
+  base:
+    name: 4.9-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/builder
+images:
+  items:
+  - dockerfile_path: Dockerfile.rhel8
+    from: base
+    to: docker-builder
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+promotion:
+  to:
+  - name: 4.9-priv
+    namespace: ocp-private
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: hack/test.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: verify
+  commands: hack/verify.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-builds
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-builds
+- always_run: false
+  as: e2e-aws-proxy
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-image-ecosystem
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-image-ecosystem
+- always_run: false
+  as: e2e-aws-cgroupsv2
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-cgroupsv2
+- always_run: false
+  as: e2e-aws-builds-rhel7
+  optional: true
+  run_if_changed: (go\.mod|vendor/)
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PLATFORM_VERSION: "7.9"
+      TEST_SUITE: openshift/build
+    workflow: openshift-e2e-aws-workers-rhel
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift-priv
+  repo: builder

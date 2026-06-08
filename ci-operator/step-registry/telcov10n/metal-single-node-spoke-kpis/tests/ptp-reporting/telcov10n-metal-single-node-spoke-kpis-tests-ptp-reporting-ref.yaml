@@ -1,0 +1,59 @@
+ref:
+  as: telcov10n-metal-single-node-spoke-kpis-tests-ptp-reporting
+  commands: telcov10n-metal-single-node-spoke-kpis-tests-ptp-reporting-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/run/telcov10n/ansible-group-all
+  env:
+  - name: TELCO_KPI_TEST_NAME
+    default: "ptp-reporting"
+    documentation: |-
+      The name of the Telco KPI test to be shown in the logs
+  - name: TELCO_KPI_COMMON_REPO
+    default: "https://gitlab.cee.redhat.com/ran/ran-integration.git"
+    documentation: |-
+      The URL for the common base Telco KPI tests repo (contains test_ptp.sh)
+  - name: TELCO_KPI_TEST_DURATION
+    default: "1m"
+    documentation: |-
+      The Telco KPI test duration. Default 1m (1 minute) is sufficient as PTP reporting
+      collects metrics from background logs accumulated during OSLAT and CPU-util tests
+      that run for ~2 hours. This saves ~1 hour per pipeline run.
+  - name: TELCO_KPI_RAN_METRICS_END_POINT_URL
+    default: "https://pushgateway.ran-metrics.telco5g.corp.redhat.com/metrics/job/pipeline1/"
+    documentation: |-
+      The URL where pushing the metrics for the concrete Telco KPI test
+  - name: AUX_HOST
+    default: ""
+    documentation: |
+      The Bastion host where jobs can share synchronised data and run remote aux scripts and playbooks
+  - name: TEST_COMPONENT
+    default: '[Jira:"Telco Performance"]'
+    documentation: |
+      If ptp-reporting test failed, this must be used for Telco Performance component to triage.
+      [see: https://github.com/neisw/ci-test-mapping/blob/main/pkg/components/telcoperformance/component.go]
+  documentation: |-
+    This step runs PTP (Precision Time Protocol) reporting tests on a SNO Spoke cluster.
+
+    It uses test_ptp.sh from the ran-integration repository (same pattern as OSLAT/CPU-util).
+
+    The test collects and validates PTP synchronization metrics from the linuxptp-daemon:
+    - ptp4l: Master offset measurements (ptp4l_max, ptp4l_min, ptp4l_offset_avg)
+    - phc2sys: System clock synchronization (phc2sys_max, phc2sys_min, phc2sys_offset_avg)
+
+    Prerequisites:
+    - PTP operator deployed on spoke cluster
+    - PtpConfig with logReduce: "false" for event logging
+    - ptp4l and phc2sys processes running
+
+    Artifacts generated (in ran-integration/artifacts/):
+    - ptp_report.xml: JUnit XML for CI integration
+    - *_ptp-daemon.ptplog: Raw PTP daemon logs
+    - *_master-offset.ptplog: ptp4l offset logs
+    - *_phc2sys.ptplog: phc2sys logs

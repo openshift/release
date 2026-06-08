@@ -1,0 +1,131 @@
+periodics:
+- agent: kubernetes
+  cluster: build13
+  decorate: true
+  interval: 7200h
+  labels:
+    job-release: "4.9"
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.9-s390x
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl -L --fail -v https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        sha256sum /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag --ignore-not-found -n ocp-${ARCH} "${BRANCH}-art-latest-${ARCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
+        if [[ "${from}" == "${to}" ]]; then
+          echo "info: ${TAG_NS}/${TAG_SOURCE} already in ${BRANCH}-art-latest-${ARCH}:${TAG}"
+          exit 0
+        fi
+        echo "Will promote ${from}, current is ${to}"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@${from}"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "${to_quay}"; then
+          echo "error: The source image has not been pushed to quay ${from}"
+          exit 1
+        fi
+
+        # TODO: Enable e2e testing when arch specific CI is available
+      env:
+      - name: TAG_NS
+        value: rhcos
+      - name: TAG
+        value: machine-os-content
+      - name: BRANCH
+        value: "4.9"
+      - name: ARCH
+        value: s390x
+      - name: TAG_SOURCE
+        value: machine-os-content:$(BRANCH)-legacy-$(ARCH)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build13
+  decorate: true
+  interval: 7200h
+  labels:
+    job-release: "4.9"
+  name: promote-release-openshift-machine-os-content-e2e-aws-4.9-ppc64le
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # prow doesn't allow init containers or a second container
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl -L --fail -v https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        sha256sum /tmp/bin/oc
+
+        # if the source and destination are identical, do nothing
+        from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
+        to=$( oc get istag --ignore-not-found -n ocp-${ARCH} "${BRANCH}-art-latest-${ARCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
+        if [[ "${from}" == "${to}" ]]; then
+          echo "info: ${TAG_NS}/${TAG_SOURCE} already in ${BRANCH}-art-latest-${ARCH}:${TAG}"
+          exit 0
+        fi
+        echo "Will promote ${from}, current is ${to}"
+
+        # error out if the image isn't on quay
+        to_quay="quay.io/openshift-release-dev/ocp-v4.0-art-dev@${from}"
+        if ! oc image info -a "/usr/local/pull-secret/.dockerconfigjson" "${to_quay}"; then
+          echo "error: The source image has not been pushed to quay ${from}"
+          exit 1
+        fi
+
+        # TODO: Enable e2e testing when arch specific CI is available
+      env:
+      - name: TAG_NS
+        value: rhcos
+      - name: TAG
+        value: machine-os-content
+      - name: BRANCH
+        value: "4.9"
+      - name: ARCH
+        value: ppc64le
+      - name: TAG_SOURCE
+        value: machine-os-content:$(BRANCH)-legacy-$(ARCH)
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
