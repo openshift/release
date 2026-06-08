@@ -48,6 +48,87 @@ PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PA
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
 
+# Generate autodl JSON deterministically for accepted payloads (no Claude needed).
+# Uses the same schema as rejected-payload autodl but with empty job/candidate fields.
+generate_accepted_autodl() {
+    local phase="${1:-Accepted}"
+    local analyzed_at
+    analyzed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+    local autodl_file="${ARTIFACT_DIR}/payload-analysis-${PAYLOAD_TAG}-autodl.json"
+
+    jq -n \
+        --arg payload_tag "${PAYLOAD_TAG}" \
+        --arg version "${VERSION}" \
+        --arg stream "${STREAM}" \
+        --arg phase "${phase}" \
+        --arg release_controller_url "${PAYLOAD_URL}" \
+        --arg analyzed_at "${analyzed_at}" \
+        --arg total_blocking_jobs "${TOTAL}" \
+        --arg failed_blocking_jobs "${FAILED}" \
+        '{
+            table_name: "payload_triage",
+            schema: {
+                payload_tag: "string",
+                version: "string",
+                stream: "string",
+                architecture: "string",
+                phase: "string",
+                release_controller_url: "string",
+                analyzed_at: "string",
+                rejection_streak: "int64",
+                total_blocking_jobs: "int64",
+                failed_blocking_jobs: "int64",
+                force_accept_recommended: "int64",
+                job_name: "string",
+                prow_url: "string",
+                failure_type: "string",
+                root_cause_summary: "string",
+                streak_length: "int64",
+                is_new_failure: "int64",
+                originating_payload_tag: "string",
+                candidate_pr_url: "string",
+                candidate_title: "string",
+                candidate_repo: "string",
+                candidate_confidence_score: "int64",
+                candidate_rationale: "string",
+                revert_pr_url: "string",
+                revert_pr_status: "string"
+            },
+            rows: [
+                {
+                    payload_tag: $payload_tag,
+                    version: $version,
+                    stream: $stream,
+                    architecture: "amd64",
+                    phase: $phase,
+                    release_controller_url: $release_controller_url,
+                    analyzed_at: $analyzed_at,
+                    rejection_streak: "0",
+                    total_blocking_jobs: $total_blocking_jobs,
+                    failed_blocking_jobs: $failed_blocking_jobs,
+                    force_accept_recommended: "0",
+                    job_name: "",
+                    prow_url: "",
+                    failure_type: "",
+                    root_cause_summary: "",
+                    streak_length: "0",
+                    is_new_failure: "0",
+                    originating_payload_tag: $payload_tag,
+                    candidate_pr_url: "",
+                    candidate_title: "",
+                    candidate_repo: "",
+                    candidate_confidence_score: "0",
+                    candidate_rationale: "",
+                    revert_pr_url: "",
+                    revert_pr_status: ""
+                }
+            ]
+        }' > "${autodl_file}"
+
+    echo "Generated autodl JSON: ${autodl_file}"
+}
+
 # Poll until blocking jobs finish OR the payload reaches a terminal state.
 # The release controller can report jobs as Pending even after they complete
 # in Prow, so also check the payload phase as a fallback. The phase can be
@@ -122,6 +203,7 @@ _Model: ${CLAUDE_MODEL}_"
                     "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
             fi
 
+            generate_accepted_autodl "Accepted"
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
@@ -140,6 +222,7 @@ _Model: ${CLAUDE_MODEL}_"
                 break
             elif [[ "${PHASE}" == "Accepted" ]]; then
                 echo "Payload was accepted. No analysis needed."
+                generate_accepted_autodl "Accepted"
                 exit 0
             fi
         fi
