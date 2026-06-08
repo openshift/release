@@ -120,6 +120,9 @@ CONFIG = {
     'metal-perfscale-osp-nfv-quota-slice': {
         'metal-perfscale-osp-nfv-bos2': 1,
     },
+    'metal-perfscale-osp-selfsched-quota-slice': {
+        'metal-perfscale-osp-selfsched': 3,
+    },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
     },
