@@ -4,8 +4,20 @@ set -o nounset
 set -o pipefail
 
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
-  export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
+    export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
+
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ -f "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
+fi
+
+if [[ -n "${SELECTED_LOCATION:-}" ]]; then
+    export LOCATION="${SELECTED_LOCATION}"
+fi
+
+: "${LOCATION:?LOCATION must be set directly, via Gangway override, or by SELECTED_LOCATION in the runtime slot export file}"
 
 export AZURE_TOKEN_CREDENTIALS=prod
 

@@ -3,6 +3,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ ! -f "${env_file}" ]]; then
+    printf 'Missing runtime lease export file: %s\n' "${env_file}" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${env_file}"
+
+export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
+: "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
