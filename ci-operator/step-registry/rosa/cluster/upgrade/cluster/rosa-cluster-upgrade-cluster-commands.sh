@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x  # TEMPORARY DEBUG - REMOVE BEFORE MERGE
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -61,11 +62,31 @@ function unset_proxy () {
 
 function get_recommended_version_for_cluster () {
   major_version=$1
-  recommended_version=$(rosa list upgrade -c $cluster_id | grep -v 'no available upgrades' | grep 'recommended' | grep $major_version | cut -d ' ' -f1 || true)
+
+  ocm get cluster $cluster_id | grep channel -C 6
+  echo '{"channel": "candidate-4.22"}' | ocm patch /api/clusters_mgmt/v1/clusters/$cluster_id
+  ocm get cluster $cluster_id | grep channel -C 6
+  log "DEBUG: ========== START get_recommended_version_for_cluster =========="
+  log "DEBUG: cluster_id=$cluster_id, major_version=$major_version"
+  log "DEBUG: Timestamp: $(date -u '+%Y-%m-%dT%H:%M:%S %Z')"
+
+  log "DEBUG: rosa describe cluster output:"
+  rosa describe cluster -c $cluster_id -o json | jq '{creation_timestamp, state, openshift_version, channel_group: .version.channel_group, available_upgrades: .version.available_upgrades}'
+
+  log "DEBUG: rosa list upgrade output:"
+  rosa list upgrade -c $cluster_id
+
+  recommended_version=$(rosa list upgrade -c $cluster_id | grep -v 'no available upgrades' | grep 'recommended' | grep "$major_version" | cut -d ' ' -f1 || true)
+
+  log "DEBUG: recommended_version='$recommended_version'"
+
   if [[ -z "$recommended_version" ]]; then
     log "Error: No recommended $major_version version for the cluster $cluster_id to be upgraded to."
+    log "DEBUG: ========== END get_recommended_version_for_cluster (FAILED) =========="
     exit 1
   fi
+
+  log "DEBUG: ========== END get_recommended_version_for_cluster (SUCCESS) =========="
 }
 
 function get_recommended_version_for_machinepool () {

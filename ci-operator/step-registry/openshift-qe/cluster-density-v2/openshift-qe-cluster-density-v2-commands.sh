@@ -63,7 +63,7 @@ ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_
 export ITERATIONS
 
 export WORKLOAD=cluster-density-v2
-EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF} --ignore-health-check=true"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
