@@ -47,6 +47,8 @@ GITLAB_BOT_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/git
 RELEASE_CATALOG_TA_QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/release-catalog-ta-quay-token)
 SMEE_CHANNEL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/smee-channel)
 CODEBERG_BOT_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/codeberg-bot-token)
+DR_TIMEOUT=185m
+DR_LABEL="disaster-recovery"
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
@@ -109,7 +111,30 @@ GIT_CREDS_PATH="${HOME}/creds/file"
 git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
-cd "$(mktemp -d)"
+# Clone infra-deployments for DR test code
+INFRA_DIR="/tmp/infra-deployments"
+git clone --branch main "https://github.com/redhat-appstudio/infra-deployments.git" "$INFRA_DIR"
 
-git clone --branch main "https://github.com/konflux-ci/e2e-tests.git" .
-make ci/test/disaster-recovery
+# If this is an infra-deployments PR, merge the PR changes
+if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
+    pushd "$INFRA_DIR"
+    git fetch origin "refs/pull/${PULL_NUMBER}/head"
+    git merge --no-edit FETCH_HEAD
+    popd
+fi
+
+# Point ginkgo at the infra-deployments test directory
+export E2E_BIN_PATH="${INFRA_DIR}/tests/disaster-recovery"
+
+# Run DR tests directly via ginkgo from infra-deployments
+timeout "$DR_TIMEOUT" ginkgo \
+    -v \
+    --no-color \
+    --output-interceptor-mode=none \
+    --timeout=180m \
+    --fail-on-empty \
+    --label-filter="${DR_LABEL}" \
+    --junit-report=dr-tests-report.xml \
+    --output-dir="${ARTIFACT_DIR}" \
+    "${E2E_BIN_PATH}" \
+    2>&1 | tee "${ARTIFACT_DIR}/dr-tests.log"
