@@ -8,13 +8,15 @@ echo "=== TRT Jira Solver ==="
 
 # --- Read tokens and issue from SHARED_DIR (written by init pre-step) ---
 set +x
-export GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
+export GH_FORK_TOKEN
+GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+export GITHUB_TOKEN
 JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
-ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
-
 export JIRA_ISSUE_KEY
-export ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
+ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
+ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
+export ISSUE_SUMMARY
 
 git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 
@@ -27,6 +29,7 @@ git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git"
 
 echo "Running setup script: ${SETUP_SCRIPT}..."
+# shellcheck source=/dev/null
 source "/workspace/${SETUP_SCRIPT}"
 
 mkdir -p /workspace/artifacts
@@ -61,6 +64,9 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --max-turns 10 \
         -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to /workspace/artifacts/pr-description.md." \
         --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
+elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+    echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+    exit "${CLAUDE_EXIT}"
 fi
 
 # --- Create PR ---

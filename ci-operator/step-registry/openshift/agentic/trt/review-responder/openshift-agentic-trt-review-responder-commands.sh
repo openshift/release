@@ -8,8 +8,10 @@ echo "=== TRT Review Responder ==="
 
 # --- Read tokens from SHARED_DIR ---
 set +x
-export GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
+export GH_FORK_TOKEN
+GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+export GITHUB_TOKEN
 JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
 git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
@@ -36,6 +38,7 @@ git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
 
 echo "Running setup script: ${SETUP_SCRIPT}..."
+# shellcheck source=/dev/null
 source "/workspace/${SETUP_SCRIPT}"
 
 mkdir -p /workspace/artifacts
@@ -64,6 +67,8 @@ is_trusted_user() {
 # --- Poll for review comments every 5 minutes for 30 minutes ---
 echo "=== Watching PR #${PR_NUM} for review comments (6 checks, 5 min apart) ==="
 
+PROCESSED_IDS=""
+
 for i in $(seq 1 6); do
     echo "Waiting 5 minutes before checking for comments (check $i/6)..."
     sleep 300
@@ -71,6 +76,7 @@ for i in $(seq 1 6); do
     raw_comments=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/comments" --paginate 2>/dev/null || echo "[]")
     raw_reviews=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/reviews" --paginate 2>/dev/null || echo "[]")
 
+    # Filter to trusted users
     all_users=$(echo "${raw_comments}" "${raw_reviews}" | jq -r '.[].user.login' 2>/dev/null | sort -u)
     trusted_users=""
     for user in ${all_users}; do
@@ -83,16 +89,25 @@ for i in $(seq 1 6); do
     COMMENTS_JSON=$(echo "${raw_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
     REVIEWS_JSON=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
 
+    # Filter out already-processed items
+    if [[ -n "${PROCESSED_IDS}" ]]; then
+        processed_jq_filter=$(echo "${PROCESSED_IDS}" | tr ' ' '\n' | jq -R . | jq -s '.')
+        COMMENTS_JSON=$(echo "${COMMENTS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
+        REVIEWS_JSON=$(echo "${REVIEWS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
+    fi
+
     comment_count=$(echo "${COMMENTS_JSON}" | jq 'length')
     review_count=$(echo "${REVIEWS_JSON}" | jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length')
     TOTAL=$(( comment_count + review_count ))
 
-    echo "Found ${TOTAL} comment(s)/review(s) from trusted users."
+    echo "Found ${TOTAL} new comment(s)/review(s) from trusted users."
 
     if [[ "${TOTAL}" -gt 0 ]]; then
         echo "Addressing review comments..."
 
+        # shellcheck disable=SC2034 # used in the -p argument below
         REVIEW_BODY=$(echo "${COMMENTS_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
+        # shellcheck disable=SC2034
         REVIEW_SUMMARY=$(echo "${REVIEWS_JSON}" | jq -r '.[] | select(.state != "APPROVED" and .state != "PENDING") | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
 
         timeout 1800 claude \
@@ -101,8 +116,19 @@ for i in $(seq 1 6); do
             --output-format stream-json \
             --max-turns 50 \
             --append-system-prompt-file "/workspace/.apm/prompts/agentic-followup.prompt.md" \
-            -p "Address the review comments for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}." \
+            -p "Address the review comments for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
+
+Inline comments:
+${REVIEW_BODY}
+
+Reviews:
+${REVIEW_SUMMARY}" \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
+
+        # Track processed IDs
+        new_comment_ids=$(echo "${COMMENTS_JSON}" | jq -r '.[].id' 2>/dev/null)
+        new_review_ids=$(echo "${REVIEWS_JSON}" | jq -r '.[].id' 2>/dev/null)
+        PROCESSED_IDS="${PROCESSED_IDS} ${new_comment_ids} ${new_review_ids}"
     fi
 done
 

@@ -8,8 +8,10 @@ echo "=== TRT PR Followup ==="
 
 # --- Read tokens from SHARED_DIR ---
 set +x
-export GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
+export GH_FORK_TOKEN
+GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+export GITHUB_TOKEN
 JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
 git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
@@ -37,6 +39,12 @@ cd /workspace
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git"
+
+if ! git ls-remote --exit-code fork "refs/heads/${PR_BRANCH}" >/dev/null 2>&1; then
+    echo "PR #${PR_NUM} branch ${PR_BRANCH} not found on fork. Nothing to do."
+    exit 0
+fi
+
 git fetch fork "${PR_BRANCH}"
 git checkout -b "${PR_BRANCH}" "fork/${PR_BRANCH}"
 
