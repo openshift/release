@@ -17,6 +17,7 @@ fi
 # Per-pool override takes precedence, then falls back to OSSTREAM
 MASTER_STREAM="${OS_IMAGE_STREAM_MCP_MASTER:-${OSSTREAM:-}}"
 WORKER_STREAM="${OS_IMAGE_STREAM_MCP_WORKER:-${OSSTREAM:-}}"
+ARBITER_STREAM="${OS_IMAGE_STREAM_MCP_ARBITER:-${OSSTREAM:-}}"
 
 # If neither pool has a stream configured, skip
 if [[ -z "${MASTER_STREAM}" && -z "${WORKER_STREAM}" ]]; then
@@ -71,6 +72,30 @@ spec:
       node-role.kubernetes.io/worker: ""
   osImageStream:
     name: ${WORKER_STREAM}
+
+EOF
+fi
+
+# Generate arbiter MCP manifest if stream is configured
+if [[ -n "${ARBITER_STREAM}" ]]; then
+  echo "Configuring the arbiter MCP for ${ARBITER_STREAM} osImageStream"
+  cat > "${SHARED_DIR}/manifest_arbiter.machineconfigpool.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: arbiter
+  labels:
+    "machineconfiguration.openshift.io/mco-built-in": ""
+    "pools.operator.machineconfiguration.openshift.io/arbiter": ""
+spec:
+  machineConfigSelector:
+    matchLabels:
+      "machineconfiguration.openshift.io/role": "arbiter"
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/arbiter: ""
+  osImageStream:
+    name: ${ARBITER_STREAM}
 
 EOF
 fi
