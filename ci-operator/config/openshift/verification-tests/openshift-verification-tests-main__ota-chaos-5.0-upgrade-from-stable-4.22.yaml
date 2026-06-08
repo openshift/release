@@ -111,7 +111,11 @@ tests:
     test:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
+    - ref: cucushift-upgrade-setchannel
     - ref: cucushift-ota-preupgrade
+    - ref: cucushift-upgrade-toversion
+    - ref: cucushift-upgrade-healthcheck
+    - ref: cucushift-ota-postupgrade
     workflow: cucushift-installer-rehearse-aws-ipi
 - always_run: false
   as: aws-ipi-amd-tolatest-f28
@@ -121,6 +125,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ENABLE_OTA_TEST: OCP-23799
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     observers:
       enable:
       - redhat-chaos-pod-scenarios-random-system-pods-observer
@@ -130,6 +135,7 @@ tests:
     - ref: cucushift-upgrade-setchannel
     - ref: cucushift-ota-preupgrade
     - ref: cucushift-upgrade-toversion
+    - ref: cucushift-upgrade-healthcheck
     - ref: cucushift-ota-postupgrade
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -144,6 +150,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       ENABLE_OTA_TEST: OCP-53907
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     observers:
       enable:
       - redhat-chaos-node-disruptions-worker-outage-observer
@@ -162,6 +169,8 @@ tests:
   as: gcp-ipi-retarget-f28
   steps:
     cluster_profile: gcp-qe
+    env:
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     observers:
       enable:
       - redhat-chaos-pod-scenarios-random-system-pods-observer
@@ -179,6 +188,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - ref: cucushift-upgrade-retarget
+    - ref: cucushift-upgrade-healthcheck
     workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
