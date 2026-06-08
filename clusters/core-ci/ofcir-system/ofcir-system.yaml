@@ -343,10 +343,14 @@ metadata:
   namespace: ofcir-system
 spec:
   ports:
-  - name: https
-    port: 443
-    targetPort: 8443
+  - name: http
+    port: 80
     protocol: TCP
+    targetPort: 8087
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
   selector:
     control-plane: controller-manager
   type: ClusterIP
@@ -373,30 +377,11 @@ spec:
         control-plane: controller-manager
     spec:
       nodeSelector:
-            beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/arch: amd64
       containers:
       - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8087/
-        - --logtostderr=true
-        - --ignore-paths=/v1/ofcir,/v1/ofcir/*
-        - --v=0
-        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.16.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 2m
-            memory: 96Mi
-          requests:
-            cpu: 2m
-            memory: 96Mi
-      - args:
         - --health-probe-bind-address=:8081
-        - --metrics-bind-address=127.0.0.1:8080
+        - --metrics-bind-address=:8443
         command:
         - /ofcir-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ocp-kni_test_ofcir
@@ -408,6 +393,10 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: ofcir-operator
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -492,6 +481,6 @@ spec:
     kind: Service
     name: ofcir-service
   port:
-    targetPort: https
+    targetPort: http
   tls:
-    termination: passthrough
+    termination: edge

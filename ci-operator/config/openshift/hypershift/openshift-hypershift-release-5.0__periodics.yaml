@@ -94,6 +94,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-autonode
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-multi
   cron: 0 2 * * *
   steps:
@@ -239,7 +252,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-v2-self-managed
-  cron: 30 1 * * *
+  cron: 30 1,7,13,19 * * *
   steps:
     cluster_profile: hypershift-azure
     dependencies:

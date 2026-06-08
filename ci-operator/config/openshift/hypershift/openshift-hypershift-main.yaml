@@ -102,26 +102,19 @@ releases:
       product: ocp
       stream: ci
       version: "4.22"
-  n1minor:
+  multi-initial:
     candidate:
+      architecture: multi
       product: ocp
-      stream: ci
-      version: "4.22"
-  n2minor:
+      relative: 1
+      stream: nightly
+      version: "5.0"
+  multi-latest:
     candidate:
+      architecture: multi
       product: ocp
-      stream: ci
-      version: "4.21"
-  n3minor:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.20"
-  n4minor:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.19"
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -143,11 +136,6 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aks
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -156,6 +144,10 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
@@ -167,15 +159,15 @@ tests:
     cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:latest-422
-      OCP_IMAGE_N1: release:latest-421
-      OCP_IMAGE_N2: release:latest-420
-      OCP_IMAGE_N3: release:latest-419
-      OCP_IMAGE_N4: release:latest-418
       OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "4.21"
+      NODEPOOL_N2_VERSION: "4.20"
+      NODEPOOL_N3_VERSION: "4.19"
+      NODEPOOL_N4_VERSION: "4.18"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
@@ -194,13 +186,12 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     post:
     - ref: hypershift-analyze-e2e-failure
@@ -270,14 +261,12 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-azure
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
     env:
       CI_TESTS_RUN: ^(TestCreateCluster$|TestAutoscaling|TestNodePool|TestUpgradeControlPlane|TestHAEtcdChaos|TestAzureOAuthLoadBalancer|TestAzurePrivateTopology)$
       E2E_RESOURCE_REQUEST_OVERRIDES: "1"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "4.22"
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: hypershift-destroy-nested-management-cluster
@@ -288,25 +277,24 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-azure
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
     workflow: hypershift-azure-e2e-v2-self-managed
 - always_run: false
   as: e2e-aws-minimal
   optional: true
   steps:
     cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
     env:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
@@ -314,13 +302,12 @@ tests:
   optional: true
   steps:
     cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-nested
@@ -358,13 +345,13 @@ tests:
     cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_LATEST: release:latest-422
-      OCP_IMAGE_N1: release:latest-421
-      OCP_IMAGE_N2: release:latest-420
-      OCP_IMAGE_N3: release:latest-419
-      OCP_IMAGE_N4: release:latest-418
       OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.21"
+      NODEPOOL_N2_VERSION: "4.20"
+      NODEPOOL_N3_VERSION: "4.19"
+      NODEPOOL_N4_VERSION: "4.18"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
     workflow: hypershift-aws-e2e-nested
@@ -530,15 +517,17 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
     env:
-      CI_TESTS_RUN: ^TestKarpenter$
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-nested
 - as: verify-deps
   steps:

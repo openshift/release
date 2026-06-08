@@ -1,0 +1,50 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source-repo kubernetes-sigs/cluster-api \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/cluster-api:main \
+                  --rebase openshift-cloud-team/cluster-api:rebase-bot-main \
+                  --update-go-modules \
+                  --post-rebase-hook git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/update-ocp-manifests-gen.sh git:https://github.com/openshift/cluster-capi-operator/main:hack/rebasebot-hook-scripts/generate-ocp-manifests.sh \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cluster-api
+  variant: periodics

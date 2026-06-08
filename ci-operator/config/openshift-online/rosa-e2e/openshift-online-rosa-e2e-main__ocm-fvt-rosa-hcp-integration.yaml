@@ -34,32 +34,277 @@ tests:
       OCM_FVT_OCM_ENV: integration
     test:
     - ref: rosa-e2e-ocm-fvt
-  timeout: 3h0m0s
-- as: ocm-fvt-periodic-cs-rosa-hcp-backup-restore-integration-main
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-rest-integration-main
   capabilities:
   - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-rest-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
-  steps:
-    env:
-      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
-      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-restore-integration-main
-      OCM_FVT_OCM_ENV: integration
-    test:
-    - ref: rosa-e2e-ocm-fvt
-- as: ocm-fvt-periodic-cs-rosa-hcp-bkp-cp-upgrade-integration-main
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-scale-integration-main
   capabilities:
   - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-scale-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
-  steps:
-    env:
-      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
-      OCM_FVT_GCP_CREDS: "true"
-      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-cp-upgrade-integration-main
-      OCM_FVT_OCM_ENV: integration
-    test:
-    - ref: rosa-e2e-ocm-fvt
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-scale-2-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-scale-2-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-2-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cp-up-2-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cp-up-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-rest-2-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-rest-2-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
 zz_generated_metadata:
   branch: main
   org: openshift-online

@@ -10,7 +10,7 @@ echo "************ agent gather command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 echo "### Gathering logs..."
-timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
+timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
 cd dev-scripts
 make agent_gather
 EOF
