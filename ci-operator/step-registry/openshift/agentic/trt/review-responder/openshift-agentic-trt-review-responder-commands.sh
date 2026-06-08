@@ -47,6 +47,10 @@ copy_artifacts() {
     echo "Copying artifacts..."
     cp /workspace/artifacts/* "${ARTIFACT_DIR}/" 2>/dev/null || true
     podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
+    if [[ -d "${HOME}/.claude/projects" ]]; then
+        echo "Archiving Claude session logs..."
+        tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+    fi
 }
 trap copy_artifacts EXIT TERM INT
 
