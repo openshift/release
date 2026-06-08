@@ -11,6 +11,8 @@ spec:
     kind: ReleasePayload
     listKind: ReleasePayloadList
     plural: releasepayloads
+    shortNames:
+      - rp
     singular: releasepayload
   scope: Namespaced
   versions:
@@ -44,6 +46,9 @@ spec:
                       type: string
                     namespace:
                       description: Namespace must match that of the ReleasePayload
+                      type: string
+                    streamName:
+                      description: StreamName is the name of the release stream this payload belongs to (e.g. "4.19.0-0.nightly")
                       type: string
                 payloadCreationConfig:
                   description: PayloadCreationConfig the configuration used when creating the ReleasePayload
@@ -116,6 +121,101 @@ spec:
                           maxRetries:
                             description: MaxRetries Maximum retry attempts for the job. Defaults to 0 - do not retry on fail
                             type: integer
+                          qualifiers:
+                            description: 'Qualifiers holds the releasequalifiers.ReleaseQualifiers definitions that enable, and override (if specified), any settings defined in: https://github.com/openshift/release/blob/master/core-services/release-controller/release-qualifiers.yaml'
+                            type: object
+                            additionalProperties:
+                              description: ReleaseQualifier defines the configuration for a single release qualifier It contains metadata about the qualifier and its notification settings
+                              type: object
+                              properties:
+                                approval:
+                                  description: Approval indicates whether this qualifier is earned via Team Approval Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                badgeName:
+                                  description: BadgeName short name displayed, as UI badges, in job level summaries
+                                  type: string
+                                description:
+                                  description: Description contains detailed information about the qualifier for display in tooltips or detailed views
+                                  type: string
+                                enabled:
+                                  description: Enabled indicates whether this qualifier is currently active Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                failureLabels:
+                                  description: FailureLabels labels to apply when qualifying jobs fail
+                                  type: array
+                                  items:
+                                    type: string
+                                notifications:
+                                  description: Notifications contains configuration for notification channels
+                                  type: object
+                                  properties:
+                                    jira:
+                                      description: Jira contains Jira-specific notification configuration
+                                      type: object
+                                      properties:
+                                        assignee:
+                                          description: Assignee is the default assignee for tickets created by this qualifier
+                                          type: string
+                                        component:
+                                          description: Component is the Jira component this qualifier relates to
+                                          type: string
+                                        description:
+                                          description: Description is the default description text for Jira tickets
+                                          type: string
+                                        escalations:
+                                          description: Escalations defines the escalation rules for Jira notifications Each escalation specifies when and how to create tickets based on failure patterns
+                                          type: array
+                                          items:
+                                            description: 'Escalation defines a single escalation rule for Jira notifications It specifies the conditions and actions for creating Jira tickets Multiple criteria can be combined to create sophisticated escalation rules: - Simple: Failures=3 triggers after 3 consecutive failures - Windowed: OverLastRuns=10, Failures=2 triggers if >=2 of last 10 runs failed - Percentage: OverLastRuns=10, PassPercentage=60 triggers if <60% of last 10 runs passed - Time-bounded: OverPeriod="2d", OverLastRuns=20, PassPercentage=80 considers last 20 runs or runs from last 2 days (whichever provides more samples)'
+                                            type: object
+                                            properties:
+                                              failures:
+                                                description: Failures is the number of failures required to trigger this escalation When used alone, this counts consecutive failures When combined with OverLastRuns, this counts total failures in the window
+                                                type: integer
+                                              mentions:
+                                                description: Mentions is a list of users to mention in the Jira ticket
+                                                type: array
+                                                items:
+                                                  type: string
+                                              name:
+                                                description: Name is the unique identifier for this escalation level
+                                                type: string
+                                              needsInfo:
+                                                description: NeedsInfo is a list of users to add as watchers or request information from
+                                                type: array
+                                                items:
+                                                  type: string
+                                              overLastRuns:
+                                                description: OverLastRuns defines the window of recent runs to consider If omitted when Failures is set, defaults to Failures (consecutive mode) Can be combined with Failures, PassPercentage, or OverPeriod
+                                                type: integer
+                                                minimum: 1
+                                              overPeriod:
+                                                description: 'OverPeriod defines a time window for considering runs (e.g., "2d" for 2 days) Used with OverLastRuns to expand the sample set: whichever provides more runs is used Format examples: "1h", "24h", "2d", "1w"'
+                                                type: string
+                                                pattern: ^[1-9]\d*(h|d|w)$
+                                              passPercentage:
+                                                description: PassPercentage defines the minimum pass rate required (0-100) Escalates when the pass rate falls below this threshold Must be used with OverLastRuns to define the evaluation window
+                                                type: integer
+                                                maximum: 100
+                                                minimum: 0
+                                              priority:
+                                                description: Priority is the Jira priority level for tickets created at this escalation
+                                                type: string
+                                        project:
+                                          description: Project is the Jira project key where tickets will be created
+                                          type: string
+                                        summary:
+                                          description: Summary is the default summary text for Jira tickets
+                                          type: string
+                                        thread:
+                                          description: Thread identifier for separating notifications across jobs When multiple jobs contribute to the same qualifier, different thread values will result in separate Jira tickets being created
+                                          type: string
+                                payloadBadgeStatus:
+                                  description: PayloadBadgeStatus indicates if/when the qualifier's BadgeName should be displayed at the ReleasePayload level
+                                  type: string
+                                summary:
+                                  description: Summary provides a brief description of what this qualifier represents
+                                  type: string
                     informingJobs:
                       description: InformingJobs are release verification jobs used to execute tests against a ReleasePayload
                       type: array
@@ -135,6 +235,101 @@ spec:
                           maxRetries:
                             description: MaxRetries Maximum retry attempts for the job. Defaults to 0 - do not retry on fail
                             type: integer
+                          qualifiers:
+                            description: 'Qualifiers holds the releasequalifiers.ReleaseQualifiers definitions that enable, and override (if specified), any settings defined in: https://github.com/openshift/release/blob/master/core-services/release-controller/release-qualifiers.yaml'
+                            type: object
+                            additionalProperties:
+                              description: ReleaseQualifier defines the configuration for a single release qualifier It contains metadata about the qualifier and its notification settings
+                              type: object
+                              properties:
+                                approval:
+                                  description: Approval indicates whether this qualifier is earned via Team Approval Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                badgeName:
+                                  description: BadgeName short name displayed, as UI badges, in job level summaries
+                                  type: string
+                                description:
+                                  description: Description contains detailed information about the qualifier for display in tooltips or detailed views
+                                  type: string
+                                enabled:
+                                  description: Enabled indicates whether this qualifier is currently active Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                failureLabels:
+                                  description: FailureLabels labels to apply when qualifying jobs fail
+                                  type: array
+                                  items:
+                                    type: string
+                                notifications:
+                                  description: Notifications contains configuration for notification channels
+                                  type: object
+                                  properties:
+                                    jira:
+                                      description: Jira contains Jira-specific notification configuration
+                                      type: object
+                                      properties:
+                                        assignee:
+                                          description: Assignee is the default assignee for tickets created by this qualifier
+                                          type: string
+                                        component:
+                                          description: Component is the Jira component this qualifier relates to
+                                          type: string
+                                        description:
+                                          description: Description is the default description text for Jira tickets
+                                          type: string
+                                        escalations:
+                                          description: Escalations defines the escalation rules for Jira notifications Each escalation specifies when and how to create tickets based on failure patterns
+                                          type: array
+                                          items:
+                                            description: 'Escalation defines a single escalation rule for Jira notifications It specifies the conditions and actions for creating Jira tickets Multiple criteria can be combined to create sophisticated escalation rules: - Simple: Failures=3 triggers after 3 consecutive failures - Windowed: OverLastRuns=10, Failures=2 triggers if >=2 of last 10 runs failed - Percentage: OverLastRuns=10, PassPercentage=60 triggers if <60% of last 10 runs passed - Time-bounded: OverPeriod="2d", OverLastRuns=20, PassPercentage=80 considers last 20 runs or runs from last 2 days (whichever provides more samples)'
+                                            type: object
+                                            properties:
+                                              failures:
+                                                description: Failures is the number of failures required to trigger this escalation When used alone, this counts consecutive failures When combined with OverLastRuns, this counts total failures in the window
+                                                type: integer
+                                              mentions:
+                                                description: Mentions is a list of users to mention in the Jira ticket
+                                                type: array
+                                                items:
+                                                  type: string
+                                              name:
+                                                description: Name is the unique identifier for this escalation level
+                                                type: string
+                                              needsInfo:
+                                                description: NeedsInfo is a list of users to add as watchers or request information from
+                                                type: array
+                                                items:
+                                                  type: string
+                                              overLastRuns:
+                                                description: OverLastRuns defines the window of recent runs to consider If omitted when Failures is set, defaults to Failures (consecutive mode) Can be combined with Failures, PassPercentage, or OverPeriod
+                                                type: integer
+                                                minimum: 1
+                                              overPeriod:
+                                                description: 'OverPeriod defines a time window for considering runs (e.g., "2d" for 2 days) Used with OverLastRuns to expand the sample set: whichever provides more runs is used Format examples: "1h", "24h", "2d", "1w"'
+                                                type: string
+                                                pattern: ^[1-9]\d*(h|d|w)$
+                                              passPercentage:
+                                                description: PassPercentage defines the minimum pass rate required (0-100) Escalates when the pass rate falls below this threshold Must be used with OverLastRuns to define the evaluation window
+                                                type: integer
+                                                maximum: 100
+                                                minimum: 0
+                                              priority:
+                                                description: Priority is the Jira priority level for tickets created at this escalation
+                                                type: string
+                                        project:
+                                          description: Project is the Jira project key where tickets will be created
+                                          type: string
+                                        summary:
+                                          description: Summary is the default summary text for Jira tickets
+                                          type: string
+                                        thread:
+                                          description: Thread identifier for separating notifications across jobs When multiple jobs contribute to the same qualifier, different thread values will result in separate Jira tickets being created
+                                          type: string
+                                payloadBadgeStatus:
+                                  description: PayloadBadgeStatus indicates if/when the qualifier's BadgeName should be displayed at the ReleasePayload level
+                                  type: string
+                                summary:
+                                  description: Summary provides a brief description of what this qualifier represents
+                                  type: string
                     payloadVerificationDataSource:
                       description: PayloadVerificationDataSource where JobRunResult will be collected from.
                       type: string
@@ -164,6 +359,101 @@ spec:
                           maxRetries:
                             description: MaxRetries Maximum retry attempts for the job. Defaults to 0 - do not retry on fail
                             type: integer
+                          qualifiers:
+                            description: 'Qualifiers holds the releasequalifiers.ReleaseQualifiers definitions that enable, and override (if specified), any settings defined in: https://github.com/openshift/release/blob/master/core-services/release-controller/release-qualifiers.yaml'
+                            type: object
+                            additionalProperties:
+                              description: ReleaseQualifier defines the configuration for a single release qualifier It contains metadata about the qualifier and its notification settings
+                              type: object
+                              properties:
+                                approval:
+                                  description: Approval indicates whether this qualifier is earned via Team Approval Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                badgeName:
+                                  description: BadgeName short name displayed, as UI badges, in job level summaries
+                                  type: string
+                                description:
+                                  description: Description contains detailed information about the qualifier for display in tooltips or detailed views
+                                  type: string
+                                enabled:
+                                  description: Enabled indicates whether this qualifier is currently active Using a pointer to distinguish between "not set" and "set to false"
+                                  type: boolean
+                                failureLabels:
+                                  description: FailureLabels labels to apply when qualifying jobs fail
+                                  type: array
+                                  items:
+                                    type: string
+                                notifications:
+                                  description: Notifications contains configuration for notification channels
+                                  type: object
+                                  properties:
+                                    jira:
+                                      description: Jira contains Jira-specific notification configuration
+                                      type: object
+                                      properties:
+                                        assignee:
+                                          description: Assignee is the default assignee for tickets created by this qualifier
+                                          type: string
+                                        component:
+                                          description: Component is the Jira component this qualifier relates to
+                                          type: string
+                                        description:
+                                          description: Description is the default description text for Jira tickets
+                                          type: string
+                                        escalations:
+                                          description: Escalations defines the escalation rules for Jira notifications Each escalation specifies when and how to create tickets based on failure patterns
+                                          type: array
+                                          items:
+                                            description: 'Escalation defines a single escalation rule for Jira notifications It specifies the conditions and actions for creating Jira tickets Multiple criteria can be combined to create sophisticated escalation rules: - Simple: Failures=3 triggers after 3 consecutive failures - Windowed: OverLastRuns=10, Failures=2 triggers if >=2 of last 10 runs failed - Percentage: OverLastRuns=10, PassPercentage=60 triggers if <60% of last 10 runs passed - Time-bounded: OverPeriod="2d", OverLastRuns=20, PassPercentage=80 considers last 20 runs or runs from last 2 days (whichever provides more samples)'
+                                            type: object
+                                            properties:
+                                              failures:
+                                                description: Failures is the number of failures required to trigger this escalation When used alone, this counts consecutive failures When combined with OverLastRuns, this counts total failures in the window
+                                                type: integer
+                                              mentions:
+                                                description: Mentions is a list of users to mention in the Jira ticket
+                                                type: array
+                                                items:
+                                                  type: string
+                                              name:
+                                                description: Name is the unique identifier for this escalation level
+                                                type: string
+                                              needsInfo:
+                                                description: NeedsInfo is a list of users to add as watchers or request information from
+                                                type: array
+                                                items:
+                                                  type: string
+                                              overLastRuns:
+                                                description: OverLastRuns defines the window of recent runs to consider If omitted when Failures is set, defaults to Failures (consecutive mode) Can be combined with Failures, PassPercentage, or OverPeriod
+                                                type: integer
+                                                minimum: 1
+                                              overPeriod:
+                                                description: 'OverPeriod defines a time window for considering runs (e.g., "2d" for 2 days) Used with OverLastRuns to expand the sample set: whichever provides more runs is used Format examples: "1h", "24h", "2d", "1w"'
+                                                type: string
+                                                pattern: ^[1-9]\d*(h|d|w)$
+                                              passPercentage:
+                                                description: PassPercentage defines the minimum pass rate required (0-100) Escalates when the pass rate falls below this threshold Must be used with OverLastRuns to define the evaluation window
+                                                type: integer
+                                                maximum: 100
+                                                minimum: 0
+                                              priority:
+                                                description: Priority is the Jira priority level for tickets created at this escalation
+                                                type: string
+                                        project:
+                                          description: Project is the Jira project key where tickets will be created
+                                          type: string
+                                        summary:
+                                          description: Summary is the default summary text for Jira tickets
+                                          type: string
+                                        thread:
+                                          description: Thread identifier for separating notifications across jobs When multiple jobs contribute to the same qualifier, different thread values will result in separate Jira tickets being created
+                                          type: string
+                                payloadBadgeStatus:
+                                  description: PayloadBadgeStatus indicates if/when the qualifier's BadgeName should be displayed at the ReleasePayload level
+                                  type: string
+                                summary:
+                                  description: Summary provides a brief description of what this qualifier represents
+                                  type: string
                   x-kubernetes-validations:
                     - rule: '!has(oldSelf.payloadVerificationDataSource) || has(self.payloadVerificationDataSource)'
                       message: PayloadVerificationDataSource is required once set
@@ -340,6 +630,78 @@ spec:
                       state:
                         description: AggregateState is the overall success/failure of all the executed jobs
                         type: string
+                qualifiersSummary:
+                  description: QualifiersSummary aggregates all qualifier-related information for this payload. Contains payload-level qualifier metadata (e.g., failure labels) and a map of per-qualifier summaries.
+                  type: object
+                  properties:
+                    failureLabels:
+                      description: FailureLabels are labels to apply to the payload when any qualifying jobs fail. Aggregated from the merged qualifier config for all qualifiers referenced by this payload.
+                      type: array
+                      items:
+                        type: string
+                    qualifiers:
+                      description: Qualifiers maps each QualifierId to summary information about that qualifier, including the list of jobs that reference it, aggregate state, and badge status. This field is computed from the Spec and provides a convenient lookup for UI and reporting purposes.
+                      type: object
+                      additionalProperties:
+                        description: ReleaseQualifierSummary contains summary information about a specific release qualifier including which jobs reference it, aggregate state, and badge status.
+                        type: object
+                        properties:
+                          aggregateState:
+                            description: AggregateState represents the overall state of all jobs for this qualifier Computed using the same logic as ComputeJobState
+                            type: string
+                          approval:
+                            description: Approval indicates this qualifier is approval-based (label-driven) rather than job-based.
+                            type: boolean
+                          badgeEarned:
+                            description: 'BadgeEarned indicates whether this qualifier badge has been earned Badges are earned when: qualifier.Enabled == true AND AggregateState == JobStateSuccess'
+                            type: boolean
+                          badgeName:
+                            description: BadgeName is the display name for the badge from the global config Empty if no badge is configured for this qualifier
+                            type: string
+                          badgePropagated:
+                            description: 'BadgePropagated indicates whether the earned badge should be displayed at payload level Computed from: BadgeEarned AND PayloadBadgeStatus rules Only true if badge is earned AND PayloadBadgeStatus allows propagation'
+                            type: boolean
+                          failureLabels:
+                            description: FailureLabels are labels to apply when this qualifier's jobs fail. Computed from the merged global and per-job qualifier config.
+                            type: array
+                            items:
+                              type: string
+                          jiraNotifications:
+                            description: 'JiraNotifications tracks per-thread Jira escalation notification state. The map key is the thread ID (format: <stream>-<qualifierID>-<project>-<component>-<thread>).'
+                            type: object
+                            additionalProperties:
+                              description: JiraNotificationState tracks the notification state for a specific Jira escalation thread. This state is used to prevent duplicate notifications and detect when conditions abate.
+                              type: object
+                              properties:
+                                abated:
+                                  description: Abated indicates conditions have improved since the last escalation. When true, an abatement comment has been left on the Jira ticket. Cleared when conditions worsen again and a new escalation triggers.
+                                  type: boolean
+                                activeEscalation:
+                                  description: ActiveEscalation is the name of the highest escalation level that has been notified
+                                  type: string
+                                activePriority:
+                                  description: ActivePriority is the Jira priority of the active escalation
+                                  type: string
+                                issueKey:
+                                  description: IssueKey is the Jira issue key (e.g., "OCPBUGS-123") created for this thread
+                                  type: string
+                                lastTransitionTime:
+                                  description: LastTransitionTime is when the notification state last changed
+                                  type: string
+                                  format: date-time
+                          jobs:
+                            description: Jobs lists all jobs that reference this qualifier
+                            type: array
+                            items:
+                              description: ReleaseQualifierJobReference represents a job that has been tagged with a specific qualifier
+                              type: object
+                              properties:
+                                ciConfigurationJobName:
+                                  description: CIConfigurationJobName is the name of the prowjob definition as stored in the CI Job Configuration
+                                  type: string
+                                ciConfigurationName:
+                                  description: CIConfigurationName the unique name given to a verification test
+                                  type: string
                 releaseCreationJobResult:
                   description: ReleaseCreationJobResult stores the coordinates and status of the release creation job that is created, by the release-controller, to create the release imagestream defined by the PayloadCoordinates in the ReleasePayloadSpec.  If the release creation job fails to get created or completes unsuccessfully, the ReleasePayload will automatically be "Rejected".  If the release creation job is successful, the release-controller will then begin the validation process.
                   type: object
