@@ -12,6 +12,24 @@ echo ""
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+VAULT_ROUTE_HOST=""
+if [[ -f "${SHARED_DIR}/vault-route-host" ]]; then
+  VAULT_ROUTE_HOST=$(cat "${SHARED_DIR}/vault-route-host")
+fi
+
+VAULT_SERVER_NAME=""
+if [[ -f "${SHARED_DIR}/vault-server-name" ]]; then
+  VAULT_SERVER_NAME=$(cat "${SHARED_DIR}/vault-server-name")
+fi
+
+VAULT_ADDR="https://vault.${VAULT_NAMESPACE}.svc:8200"
+if [[ -n "${VAULT_ROUTE_HOST}" ]]; then
+  VAULT_ADDR="https://${VAULT_ROUTE_HOST}"
+fi
+if [[ -z "${VAULT_SERVER_NAME}" && -n "${VAULT_ROUTE_HOST}" ]]; then
+  VAULT_SERVER_NAME="${VAULT_ROUTE_HOST}"
+fi
+
 # In dev mode, Vault is already initialized and unsealed with root token "root"
 ROOT_TOKEN="root"
 
@@ -77,6 +95,8 @@ oc create secret generic vault-credentials \
   --from-literal=role-id="${ROLE_ID}" \
   --from-literal=secret-id="${SECRET_ID}" \
   --from-literal=root-token="${ROOT_TOKEN}" \
+  --from-literal=vault-address="${VAULT_ADDR}" \
+  --from-literal=server-name="${VAULT_SERVER_NAME}" \
   -n "${VAULT_NAMESPACE}"
 
 echo "Vault credentials saved to vault-credentials secret"
@@ -87,9 +107,9 @@ echo "Vault Configuration Complete"
 echo "========================================="
 echo ""
 echo "Summary:"
-echo "  - Vault Service: vault.${VAULT_NAMESPACE}.svc:8200"
+echo "  - Vault address: ${VAULT_ADDR}"
+echo "  - TLS serverName: ${VAULT_SERVER_NAME}"
 echo "  - Credentials Secret: vault-credentials (namespace: ${VAULT_NAMESPACE})"
 echo "  - Vault Enterprise Namespace: ${VAULT_ENTERPRISE_NS}"
 echo "  - Transit Key: ${VAULT_KMS_KEY_NAME}"
-echo "  - ROLE_ID: ${ROLE_ID}"
 echo ""
