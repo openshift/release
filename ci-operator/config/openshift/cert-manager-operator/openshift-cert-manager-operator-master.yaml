@@ -284,6 +284,45 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-operator-ipi-aws
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    timeout: 2h0m0s
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    pre:
+    - chain: ipi-aws-pre
+    - as: save-cluster1-state
+      commands: |
+        cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/kubeconfig-cluster1"
+        cp "${SHARED_DIR}/metadata.json" "${SHARED_DIR}/metadata-cluster1.json"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: cert-manager-ipi-aws-install-another
+    test:
+    - ref: optional-operators-operator-sdk
+    post:
+    - ref: cert-manager-ipi-aws-destroy-another
+    - as: restore-cluster1-state
+      timeout: 30m0s
+      best_effort: true
+      commands: |
+        cp "${SHARED_DIR}/kubeconfig-cluster1" "${SHARED_DIR}/kubeconfig"
+        cp "${SHARED_DIR}/metadata-cluster1.json" "${SHARED_DIR}/metadata.json"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - chain: ipi-aws-post
 zz_generated_metadata:
   branch: master
   org: openshift

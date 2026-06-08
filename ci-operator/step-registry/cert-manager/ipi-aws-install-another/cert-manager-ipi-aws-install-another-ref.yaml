@@ -1,0 +1,34 @@
+ref:
+  as: cert-manager-ipi-aws-install-another
+  from: installer
+  grace_period: 10m
+  commands: cert-manager-ipi-aws-install-another-commands.sh
+  timeout: 60m
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+  - name: CLUSTER2_BASE_DOMAIN
+    default: ""
+    documentation: "Base domain for the second cluster. If empty, reads from CLUSTER_PROFILE_DIR/baseDomain."
+  - name: CLUSTER2_COMPUTE_NODE_TYPE
+    default: "m6a.xlarge"
+    documentation: "AWS instance type for compute nodes of the second cluster."
+  - name: CLUSTER2_COMPUTE_NODE_REPLICAS
+    default: "3"
+    documentation: "Number of compute nodes for the second cluster."
+  - name: CLUSTER2_CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: "Number of control plane nodes for the second cluster."
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    Provisions a second AWS IPI cluster alongside the primary cluster already
+    set up by ipi-aws-pre. Saves the kubeconfig, metadata, and kubeadmin
+    password with a -cluster2 suffix in SHARED_DIR so that both clusters
+    can coexist. Uses the same cluster profile credentials and LEASED_RESOURCE
+    region as the primary cluster.
