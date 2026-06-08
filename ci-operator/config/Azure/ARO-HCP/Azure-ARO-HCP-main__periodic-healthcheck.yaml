@@ -1,0 +1,132 @@
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
+images:
+  items:
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: backend/Dockerfile
+    to: aro-hcp-backend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: frontend/Dockerfile
+    to: aro-hcp-frontend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: admin/Dockerfile
+    to: aro-hcp-admin-api
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: sessiongate/Dockerfile
+    to: aro-hcp-sessiongate
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: fleet/Dockerfile
+    to: aro-hcp-fleet
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: mgmt-agent/Dockerfile
+    to: aro-hcp-mgmt-agent
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: kube-applier/Dockerfile
+    to: aro-hcp-kube-applier
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: hcp-recovery/Dockerfile
+    from: src
+    to: aro-hcp-hcp-recovery
+  - dockerfile_literal: |
+      FROM src
+      USER root
+      COPY /src /opt/app-root/src/github.com/Azure
+      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+      ENV GOFLAGS='-mod=readonly'
+      RUN make -C tooling/templatize templatize && \
+          go clean -cache -modcache && rm -f go.work.sum
+      RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+    from: src
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/Azure/ARO-HCP
+    to: aro-hcp-e2e-tools
+  - dockerfile_path: test/Containerfile.e2e
+    from: src
+    to: aro-hcp-e2e-tests
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  aro-hcp-e2e-tests:
+    limits:
+      cpu: "8"
+      memory: 12Gi
+    requests:
+      cpu: "8"
+      memory: 12Gi
+tests:
+- as: provision-westus3
+  cron: 0 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: westus3
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+- as: provision-centralus
+  cron: 20 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: centralus
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+- as: provision-canadacentral
+  cron: 40 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: canadacentral
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: periodic-healthcheck
