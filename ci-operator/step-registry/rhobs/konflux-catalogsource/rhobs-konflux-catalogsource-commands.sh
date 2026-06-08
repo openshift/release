@@ -223,23 +223,27 @@ main() {
 		echo "failed to update global auth. resolve the above errors"
 		return 1
 	}
+
 	echo "sleeping for 5s"
 	sleep 5
+
 	create_icsp_connected || {
 		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
 		return 1
 	}
+
 	check_marketplace || {
 		echo "failed to check marketplace. resolve the above errors"
 		return 1
 	}
+
 	create_catalog_sources || {
 		echo "failed to create catalogsource. resolve the above errors"
 		return 1
 	}
 
-	#support hypershift config guest cluster's icsp
+	# Support hypershift config guest cluster's icsp.
 	oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
-
 }
+
 main
