@@ -4,13 +4,10 @@ set -o nounset
 set -o pipefail
 
 env_file="${SHARED_DIR}/aro-hcp-slot.env"
-if [[ ! -f "${env_file}" ]]; then
-    printf 'Missing runtime lease export file: %s\n' "${env_file}" >&2
-    exit 1
+if [[ -f "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
 fi
-
-# shellcheck disable=SC1090
-source "${env_file}"
 
 export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 : "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
