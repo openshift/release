@@ -83,7 +83,7 @@ podman run \
 if [[ -d "${ARTIFACT_DIR:-}" ]]; then
   xml_count=0
   while IFS= read -r -d '' xml_file; do
-    cp "${xml_file}" "${ARTIFACT_DIR}/"
+    cp "${xml_file}" "${ARTIFACT_DIR}/" || echo "WARNING: failed to copy ${xml_file}"
     xml_count=$((xml_count + 1))
   done < <(find "${fvt_output_dir}" -name '*.xml' -print0)
   echo "Copied ${xml_count} JUnit XML file(s) to ${ARTIFACT_DIR}"
