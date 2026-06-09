@@ -11,7 +11,7 @@ export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cl
 export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
 export KUSTO_LOCATION; KUSTO_LOCATION="${KUSTO_LOCATION:-eastus2}"
-export DEPLOY_ENV="prow"
+export DEPLOY_ENV="ci00"
 
 resolve_config_from_templatize() {
     local config_ref="$1"
@@ -97,10 +97,10 @@ az deployment group create \
 #-# GEOGRAPHY PIPELINE (KUSTO) #-#
 
 # Kusto now lives in the Geography pipeline. Management is disabled by default
-# for most dev environments (including prow), so this job explicitly overrides
+# for most dev environments (including ci00), so this job explicitly overrides
 # kusto.manageInstance to true and runs Geography as the single kusto manager.
 
-# Global postsubmit is the only owner of Kusto management. Override prow defaults
+# Global postsubmit is the only owner of Kusto management. Override ci00 defaults
 # at runtime so Geography does real management work in this job.
 OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE:-/tmp/global-override-config-$(date +%s).yaml}"
 yq eval -n "
