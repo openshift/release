@@ -336,6 +336,10 @@ rm /tmp/pull-secret
 # custom rhcos ami for non-public regions
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && [[ -z "${COMPUTE_AMI}" ]]; then
   jq --version
+  ami_arch_key="x86_64"
+  if [[ "${OCP_ARCH}" == "arm64" ]]; then
+    ami_arch_key="aarch64"
+  fi
   if version_le "${ocp_version}" "4.9"; then
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
@@ -343,7 +347,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
   elif version_le "${ocp_version}" "4.21"; then
     # 4.10 to 4.21
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
-    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region --arg arch $ami_arch_key -r '.architectures[$arch].images.aws.regions[$r].image' /tmp/ami.json)
   else
     # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
     coreos_file="coreos-rhel-9.json"
@@ -351,7 +355,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
       coreos_file="coreos-rhel-10.json"
     fi
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
-    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region --arg arch $ami_arch_key -r '.architectures[$arch].images.aws.regions[$r].image' /tmp/ami.json)
   fi
   COMPUTE_AMI="${CONTROL_PLANE_AMI}"
   echo "RHCOS for C2S: ${CONTROL_PLANE_AMI}"
