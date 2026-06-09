@@ -12,6 +12,7 @@ allowed-tools:
   - Bash(.claude/scripts/monitor-validation.sh *)
   - Bash(.claude/scripts/analyze-validation.sh *)
   - Bash(.claude/scripts/list-affected-jobs.sh *)
+  - Bash(.claude/scripts/verify-rehearsal-started.sh *)
   - Bash(.claude/scripts/monitor-rehearsal.sh *)
   - Bash(.claude/scripts/analyze-prowjob.sh *)
   - Bash(.claude/scripts/prow-fetch.sh *)
@@ -392,70 +393,36 @@ Prow can reject rehearsals for several reasons:
 - Job name typo or version mismatch
 - Configuration errors preventing job generation
 - Job not marked as rehearsable
+- Job requires network-access label (restrict_network_access: false)
 
-**MANDATORY verification workflow:**
+**MANDATORY verification script:**
 
 ```bash
 # 1. Trigger rehearsal
 .claude/scripts/trigger-rehearsal.sh <PR> <JOB_NAME>
 
-# 2. IMMEDIATELY check for rejection (every 2 min for 15 min)
-for i in {1..8}; do
-  echo "=== Rehearsal verification check $i/8 at $(date +%H:%M:%S) ==="
-  
-  # Check for rejection message in PR comments
-  REJECTION=$(gh pr view <PR> --repo openshift/release --json comments \
-    --jq '.comments[] | select(.author.login == "openshift-merge-bot") | .body' \
-    | grep -i "either don't exist or were not found to be affected")
-  
-  if [[ -n "$REJECTION" ]]; then
-    echo "❌ REHEARSAL REJECTED!"
-    echo "$REJECTION"
-    echo ""
-    echo "Common causes:"
-    echo "1. Job name doesn't match affected jobs list"
-    echo "2. Job not marked rehearsable (needs 'cron: 0 0 31 2 1' trick)"
-    echo "3. Configuration validation failed"
-    echo ""
-    echo "ACTION REQUIRED:"
-    echo "- Run: .claude/scripts/list-affected-jobs.sh <PR>"
-    echo "- Verify job name EXACTLY matches"
-    echo "- Check job has rehearsable marker in config"
-    exit 1
-  fi
-  
-  # Check if job appears in PR checks
-  JOB_CHECK=$(gh pr checks <PR> --repo openshift/release --json name,state \
-    | jq -r '.[] | select(.name | contains("<SHORT_JOB_PATTERN>")) | .name')
-  
-  if [[ -n "$JOB_CHECK" ]]; then
-    echo "✅ Rehearsal job found in checks: $JOB_CHECK"
-    echo "Job is starting/running. Proceeding to monitoring..."
-    break
-  fi
-  
-  if [[ $i -eq 8 ]]; then
-    echo "❌ REHEARSAL FAILED TO START (15 min timeout)"
-    echo ""
-    echo "Job never appeared in PR checks after 15 minutes."
-    echo "This indicates /pj-rehearse failed silently."
-    echo ""
-    echo "Possible causes:"
-    echo "1. Job configuration has errors"
-    echo "2. Prow is experiencing issues"
-    echo "3. Job was rejected but message not yet posted"
-    echo ""
-    echo "ACTION REQUIRED:"
-    echo "- Check PR comments for rejection message"
-    echo "- Verify job configuration is valid"
-    echo "- Try triggering again"
-    exit 1
-  fi
-  
-  echo "Waiting 2 min before next check..."
-  sleep 120
-done
+# 2. Verify it started (checks every 2 min for 16 min)
+.claude/scripts/verify-rehearsal-started.sh <PR> <JOB_PATTERN>
 ```
+
+**Examples:**
+
+```bash
+# Example 1: After triggering candidate421 aws-ipi-coco
+.claude/scripts/trigger-rehearsal.sh 80236 "periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-aws-ipi-coco"
+.claude/scripts/verify-rehearsal-started.sh 80236 "candidate421.*aws-ipi-coco"
+
+# Example 2: After triggering azure-ipi-kata
+.claude/scripts/trigger-rehearsal.sh 79996 "periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate-azure-ipi-kata"
+.claude/scripts/verify-rehearsal-started.sh 79996 "azure-ipi-kata"
+```
+
+**The script will:**
+- Check every 2 minutes for rejection messages
+- Check if job appears in PR checks
+- Exit code 0: Job found (proceed to monitoring)
+- Exit code 1: Rejected or failed to start (investigate)
+- Exit code 2: Invalid arguments
 
 **What this catches:**
 
