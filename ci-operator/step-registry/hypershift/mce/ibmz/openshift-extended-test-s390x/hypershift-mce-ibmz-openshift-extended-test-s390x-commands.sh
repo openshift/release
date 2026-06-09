@@ -1,0 +1,1 @@
+../../../../openshift-extended/test/openshift-extended-test-commands.sh
