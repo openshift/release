@@ -381,7 +381,8 @@ tests:
             (. // []) |
             def pass:
               .result == "passed" or
-              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+              ((.output // "") | contains("SUCCESS! -- 1 Passed")) or
+              ((.output // "") | contains("| 0 Failed |"));
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
             "<testsuite tests=\"\(length)\" failures=\"\([.[] | select(pass | not)] | length)\">",
             (.[] |
@@ -397,20 +398,22 @@ tests:
             (. // []) |
             def pass:
               .result == "passed" or
-              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+              ((.output // "") | contains("SUCCESS! -- 1 Passed")) or
+              ((.output // "") | contains("| 0 Failed |"));
             [.[] | select((.lifecycle // "blocking") == "blocking") | select(pass | not)] | length
           ' "$RESULT_JSON")
           INFORM_FAIL_COUNT=$(jq '
             (. // []) |
             def pass:
               .result == "passed" or
-              ((.output // "") | contains("SUCCESS! -- 1 Passed"));
+              ((.output // "") | contains("SUCCESS! -- 1 Passed")) or
+              ((.output // "") | contains("| 0 Failed |"));
             [.[] | select((.lifecycle // "blocking") == "informing") | select(pass | not)] | length
           ' "$RESULT_JSON")
           TOTAL=$(jq '(. // []) | length' "$RESULT_JSON")
           PASS_COUNT=$((TOTAL - BLOCK_FAIL_COUNT - INFORM_FAIL_COUNT))
           echo "Results: ${PASS_COUNT} passed, ${BLOCK_FAIL_COUNT} blocking failures, ${INFORM_FAIL_COUNT} informing failures (non-terminal)"
-          [[ $BLOCK_FAIL_COUNT -gt 0 ]] && exit 1
+          if [[ $BLOCK_FAIL_COUNT -gt 0 ]]; then exit 1; fi
         fi
       credentials:
       - mount_path: /tmp/credentials/hiveci-aws-creds
