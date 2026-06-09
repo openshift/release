@@ -91,6 +91,6 @@ for i in 0 1 2 3; do
     mv "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/report_testrun.xml" \
        "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml"
     cp "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml" \
-       "${SHARED_DIR}/[${CYCLE_NAME}]__${REPORTER_LAUNCH_NAME}__ptp_suite_test_junit.xml"
+       "${SHARED_DIR}/junit_${CYCLE_NAME}__${REPORTER_LAUNCH_NAME}__ptp_suite_test_junit.xml"
   fi
 done
