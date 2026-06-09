@@ -32,7 +32,7 @@ fi
 export CLUSTER_NAME="${CLUSTER_NAME}"
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
-KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 echo "Remove report directories"
 rm -rf /tmp/reports /tmp/junit
@@ -79,7 +79,7 @@ fi
 echo "Uploading reports to Polarion and Report Portal"
 ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${KUBECONFIG} \
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
     reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
     processed_report_dir=/tmp/reports \
     junit_report_dir=/tmp/junit \
