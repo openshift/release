@@ -15,7 +15,7 @@ if [[ $TAG == "latest" ]]; then
 else
     LATEST_TAG=$TAG
 fi
-git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
+git clone -q --branch https://github.com/rsevilla87/orion.git --depth 1
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -74,47 +74,10 @@ fi
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    export ORION_CONFIG="examples/${scale_prefix}-${ORION_WORKLOAD_TYPE}.yaml"
-    echo "Auto-selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix, workload: $ORION_WORKLOAD_TYPE)"
-fi
-
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+    ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
+    curl -LO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64
+    CLUSTER_METADATA=$(ocp-metadata-linux-amd64)
+    EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 fi
 
 export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
@@ -137,15 +100,13 @@ else
     exit 1
 fi
 
-if [[ -n "$ORION_CONFIG" ]]; then
-    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="$(basename ${ORION_CONFIG})"
-        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
-        else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
-        fi
+if [[ -n "${ORION_CONFIG}" ]] && [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+    fileBasename="$(basename ${ORION_CONFIG})"
+    if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+        ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+    else
+        echo "Error: Failed to download $ORION_CONFIG" >&2
+        exit 1
     fi
 fi
 
@@ -216,7 +177,7 @@ export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
+orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 
