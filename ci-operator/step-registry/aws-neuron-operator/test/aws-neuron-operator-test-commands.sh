@@ -29,6 +29,11 @@ fi
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
 
+# Source DeviceConfig values saved by install-operators step
+if [[ -f "${SHARED_DIR}/neuron-deviceconfig.env" ]]; then
+    source "${SHARED_DIR}/neuron-deviceconfig.env"
+fi
+
 # Determine OCP version using multiple fallback methods (ROSA HCP may restrict clusterversion access)
 OCP_VERSION=""
 OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
