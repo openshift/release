@@ -1,0 +1,19 @@
+workflow:
+  as: aro-hcp-persistent-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: aro-hcp-lease-acquire
+      - ref: aro-hcp-write-config
+    test:
+      - ref: aro-hcp-test-persistent
+    post:
+      - ref: aro-hcp-gather-test-visualization
+      - ref: aro-hcp-gather-custom-link-tools
+      - ref: aro-hcp-lease-release
+  documentation: |-
+    The ARO HCP persistent e2e workflow runs the full end-to-end suite against an existing
+    persistent environment (INT, STG, or PROD) using slot-based Boskos leasing.
+    Unlike aro-hcp-e2e, this workflow acquires a slot lease via aro-hcp-lease-acquire
+    before running tests and releases it afterwards, enabling customer-subscription sharding
+    for persistent environments.
