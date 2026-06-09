@@ -25,6 +25,8 @@ umask "${old_umask}"
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
   echo "JOB_LINK=${JOB_LINK}"
+  echo "SLACK_WEBHOOK_URL=$(cat /usr/local/cs-qe-credentials/slack_webhook_url)"
+  echo "CONSOLE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/console_client_secret)"
 } > "${podman_env_file}"
 
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
