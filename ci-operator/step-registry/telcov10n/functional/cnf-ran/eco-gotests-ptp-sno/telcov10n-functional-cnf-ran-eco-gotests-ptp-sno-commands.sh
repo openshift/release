@@ -78,7 +78,9 @@ ssh -o ServerAliveInterval=30 \
   "cd /tmp/eco_gotests_ptp && ./eco-gotests-ptp-run.sh || true"
 
 echo "Gather artifacts from bastion"
+CYCLE_NAMES=("BC-OC" "OC2port" "T-TSC" "T-BC")
 for i in 0 1 2 3; do
+  CYCLE_NAME="${CYCLE_NAMES[$i]}"
   mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}"
   scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -i "${PROJECT_DIR}/temp_ssh_key" \
@@ -89,6 +91,6 @@ for i in 0 1 2 3; do
     mv "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/report_testrun.xml" \
        "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml"
     cp "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml" \
-       "${SHARED_DIR}/junit_ptp_${i}_suite_test_junit.xml"
+       "${SHARED_DIR}/[${CYCLE_NAME}]__${REPORTER_LAUNCH_NAME}__ptp_suite_test_junit.xml"
   fi
 done
