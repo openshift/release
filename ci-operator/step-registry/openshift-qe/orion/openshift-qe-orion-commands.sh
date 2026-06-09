@@ -74,20 +74,18 @@ fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
+if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata; then
+    echo "Error: Failed to download ocp-metadata binary"
+    exit 1
+fi
+chmod +x ocp-metadata
+CLUSTER_METADATA=$(./ocp-metadata)
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
+
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
     ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
-    curl -LO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64
-    if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata; then
-        echo "Error: Failed to download ocp-metadata binary"
-        exit 1
-    fi
-    chmod +x ocp-metadata
-    CLUSTER_METADATA=$(./ocp-metadata)
-    EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 fi
-
-export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
 
 # Unset proxy so we can pip install, reach sippy, etc.
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
@@ -179,7 +177,6 @@ fi
 set +e
 set -o pipefail
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
-export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{.data.install-config}' | yq -r '.fips // false')}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
