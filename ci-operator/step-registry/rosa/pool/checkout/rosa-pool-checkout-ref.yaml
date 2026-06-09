@@ -30,19 +30,22 @@ ref:
     documentation: Namespace on the pool host cluster where pool ConfigMaps live.
   - name: OCM_LOGIN_ENV
     default: "staging"
-    documentation: OCM environment for backplane login.
+    documentation: OCM environment for fetching cluster credentials.
   documentation: |-
     Checks out a pre-provisioned ROSA cluster from the standby pool.
 
     Uses ConfigMap-based lease tracking with optimistic concurrency (CAS)
     to safely claim a cluster. If no clusters are available, waits and
     retries until POOL_CHECKOUT_TIMEOUT_MINUTES. On successful checkout,
-    logs in via ocm backplane and writes cluster-id, cluster-name, and
-    kubeconfig to SHARED_DIR.
+    fetches the admin kubeconfig from OCM and writes cluster-id,
+    cluster-name, and kubeconfig to SHARED_DIR.
+
+    Pool clusters must have public API servers since Prow pods run on
+    public infrastructure and cannot use backplane.
 
     Pool ConfigMaps live in POOL_NAMESPACE on the pool host cluster.
     Each ConfigMap represents one pool cluster with labels for type,
     region, version, and availability status.
 
     Requires rosa-pool-manager credentials (kubeconfig for pool host)
-    and OCM credentials (from cluster profile) for backplane login.
+    and OCM credentials (from cluster profile) for kubeconfig fetch.

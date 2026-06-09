@@ -123,41 +123,39 @@ done
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 log "Cluster claimed: ${CLUSTER_ID}"
 
-# Log in to OCM for backplane access
+# Log in to OCM to fetch cluster credentials
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
 
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with SSO credentials"
     ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
 elif [[ -n "${OCM_TOKEN}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with offline token"
     ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 else
     log "ERROR: No OCM credentials found in cluster profile"
     exit 1
 fi
 
-# Get cluster access via backplane
-log "Getting kubeconfig for ${CLUSTER_ID} via backplane"
-ocm backplane login "${CLUSTER_ID}" --multi
+# Fetch admin kubeconfig directly from OCM
+log "Fetching kubeconfig for ${CLUSTER_ID} from OCM"
+ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" | jq -r '.kubeconfig' > "${SHARED_DIR}/kubeconfig"
 
-# Copy the backplane-generated kubeconfig to SHARED_DIR
-BACKPLANE_KUBECONFIG="${HOME}/.kube/backplane/${CLUSTER_ID}/config"
-if [[ -f "${BACKPLANE_KUBECONFIG}" ]]; then
-    cp "${BACKPLANE_KUBECONFIG}" "${SHARED_DIR}/kubeconfig"
-elif [[ -f "${HOME}/.kube/config" ]]; then
-    cp "${HOME}/.kube/config" "${SHARED_DIR}/kubeconfig"
-else
-    log "ERROR: No kubeconfig produced by backplane login"
+if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+    log "ERROR: Failed to fetch kubeconfig from OCM for ${CLUSTER_ID}"
     exit 1
 fi
 
-# Verify cluster access
+# Verify cluster access and confirm we're targeting the right cluster
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if oc whoami &>/dev/null; then
-    log "Verified cluster access: $(oc whoami --show-server)"
+    CURRENT_SERVER="$(oc whoami --show-server)"
+    EXPECTED_SERVER="$(cat "${SHARED_DIR}/api-url" 2>/dev/null || true)"
+    if [[ -n "${EXPECTED_SERVER}" && "${CURRENT_SERVER}" != *"${CLUSTER_ID}"* && "${CURRENT_SERVER}" != "${EXPECTED_SERVER}" ]]; then
+        log "ERROR: Kubeconfig server mismatch. Expected ${EXPECTED_SERVER}, got ${CURRENT_SERVER}"
+        exit 1
+    fi
+    log "Verified cluster access: ${CURRENT_SERVER}"
     log "Nodes: $(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')"
 else
     log "WARNING: Could not verify cluster access (oc whoami failed)"

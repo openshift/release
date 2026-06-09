@@ -22,7 +22,7 @@ pool_oc() {
     oc --kubeconfig="${POOL_HOST_KUBECONFIG}" "$@"
 }
 
-# Log in to OCM for cluster status checks and backplane access
+# Log in to OCM for cluster status checks and kubeconfig access
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
@@ -124,33 +124,46 @@ for i in $(seq 0 $((TOTAL - 1))); do
         continue
     fi
 
-    # Check API server reachability via backplane
-    if ocm backplane login "${CLUSTER_ID}" --multi 2>/dev/null; then
-        BACKPLANE_KC="${HOME}/.kube/backplane/${CLUSTER_ID}/config"
-        if [[ -f "${BACKPLANE_KC}" ]]; then
-            NODE_COUNT=$(oc --kubeconfig="${BACKPLANE_KC}" get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
-            READY_NODES=$(oc --kubeconfig="${BACKPLANE_KC}" get nodes --no-headers 2>/dev/null | grep -c " Ready" || echo "0")
-
-            echo "  OCM status: ready" >> "${REPORT}"
-            echo "  Nodes: ${READY_NODES}/${NODE_COUNT} ready" >> "${REPORT}"
-
-            if [[ "${READY_NODES}" -eq 0 ]]; then
-                log "UNHEALTHY: ${CM_NAME} has no ready nodes"
-                if [[ "${STATUS}" != "error" ]]; then
-                    pool_oc patch configmap "${CM_NAME}" -n "${POOL_NAMESPACE}" --type merge -p '{
-                        "metadata": {
-                            "labels": { "rosa-pool/status": "error" },
-                            "annotations": { "rosa-pool/error-reason": "No ready nodes" }
-                        }
-                    }' || true
-                fi
-                UNHEALTHY=$((UNHEALTHY + 1))
-                continue
+    # Check API server reachability via OCM kubeconfig
+    CLUSTER_KC=$(mktemp)
+    if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null | jq -r '.kubeconfig' > "${CLUSTER_KC}" && [[ -s "${CLUSTER_KC}" ]]; then
+        if ! NODES_OUTPUT=$(oc --kubeconfig="${CLUSTER_KC}" get nodes --no-headers 2>/dev/null); then
+            log "UNHEALTHY: ${CM_NAME} failed to query nodes"
+            echo "  Nodes: query failed (UNHEALTHY)" >> "${REPORT}"
+            if [[ "${STATUS}" != "error" ]]; then
+                pool_oc patch configmap "${CM_NAME}" -n "${POOL_NAMESPACE}" --type merge -p '{
+                    "metadata": {
+                        "labels": { "rosa-pool/status": "error" },
+                        "annotations": { "rosa-pool/error-reason": "Node query failed" }
+                    }
+                }' || true
             fi
+            UNHEALTHY=$((UNHEALTHY + 1))
+            continue
+        fi
+
+        NODE_COUNT=$(printf "%s\n" "${NODES_OUTPUT}" | sed '/^$/d' | wc -l | tr -d ' ')
+        READY_NODES=$(printf "%s\n" "${NODES_OUTPUT}" | grep -c " Ready" || true)
+
+        echo "  OCM status: ready" >> "${REPORT}"
+        echo "  Nodes: ${READY_NODES}/${NODE_COUNT} ready" >> "${REPORT}"
+
+        if [[ "${READY_NODES}" -eq 0 ]]; then
+            log "UNHEALTHY: ${CM_NAME} has no ready nodes"
+            if [[ "${STATUS}" != "error" ]]; then
+                pool_oc patch configmap "${CM_NAME}" -n "${POOL_NAMESPACE}" --type merge -p '{
+                    "metadata": {
+                        "labels": { "rosa-pool/status": "error" },
+                        "annotations": { "rosa-pool/error-reason": "No ready nodes" }
+                    }
+                }' || true
+            fi
+            UNHEALTHY=$((UNHEALTHY + 1))
+            continue
         fi
     else
-        log "UNHEALTHY: ${CM_NAME} backplane login failed"
-        echo "  Backplane: FAILED" >> "${REPORT}"
+        log "UNHEALTHY: ${CM_NAME} OCM kubeconfig fetch failed"
+        echo "  OCM kubeconfig: FAILED" >> "${REPORT}"
 
         if [[ "${STATUS}" != "error" ]]; then
             pool_oc patch configmap "${CM_NAME}" -n "${POOL_NAMESPACE}" --type merge -p '{
