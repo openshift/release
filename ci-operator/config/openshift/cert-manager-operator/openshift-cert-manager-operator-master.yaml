@@ -26,6 +26,27 @@ images:
   - dockerfile_path: images/ci/operand.Dockerfile
     from: base-rhel9
     to: cert-manager
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21 AS builder
+      ARG SRC_DIR=/go/src/github.com/openshift/cert-manager-operator
+      ENV GO_BUILD_TAGS=strictfipsruntime,openssl
+      ENV GOEXPERIMENT=strictfipsruntime
+      ENV CGO_ENABLED=1
+      ENV GOFLAGS=""
+      WORKDIR $SRC_DIR
+      COPY . .
+      RUN go build -tags $GO_BUILD_TAGS \
+          -cover -covermode=count -coverpkg=./... \
+          -o cert-manager-operator .
+      FROM registry.access.redhat.com/ubi9-minimal:9.4
+      RUN microdnf install -y tar && microdnf clean all
+      ARG SRC_DIR=/go/src/github.com/openshift/cert-manager-operator
+      COPY --from=builder $SRC_DIR/cert-manager-operator /usr/bin/cert-manager-operator
+      RUN mkdir -p /tmp/e2e-cover && chown 65534:65534 /tmp/e2e-cover && chmod 700 /tmp/e2e-cover
+      USER 65534:65534
+      ENV GOCOVERDIR=/tmp/e2e-cover
+      ENTRYPOINT ["/usr/bin/cert-manager-operator"]
+    to: cert-manager-operator-coverage
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -85,6 +106,93 @@ tests:
     version: "4.20"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NAMESPACE="cert-manager-operator"
+        POD_LABEL="name=cert-manager-operator"
+        GOCOVERDIR_PATH="/tmp/e2e-cover"
+        CODECOV_SECRET="/var/run/secrets/codecov/CODECOV_TOKEN"
+
+        artifact_dir="${ARTIFACT_DIR:-.}"
+        coverage_dir="${artifact_dir}/e2e-cover-data"
+        coverage_profile="${artifact_dir}/coverage-e2e.out"
+
+        if [ -z "${CODECOV_TOKEN:-}" ] && [ -f "${CODECOV_SECRET}" ]; then
+          CODECOV_TOKEN=$(cat "${CODECOV_SECRET}")
+          export CODECOV_TOKEN
+        fi
+
+        pod=$(oc get pod -n "${NAMESPACE}" -l "${POD_LABEL}" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [ -z "${pod}" ]; then
+          echo "Error: no operator pod found"; exit 1
+        fi
+        echo "Operator pod: ${pod}"
+
+        echo "Sending SIGTERM to operator process to flush coverage data..."
+        oc exec -n "${NAMESPACE}" "${pod}" -c cert-manager-operator -- /bin/sh -c 'kill -TERM 1' || true
+
+        echo "Waiting for container to restart..."
+        sleep 10
+        oc wait pod/"${pod}" --for=condition=Ready -n "${NAMESPACE}" --timeout=120s
+
+        mkdir -p "${coverage_dir}"
+        echo "Copying coverage data from operator pod..."
+        oc cp "${NAMESPACE}/${pod}:${GOCOVERDIR_PATH}/." "${coverage_dir}" -c cert-manager-operator
+
+        echo "Coverage files:"
+        ls -la "${coverage_dir}/" 2>/dev/null || true
+
+        if ls "${coverage_dir}"/covmeta.* >/dev/null 2>&1; then
+          echo "Converting coverage data..."
+          go tool covdata textfmt -i="${coverage_dir}" -o="${coverage_profile}"
+          echo "=== E2E Coverage Summary ==="
+          go tool covdata percent -i="${coverage_dir}"
+          echo "============================="
+
+          if [ -n "${CODECOV_TOKEN:-}" ]; then
+            echo "Uploading to Codecov..."
+            codecov_bin="${artifact_dir}/codecov"
+            curl -sS -o "${codecov_bin}" https://uploader.codecov.io/latest/linux/codecov
+            curl -sS -o "${codecov_bin}.SHA256SUM" https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+            cd "$(dirname "${codecov_bin}")" && sha256sum -c "$(basename "${codecov_bin}").SHA256SUM" && cd - >/dev/null
+            chmod +x "${codecov_bin}"
+
+            codecov_flags="--file=${coverage_profile} --flags=e2e --name=E2E-Coverage --verbose"
+            job_type="${JOB_TYPE:-local}"
+            if [ "${job_type}" = "presubmit" ]; then
+              [ -n "${PULL_NUMBER:-}" ] && codecov_flags="${codecov_flags} --pr ${PULL_NUMBER}"
+              [ -n "${PULL_PULL_SHA:-}" ] && codecov_flags="${codecov_flags} --sha ${PULL_PULL_SHA}"
+              [ -n "${PULL_BASE_REF:-}" ] && codecov_flags="${codecov_flags} --branch ${PULL_BASE_REF}"
+              [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ] && codecov_flags="${codecov_flags} --slug ${REPO_OWNER}/${REPO_NAME}"
+            elif [ "${job_type}" = "postsubmit" ]; then
+              [ -n "${PULL_BASE_SHA:-}" ] && codecov_flags="${codecov_flags} --sha ${PULL_BASE_SHA}"
+              [ -n "${PULL_BASE_REF:-}" ] && codecov_flags="${codecov_flags} --branch ${PULL_BASE_REF}"
+              [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ] && codecov_flags="${codecov_flags} --slug ${REPO_OWNER}/${REPO_NAME}"
+            fi
+
+            ${codecov_bin} ${codecov_flags} || echo "Warning: Codecov upload failed (non-fatal)"
+            rm -f "${codecov_bin}" "${codecov_bin}.SHA256SUM"
+          else
+            echo "CODECOV_TOKEN not set -- skipping upload. Profile saved: ${coverage_profile}"
+          fi
+        else
+          echo "Warning: No coverage data found"
+        fi
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: cert-manager-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
     test:
     - as: install
       cli: latest
@@ -96,6 +204,54 @@ tests:
       - env: OO_BUNDLE
         name: cert-manager-operator-bundle
       from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NAMESPACE="cert-manager-operator"
+        DEPLOYMENT="cert-manager-operator-controller-manager"
+        GOCOVERDIR_PATH="/tmp/e2e-cover"
+
+        echo "--- E2E Coverage Setup ---"
+        echo "Coverage image: ${COVERAGE_IMAGE}"
+
+        csv=$(oc get deployment "${DEPLOYMENT}" -n "${NAMESPACE}" \
+          -o jsonpath='{.metadata.ownerReferences[?(@.kind=="ClusterServiceVersion")].name}' 2>/dev/null)
+
+        if [ -n "${csv}" ]; then
+          echo "Found CSV: ${csv} -- patching via CSV"
+          oc patch csv "${csv}" -n "${NAMESPACE}" --type=json -p "[
+            {\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"${COVERAGE_IMAGE}\"},
+            {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-\", \"value\": {\"name\": \"GOCOVERDIR\", \"value\": \"${GOCOVERDIR_PATH}\"}},
+            {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/volumeMounts/-\", \"value\": {\"name\": \"coverage-data\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}},
+            {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/volumes/-\", \"value\": {\"name\": \"coverage-data\", \"emptyDir\": {}}}
+          ]"
+        else
+          echo "No CSV found -- patching deployment directly"
+          oc set image "deployment/${DEPLOYMENT}" -n "${NAMESPACE}" \
+            cert-manager-operator="${COVERAGE_IMAGE}"
+          oc set env "deployment/${DEPLOYMENT}" -n "${NAMESPACE}" \
+            -c cert-manager-operator GOCOVERDIR="${GOCOVERDIR_PATH}"
+          oc patch "deployment/${DEPLOYMENT}" -n "${NAMESPACE}" --type=json -p "[
+            {\"op\": \"add\", \"path\": \"/spec/template/spec/containers/0/volumeMounts/-\", \"value\": {\"name\": \"coverage-data\", \"mountPath\": \"${GOCOVERDIR_PATH}\"}},
+            {\"op\": \"add\", \"path\": \"/spec/template/spec/volumes/-\", \"value\": {\"name\": \"coverage-data\", \"emptyDir\": {}}}
+          ]"
+        fi
+
+        echo "Waiting for rollout..."
+        sleep 5
+        oc rollout status "deployment/${DEPLOYMENT}" -n "${NAMESPACE}" --timeout=180s
+
+        oc exec -n "${NAMESPACE}" "deploy/${DEPLOYMENT}" -- env | grep GOCOVERDIR || \
+          echo "Warning: GOCOVERDIR not found (non-fatal)"
+        echo "--- Coverage setup complete ---"
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: cert-manager-operator-coverage
+      from: src
       resources:
         requests:
           cpu: 100m
