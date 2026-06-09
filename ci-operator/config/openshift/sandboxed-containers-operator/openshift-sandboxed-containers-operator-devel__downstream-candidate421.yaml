@@ -7,6 +7,15 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: upi-installer
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      RUN microdnf install -y git tar gzip && microdnf clean all
+      RUN git clone --depth 1 --branch main \
+          https://github.com/confidential-devhub/charts /charts && \
+          rm -rf /charts/.git
+    to: trustee-charts
 prowgen:
   disable_sparse_checkout: true
 releases:

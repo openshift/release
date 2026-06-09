@@ -1,37 +1,75 @@
 #!/usr/bin/env bash
+#
+# Install Trustee Operator for Confidential Containers (CoCo)
+#
+# This script installs and configures the Trustee operator and operands using
+# helm charts from https://github.com/confidential-devhub/charts
+#
+# NETWORK ACCESS:
+#   Preferred: Use TRUSTEE_CHARTS_IMAGE (pre-built image dependency)
+#              Works with restrict_network_access: true for rehearsals
+#   Fallback:  Fetches from GitHub (requires restrict_network_access: false)
+#
+# Environment Variables:
+#   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
+#   TRUSTEE_NAMESPACE             - Namespace for operator (default: trustee-operator-system)
+#   TRUSTEE_CATALOG_SOURCE_NAME   - CatalogSource name (default: redhat-operators)
+#   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
+#   IMAGE_TRUSTEE_CHARTS          - Pre-built charts image (set by ci-operator, recommended)
+#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: https://github.com/confidential-devhub/charts)
+#   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
+#   KBS_CLIENT_TAG                - kbs-client version override (optional)
+#
+# Outputs to SHARED_DIR:
+#   TRUSTEE_URL       - KBS service URL for CoCo workloads
+#   TRUSTEE_HOST      - KBS hostname
+#   TRUSTEE_PORT      - KBS port
+#   INITDATA          - Base64-encoded gzipped initdata.toml
+#   initdata.toml     - Plain text initdata configuration
+#
 
 set -euo pipefail
 
+#========================================
+# Configuration
+#========================================
+
 export SHARED_DIR=${SHARED_DIR:-/tmp}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
-TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 
+TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
+TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
+TRUSTEE_CATALOG_SOURCE_NAME=${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}
+TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
+TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts}
+TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
+
+# Early exit if installation disabled
 if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   echo ">>> Skipping trustee operator installation (TRUSTEE_INSTALL=${TRUSTEE_INSTALL})"
   exit 0
 fi
 
-TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
-TRUSTEE_CATALOG_SOURCE_NAME=${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}
-TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
-
-# Legacy variables for backward compatibility (used when TRUSTEE_CATALOG_SOURCE_IMAGE is set)
-TRUSTEE_IMAGE_REPO=${TRUSTEE_IMAGE_REPO:-quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc}
-TRUSTEE_IMAGE_TAG=${TRUSTEE_IMAGE_TAG:-1.1.0-1776506656}
-
+# Show configuration
+echo ">>> Trustee charts: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (using existing catalog)"
 fi
 
+#========================================
+# Cleanup Handler
+#========================================
+
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
 
 function exit_handler() {
-  exitcode=$?
+  local exitcode=$?
   set +e
   rm -rf "${SCRATCH}"
+
   if [[ ${exitcode} -ne 0 ]]; then
     echo ">>> ERROR: Trustee operator installation failed"
     echo ">>> Namespace status:"
@@ -42,8 +80,13 @@ function exit_handler() {
 }
 trap 'exit_handler' EXIT
 
+#========================================
+# Helper Functions
+#========================================
+
+# Retry command up to 10 times with 30s delay between attempts
 function retry() {
-  "$@" && return 0  # unrolled 1 to simplify sleep only between tries
+  "$@" && return 0
   for (( i = 0; i < 9; i++ )); do
     sleep 30
     "$@" && return 0
@@ -51,6 +94,48 @@ function retry() {
   return 1
 }
 
+# Fetch trustee helm charts (from pre-built image or GitHub)
+function fetch_trustee_charts() {
+  local charts_dir="${SCRATCH}/charts"
+
+  # Option 1: Extract from pre-built container image (preferred, works with restrict_network_access: true)
+  # ci-operator provides built images via IMAGE_FORMAT and IMAGE_TRUSTEE_CHARTS env vars
+  if [[ -n "${IMAGE_TRUSTEE_CHARTS:-}" ]]; then
+    local charts_image="${IMAGE_TRUSTEE_CHARTS}"
+    echo ">>> Extracting trustee charts from pre-built image"
+    echo ">>> Image: ${charts_image}"
+
+    # Extract charts from the image
+    mkdir -p "${charts_dir}"
+    if oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1; then
+      echo ">>> Charts extracted from image (no network access needed)"
+      echo "${charts_dir}"
+      return 0
+    else
+      echo ">>> WARNING: Failed to extract charts from image, falling back to git clone"
+    fi
+  fi
+
+  # Option 2: Fallback to git clone (requires restrict_network_access: false)
+  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
+
+  if ! command -v git &> /dev/null; then
+    echo ">>> ERROR: git command not found"
+    return 1
+  fi
+
+  git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
+
+  if [[ ! -d "${charts_dir}" ]]; then
+    echo ">>> ERROR: Failed to clone charts repository"
+    return 1
+  fi
+
+  echo ">>> Charts cloned from GitHub"
+  echo "${charts_dir}"
+}
+
+# Get cluster domain from ingress config, console route, or console URL
 function get_cluster_domain() {
   local cluster_domain=""
 
@@ -78,243 +163,125 @@ function get_cluster_domain() {
   echo "${cluster_domain}"
 }
 
-function get_trustee_catalog_source_manifest() {
-  # Only output CatalogSource manifest if TRUSTEE_CATALOG_SOURCE_IMAGE is set
-  # and the catalog source doesn't already exist
-  if [[ -z "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
-    return 0
+#========================================
+# Helm Chart Functions
+#========================================
+
+# Render trustee operator chart using helm template
+function render_trustee_operator_chart() {
+  local charts_dir="$1"
+  local operator_chart="${charts_dir}/trustee-operator"
+
+  if [[ ! -d "${operator_chart}" ]]; then
+    echo ">>> ERROR: Operator chart not found at ${operator_chart}"
+    return 1
   fi
 
-  if oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" &>/dev/null; then
-    echo ">>> CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} already exists, skipping creation"
-    return 0
+  echo ">>> Rendering trustee-operator chart"
+
+  # Create values file for operator chart
+  local values_file="${SCRATCH}/operator-values.yaml"
+  cat > "${values_file}" <<EOF
+# Trustee Operator values
+namespace: ${TRUSTEE_NAMESPACE}
+
+# CatalogSource configuration
+catalogSource:
+  name: ${TRUSTEE_CATALOG_SOURCE_NAME}
+EOF
+
+  # Add custom catalog image if provided
+  if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
+    cat >> "${values_file}" <<EOF
+  image: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
+  create: true
+EOF
+  else
+    cat >> "${values_file}" <<EOF
+  create: false
+EOF
   fi
 
-  cat << 'CATALOG_EOF'
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER
-  namespace: openshift-marketplace
-spec:
-  displayName: Trustee Operator Catalog
-  sourceType: grpc
-  image: "TRUSTEE_CATALOG_SOURCE_IMAGE_PLACEHOLDER"
-  publisher: Confidential Containers Team
----
-CATALOG_EOF
+  # Render the chart
+  helm template trustee-operator "${operator_chart}" \
+    --namespace "${TRUSTEE_NAMESPACE}" \
+    --values "${values_file}"
 }
 
-function get_trustee_operator_manifests() {
-  cat << 'MANIFEST_EOF'
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: TRUSTEE_NAMESPACE_PLACEHOLDER
----
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageDigestMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator-bundle
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/build-of-trustee/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/build-of-trustee/trustee-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator-bundle
-      source: registry.redhat.io/build-of-trustee/trustee-operator-bundle
----
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator-bundle
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/build-of-trustee/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/build-of-trustee/trustee-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator-bundle
-      source: registry.redhat.io/build-of-trustee/trustee-operator-bundle
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: trustee-operator-group
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-spec:
-  targetNamespaces:
-  - TRUSTEE_NAMESPACE_PLACEHOLDER
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: trustee-operator
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-spec:
-  channel: stable
-  installPlanApproval: Automatic
-  name: trustee-operator
-  source: TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER
-  sourceNamespace: openshift-marketplace
-MANIFEST_EOF
-}
+# Render trustee operands chart using helm template
+function render_trustee_operands_chart() {
+  local charts_dir="$1"
+  local operands_chart="${charts_dir}/trustee-operands"
 
-function get_trustee_operands_manifests() {
-  cat << 'MANIFEST_EOF'
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cosign-keys
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-type: Opaque
-stringData:
-  key-0: |
-    -----BEGIN PUBLIC KEY-----
-    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwQEjdCiL3ILUf07NDkDVhgKCj1C6
-    BsCfmM/zt1kNSj0/+nAqA+25XfyClYq2lJFJ6TkgCsf57cTCkXYDz9c+Yg==
-    -----END PUBLIC KEY-----
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: containers-policy
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-type: Opaque
-stringData:
-  insecure: |
-    {
-      "default": [
-        {
-          "type": "insecureAcceptAnything"
-        }
-      ],
-      "transports": {}
-    }
-  reject: |
-    {
-      "default": [
-        {
-          "type": "reject"
-        }
-      ],
-      "transports": {}
-    }
-  signed: |
-    {
-      "default": [
-        {
-          "type": "reject"
-        }
-      ],
-      "transports": {
-        "docker": {
-          "ghcr.io/confidential-containers/test-container-image-rs": [
-            {
-              "type": "sigstoreSigned",
-              "keyPath": "kbs:///default/cosign-keys/key-0"
-            }
-          ]
-        }
-      }
-    }
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: kbsres1
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-type: Opaque
-data:
-  key1: cmVzMXZhbDEK
----
-apiVersion: confidentialcontainers.org/v1alpha1
-kind: KbsConfig
-metadata:
+  if [[ ! -d "${operands_chart}" ]]; then
+    echo ">>> ERROR: Operands chart not found at ${operands_chart}"
+    return 1
+  fi
+
+  echo ">>> Rendering trustee-operands chart"
+
+  # Create values file for operands chart
+  local values_file="${SCRATCH}/operands-values.yaml"
+  cat > "${values_file}" <<EOF
+# Trustee Operands values
+namespace: ${TRUSTEE_NAMESPACE}
+clusterDomain: ${CLUSTER_DOMAIN}
+
+# TrusteeConfig
+trusteeConfig:
+  name: trustee-operands
+  profileType: Permissive
+  kbsServiceType: ClusterIP
+
+# KbsConfig - secrets to publish as KBS resources
+kbsConfig:
   name: trustee-operands-kbs-config
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-spec:
-  kbsSecretResources:
+  secretResources:
     - containers-policy
     - cosign-keys
     - kbsres1
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
+
+# Test secrets
+secrets:
+  cosignKeys:
+    enabled: true
+  containersPolicy:
+    enabled: true
+  kbsres1:
+    enabled: true
+
+# OpenShift Route for KBS
+route:
+  enabled: true
   name: kbs-service
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-spec:
-  to:
-    kind: Service
-    name: kbs-service
-  port:
-    targetPort: kbs-port
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Allow
----
-apiVersion: confidentialcontainers.org/v1alpha1
-kind: TrusteeConfig
-metadata:
-  name: trustee-operands
-  namespace: TRUSTEE_NAMESPACE_PLACEHOLDER
-spec:
-  profileType: Permissive
-  kbsServiceType: ClusterIP
-MANIFEST_EOF
+EOF
+
+  # Render the chart
+  helm template trustee-operands "${operands_chart}" \
+    --namespace "${TRUSTEE_NAMESPACE}" \
+    --values "${values_file}"
 }
 
+#========================================
+# Installation Functions
+#========================================
+
+# Install trustee operator via OLM using helm-rendered manifests
 function install_trustee_operator() {
-  # Apply CatalogSource if needed (only if TRUSTEE_CATALOG_SOURCE_IMAGE is set and catalog doesn't exist)
-  get_trustee_catalog_source_manifest | \
-    sed "s@TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_NAME}@g" | \
-    sed "s@TRUSTEE_CATALOG_SOURCE_IMAGE_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_IMAGE}@g" | \
-    oc apply -f - || true
+  local charts_dir="$1"
 
-  # Apply operator manifests (Namespace, mirrors, OperatorGroup, Subscription)
-  get_trustee_operator_manifests | \
-    sed "s@TRUSTEE_NAMESPACE_PLACEHOLDER@${TRUSTEE_NAMESPACE}@g" | \
-    sed "s@TRUSTEE_CATALOG_SOURCE_NAME_PLACEHOLDER@${TRUSTEE_CATALOG_SOURCE_NAME}@g" | \
-    oc apply -f -
+  echo ">>> Installing Trustee operator"
+
+  # Render and apply operator chart
+  render_trustee_operator_chart "${charts_dir}" | oc apply -f -
 }
 
+# Wait for operator installation through all OLM stages
+# Stages: CatalogSource READY → Subscription → InstallPlan → CSV → Deployment
 function wait_for_operator() {
-  # OLM installation stages (poll each with timeout)
-  # 1. CatalogSource READY
-  # 2. Subscription has InstallPlan
-  # 3. InstallPlan Complete
-  # 4. CSV Succeeded
-  # 5. Deployment Available
-
   # Stage 1: Wait for CatalogSource to be READY (60s)
   # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
@@ -428,15 +395,17 @@ function wait_for_operator() {
   echo ">>> Operator installation complete"
 }
 
+# Install Trustee operands using helm-rendered manifests
 function install_trustee_operands() {
-  echo ">>> Cluster domain: ${CLUSTER_DOMAIN}"
+  local charts_dir="$1"
 
-  get_trustee_operands_manifests | \
-    sed "s@TRUSTEE_NAMESPACE_PLACEHOLDER@${TRUSTEE_NAMESPACE}@g" | \
-    sed "s@CLUSTER_DOMAIN_PLACEHOLDER@${CLUSTER_DOMAIN}@g" | \
-    oc apply -f -
+  echo ">>> Installing Trustee operands (cluster domain: ${CLUSTER_DOMAIN})"
+
+  # Render and apply operands chart
+  render_trustee_operands_chart "${charts_dir}" | oc apply -f -
 }
 
+# Wait for operand deployments to become available
 function wait_for_operands() {
   sleep 10
 
@@ -463,6 +432,11 @@ function wait_for_operands() {
   fi
 }
 
+#========================================
+# Configuration Functions
+#========================================
+
+# Get TLS certificate for cluster ingress (tries multiple sources)
 function get_tls_certificate() {
   local cert_data=""
 
@@ -499,6 +473,7 @@ function get_tls_certificate() {
   echo "${cert_data}"
 }
 
+# Get Trustee KBS service URL and save to SHARED_DIR
 function get_trustee_url() {
   local kbs_service="kbs-service"
   local trustee_url=""
@@ -548,6 +523,7 @@ function get_trustee_url() {
   export TRUSTEE_PORT="${trustee_port}"
 }
 
+# Create INITDATA for confidential containers (includes aa.toml, cdh.toml, policy.rego)
 function create_initdata() {
   local tls_cert
   tls_cert=$(get_tls_certificate)
@@ -681,6 +657,7 @@ EOF
   export INITDATA="${encoded_initdata}"
 }
 
+# Update osc-config ConfigMap with Trustee URL and INITDATA
 function update_env_configmap() {
   if ! oc get configmap osc-config -n default &>/dev/null; then
     echo ">>> WARN: osc-config ConfigMap not found (normal if env-cm step hasn't run yet)"
@@ -693,6 +670,11 @@ function update_env_configmap() {
   ]"
 }
 
+#========================================
+# Verification Functions
+#========================================
+
+# Generate kbs-client test pod manifest
 function get_kbs_client_manifest() {
   cat << 'MANIFEST_EOF'
 ---
@@ -718,34 +700,26 @@ spec:
 MANIFEST_EOF
 }
 
+# Map trustee operator version to compatible kbs-client version
 function map_trustee_to_kbs_client_version() {
   local trustee_version="$1"
-
-  # Map trustee operator versions to compatible kbs-client versions
-  # Based on semantic versioning compatibility
   case "${trustee_version}" in
-    1.1.*|1.1)
-      echo "v0.17.0"
-      ;;
-    1.11.*|1.11)
-      echo "v0.19.0"
-      ;;
-    *)
-      # Return empty string if no mapping exists
-      echo ""
-      ;;
+    1.1.*|1.1)   echo "v0.17.0" ;;
+    1.11.*|1.11) echo "v0.19.0" ;;
+    *)           echo "" ;;  # No mapping exists
   esac
 }
 
+# Determine kbs-client image tag (from KBS_CLIENT_TAG, trustee CSV, or auto-discover)
 function get_kbs_client_tag() {
-  # Override: explicit KBS_CLIENT_TAG takes precedence
+  # 1. Use explicit override if provided
   if [[ -n "${KBS_CLIENT_TAG:-}" ]]; then
     echo ">>> kbs-client tag (from KBS_CLIENT_TAG): ${KBS_CLIENT_TAG}" >&2
     echo "${KBS_CLIENT_TAG}"
     return 0
   fi
 
-  # Try to determine from trustee operator CSV version
+  # 2. Try to map from trustee operator CSV version
   if [[ -n "${TRUSTEE_CSV_NAME:-}" ]]; then
     # Extract version from CSV name (e.g., "trustee-operator.v1.10.0" -> "1.10.0")
     local trustee_version
@@ -773,7 +747,7 @@ function get_kbs_client_tag() {
     fi
   fi
 
-  # Fallback: Auto-discover latest semver tag from registry
+  # 3. Auto-discover latest semver tag from registry
   local latest_tag=""
   latest_tag=$(skopeo list-tags docker://quay.io/confidential-containers/kbs-client 2>/dev/null | \
     jq -r '.Tags[]' | \
@@ -787,26 +761,27 @@ function get_kbs_client_tag() {
     return 0
   fi
 
-  # Last resort fallback
+  # 4. Fallback to known-good version
   echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.17.0" >&2
   echo "v0.17.0"
 }
 
+# Verify Trustee KBS connectivity using kbs-client test pod
 function verify_trustee_connectivity() {
   local kbs_client_pod="kbs-client-test"
-  local kbs_client_namespace="$TRUSTEE_NAMESPACE"
-
+  local kbs_client_namespace="${TRUSTEE_NAMESPACE}"
   local kbs_client_tag
   kbs_client_tag=$(get_kbs_client_tag)
   local kbs_client_image="quay.io/confidential-containers/kbs-client:${kbs_client_tag}"
 
+  echo ">>> Creating kbs-client test pod (image: ${kbs_client_image})"
   get_kbs_client_manifest | \
     sed "s@KBS_CLIENT_POD_PLACEHOLDER@${kbs_client_pod}@g" | \
     sed "s@KBS_CLIENT_NAMESPACE_PLACEHOLDER@${kbs_client_namespace}@g" | \
     sed "s@KBS_CLIENT_IMAGE_PLACEHOLDER@${kbs_client_image}@g" | \
     oc apply -f -
 
-  # Wait for pod ready (10 tries, 15s apart = 150s total)
+  # Wait for pod to become ready
   local pod_ready=false
   for i in {1..10}; do
     if oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; then
@@ -824,21 +799,18 @@ function verify_trustee_connectivity() {
     return 1
   fi
 
-  local kbs_test_failed=false
-
-  # Test KBS connectivity by retrieving a real resource
-  # Note: kbs-client will perform RCA protocol handshake:
+  # Test KBS connectivity using RCA protocol
+  # The kbs-client performs Remote Attestation Protocol (RCA):
   #   1. GET resource → 401 (no token)
   #   2. POST /auth + POST /attest (get attestation token)
   #   3. GET resource → 200 (with token)
-  # We suppress normal protocol warnings (stderr) on success
-  echo ">>> Testing KBS connectivity at ${TRUSTEE_URL}"
-  echo ">>> Running: oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- kbs-client --url \"${TRUSTEE_URL}\" get-resource --path default/kbsres1/key1"
+  local kbs_test_failed=false
+  echo ">>> Testing KBS connectivity: ${TRUSTEE_URL}/default/kbsres1/key1"
   if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
     kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 \
     > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
-    # Success - show that we got the resource
+    # Success
     echo ">>> Successfully retrieved default/kbsres1/key1"
     local resource_value
     resource_value=$(cat /tmp/kbs-resource.txt 2>/dev/null || echo "")
@@ -846,7 +818,7 @@ function verify_trustee_connectivity() {
 
     kbs_test_failed=false
   else
-    # Failed - show full diagnostics
+    # Failure - show diagnostics
     echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
 
     # Show stderr (has the actual error)
@@ -878,7 +850,7 @@ function verify_trustee_connectivity() {
     kbs_test_failed=true
   fi
 
-  # Capture KBS logs showing attestation attempts
+  # Capture KBS logs for debugging (shows RCA protocol flow)
   local kbs_pod
   kbs_pod=$(oc get pod -n "${TRUSTEE_NAMESPACE}" -l app=kbs -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
@@ -921,14 +893,32 @@ function verify_trustee_connectivity() {
   return 0
 }
 
+#========================================
+# Main Execution
+#========================================
+
+echo ">>> Starting Trustee operator installation"
+
+# Fetch helm charts from GitHub
+CHARTS_DIR=$(fetch_trustee_charts)
+export CHARTS_DIR
+
+# Get cluster domain
 CLUSTER_DOMAIN=$(get_cluster_domain)
 export CLUSTER_DOMAIN
 
-install_trustee_operator
+# Install operator and operands
+install_trustee_operator "${CHARTS_DIR}"
 wait_for_operator
-install_trustee_operands
+install_trustee_operands "${CHARTS_DIR}"
 wait_for_operands
+
+# Configure and verify
 get_trustee_url
 create_initdata
 update_env_configmap
 verify_trustee_connectivity
+
+echo ">>> Trustee operator installation complete"
+echo ">>> KBS URL: ${TRUSTEE_URL}"
+echo ">>> INITDATA saved to: ${SHARED_DIR}/INITDATA"
