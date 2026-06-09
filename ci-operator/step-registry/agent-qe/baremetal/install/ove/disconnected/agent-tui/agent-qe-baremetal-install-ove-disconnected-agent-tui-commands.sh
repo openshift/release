@@ -9,7 +9,6 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && { echo "Proxy conf file is not found. Failing."; exit 1; }
 
 if ! whoami &>/dev/null; then
   if [[ -w /etc/passwd ]]; then
@@ -20,7 +19,9 @@ if ! whoami &>/dev/null; then
   fi
 fi
 
-source "${SHARED_DIR}/proxy-conf.sh"
+proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
+export HTTP_PROXY=${proxy}
+export HTTPS_PROXY=${proxy}
 
 RENDEZVOUS_NODE="yes"
 SSH_PRIVATE_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-privatekey)

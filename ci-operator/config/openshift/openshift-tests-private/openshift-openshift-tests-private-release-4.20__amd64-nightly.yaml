@@ -1281,31 +1281,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-ipsec
-- as: aws-ipi-cilium-hypershift-guest-f14
-  cron: 16 6 3,17 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~SDN&;~56898&;~44493&;~55767&;~74734&
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-cilium
 - as: aws-ipi-ovn-hypershift-guest-longduration-f14
   cron: 7 4 4,18 * *
   reporter_config:
@@ -2702,30 +2677,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet
-- as: azure-aks-hypershift-cilium-guest-f14
-  cron: 6 21 6,22 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
-      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
-      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
-      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-cilium-guest
 - as: azure-aks-hypershift-disaster-recovery-infra-guest-f14
   cron: 45 17 9,25 * *
   reporter_config:
@@ -4749,7 +4700,7 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: metal-ds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
+- as: metal-ds-ipi-ovn-ipv4-f28-virt-netobserv
   capabilities:
   - intranet
   cron: 55 14 5 * *
@@ -4767,7 +4718,7 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6v4
+        IP_STACK=v4
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes

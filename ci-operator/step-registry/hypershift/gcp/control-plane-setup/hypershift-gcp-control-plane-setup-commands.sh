@@ -8,13 +8,11 @@ set -euo pipefail
 
 echo "Starting GCP Workload Identity setup..."
 
-# Load GCP credentials and project info (before set -x to protect secrets)
-GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
 CP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
 EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.com"
 
-# Authenticate with GCP
-gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
+# Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step
+gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 gcloud config set project "${CP_PROJECT_ID}"
 
 # Service account name

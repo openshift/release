@@ -12,6 +12,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -224,6 +225,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -308,6 +310,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -449,6 +452,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -591,6 +595,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -650,13 +655,14 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build10
     context: ci/prow/integration
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -741,6 +747,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -833,6 +840,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -917,6 +925,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1001,6 +1010,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1085,6 +1095,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1161,13 +1172,14 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build10
     context: ci/prow/mega-linter
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1252,6 +1264,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1336,6 +1349,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1409,6 +1423,72 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )observability-verify,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/periodic-healthcheck-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+    labels:
+      ci-operator.openshift.io/variant: periodic-healthcheck
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-periodic-healthcheck-images
+    rerun_command: /test periodic-healthcheck-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodic-healthcheck
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodic-healthcheck-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -1420,6 +1500,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1512,6 +1593,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1596,6 +1678,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1688,6 +1771,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1772,6 +1856,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1856,6 +1941,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1948,6 +2034,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2032,6 +2119,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2124,6 +2212,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2208,6 +2297,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2291,6 +2381,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile

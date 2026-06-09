@@ -277,21 +277,6 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: openshift-org-gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e-ocl
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h10m0s
-    workflow: ipi-gcp
 - as: e2e-gcp-op-ocl-part1
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -716,6 +701,13 @@ tests:
 - always_run: false
   as: e2e-aws-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -724,6 +716,13 @@ tests:
 - always_run: false
   as: e2e-gcp-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-gcp
     env:

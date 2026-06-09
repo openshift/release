@@ -35,6 +35,10 @@ base_images:
     name: nested-environment-builder
     namespace: ci
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ocp_4.10_cli:
     name: "5.0"
     namespace: ocp
@@ -1249,6 +1253,7 @@ tests:
 - as: e2e-agent-two-node-fencing-ipv4
   capabilities:
   - intranet
+  - nested-podman
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
@@ -1527,18 +1532,15 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-public-ipv4-pool-disabled
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: none
     workflow: openshift-e2e-aws

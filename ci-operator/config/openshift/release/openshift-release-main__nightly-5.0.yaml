@@ -87,6 +87,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "5.0"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "5.0"
     namespace: ocp
@@ -353,6 +357,10 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_DISK=80
+        WORKER_DISK=80
         FEATURE_SET=TechPreviewNoUpgrade
         OS_IMAGE_STREAM=rhel-9
       TEST_TYPE: upgrade-conformance
@@ -368,6 +376,10 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_DISK=80
+        WORKER_DISK=80
         FEATURE_SET=TechPreviewNoUpgrade
         OS_IMAGE_STREAM=rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
@@ -1153,6 +1165,7 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-serial
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-serial-rhcos9-techpreview
   cron: 2 20 * * *
   steps:
@@ -1166,7 +1179,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 40,55 2,9,10 * * *
   reporter_config:
@@ -1181,7 +1194,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-rhcos9-techpreview-serial
   cron: 3 22 * * *
   steps:
@@ -1193,7 +1206,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-rhcos10-techpreview-serial
   cron: 3 4 * * 4
   steps:
@@ -1202,7 +1215,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
   cron: 44 22 * * 0
   reporter_config:
@@ -1242,7 +1255,7 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-upi-serial
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-csi-operator-test
   cron: 18 3 * * *
   steps:
@@ -1394,11 +1407,11 @@ tests:
       PERSISTENT_MONITORING: "false"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
       TEST_ARGS: ' --disable-monitor=legacy-cvo-invariants --cluster-stability=Disruptive '
-      TEST_SKIPS: \[FeatureGate:VSphereDriverConfiguration\]\|\[sig-arch\]\[Early\]
+      TEST_SKIPS: \[sig-cli\]\|\[FeatureGate:VSphereDriverConfiguration\]\|\[sig-arch\]\[Early\]
         Operators low level operators
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-vsphere-hybrid-env
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-hybrid-env-techpreview
   cron: 50 1 * * *
   steps:
@@ -2041,7 +2054,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-aws-custom-dns-techpreview
-  interval: 168h
+  interval: 12h
   steps:
     cluster_profile: aws-qe
     env:
@@ -2135,7 +2148,7 @@ tests:
 - as: e2e-agent-compact-iso-no-registry-techpreview
   capabilities:
   - intranet
-  cron: 0 */12 * * *
+  cron: 0 */8 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -2143,6 +2156,49 @@ tests:
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: agent-e2e-generic-conformance-iso-no-registry
+- as: e2e-agent-ha-dualstack-iso-no-registry-techpreview
+  capabilities:
+  - intranet
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: agent-e2e-generic-conformance-iso-no-registry
+  timeout: 4h0m0s
+- as: e2e-agent-ha5-dualstack-iso-no-registry-techpreview
+  capabilities:
+  - intranet
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4V6
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+        FEATURE_SET=TechPreviewNoUpgrade
+    workflow: agent-e2e-generic-conformance-iso-no-registry
+  timeout: 4h0m0s
+- as: e2e-agent-sno-ipv4-iso-no-registry-techpreview
+  capabilities:
+  - intranet
+  cron: 0 */8 * * *
+  node_architecture: amd64
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+        AGENT_PLATFORM_TYPE=none
         FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: e2e-agent-single-node-ipv6-conformance
@@ -2571,6 +2627,20 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
+- as: e2e-aws-public-ipv4-pool
+  cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: aws-us-east-1
+    env:
+      AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
+    workflow: openshift-e2e-aws
 - as: metal-ovn-single-node-recert-cluster-rename
   cron: '@weekly'
   steps:
@@ -2591,6 +2661,15 @@ tests:
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
+    workflow: ipi-aws
+- as: tls-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-external-aws
   cron: '@weekly'
@@ -2630,6 +2709,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
@@ -2644,6 +2724,8 @@ tests:
       :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
@@ -2723,7 +2805,7 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-serial-runc
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-azure-ovn-serial-runc
   cron: '@daily'
   steps:
@@ -2923,6 +3005,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_REQUIRES_SSH: "yes"
       TEST_SUITE: openshift/disruptive-longrunning
       TEST_TYPE: suite
@@ -2937,6 +3020,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -2949,6 +3033,7 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -2961,6 +3046,7 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -2972,6 +3058,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-metal-ipi-ovn-ipv4-disruptive-longrunning-techpreview
@@ -2985,6 +3072,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -3001,6 +3089,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -3017,6 +3106,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -3029,6 +3119,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:

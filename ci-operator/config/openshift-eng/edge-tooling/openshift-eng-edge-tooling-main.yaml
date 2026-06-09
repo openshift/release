@@ -48,10 +48,17 @@ tests:
     clone: true
     from: shellcheck
   run_if_changed: .sh$
+- always_run: false
+  as: skills-lint
+  commands: make lint-all-skills
+  container:
+    clone: true
+    from: root
+  run_if_changed: (SKILL\.md|^scripts/lint-skills\.py|^Makefile|^plugins/.*/skills/)
 - as: ocp-ci-monitor
   cron: 0 7 * * 1-5
   reporter_config:
-    channel: '#team-ocp-edge-collab'
+    channel: '#team-ocp-edge-notifications'
     job_states_to_report:
     - failure
     - error
@@ -62,20 +69,25 @@ tests:
 - as: microshift-ci-doctor
   cron: 0 8,14 * * 1-5
   reporter_config:
-    channel: '#team-ocp-edge-collab'
+    channel: '#team-ocp-edge-notifications'
     job_states_to_report:
     - success
     - failure
     - error
-    report_template: |
-      :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.
-      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/microshift-ci-doctor-report.html|View report> | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/analyze-ci-create-bugs-merged.txt|View bugs> | <{{.Status.URL}}|View logs> |
+    report_template: |-
+      :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.{{"\n"}}
+      {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
+      {{- $rp := printf "%s%s" $ab "microshift-ci-doctor-report.html" -}}
+      {{- $bg := printf "%s%s" $ab "analyze-ci-create-bugs-merged.txt" -}}
+      {{- $st := printf "%s%s" $ab "report-close-stale-bugs.txt" -}}
+      {{- $pr := printf "%s%s" $ab "report-fix-test-bugs.txt" -}}
+      | <{{$rp}}|Report> | <{{$bg}}|Bugs(+)> | <{{$st}}|Bugs(-)> | <{{$pr}}|PRs> | <{{.Status.URL}}|Logs> |
   steps:
     workflow: openshift-edge-tooling-microshift-ci-doctor
 - as: lvms-ci-doctor
-  cron: 0 17 * * 0
+  cron: 30 3 * * 2
   reporter_config:
-    channel: '#team-ocp-edge-collab'
+    channel: '#team-ocp-edge-notifications'
     job_states_to_report:
     - success
     - failure
@@ -88,7 +100,7 @@ tests:
 - as: pr-notifier
   cron: 0 7 * * 0-5
   reporter_config:
-    channel: '#team-ocp-edge-collab'
+    channel: '#team-ocp-edge-notifications'
     job_states_to_report:
     - failure
     - error

@@ -12,9 +12,11 @@ GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
 TAG_NAME=""
 IMAGE_REPO=""
-IMAGE_REGISTRY=""
+IMAGE_REGISTRY="quay.io"
 QUAY_REPO=""
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
+CATALOG_INDEX_IMAGE=""
+CHART_VERSION=""
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME IMAGE_REPO IMAGE_REGISTRY QUAY_REPO CATALOG_INDEX_IMAGE CHART_VERSION
 
 echo "========== Gangway API Overrides =========="
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}" ]]; then
@@ -44,6 +46,14 @@ fi
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REGISTRY}" ]]; then
     IMAGE_REGISTRY="${MULTISTAGE_PARAM_OVERRIDE_IMAGE_REGISTRY}"
     echo "Override applied: IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CATALOG_INDEX_IMAGE}" ]]; then
+    CATALOG_INDEX_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_CATALOG_INDEX_IMAGE}"
+    echo "Override applied: CATALOG_INDEX_IMAGE=${CATALOG_INDEX_IMAGE}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CHART_VERSION}" ]]; then
+    CHART_VERSION="${MULTISTAGE_PARAM_OVERRIDE_CHART_VERSION}"
+    echo "Override applied: CHART_VERSION=${CHART_VERSION}"
 fi
 
 echo "========== Workdir Setup =========="
@@ -153,7 +163,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "$
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "TAG_NAME: $TAG_NAME"
-    IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    IMAGE_NAME="${IMAGE_REPO:-rhdh-community/rhdh}:${TAG_NAME}"
     echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
@@ -200,8 +210,9 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
     IMAGE_REPO="rhdh-community/rhdh"
-    IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
+    IMAGE_NAME="${IMAGE_REPO}:${TAG_NAME}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
+        echo "Waiting for Docker image availability..."
         # Timeout configuration for waiting for Docker image availability
         MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
         POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
@@ -236,9 +247,7 @@ else
         echo "INFO: Skipping image availability check for non-quay.io registry: ${IMAGE_REGISTRY}"
     fi
 fi
-IMAGE_REGISTRY="${IMAGE_REGISTRY:-quay.io}"
 QUAY_REPO="${IMAGE_REPO}" # Keep QUAY_REPO in sync for backward compatibility
-export IMAGE_REPO IMAGE_REGISTRY QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"

@@ -164,6 +164,25 @@ tests:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
     workflow: openshift-upgrade-aws-single-node
+- as: opct-platform-external-aws-upgrade
+  cron: 0 6 1,15 * *
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

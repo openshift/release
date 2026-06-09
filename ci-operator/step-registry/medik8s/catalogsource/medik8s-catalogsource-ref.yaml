@@ -1,0 +1,51 @@
+ref:
+  as: medik8s-catalogsource
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CATALOG_MODE
+    documentation: |-
+      Catalog source mode: "konflux" (default) or "direct".
+      In konflux mode, resolves a Konflux FBC image from Quay and applies IDMS for pre-release testing.
+      In direct mode, creates a CatalogSource from any provided image reference (no IDMS needed).
+      Use direct mode for: GA IIB validation, released operator testing, or custom catalog images.
+    default: "konflux"
+  - name: OCP_VERSION
+    documentation: OCP version suffix for the FBC catalog image (e.g., "422" for OCP 4.22). Required in konflux mode.
+    default: ""
+  - name: GIT_REF
+    documentation: |-
+      The branch or git ref to resolve the FBC commit from. Only used in konflux mode.
+      Supports slash-containing refs (e.g., "release/v1.0") via URL encoding.
+    default: "main"
+  - name: FBC_COMMIT_SHA
+    documentation: |-
+      Pin to a specific dragonfly/rhwa-fbc commit SHA for reproducibility.
+      If empty, the step resolves the latest commit from GIT_REF (default: main).
+      Only used in konflux mode.
+    default: ""
+  - name: CATALOG_IMAGE_REF
+    documentation: |-
+      Direct catalog image reference. Required when CATALOG_MODE=direct.
+      Use cases: testing against GA IIBs, released operator indexes, or custom catalog images.
+      Examples: registry-proxy.engineering.redhat.com/rh-osbs/iib:1132469 (GA IIB),
+      registry.redhat.io/redhat/redhat-operator-index:v4.22 (released catalog).
+    default: ""
+  - name: CATALOG_SOURCE_NAME
+    documentation: The name of the CatalogSource to create.
+    default: "medik8s-catalog"
+  - name: IDMS_NAME
+    documentation: The name of the ImageDigestMirrorSet to create. Only used in konflux mode.
+    default: "medik8s-konflux"
+  documentation: |-
+    Creates a CatalogSource for medik8s/RHWA operator testing.
+    Two modes: "konflux" (default) resolves Konflux FBC artifacts from Quay with IDMS
+    for pre-release testing; "direct" creates a CatalogSource from any provided image
+    (GA IIBs, released operator indexes, custom catalogs) without IDMS.
+    Quay repos and GitLab API are public; no credentials needed.

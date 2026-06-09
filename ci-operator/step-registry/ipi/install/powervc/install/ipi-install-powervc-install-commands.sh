@@ -22,7 +22,7 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.3.4"
+readonly POWERVC_TOOL_VERSION="v2.3.8"
 readonly YQ_VERSION="v4.53.2"
 readonly IBMCLOUD_VERSION="2.43.0"
 
@@ -632,6 +632,70 @@ function hack_cleanup_containers() {
 	)
 }
 
+# Function: find_common_prefix
+# Description: Find the longest common prefix between two strings
+# Arguments:
+#   $1 - First string
+#   $2 - Second string
+# Returns:
+#   Prints the common prefix to stdout
+#   Returns 0 on success, 1 if no common prefix found
+find_common_prefix() {
+    local str1="${1:-}"
+    local str2="${2:-}"
+    local prefix=""
+    local min_length
+    
+    # Validate inputs
+    if [[ -z "$str1" ]]; then
+        log_error "First string is empty"
+        return 1
+    fi
+    
+    if [[ -z "$str2" ]]; then
+        log_error "Second string is empty"
+        return 1
+    fi
+    
+    log_debug "Comparing strings:"
+    log_debug "  String 1: '$str1' (length: ${#str1})"
+    log_debug "  String 2: '$str2' (length: ${#str2})"
+    
+    # Determine the minimum length to avoid out-of-bounds access
+    if [[ ${#str1} -le ${#str2} ]]; then
+        min_length=${#str1}
+    else
+        min_length=${#str2}
+    fi
+    
+    log_debug "  Minimum length: $min_length"
+    
+    # Find common prefix
+    for (( i=0; i<min_length; i++ )); do
+        local char1="${str1:$i:1}"
+        local char2="${str2:$i:1}"
+        
+        log_debug "  Position $i: '$char1' vs '$char2'"
+        
+        if [[ "$char1" == "$char2" ]]; then
+            prefix+="$char1"
+        else
+            log_debug "  Mismatch found at position $i"
+            break
+        fi
+    done
+    
+    # Output result
+    if [[ -n "$prefix" ]]; then
+        log_debug "  Common prefix found: '$prefix' (length: ${#prefix})"
+        echo "$prefix"
+        return 0
+    else
+        log_debug "  No common prefix found"
+        return 1
+    fi
+}
+
 # destroy_resources - Destroy all cluster resources
 # Description:
 #   Cleans up containers and runs openshift-install destroy cluster
@@ -1032,7 +1096,34 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 # Send metadata if it exists
 if [[ -f "${DIR}/metadata.json" ]]; then
+	# Extract and save infraID
+	INFRAID=$(jq -r .infraID "${DIR}/metadata.json" 2>/dev/null || echo "")
+	if [[ -n "${INFRAID}" && "${INFRAID}" != "null" ]]; then
+		log_info "INFRAID=${INFRAID}"
+		# Note: powervc-conf.yaml might be read-only, so we ignore errors
+		echo "INFRAID: ${INFRAID}" >> "${SHARED_DIR}/powervc-conf.yaml" 2>/dev/null || \
+			log_debug "Could not write INFRAID to powervc-conf.yaml (read-only filesystem)"
+	fi
 	log_info "Sending metadata.json to server"
+
+	# Find the common prefix
+	if result=$(find_common_prefix "${CLUSTER_NAME}" "${INFRAID}"); then
+		# Delete any matching previous metadata entries
+		log_info "Erasing previous metadata matching pattern: ${result}*"
+		if PowerVC-Tool \
+			erase-metadata \
+			--pattern "${result}*" \
+			--serverIP "${SERVER_IP}" \
+			--shouldDebug true; then
+			log_info "Metadata erased successfully"
+		else
+			log_warn "Failed to erase metadata, continuing anyway"
+		fi
+	else
+		log_info "No common prefix found between the strings"
+		return 1
+	fi
+
 	if PowerVC-Tool \
 		send-metadata \
 		--createMetadata "${DIR}/metadata.json" \
@@ -1041,15 +1132,6 @@ if [[ -f "${DIR}/metadata.json" ]]; then
 		log_info "Metadata sent successfully"
 	else
 		log_warn "Failed to send metadata, continuing anyway"
-	fi
-
-	# Extract and save infraID
-	INFRAID=$(jq -r .infraID "${DIR}/metadata.json" 2>/dev/null || echo "")
-	if [[ -n "${INFRAID}" && "${INFRAID}" != "null" ]]; then
-		log_info "INFRAID=${INFRAID}"
-		# Note: powervc-conf.yaml might be read-only, so we ignore errors
-		echo "INFRAID: ${INFRAID}" >> "${SHARED_DIR}/powervc-conf.yaml" 2>/dev/null || \
-			log_debug "Could not write INFRAID to powervc-conf.yaml (read-only filesystem)"
 	fi
 else
 	log_warn "Could not find ${DIR}/metadata.json for send-metadata"

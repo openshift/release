@@ -11,7 +11,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 else
     LATEST_TAG=$TAG
 fi
@@ -32,7 +32,7 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]]; then
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]]; then
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
@@ -319,23 +319,25 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 # Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
 (
-    EXP_DIR="${ARTIFACT_DIR}/orion-original-edivisive"
+    EXP_DIR="/tmp/orion-original-edivisive"
     mkdir -p "$EXP_DIR"
-    EXP_BINARY="/tmp/orion-original-edivisive"
+    pushd "$EXP_DIR"
+    git clone -q --branch orig-edivisive-exp $ORION_REPO --depth 1
+    pushd orion
+    pip install -q -r requirements.txt
+    pip install -q .
 
-    echo "Downloading experimental orion binary..."
-    if ! curl -fsSL "https://github.com/cloud-bulldozer/orion/releases/download/orig-edivisive-exp/orion-amd64" -o "$EXP_BINARY"; then
-        echo "Failed to download experimental orion binary, skipping."
-        exit 0
-    fi
-    chmod +x "$EXP_BINARY"
 
     echo "Running experimental orion (original e-divisive)..."
-    "$EXP_BINARY" --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee "$EXP_DIR/${FILENAME}.txt" || true
+    # Strip JIRA flags for experimental run
+    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
+    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
 
     # Copy all results except .xml files into the experimental artifacts subdirectory
-    cp *.csv *.json *.txt *.html "$EXP_DIR/" 2>/dev/null || true
-
+    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
+    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
+    popd
+    popd
     echo "Experimental orion run complete."
 ) || echo "Experimental orion block failed, continuing."
 

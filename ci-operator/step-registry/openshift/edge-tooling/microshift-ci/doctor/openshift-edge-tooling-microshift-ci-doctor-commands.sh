@@ -9,19 +9,25 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
-CLAUDE_ANALYSIS_LOG="${WORKDIR}/claude-analysis.log"
-CLAUDE_BUG_CREATION_LOG="${WORKDIR}/claude-bug-creation.log"
-CLAUDE_REPORT_REFRESH_LOG="${WORKDIR}/claude-report-refresh.log"
-JIRA_MCP_LOG="${WORKDIR}/jira-mcp.log"
+CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
+CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
+CLAUDE_CLOSE_STALE_BUGS_LOG="${WORKDIR}/claude-close-stale-bugs.log"
+CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
+CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
+MCP_JIRA_LOG="${WORKDIR}/mcp-jira.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying report files to the artifact directory..."
-        find "${WORKDIR}" -maxdepth 1 -name "*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.txt"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
-        find "${WORKDIR}" -maxdepth 1 -name "*.log"  -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        # Sync report files: skip project/artifact/sos dirs, enter first-level subdirs only,
+        # copy html/json/txt/log files, ignore everything else, prune empty dirs
+        rsync -am --no-perms \
+            --exclude='microshift/' --exclude='artifacts/' --exclude='sos*/' \
+            --include='/*/' --exclude='*/' \
+            --include='*.html' --include='*.json' --include='*.txt' --include='*.log' \
+            --exclude='*' \
+            "${WORKDIR}/" "${ARTIFACT_DIR}/"
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
@@ -43,7 +49,7 @@ atexit_handler() {
     fi
 
     # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_ANALYSIS_LOG}" "${CLAUDE_BUG_CREATION_LOG}" "${CLAUDE_REPORT_REFRESH_LOG}"; do
+    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -64,6 +70,21 @@ atexit_handler() {
             return 1
         fi
     done
+}
+
+check_claude_rc() {
+    local -r rc="$1"
+    local -r session="$2"
+    local -r timeout_min="$3"
+
+    if [ "${rc}" -eq 124 ]; then
+        echo "ERROR: Claude ${session} session timed out after ${timeout_min} minutes"
+        exit 1
+    elif [ "${rc}" -ne 0 ]; then
+        echo "ERROR: Claude ${session} session failed with exit code ${rc}"
+        exit 1
+    fi
+    echo "Claude ${session} session completed successfully"
 }
 
 github_app_token() {
@@ -175,11 +196,7 @@ configure_claude() {
       "Write(//tmp/**)",
       "Bash(bash plugins/microshift-ci/scripts/*)",
       "Bash(python3 plugins/microshift-ci/scripts/*)",
-      "Skill(microshift-ci:create-bugs)",
-      "Skill(microshift-ci:doctor)",
-      "Skill(microshift-ci:prow-job)",
-      "Skill(microshift-ci:test-job)",
-      "Skill(microshift-ci:test-scenario)"
+      "Skill(microshift-ci:*)"
     ]
   }
 }
@@ -198,7 +215,7 @@ EOF
             -e MCP_VERBOSE=true \
             --scope user \
             --transport stdio \
-            jira -- bash -c "uvx mcp-atlassian@0.21.0 2>>${JIRA_MCP_LOG}"
+            jira -- bash -c "uvx mcp-atlassian@0.21.0 2>>${MCP_JIRA_LOG}"
 
         echo "Waiting for JIRA MCP to become available..."
         wait_for_mcp_status "jira" "Connected"
@@ -233,40 +250,8 @@ cd "${SRC_DIR}"
 # Configure the GitHub token for MicroShift repo operations
 { set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
-echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-timeout 2700 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 100 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_ANALYSIS_LOG}"
-echo "Analysis for MicroShift CI jobs and pull requests completed"
-
-# Run bug creation for failed jobs (10m and 50 turns).
-echo "Running Claude to create bugs for failed jobs..."
-timeout 600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create --auto" \
-    --verbose 2>&1 | tee "${CLAUDE_BUG_CREATION_LOG}"
-echo "Bug creation for failed jobs completed"
-
-# Run HTML report refresh to include the new bugs (5m and 30 turns).
-echo "Running Claude to refresh the HTML report..."
-timeout 300 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 30 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_REPORT_REFRESH_LOG}"
-echo "HTML report refresh completed"
-
-# Close duplicate rebase PRs before attempting to restart failed test jobs.
+# Close duplicate rebase PRs before running the analysis to prevent them
+# from being included in the analysis and bug creation.
 echo "Running automatic closing of duplicate rebase PRs..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
     --mode close-duplicates \
@@ -274,6 +259,67 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --author 'microshift-rebase-script[bot]' \
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
+
+# Run analysis on all releases and open rebase PRs (45m and 100 turns).
+echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
+CLAUDE_RC=0
+timeout 2700 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 100 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
+    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "doctor" 45
+
+# Run bug creation for failed jobs (15m and 50 turns).
+echo "Running Claude to create bugs for failed jobs..."
+CLAUDE_RC=0
+timeout 900 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 50 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
+    --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
+
+# Close stale bugs that are no longer linked to current failures (10m and 20 turns).
+echo "Running Claude to close stale bugs..."
+CLAUDE_RC=0
+timeout 600 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 20 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:close-stale-bugs --close" \
+    --verbose 2>&1 | tee "${CLAUDE_CLOSE_STALE_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "close-stale-bugs" 10
+
+# Run bug fix for test bugs (15m and 50 turns).
+# Dry-run mode only.
+echo "Running Claude to fix test bugs (dry-run mode)..."
+CLAUDE_RC=0
+timeout 900 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 50 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
+    --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
+
+# Run HTML report refresh to include the new bugs (10m and 20 turns).
+echo "Running Claude to refresh the HTML report..."
+CLAUDE_RC=0
+timeout 600 claude \
+    --model "${CLAUDE_MODEL}" \
+    --max-turns 20 \
+    --output-format stream-json \
+    --plugin-dir "${PLUGIN_DIR}" \
+    -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
+    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
+check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.

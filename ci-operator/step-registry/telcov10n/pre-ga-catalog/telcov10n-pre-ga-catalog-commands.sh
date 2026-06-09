@@ -168,6 +168,9 @@ function apply_catalog_source_and_image_digest_mirror_set {
 
   catalog_info_dir=$(mktemp -d)
 
+  echo "Copy PreGA pull secret to temporary file to AUX_HOST"
+  scp "${SSHOPTS[@]}" "/var/run/telcov10n/ztp-left-shifting/prega-pull-secret" "root@${AUX_HOST}:/tmp/prega-pull-secret"
+
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
     "${PREGA_CATSRC_AND_IDMS_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
     "${catalog_info_dir}" "${IMAGE_INDEX_OCP_VERSION}" << 'EOF'
@@ -175,11 +178,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+## Reading pull secret before set -x to avoid logging the secret
+echo "Read Pull secret from temporary file"
+prega_pull_secret="$(cat /tmp/prega-pull-secret)"
+rm -rf /tmp/prega-pull-secret
+
 set -x
 catalog_soruces_url="${1}"
 prega_operator_index_tags_url="${2}"
 image_index_ocp_version="${4}"
 tag_version="v${4}.0"
+
 
 function findout_manifest_digest {
   # Query Quay API for stable tag to get manifest digest
@@ -189,17 +198,38 @@ function findout_manifest_digest {
   local stable_tag="${tag_version%.0}"  # v4.21.0 -> v4.21
 
   echo "==============================================================================" >&2
+  echo "Save PreGA pull secret to a temporary file" >&2
+  echo "==============================================================================" >&2
+
+  local prega_pull_secret_dir="$(mktemp -d)"
+  local prega_pull_secret_path="${prega_pull_secret_dir}/config.json"
+
+  cat > "${prega_pull_secret_path}" <<IEOF
+  {
+    "auths": {
+      "quay.io": {
+        "auth": "${prega_pull_secret}"
+      }
+    }
+  }
+IEOF
+
+  echo "==============================================================================" >&2
   echo "Querying Quay for stable PreGA catalog tag: ${stable_tag}" >&2
   echo "==============================================================================" >&2
 
-  # Try stable tag first (v4.21) - most reliable
-  local res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${stable_tag}" 2>/dev/null | jq -r '
-    [.tags[] | select(.name == "'"${stable_tag}"'")]
-    | sort_by(.start_ts)
-    | last.manifest_digest' 2>/dev/null || echo "null")
+  local repo=$(echo "${prega_operator_index_tags_url}" | sed -E 's|https?://([^/]+)/api/v1/repository/([^/]+/[^/]+).*|\1/\2|')
 
-  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
+# Try stable tag first (v4.21) - most reliable
+  local image="${repo}:${stable_tag}"
+  echo "Attempting to inspect: ${image}" >&2
+
+  local res
+  res=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
+
+  if [ -n "${res}" ] && [ "${res}" != "null" ]; then
     echo "✓ Found stable tag ${stable_tag} with manifest digest: ${res:0:20}..." >&2
+    rm -rf "${prega_pull_secret_dir}"
     echo "${res}"
     return 0
   fi
@@ -207,70 +237,101 @@ function findout_manifest_digest {
   echo "WARNING: Stable tag ${stable_tag} not found, trying fallback with ${tag_version}" >&2
 
   # Fallback 1: Try with .0 suffix (v4.21.0)
-  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" 2>/dev/null | jq -r '
-    [.tags[]]
-    | sort_by(.start_ts)
-    | last.manifest_digest' 2>/dev/null || echo "null")
+  image="${repo}:${tag_version}"
+  echo "Attempting to inspect: ${image}" >&2
 
-  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
+  res=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
+
+  # Clean up temporary directory
+  rm -rf "${prega_pull_secret_dir}"
+
+  if [ -n "${res}" ] && [ "${res}" != "null" ]; then
     echo "✓ Found tag ${tag_version} with manifest digest: ${res:0:20}..." >&2
     echo "${res}"
     return 0
   fi
 
-  echo "WARNING: ${tag_version} not found, querying latest timestamped versions" >&2
-
-  # Fallback 2: Get second-newest timestamped version (avoids race conditions)
-  # This selects .[-2] to avoid the newest which might not be on mirror yet
-  res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" 2>/dev/null | jq -r '
-    [.tags[]
-    | select(has("end_ts") | not)]
-    | sort_by(.start_ts)
-    | .[-2].manifest_digest' 2>/dev/null || echo "null")
-
-  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
-    echo "✓ Found timestamped version with manifest digest: ${res:0:20}..." >&2
-  else
-    echo "ERROR: Could not determine manifest digest from Quay API" >&2
-  fi
-
-  echo "${res}"
+  echo "ERROR: Could not determine manifest digest using podman" >&2
+  echo "null"
+  return 1
 }
 
 function get_related_catalogs_and_idms_manifests {
   # Find the timestamped version on mirror site that matches the manifest digest
-  # from the stable tag query
+  # from the stable tag query using podman instead of Quay API
 
   local query_tag="${tag_version%.*}-"  # v4.21.0 -> v4.21-
 
   echo "" >&2
   echo "==============================================================================" >&2
-  echo "Finding timestamped version matching manifest digest on mirror" >&2
+  echo "Finding timestamped version matching manifest digest using podman" >&2
   echo "==============================================================================" >&2
   echo "Query pattern: ${query_tag}*" >&2
   echo "Target digest: ${selected_manifest_digest:0:20}..." >&2
 
-  # Search through Quay API pages to find matching timestamped tag
-  for ((page = 1; page < ${max_pages:=10}; page++)); do
-    local index_list=$(curl -sSL "${prega_operator_index_tags_url}/?filter_tag_name=like:${query_tag}&page=${page}" 2>/dev/null | jq 2>/dev/null || echo '{"tags":[]}')
+  # Create temporary auth file for podman
+  local prega_pull_secret_dir="$(mktemp -d)"
+  local prega_pull_secret_path="${prega_pull_secret_dir}/config.json"
 
-    local tag=$(echo "${index_list}" | jq -r '
-      [.tags[]
-      | select(.manifest_digest == "'"${selected_manifest_digest}"'")]
-      | first.name' 2>/dev/null || echo "null")
+  cat > "${prega_pull_secret_path}" <<IEOF
+  {
+    "auths": {
+      "quay.io": {
+        "auth": "${prega_pull_secret}"
+      }
+    }
+  }
+IEOF
 
-    if [ "${tag}" != "null" ] && [ -n "${tag}" ]; then
-      echo "✓ Found matching timestamped tag: ${tag} (page ${page})" >&2
-      echo "${tag}"
-      return 0
+  # Get repository from URL
+  local repo=$(echo "${prega_operator_index_tags_url}" | sed -E 's|https?://([^/]+)/api/v1/repository/([^/]+/[^/]+).*|\1/\2|')
+
+  # Get list of available timestamped tags from mirror site
+  # This is more efficient than brute-force checking all possible timestamps
+  echo "Fetching available tags from mirror site..." >&2
+  local available_tags=$(curl -sSLk --retry 5 --retry-delay 30 --retry-all-errors "${catalog_soruces_url}" 2>/dev/null | grep -oP "${query_tag%-}-"'\d+T\d+' | sort -ru)
+
+  if [ -z "${available_tags}" ]; then
+    echo "WARNING: No timestamped tags found on mirror site for pattern ${query_tag}*" >&2
+    rm -rf "${prega_pull_secret_dir}"
+    echo "ERROR: Could not find timestamped tags on mirror site" >&2
+    echo "${selected_manifest_digest}-not-found"
+    return 1
+  fi
+
+  echo "Found $(echo "${available_tags}" | wc -l) candidate tags on mirror site" >&2
+
+  # Check each available tag with podman to find the one matching our digest
+  local found_tag=""
+  local checked_count=0
+
+  while IFS= read -r candidate_tag; do
+    # Remove trailing slash if present
+    candidate_tag="${candidate_tag%/}"
+
+    checked_count=$((checked_count + 1))
+    echo "Checking tag ${checked_count}: ${candidate_tag}..." >&2
+
+    local image="${repo}:${candidate_tag}"
+    local digest=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
+
+    if [ -n "${digest}" ] && [ "${digest}" == "${selected_manifest_digest}" ]; then
+      echo "✓ Found matching timestamped tag: ${candidate_tag}" >&2
+      found_tag="${candidate_tag}"
+      break
     fi
+  done <<< "${available_tags}"
 
-    local has_additional=$(echo "${index_list}" | jq -r '.has_additional' 2>/dev/null || echo "false")
-    [ "${has_additional}" == "false" ] && break
-  done
+  # Clean up temporary directory
+  rm -rf "${prega_pull_secret_dir}"
+
+  if [ -n "${found_tag}" ]; then
+    echo "${found_tag}"
+    return 0
+  fi
 
   # If not found, return error indication
-  echo "ERROR: Could not find timestamped tag matching manifest digest" >&2
+  echo "ERROR: Could not find timestamped tag matching manifest digest using podman (checked ${checked_count} tags)" >&2
   echo "${selected_manifest_digest}-not-found"
 }
 
@@ -297,14 +358,14 @@ echo "Checking if selected catalog exists on mirror site"
 echo "=============================================================================="
 
 # Check if version exists on mirror
-status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
+status_code=$(curl -sSLk -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
 
 if [ "$status_code" -ne 200 ]; then
   echo "ERROR: Selected version ${version_tag} not found on mirror (HTTP ${status_code})"
   echo "Mirror may not be ready yet"
   echo ""
   echo "Available versions on mirror site:"
-  curl -sSL "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
+  curl -sSLk "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
   exit 1
 fi
 
@@ -320,7 +381,7 @@ cd ${info_dir}
 download_url="${catalog_soruces_url}/${version_tag}"
 
 echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
-yaml_files=$(curl -sSL ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
+yaml_files=$(curl -sSLk ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
 
 if [ -z "$yaml_files" ]; then
   echo "ERROR: No YAML files found in ${version_tag}"
@@ -328,11 +389,11 @@ if [ -z "$yaml_files" ]; then
 
   echo "Trying other version build"
   _version=$( echo $version_tag | cut -d"-" -f1 )
-  all_version_folder=$(curl -s $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
+  all_version_folder=$(curl -sk $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
 
   for folder in $all_version_folder
   do
-    yaml_files=$(curl -sSL ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
+    yaml_files=$(curl -sSLk ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
     if [[ ! -z $yaml_files ]]
     then
       echo "Found files in build: $folder"
@@ -351,7 +412,7 @@ fi
 echo "Downloading files..."
 for f in $yaml_files; do
   set -x
-  curl -sSLO ${download_url}/${f}
+  curl -sSLkO ${download_url}/${f}
   set +x
 done
 
