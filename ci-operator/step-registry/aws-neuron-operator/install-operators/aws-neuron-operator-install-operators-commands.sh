@@ -18,12 +18,17 @@ curl -sfL --connect-timeout 10 --max-time 30 --retry 3 --retry-connrefused --ret
 echo "Downloaded deviceconfig-sample.yaml"
 
 python3 -c "
-import yaml, shlex, os, sys, re
+import shlex, os, sys, re
 
+spec = {}
 with open('${DEVICECONFIG_SAMPLE}') as f:
-    dc = yaml.safe_load(f)
-
-spec = dc.get('spec', {})
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith('#') or line.startswith('---'):
+            continue
+        m = re.match(r'^(\w+):\s+(.+)$', line)
+        if m:
+            spec[m.group(1)] = m.group(2).strip('\"')
 
 mapping = {
     'ECO_HWACCEL_NEURON_DRIVERS_IMAGE': spec.get('driversImage', ''),
