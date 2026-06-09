@@ -3125,6 +3125,48 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-capi-customized-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      AWS_COMPUTE_GP3_THROUGHPUT: "500"
+      AWS_COMPUTE_VOLUME_SIZE: "200"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_METADATA_SERVICE_AUTH: Required
+      ENABLE_BYO_IAM_PROFILE_CUMPUTE: "true"
+      ENABLE_CUSTOM_SG_CUMPUTE: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - chain: ipi-aws-post
+    - ref: aws-deprovision-iam-profile
+    - ref: ipi-deprovision-aws-custom-security-groups
+    - ref: aws-deprovision-security-group
+    - ref: ipi-deprovision-aws-sharednetwork
+    pre:
+    - chain: ipi-conf-aws-sharednetwork
+    - ref: ipi-conf-aws-rootvolume
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-security-groups
+    - ref: aws-provision-iam-profile
+    - ref: ipi-conf-aws-byo-iam-profile
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+- as: e2e-aws-ovn-capi-edge-zones-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-edge-zones
 zz_generated_metadata:
   branch: main
   org: openshift
