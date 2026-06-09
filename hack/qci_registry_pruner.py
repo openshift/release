@@ -609,7 +609,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('--token', type=str, help=f'quay.io oauth application token (or set {QUAY_OAUTH_TOKEN_ENV_NAME} environment variable)')
-    parser.add_argument('--ttl-days', type=int, default=5, help='Only prune tags older than this (defaults to 5; -1 for all prunable tags)')
+    parser.add_argument('--ttl-days', type=int, default=60, help='Only prune tags older than this (defaults to 60; -1 for all prunable tags)')
     parser.add_argument('--confirm', action='store_true', help='Actually delete and refresh tags')
 
     run(parser.parse_args(), start_time)
