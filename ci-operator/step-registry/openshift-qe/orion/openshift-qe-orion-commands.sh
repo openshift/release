@@ -10,12 +10,12 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-else
-    LATEST_TAG=$TAG
-fi
-git clone -q --branch https://github.com/rsevilla87/orion.git --depth 1
+#if [[ $TAG == "latest" ]]; then
+#    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+#else
+#    LATEST_TAG=$TAG
+#fi
+git clone -q https://github.com/rsevilla87/orion.git --depth 1
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -76,7 +76,12 @@ fi
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
     ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
     curl -LO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64
-    CLUSTER_METADATA=$(ocp-metadata-linux-amd64)
+    if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64; then
+        echo "Error: Failed to download ocp-metadata binary"
+        exit 1
+    fi
+    chmod +x ocp-metadata-linux-amd64
+    CLUSTER_METADATA=$(./ocp-metadata-linux-amd64)
     EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 fi
 
@@ -100,7 +105,7 @@ else
     exit 1
 fi
 
-if [[ -n "${ORION_CONFIG}" ]] && [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+if [[ -n "${ORION_CONFIG}" ]] && [[ "${ORION_CONFIG}" =~ ^https?:// ]]; then
     fileBasename="$(basename ${ORION_CONFIG})"
     if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
         ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
