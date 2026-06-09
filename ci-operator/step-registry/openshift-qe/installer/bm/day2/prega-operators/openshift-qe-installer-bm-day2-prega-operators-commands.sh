@@ -6,6 +6,7 @@ set -x
 cat /etc/os-release
 
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
+QUAY_ACCESS_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/prega_quay_auth_token)
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
@@ -13,13 +14,13 @@ get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
   OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
-  DIGEST=$(curl -s ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
-  OPERATOR_PREGA_VERSION=$(curl -s ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
+  OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
   echo "PREGA Operator Version: ${OPERATOR_PREGA_VERSION} for OCP Version: ${OCP_VERSION}"
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
-    curl -o /tmp/idms.yaml http://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+    curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
   scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
   echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
