@@ -76,12 +76,12 @@ fi
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
     ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
     curl -LO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64
-    if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata-linux-amd64; then
+    if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata; then
         echo "Error: Failed to download ocp-metadata binary"
         exit 1
     fi
-    chmod +x ocp-metadata-linux-amd64
-    CLUSTER_METADATA=$(./ocp-metadata-linux-amd64)
+    chmod +x ocp-metadata
+    CLUSTER_METADATA=$(./ocp-metadata)
     EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 fi
 
