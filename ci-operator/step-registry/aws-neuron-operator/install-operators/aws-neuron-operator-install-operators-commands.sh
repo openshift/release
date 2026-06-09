@@ -9,10 +9,12 @@ DEVICECONFIG_SAMPLE="/tmp/deviceconfig-sample.yaml"
 REPO="awslabs/operator-for-ai-chips-on-aws"
 
 echo "Fetching deviceconfig-sample.yaml from latest ${REPO} release..."
-DOWNLOAD_URL=$(curl -sfL "https://api.github.com/repos/${REPO}/releases/latest" \
+DOWNLOAD_URL=$(curl -sfL --connect-timeout 10 --max-time 30 --retry 3 --retry-connrefused --retry-delay 5 \
+    "https://api.github.com/repos/${REPO}/releases/latest" \
     | python3 -c "import json,sys; assets=json.load(sys.stdin).get('assets',[]); print(next(a['browser_download_url'] for a in assets if a['name']=='deviceconfig-sample.yaml'))")
 
-curl -sfL "${DOWNLOAD_URL}" -o "${DEVICECONFIG_SAMPLE}"
+curl -sfL --connect-timeout 10 --max-time 30 --retry 3 --retry-connrefused --retry-delay 5 \
+    "${DOWNLOAD_URL}" -o "${DEVICECONFIG_SAMPLE}"
 echo "Downloaded deviceconfig-sample.yaml"
 
 python3 -c "
