@@ -76,3 +76,21 @@ EOF
 for manifest in *.yaml ; do
   cp "${manifest}" "${SHARED_DIR}/manifest_${manifest}"
 done
+
+# Workaround for OCPBUGS-85607: Apply Cilium NetworkPolicy to allow DNS pods to reach kube-apiserver
+# This needs to be applied on the management cluster for Hypershift Cilium jobs
+cat > "${SHARED_DIR}/manifest_cilium-network-policy-dns.yaml" <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: dns-allow-kube-apiserver
+  namespace: openshift-dns
+spec:
+  endpointSelector:
+    matchLabels:
+      dns.operator.openshift.io/daemonset-dns: default
+  egress:
+  - toEntities:
+    - host
+    - kube-apiserver
+EOF

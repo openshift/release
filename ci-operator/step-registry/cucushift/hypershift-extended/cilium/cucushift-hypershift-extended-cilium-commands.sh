@@ -76,6 +76,7 @@ EOF
 # where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
 cilium install \
     --namespace cilium \
+    --repository oci://quay.io/cilium/charts/cilium \
     --version "${CILIUM_VERSION}" \
     --set debug.enabled=true \
     --set k8s.requireIPv4PodCIDR=true \
@@ -98,5 +99,3 @@ cilium install \
     --set extraVolumes[0].configMap.name=cilium-cni-override \
     --set extraVolumeMounts[0].name=cni-override \
     --set extraVolumeMounts[0].mountPath=/etc/cilium-cni
-
-cilium status --namespace cilium --wait
