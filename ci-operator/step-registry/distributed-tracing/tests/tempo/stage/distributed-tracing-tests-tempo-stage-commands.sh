@@ -4,6 +4,31 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Write a flat context file to SHARED_DIR so the qe-agent post-step can detect failures.
+# SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
+function notify_qe_agent() {
+    local has_failures=false
+    grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
+
+    local i=0
+    while IFS= read -r xml; do
+        cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
+        i=$((i + 1))
+    done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+
+    cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
+{
+  "step_script_ref": "distributed-tracing/tests/tempo/stage/distributed-tracing-tests-tempo-stage-commands.sh",
+  "has_test_failures": ${has_failures},
+  "env": {
+    "MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH": "${MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH:-}"
+  }
+}
+EOF
+    echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
+}
+trap notify_qe_agent EXIT
+
 # Used for stage testing.
 # Set the Go path and Go cache environment variables
 export GOPATH=/tmp/go
