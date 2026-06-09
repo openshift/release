@@ -35,17 +35,19 @@ drivers_image = spec.get('driversImage', '')
 driver_version = drivers_image.rsplit(':', 1)[-1] if ':' in drivers_image else ''
 mapping['ECO_HWACCEL_NEURON_DRIVER_VERSION'] = driver_version
 
-image_re = re.compile(r'^[a-zA-Z0-9._/:-]+$')
-for key, value in mapping.items():
-    if value and not image_re.match(value):
-        print(f'ERROR: {key} contains unexpected characters: {value!r}', file=sys.stderr)
-        sys.exit(1)
+image_re = re.compile(r'^[a-zA-Z0-9._/:-]+(@sha256:[0-9a-fA-F]{64})?$')
 
 env_path = os.path.join(os.environ['SHARED_DIR'], 'neuron-deviceconfig.env')
 with open(env_path, 'w') as ef:
     for key, value in mapping.items():
         existing = os.environ.get(key, '')
         final = existing if existing else value
+        if not final:
+            print(f'ERROR: {key} resolved to empty', file=sys.stderr)
+            sys.exit(1)
+        if not image_re.match(final):
+            print(f'ERROR: {key} contains unexpected characters: {final!r}', file=sys.stderr)
+            sys.exit(1)
         ef.write(f'export {key}={shlex.quote(final)}\n')
         print(f'  {key}={final}')
 "
