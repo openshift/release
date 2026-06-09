@@ -24,7 +24,7 @@ images:
     to: distributed-tracing-console-plugin-test
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tracing-ui-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
     candidate:
@@ -53,7 +53,11 @@ tests:
   steps:
     cluster_profile: azure-observability
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
     test:
     - ref: distributed-tracing-tests-tracing-ui-upstream
     workflow: cucushift-installer-rehearse-azure-ipi

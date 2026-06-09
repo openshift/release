@@ -77,7 +77,7 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   exit 0
 fi
 
-# Function to copy artifacts to the artifact directory after test run.
+# Function to copy artifacts to the artifact directory and SHARED_DIR/qe-agent after test run.
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
     # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
@@ -89,6 +89,26 @@ function copyArtifacts {
   else
     echo "Directory gui_test_screenshots does not exist. Nothing to copy."
   fi
+
+  # Write flat context file and JUnit XMLs to SHARED_DIR for the qe-agent post-step.
+  # SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
+  local has_failures=false
+  grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
+
+  local i=0
+  while IFS= read -r xml; do
+      cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
+      i=$((i + 1))
+  done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+
+  cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
+{
+  "step_script_ref": "distributed-tracing/tests/tracing-ui/upstream/distributed-tracing-tests-tracing-ui-upstream-commands.sh",
+  "has_test_failures": ${has_failures},
+  "env": {}
+}
+EOF
+  echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
 }
 
 ## Add IDP for testing
