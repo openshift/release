@@ -1,0 +1,37 @@
+ref:
+  as: openshift-agentic-trt-init
+  from: sippy-agentic-dev
+  commands: openshift-agentic-trt-init-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: JIRA_ISSUE_KEY
+    default: ""
+    documentation: |-
+      Jira issue key to process. Required.
+      Set via Gangway: MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY.
+  - name: MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY
+    default: ""
+    documentation: |-
+      Gangway API override for JIRA_ISSUE_KEY. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: UPSTREAM_REPO
+    documentation: |-
+      Upstream GitHub repo (e.g., "openshift/sippy").
+  - name: FORK_REPO
+    documentation: |-
+      Fork repo to push branches to (e.g., "openshift-trt/sippy").
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 5m0s
+  documentation: |-
+    Pre-step for TRT agentic workflows. Validates credentials,
+    generates GitHub App tokens, fetches the Jira issue, and writes
+    results to SHARED_DIR for subsequent steps.
