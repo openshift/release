@@ -14,7 +14,7 @@ set -o pipefail
 E2E_NAMESPACE="$1"
 ARTIFACT_DIR="$2"
 
-KUBECONFIG=$(find ${KUBECONFIG} -type f -print -quit 2>/dev/null)
+KUBECONFIG=$(find "${KUBECONFIG}" -type f -print -quit 2>/dev/null)
 if [[ -z "${KUBECONFIG}" ]]; then
     echo "No kubeconfig found, skipping log collection"
     exit 0
@@ -22,43 +22,38 @@ fi
 
 mkdir -p "${ARTIFACT_DIR}"
 
+# Usage: gather_namespace_logs <namespace> <output_dir> [tail_lines]
+gather_namespace_logs() {
+    local ns="$1" outdir="$2" tail="${3:-}"
+    local tail_flag="" tail_prev_flag=""
+    if [[ -n "${tail}" ]]; then
+        tail_flag="--tail=${tail}"
+        tail_prev_flag="--tail=$((tail / 3))"
+    fi
+    mkdir -p "${outdir}"
+    oc get pods -n "${ns}" -o wide > "${outdir}/pods.txt" 2>&1 || true
+    oc get events -n "${ns}" --sort-by=.lastTimestamp > "${outdir}/events.txt" 2>&1 || true
+    oc describe pods -n "${ns}" > "${outdir}/pods-describe.txt" 2>&1 || true
+    oc get deployments -n "${ns}" -o wide > "${outdir}/deployments.txt" 2>&1 || true
+    oc get jobs -n "${ns}" -o wide > "${outdir}/jobs.txt" 2>&1 || true
+    oc get statefulsets -n "${ns}" -o wide > "${outdir}/statefulsets.txt" 2>&1 || true
+    for pod in $(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
+            oc logs "${pod}" -n "${ns}" -c "${container}" ${tail_flag} > "${outdir}/pod-${pod}-${container}.log" 2>&1 || true
+            oc logs "${pod}" -n "${ns}" -c "${container}" --previous ${tail_prev_flag} > "${outdir}/pod-${pod}-${container}-previous.log" 2>/dev/null || true
+        done
+        for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null); do
+            oc logs "${pod}" -n "${ns}" -c "${container}" ${tail_flag} > "${outdir}/pod-${pod}-init-${container}.log" 2>&1 || true
+        done
+    done
+}
+
 echo "Gathering OSAC logs from namespace ${E2E_NAMESPACE}..."
-
-oc get pods -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/pods.txt" 2>&1 || true
-oc get events -n "${E2E_NAMESPACE}" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>&1 || true
-oc describe pods -n "${E2E_NAMESPACE}" > "${ARTIFACT_DIR}/pods-describe.txt" 2>&1 || true
-oc get deployments -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/deployments.txt" 2>&1 || true
-oc get jobs -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/jobs.txt" 2>&1 || true
-oc get statefulsets -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/statefulsets.txt" 2>&1 || true
-
-for pod in $(oc get pods -n "${E2E_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    for container in $(oc get pod "${pod}" -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
-        oc logs "${pod}" -n "${E2E_NAMESPACE}" -c "${container}" > "${ARTIFACT_DIR}/pod-${pod}-${container}.log" 2>&1 || true
-        oc logs "${pod}" -n "${E2E_NAMESPACE}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod-${pod}-${container}-previous.log" 2>/dev/null || true
-    done
-    for container in $(oc get pod "${pod}" -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null); do
-        oc logs "${pod}" -n "${E2E_NAMESPACE}" -c "${container}" > "${ARTIFACT_DIR}/pod-${pod}-init-${container}.log" 2>&1 || true
-    done
-done
+gather_namespace_logs "${E2E_NAMESPACE}" "${ARTIFACT_DIR}"
 
 for ns in keycloak ansible-aap; do
     if oc get namespace "${ns}" &>/dev/null; then
-        mkdir -p "${ARTIFACT_DIR}/${ns}"
-        oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/${ns}/pods.txt" 2>&1 || true
-        oc get events -n "${ns}" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/${ns}/events.txt" 2>&1 || true
-        oc describe pods -n "${ns}" > "${ARTIFACT_DIR}/${ns}/pods-describe.txt" 2>&1 || true
-        oc get deployments -n "${ns}" -o wide > "${ARTIFACT_DIR}/${ns}/deployments.txt" 2>&1 || true
-        oc get jobs -n "${ns}" -o wide > "${ARTIFACT_DIR}/${ns}/jobs.txt" 2>&1 || true
-        oc get statefulsets -n "${ns}" -o wide > "${ARTIFACT_DIR}/${ns}/statefulsets.txt" 2>&1 || true
-        for pod in $(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-            for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
-                oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/${ns}/pod-${pod}-${container}.log" 2>&1 || true
-                oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/${ns}/pod-${pod}-${container}-previous.log" 2>/dev/null || true
-            done
-            for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null); do
-                oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/${ns}/pod-${pod}-init-${container}.log" 2>&1 || true
-            done
-        done
+        gather_namespace_logs "${ns}" "${ARTIFACT_DIR}/${ns}"
     fi
 done
 
@@ -100,6 +95,10 @@ oc get subnets -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/subnets.txt" 2>&
 oc get subnets -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subnets.yaml" 2>&1 || true
 oc get securitygroups -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/securitygroups.txt" 2>&1 || true
 oc get clusteruserdefinednetwork -o yaml > "${ARTIFACT_DIR}/clusteruserdefinednetwork.yaml" 2>&1 || true
+oc get tenants -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/tenants.yaml" 2>&1 || true
+oc get publicips -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/publicips.yaml" 2>&1 || true
+oc get publicippools -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/publicippools.yaml" 2>&1 || true
+oc get publicipattachments -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/publicipattachments.yaml" 2>&1 || true
 
 echo "=== Collecting cert-manager status ==="
 oc get certificates -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/certificates.txt" 2>&1 || true
@@ -118,6 +117,7 @@ oc get nodepools -A -o yaml > "${ARTIFACT_DIR}/caas/nodepools.yaml" 2>&1 || true
 oc get agents -A -o wide > "${ARTIFACT_DIR}/caas/agents.txt" 2>&1 || true
 oc get agents -A -o yaml > "${ARTIFACT_DIR}/caas/agents.yaml" 2>&1 || true
 oc get infraenvs -A -o wide > "${ARTIFACT_DIR}/caas/infraenvs.txt" 2>&1 || true
+oc get infraenvs -A -o yaml > "${ARTIFACT_DIR}/caas/infraenvs.yaml" 2>&1 || true
 oc get agentserviceconfig -o yaml > "${ARTIFACT_DIR}/caas/agentserviceconfig.yaml" 2>&1 || true
 oc get multiclusterengine -o yaml > "${ARTIFACT_DIR}/caas/multiclusterengine.yaml" 2>&1 || true
 oc get ipaddresspool -A -o yaml > "${ARTIFACT_DIR}/caas/metallb-pools.yaml" 2>&1 || true
@@ -144,23 +144,9 @@ oc get agentmachines.capi-provider.agent-install.openshift.io -A -o yaml > "${AR
 for ns in $(oc get ns -o name 2>/dev/null | grep "^namespace/${E2E_NAMESPACE}-" | sed 's|namespace/||'); do
     echo "  Control plane namespace: ${ns}"
     cpdir="${ARTIFACT_DIR}/caas/cp-${ns}"
-    mkdir -p "${cpdir}"
-    oc get pods -n "${ns}" -o wide > "${cpdir}/pods.txt" 2>&1 || true
-    oc describe pods -n "${ns}" > "${cpdir}/pods-describe.txt" 2>&1 || true
+    gather_namespace_logs "${ns}" "${cpdir}" 3000
     oc get svc -n "${ns}" -o wide > "${cpdir}/svc.txt" 2>&1 || true
     oc get svc -n "${ns}" -o yaml > "${cpdir}/svc.yaml" 2>&1 || true
-    oc get deployments -n "${ns}" -o wide > "${cpdir}/deployments.txt" 2>&1 || true
-    oc get events -n "${ns}" --sort-by=.lastTimestamp > "${cpdir}/events.txt" 2>&1 || true
-
-    # All pod logs in CP namespace (not just control-plane-operator)
-    for pod in $(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-        for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
-            oc logs "${pod}" -n "${ns}" -c "${container}" --tail=3000 \
-                > "${cpdir}/pod-${pod}-${container}.log" 2>&1 || true
-            oc logs "${pod}" -n "${ns}" -c "${container}" --previous --tail=1000 \
-                > "${cpdir}/pod-${pod}-${container}-previous.log" 2>/dev/null || true
-        done
-    done
 
     # All resources with finalizers (finds anything stuck)
     oc api-resources --verbs=list --namespaced -o name 2>/dev/null | while read resource; do
@@ -173,8 +159,7 @@ echo "=== Collecting HyperShift operator diagnostics ==="
 HYPERSHIFT_NS=$(oc get deployment -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name --no-headers 2>/dev/null \
     | grep -i "hypershift.*operator" | head -1 | awk '{print $1}')
 if [[ -n "${HYPERSHIFT_NS}" ]]; then
-    HYPERSHIFT_DEP=$(oc get deployment -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name --no-headers 2>/dev/null \
-        | grep -i "hypershift.*operator" | head -1 | awk '{print $2}')
+    oc get deployments -n "${HYPERSHIFT_NS}" -o wide > "${ARTIFACT_DIR}/caas/hypershift-deployments.txt" 2>&1 || true
     for pod in $(oc get pods -n "${HYPERSHIFT_NS}" -l app=operator -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
         oc logs -n "${HYPERSHIFT_NS}" "${pod}" -c operator --tail=10000 \
             > "${ARTIFACT_DIR}/caas/hypershift-${pod}.log" 2>&1 || true

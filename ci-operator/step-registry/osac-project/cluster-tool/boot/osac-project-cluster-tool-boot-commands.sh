@@ -108,8 +108,7 @@ COMPONENT_IMAGE="${7:-}"
 COMPONENT_IMAGE_NAME="${8:-}"
 NAMESPACE="${9:-osac-e2e-ci}"
 AAP_SOURCE_REPO_URL="${10:-}"
-FLAVOR_NAME="${11:-vmaas-kustomize}"
-CLUSTER_TEMPLATE="${12:-}"
+CLUSTER_TEMPLATE="${11:-}"
 
 _timer() {
     local elapsed=$(( $(date +%s) - $1 ))
@@ -165,7 +164,7 @@ _timer $PULL_START "Pull flavor"
 
 CLUSTER_BOOT_START=$(date +%s)
 echo "=== Booting cluster ==="
-python3 /usr/local/bin/cluster-tool boot --flavor "${FLAVOR_NAME}" --name "${CLONE}"
+python3 /usr/local/bin/cluster-tool boot --flavor "${CLONE}" --name "${CLONE}"
 _timer $CLUSTER_BOOT_START "Boot cluster"
 
 systemctl restart dnsmasq
@@ -237,7 +236,7 @@ _timer $BOOT_TOTAL_START "Total (setup + pull + boot + refresh)"
 REMOTE_SCRIPT
 
 echo "Executing boot script on machine..."
-timeout -s 9 90m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
+timeout -s 9 "${BOOT_TIMEOUT}" ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     "bash /root/boot.sh \
     '${CLUSTER_TOOL_COMMIT}' \
     '${CLUSTER_TOOL_FLAVOR_IMAGE}' \
@@ -249,7 +248,6 @@ timeout -s 9 90m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     '${COMPONENT_IMAGE_NAME:-}' \
     '${E2E_NAMESPACE}' \
     '${AAP_SOURCE_REPO_URL:-}' \
-    '${CLUSTER_TOOL_FLAVOR_NAME}' \
     '${E2E_CLUSTER_TEMPLATE:-}'"
 
 echo "Boot step finished successfully."

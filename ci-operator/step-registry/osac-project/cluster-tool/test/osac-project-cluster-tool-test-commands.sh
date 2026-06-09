@@ -33,11 +33,12 @@ TEST_IMAGE="$4"
 KUBECONFIG_PATH="$5"
 RESULTS_DIR="$6"
 TEST_DIR="$7"
+SKIP_KUBEVIRT="${8:-false}"
 
 mkdir -p "${RESULTS_DIR}"
 
 export KUBECONFIG="${KUBECONFIG_PATH}"
-if [[ "${TEST_DIR}" != *"caas"* ]]; then
+if [[ "${SKIP_KUBEVIRT}" != "true" ]]; then
     echo "Waiting for KubeVirt to be Available..."
     for attempt in $(seq 1 60); do
         AVAILABLE=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "Unknown")
@@ -73,7 +74,7 @@ podman run --authfile /root/pull-secret --rm --network=host \
     -e OSAC_PULL_SECRET_PATH=/root/pull-secret \
     -e OSAC_SSH_PUBLIC_KEY_PATH=/root/.config/cluster-tool/cluster-tool.key.pub \
     "${TEST_IMAGE}" \
-    pytest ${TEST_DIR}/ -v --junitxml=/tmp/test-results/junit_e2e.xml
+    pytest "${TEST_DIR}/" -v --junitxml=/tmp/test-results/junit_e2e.xml
 
 echo "Tests completed."
 REMOTE_SCRIPT
@@ -88,7 +89,8 @@ timeout -s 9 60m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     '${OSAC_TEST_IMAGE}' \
     '${KUBECONFIG_PATH}' \
     '${REMOTE_RESULTS_DIR}' \
-    '${E2E_TEST_DIR}'" || TEST_EXIT=$?
+    '${E2E_TEST_DIR}' \
+    '${SKIP_KUBEVIRT_WAIT}'" || TEST_EXIT=$?
 
 if [[ "${TEST_EXIT}" -ne 0 ]]; then
     echo "FAILED" > "${SHARED_DIR}/test-result"
