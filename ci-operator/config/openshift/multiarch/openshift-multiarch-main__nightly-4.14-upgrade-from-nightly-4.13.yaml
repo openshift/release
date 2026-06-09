@@ -43,6 +43,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: libvirt-installer
+  libvirt-installer-uipi:
+    name: "4.16"
+    namespace: ocp
+    tag: libvirt-installer
   upi-installer:
     name: "4.13"
     namespace: ocp
@@ -138,19 +142,20 @@ tests:
     workflow: openshift-upgrade-aws
 - as: ocp-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 2 * * 5
   steps:
-    cluster_profile: libvirt-s390x-1
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-initial
+      OPENSHIFT_INSTALL_TARGET: release:s390x-initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.13"
       NODE_TUNING: "true"
       TEST_TYPE: upgrade
-    workflow: openshift-e2e-libvirt
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
