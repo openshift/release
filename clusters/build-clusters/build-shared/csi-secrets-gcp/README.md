@@ -21,6 +21,10 @@ that is the same or higher than the one specified by the label.
 
 
 ### Changes to GCP Provider
+The upstream GCP provider image only supports amd64 and arm64. We build a multi-arch
+manifest list that adds s390x and ppc64le using `hack/build-gcp-provider-multiarch.sh`,
+and publish it to `quay.io/openshift/ci-public`.
+
 The following changes needed to be done to the [upstream manifest](https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/blob/7218875135b87ca930b9bcb97231b1ede4e93e1a/deploy/provider-gcp-plugin.yaml) 
 of the Google Secret Manager Provider, in order for it to run properly on our clusters:
 1. Deleted the `spec.template.spec.initContainers` stanza:
