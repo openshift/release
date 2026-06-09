@@ -1,0 +1,36 @@
+ref:
+  as: openshift-qe-ocpbugs-77510-e2e-test
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-ocpbugs-77510-e2e-test-commands.sh
+  timeout: 50m
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: TEST_SCALE
+    default: "small"
+    documentation: |-
+      Test scale configuration. Options:
+      - small: 10 pods (2 services × 5 pods each)
+      - medium: 50 pods (10 services × 5 pods each) 
+      - large: 200 pods (40 services × 5 pods each)
+      - progressive: Run all scales sequentially on same cluster
+  documentation: |-
+    Executes an end-to-end test for OCPBUGS-77510, which validates TCP RST storm 
+    behavior during kube-apiserver rollouts. This test reproduces a critical 
+    OpenShift networking bug where API server restarts trigger massive TCP RST 
+    storms affecting application connections.
+    
+    The test creates a production-like workload with multiple services and 
+    continuously running clients, then triggers API server restarts while 
+    monitoring for TCP RST packets. Success is determined by capturing a 
+    sufficient number of RST packets, indicating the bug is present.
+    
+    This test is designed to validate both unfixed clusters (where the bug 
+    manifests) and fixed clusters (where RST storms are prevented).
