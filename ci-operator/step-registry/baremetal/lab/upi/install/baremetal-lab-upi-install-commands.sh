@@ -72,7 +72,7 @@ function destroy_bootstrap() {
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
   if [ "${DISCONNECTED}" == "true" ]; then
     echo "Destroying bootstrap: removing drop rule for disconnected network..."
-    firewall-cmd --direct --remove-rule ipv4 filter FORWARD 0 -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP || true
+    firewall-cmd --zone=internal --remove-rich-rule="rule family='ipv4' source address='${ip}' destination not address='${INTERNAL_NET_CIDR}' drop" || true
   fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
