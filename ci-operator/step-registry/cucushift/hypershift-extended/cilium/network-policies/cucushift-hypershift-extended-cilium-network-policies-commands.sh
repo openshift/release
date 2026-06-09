@@ -18,6 +18,9 @@ if [[ "$OCP_VERSION" != "4.22" && "$OCP_VERSION" != "5.0" ]]; then
     exit 0
 fi
 
+echo "Waiting for CiliumNetworkPolicy CRD to be available..."
+timeout 30m bash -c 'until oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; do sleep 10; done'
+
 # Required for OCP 4.22: See https://redhat.atlassian.net/browse/OCPBUGS-85607
 oc apply -f - <<'EOF'
 apiVersion: cilium.io/v2
