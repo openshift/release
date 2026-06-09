@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
   govulncheck:
     name: govulncheck
     namespace: ci
@@ -49,10 +53,18 @@ tests:
   commands: make verify
   container:
     from: src
+- as: fix
+  commands: go fix -diff ./...
+  container:
+    from: src
 - as: unit
   commands: make test
   container:
     from: src
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
 - as: govulncheck
   steps:
     test:
