@@ -15,8 +15,8 @@ DOWNLOAD_URL=$(curl -sfL "https://api.github.com/repos/${REPO}/releases/latest" 
 curl -sfL "${DOWNLOAD_URL}" -o "${DEVICECONFIG_SAMPLE}"
 echo "Downloaded deviceconfig-sample.yaml"
 
-eval "$(python3 -c "
-import yaml, sys, os
+python3 -c "
+import yaml, shlex, os, sys, re
 
 with open('${DEVICECONFIG_SAMPLE}') as f:
     dc = yaml.safe_load(f)
@@ -35,27 +35,22 @@ drivers_image = spec.get('driversImage', '')
 driver_version = drivers_image.rsplit(':', 1)[-1] if ':' in drivers_image else ''
 mapping['ECO_HWACCEL_NEURON_DRIVER_VERSION'] = driver_version
 
+image_re = re.compile(r'^[a-zA-Z0-9._/:-]+$')
 for key, value in mapping.items():
-    if not os.environ.get(key):
-        print(f'export {key}=\"{value}\"')
-")"
+    if value and not image_re.match(value):
+        print(f'ERROR: {key} contains unexpected characters: {value!r}', file=sys.stderr)
+        sys.exit(1)
 
-echo "DeviceConfig values resolved:"
-echo "  DRIVERS_IMAGE=${ECO_HWACCEL_NEURON_DRIVERS_IMAGE}"
-echo "  DRIVER_VERSION=${ECO_HWACCEL_NEURON_DRIVER_VERSION}"
-echo "  DEVICE_PLUGIN_IMAGE=${ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE}"
-echo "  SCHEDULER_IMAGE=${ECO_HWACCEL_NEURON_SCHEDULER_IMAGE}"
-echo "  SCHEDULER_EXTENSION_IMAGE=${ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE}"
-echo "  NODE_METRICS_IMAGE=${ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE}"
+env_path = os.path.join(os.environ['SHARED_DIR'], 'neuron-deviceconfig.env')
+with open(env_path, 'w') as ef:
+    for key, value in mapping.items():
+        existing = os.environ.get(key, '')
+        final = existing if existing else value
+        ef.write(f'export {key}={shlex.quote(final)}\n')
+        print(f'  {key}={final}')
+"
+echo "DeviceConfig values resolved (written to SHARED_DIR/neuron-deviceconfig.env)"
 
-# Save values for downstream steps (test, kserve-test)
-cat > "${SHARED_DIR}/neuron-deviceconfig.env" <<EOF
-export ECO_HWACCEL_NEURON_DRIVERS_IMAGE="${ECO_HWACCEL_NEURON_DRIVERS_IMAGE}"
-export ECO_HWACCEL_NEURON_DRIVER_VERSION="${ECO_HWACCEL_NEURON_DRIVER_VERSION}"
-export ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE="${ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE}"
-export ECO_HWACCEL_NEURON_SCHEDULER_IMAGE="${ECO_HWACCEL_NEURON_SCHEDULER_IMAGE}"
-export ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE="${ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE}"
-export ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE="${ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE}"
-EOF
+source "${SHARED_DIR}/neuron-deviceconfig.env"
 
 make cluster-operators
