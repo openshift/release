@@ -190,6 +190,15 @@ configure_claude() {
       "Bash(python3 plugins/microshift-release/scripts/*)",
       "Bash(python3:*)",
       "Bash(tee /tmp/**)",
+      "Bash(git rev-parse *)",
+      "Bash(git fetch *)",
+      "Bash(git clone *)",
+      "Bash(git sparse-checkout *)",
+      "Bash(git branch *)",
+      "Bash(git log *)",
+      "Bash(mkdir -p *)",
+      "Bash(python3 -m venv *)",
+      "Bash(python3 -m pip install *)",
       "Skill(microshift-release:pre-check)",
       "mcp__jira__*",
       "mcp__atlassian__*"
@@ -279,7 +288,7 @@ timeout 1200 claude \
     --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p " /microshift-release:pre-check ${PRECHECK_TIME_RANGE} --verbose" \
+    -p "/microshift-release:pre-check ${PRECHECK_TIME_RANGE} --verbose" \
     --verbose 2>&1 | tee "${CLAUDE_LOG}"
 check_claude_rc "${CLAUDE_RC}" "pre-check" 20
 
