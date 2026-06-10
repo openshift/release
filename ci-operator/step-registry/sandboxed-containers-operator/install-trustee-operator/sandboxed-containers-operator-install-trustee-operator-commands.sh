@@ -195,9 +195,7 @@ function render_trustee_operator_chart() {
   fi
 
   # Render the chart
-  # Note: The chart has leading spaces in templates that break YAML parsing
-  # Use sed to remove single leading space from each line
-  helm template "${helm_args[@]}" | sed 's/^ //'
+  helm template "${helm_args[@]}"
 }
 
 # Render trustee operands chart using helm template
@@ -217,8 +215,7 @@ function render_trustee_operands_chart() {
   # Use sed to remove single leading space from each line
   helm template trustee-operands "${operands_chart}" \
     --set "namespaceOverride=${TRUSTEE_NAMESPACE}" \
-    --set "clusterDomain=${CLUSTER_DOMAIN}" \
-    | sed 's/^ //'
+    --set "clusterDomain=${CLUSTER_DOMAIN}"
 }
 
 #========================================
