@@ -57,13 +57,18 @@ podman create --authfile /root/pull-secret --name installer-extract "${INSTALLER
 podman cp installer-extract:/installer/scripts /tmp/installer-scripts
 podman rm installer-extract
 
-# Create an SSH config that points to localhost (the script SSHes for DNS/VM steps)
+# setup-caas-agents.sh SSHes to ci_machine for dnsmasq and virt-install steps.
+# In CI the script already runs on the host, so SSH goes to localhost.
+# Generate a throwaway key pair so root can SSH to itself.
+ssh-keygen -t ed25519 -f /tmp/localhost-key -N "" -q
+mkdir -p /root/.ssh && cat /tmp/localhost-key.pub >> /root/.ssh/authorized_keys
 cat > /tmp/localhost-ssh-config <<SSHCFG
 Host ci_machine
     HostName 127.0.0.1
     User root
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
+    IdentityFile /tmp/localhost-key
 SSHCFG
 
 INSTALLER_NAMESPACE="${NAMESPACE}" \
