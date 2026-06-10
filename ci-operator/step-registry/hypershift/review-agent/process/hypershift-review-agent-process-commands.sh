@@ -6,6 +6,21 @@ echo "=== HyperShift Review Agent Process ==="
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 
+# Install tool dependencies
+echo "Installing tool dependencies..."
+GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
+python3.9 -m ensurepip --user 2>/dev/null || true
+python3.9 -m pip install --user pre-commit 2>&1 | tail -1
+export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
+
+# Install plugins
+echo "Installing Claude Code plugins..."
+claude plugin marketplace add openshift-eng/ai-helpers
+claude plugin install utils@ai-helpers
+claude plugin install golang@ai-helpers
+claude plugin marketplace add enxebre/ai-scripts
+claude plugin install git@enxebre
+
 # Clone ai-helpers repository (contains /utils:address-reviews command)
 echo "Cloning ai-helpers repository..."
 git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
