@@ -179,33 +179,23 @@ function render_trustee_operator_chart() {
 
   echo ">>> Rendering trustee-operator chart"
 
-  # Create values file for operator chart
-  local values_file="${SCRATCH}/operator-values.yaml"
-  cat > "${values_file}" <<EOF
-# Trustee Operator values
-namespace: ${TRUSTEE_NAMESPACE}
+  # Build helm command with --set parameters
+  local helm_args=(
+    "trustee-operator"
+    "${operator_chart}"
+    "--set" "namespaceOverride=${TRUSTEE_NAMESPACE}"
+  )
 
-# CatalogSource configuration
-catalogSource:
-  name: ${TRUSTEE_CATALOG_SOURCE_NAME}
-EOF
-
-  # Add custom catalog image if provided
+  # Add catalog source configuration if custom image provided
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
-    cat >> "${values_file}" <<EOF
-  image: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-  create: true
-EOF
-  else
-    cat >> "${values_file}" <<EOF
-  create: false
-EOF
+    helm_args+=(
+      "--set" "dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}"
+      "--set" "catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
+    )
   fi
 
   # Render the chart
-  helm template trustee-operator "${operator_chart}" \
-    --namespace "${TRUSTEE_NAMESPACE}" \
-    --values "${values_file}"
+  helm template "${helm_args[@]}"
 }
 
 # Render trustee operands chart using helm template
@@ -220,49 +210,10 @@ function render_trustee_operands_chart() {
 
   echo ">>> Rendering trustee-operands chart"
 
-  # Create values file for operands chart
-  local values_file="${SCRATCH}/operands-values.yaml"
-  cat > "${values_file}" <<EOF
-# Trustee Operands values
-namespace: ${TRUSTEE_NAMESPACE}
-clusterDomain: ${CLUSTER_DOMAIN}
-
-# TrusteeConfig
-trusteeConfig:
-  name: trustee-operands
-  profileType: Permissive
-  kbsServiceType: ClusterIP
-
-# KbsConfig - secrets to publish as KBS resources
-kbsConfig:
-  name: trustee-operands-kbs-config
-  secretResources:
-    - containers-policy
-    - cosign-keys
-    - kbsres1
-
-# Test secrets
-secrets:
-  cosignKeys:
-    enabled: true
-  containersPolicy:
-    enabled: true
-  kbsres1:
-    enabled: true
-
-# OpenShift Route for KBS
-route:
-  enabled: true
-  name: kbs-service
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Allow
-EOF
-
-  # Render the chart
+  # Render the chart with --set parameters (matching user's pattern)
   helm template trustee-operands "${operands_chart}" \
-    --namespace "${TRUSTEE_NAMESPACE}" \
-    --values "${values_file}"
+    --set "namespaceOverride=${TRUSTEE_NAMESPACE}" \
+    --set "clusterDomain=${CLUSTER_DOMAIN}"
 }
 
 #========================================
