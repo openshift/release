@@ -36,10 +36,9 @@ images:
       COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
       COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
       RUN set -x && \
-          yum config-manager --disable ubi-9-appstream ubi-9-baseos ubi-9-codeready-builder && \
-          yum update -y && \
+          yum update -y --disablerepo=ubi-9-appstream --disablerepo=ubi-9-baseos --disablerepo=ubi-9-codeready-builder && \
           PACKAGES="git gzip httpd-tools java-11-openjdk-headless openssh-clients python3-pip skopeo util-linux zip" && \
-          yum -y install --setopt=tsflags=nodocs $PACKAGES && \
+          yum -y install --setopt=tsflags=nodocs --disablerepo=ubi-9-appstream --disablerepo=ubi-9-baseos --disablerepo=ubi-9-codeready-builder $PACKAGES && \
           git config --system user.name openshift-tests-private && \
           git config --system user.email openshift-tests-private@redhat.com && \
           tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
@@ -94,8 +93,8 @@ images:
           curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
           echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
           chmod +x /usr/local/bin/yq && \
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-          yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
+          curl -fLo /tmp/google-chrome-stable_current_x86_64.rpm https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+          yum install -y /tmp/google-chrome-stable_current_x86_64.rpm && rm -f /tmp/google-chrome-stable_current_x86_64.rpm && \
           yum clean all && rm -rf /var/cache/yum/* /tmp/*
     from: tools
     to: tests-private-baseui

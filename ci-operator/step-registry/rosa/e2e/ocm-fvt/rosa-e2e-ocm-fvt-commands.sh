@@ -18,13 +18,15 @@ fi
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-trap 'rm -f "${podman_env_file}"' EXIT
+trap 'rm -f "${podman_env_file}"; rm -rf "${fvt_output_dir:-}"' EXIT
 umask "${old_umask}"
 
 {
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
   echo "JOB_LINK=${JOB_LINK}"
+  echo "SLACK_WEBHOOK_URL=$(cat /usr/local/cs-qe-credentials/slack_webhook_url)"
+  echo "CONSOLE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/console_client_secret)"
 } > "${podman_env_file}"
 
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
@@ -64,7 +66,9 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   )
 fi
 
+fvt_output_dir="$(mktemp -d /tmp/fvt-output.XXXXXX)"
 podman_args+=(--rm)
+podman_args+=("-v" "${fvt_output_dir}:/ocmci-common/output:z")
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
@@ -72,7 +76,19 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
 fi
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
+rc=0
 podman run \
   "${podman_args[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
-  ocmtest "${ocmtest_args[@]}"
+  ocmtest "${ocmtest_args[@]}" || rc=$?
+
+if [[ -d "${ARTIFACT_DIR:-}" ]]; then
+  xml_count=0
+  while IFS= read -r -d '' xml_file; do
+    cp "${xml_file}" "${ARTIFACT_DIR}/" || echo "WARNING: failed to copy ${xml_file}"
+    xml_count=$((xml_count + 1))
+  done < <(find "${fvt_output_dir}" -name '*.xml' -print0)
+  echo "Copied ${xml_count} JUnit XML file(s) to ${ARTIFACT_DIR}"
+fi
+
+exit "${rc}"
