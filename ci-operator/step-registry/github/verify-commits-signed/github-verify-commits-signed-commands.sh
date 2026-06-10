@@ -2,16 +2,11 @@
 
 set -euo pipefail
 
-if [[ -z "${PULL_NUMBER:-}" ]]; then
-  echo "PULL_NUMBER is not set — skipping commit signature verification."
-  exit 0
-fi
-
-echo "Checking GPG signature status for PR #${PULL_NUMBER} in ${REPO_OWNER}/${REPO_NAME}..."
+echo "Checking GPG signature status for PR #350 in openshift/must-gather-operator..."
 
 commits_json=$(curl -sS -f \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}/commits?per_page=100")
+  "https://api.github.com/repos/openshift/must-gather-operator/pulls/350/commits?per_page=100")
 
 python3 -c '
 import json, sys
