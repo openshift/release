@@ -171,6 +171,23 @@ if [[ -n "${HYPERSHIFT_NS}" ]]; then
     oc get events -n "${HYPERSHIFT_NS}" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/caas/hypershift-events.txt" 2>&1 || true
 fi
 
+echo "=== Collecting storage diagnostics (LVMS/topolvm) ==="
+mkdir -p "${ARTIFACT_DIR}/storage"
+oc get pv -o wide > "${ARTIFACT_DIR}/storage/pvs.txt" 2>&1 || true
+oc get pv -o yaml > "${ARTIFACT_DIR}/storage/pvs.yaml" 2>&1 || true
+oc get pvc -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/storage/pvcs.txt" 2>&1 || true
+oc get pvc -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/storage/pvcs.yaml" 2>&1 || true
+oc get sc -o yaml > "${ARTIFACT_DIR}/storage/storageclasses.yaml" 2>&1 || true
+oc get logicalvolumes.topolvm.io -o yaml > "${ARTIFACT_DIR}/storage/topolvm-logicalvolumes.yaml" 2>&1 || true
+oc get lvmclusters -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmclusters.yaml" 2>&1 || true
+oc get lvmvolumegroups -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmvolumegroups.yaml" 2>&1 || true
+oc get events -n openshift-storage --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/storage/events-openshift-storage.txt" 2>&1 || true
+for pod in $(oc get pods -n openshift-storage -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    oc logs "${pod}" -n openshift-storage --tail=2000 > "${ARTIFACT_DIR}/storage/pod-${pod}.log" 2>&1 || true
+done
+oc get pods -n openshift-storage -o wide > "${ARTIFACT_DIR}/storage/pods-openshift-storage.txt" 2>&1 || true
+oc describe pv > "${ARTIFACT_DIR}/storage/pvs-describe.txt" 2>&1 || true
+
 echo "=== Collecting node resource usage ==="
 oc adm top node > "${ARTIFACT_DIR}/node-resources.txt" 2>&1 || true
 oc adm top pod -n "${E2E_NAMESPACE}" --sort-by=memory > "${ARTIFACT_DIR}/pod-resources.txt" 2>&1 || true
