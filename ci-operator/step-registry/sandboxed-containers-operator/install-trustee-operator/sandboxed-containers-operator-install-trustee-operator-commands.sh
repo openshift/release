@@ -102,43 +102,43 @@ function fetch_trustee_charts() {
   # ci-operator provides built images via IMAGE_FORMAT and IMAGE_TRUSTEE_CHARTS env vars
   if [[ -n "${IMAGE_TRUSTEE_CHARTS:-}" ]]; then
     local charts_image="${IMAGE_TRUSTEE_CHARTS}"
-    echo ">>> Extracting trustee charts from pre-built image"
-    echo ">>> Image: ${charts_image}"
+    echo ">>> Extracting trustee charts from pre-built image" >&2
+    echo ">>> Image: ${charts_image}" >&2
 
     # Extract charts from the image
     mkdir -p "${charts_dir}"
     local extract_output
     if extract_output=$(oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1); then
-      echo ">>> Charts extracted from image (no network access needed)"
-      echo ">>> Extracted files:"
-      ls -lR "${charts_dir}" | head -50
+      echo ">>> Charts extracted from image (no network access needed)" >&2
+      echo ">>> Extracted files:" >&2
+      ls -lR "${charts_dir}" | head -50 >&2
       echo "${charts_dir}"
       return 0
     else
-      echo ">>> ERROR: Failed to extract charts from image"
-      echo "$extract_output"
-      echo ">>> Falling back to git clone"
+      echo ">>> ERROR: Failed to extract charts from image" >&2
+      echo "$extract_output" >&2
+      echo ">>> Falling back to git clone" >&2
     fi
   else
-    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback"
+    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback" >&2
   fi
 
   # Option 2: Fallback to git clone (requires restrict_network_access: false)
-  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
+  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
   if ! command -v git &> /dev/null; then
-    echo ">>> ERROR: git command not found"
+    echo ">>> ERROR: git command not found" >&2
     return 1
   fi
 
   git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
 
   if [[ ! -d "${charts_dir}" ]]; then
-    echo ">>> ERROR: Failed to clone charts repository"
+    echo ">>> ERROR: Failed to clone charts repository" >&2
     return 1
   fi
 
-  echo ">>> Charts cloned from GitHub"
+  echo ">>> Charts cloned from GitHub" >&2
   echo "${charts_dir}"
 }
 
@@ -180,13 +180,13 @@ function render_trustee_operator_chart() {
   local operator_chart="${charts_dir}/trustee-operator"
 
   if [[ ! -d "${operator_chart}" ]]; then
-    echo ">>> ERROR: Operator chart not found at ${operator_chart}"
+    echo ">>> ERROR: Operator chart not found at ${operator_chart}" >&2
     return 1
   fi
 
-  echo ">>> Rendering trustee-operator chart from: ${operator_chart}"
-  echo ">>> Chart files:"
-  ls -la "${operator_chart}"
+  echo ">>> Rendering trustee-operator chart from: ${operator_chart}" >&2
+  echo ">>> Chart files:" >&2
+  ls -la "${operator_chart}" >&2
 
   # Build helm command with --set parameters
   local helm_args=(
@@ -201,16 +201,16 @@ function render_trustee_operator_chart() {
       "--set" "dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}"
       "--set" "catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
     )
-    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}, catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}, catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}" >&2
   else
-    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}"
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}" >&2
   fi
 
   # Render the chart and capture output for debugging
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
-    echo ">>> ERROR: helm template failed"
-    echo "$helm_output"
+    echo ">>> ERROR: helm template failed" >&2
+    echo "$helm_output" >&2
     return 1
   fi
 
@@ -223,22 +223,22 @@ function render_trustee_operands_chart() {
   local operands_chart="${charts_dir}/trustee-operands"
 
   if [[ ! -d "${operands_chart}" ]]; then
-    echo ">>> ERROR: Operands chart not found at ${operands_chart}"
+    echo ">>> ERROR: Operands chart not found at ${operands_chart}" >&2
     return 1
   fi
 
-  echo ">>> Rendering trustee-operands chart from: ${operands_chart}"
-  echo ">>> Chart files:"
-  ls -la "${operands_chart}"
-  echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, clusterDomain=${CLUSTER_DOMAIN}"
+  echo ">>> Rendering trustee-operands chart from: ${operands_chart}" >&2
+  echo ">>> Chart files:" >&2
+  ls -la "${operands_chart}" >&2
+  echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, clusterDomain=${CLUSTER_DOMAIN}" >&2
 
   # Render the chart and capture output for debugging
   local helm_output
   if ! helm_output=$(helm template trustee-operands "${operands_chart}" \
     --set "namespaceOverride=${TRUSTEE_NAMESPACE}" \
     --set "clusterDomain=${CLUSTER_DOMAIN}" 2>&1); then
-    echo ">>> ERROR: helm template failed"
-    echo "$helm_output"
+    echo ">>> ERROR: helm template failed" >&2
+    echo "$helm_output" >&2
     return 1
   fi
 
