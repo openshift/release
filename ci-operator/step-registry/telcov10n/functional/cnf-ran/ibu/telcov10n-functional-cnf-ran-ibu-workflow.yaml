@@ -2,15 +2,19 @@ workflow:
   as: telcov10n-functional-cnf-ran-ibu
   documentation: |-
     IBU (Image Based Upgrade) workflow for CNF RAN testing.
-    Pre: deploy seed hub (kni-qe-108) and target hub (kni-qe-109) at VERSION.
+    Pre: deploy seed hub (kni-qe-108) and target hub (kni-qe-109) at VERSION, install operators on both.
     Test: run IBU upgrade and post-upgrade eco-gotests, report results.
     Post: notify Slack, trigger next job in chain.
   steps:
     pre:
     # Seed hub setup — kni-qe-108 deployed at VERSION
     - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-hub-config
+    - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
     # Target hub setup — kni-qe-109 deployed at VERSION
     - ref: telcov10n-functional-cnf-ran-ibu-target-hub-deploy
-    post:
-    - ref: wait
+    - ref: telcov10n-functional-cnf-ran-ibu-target-hub-config
+    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-spoke-operators
+    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
+    post: []
 
