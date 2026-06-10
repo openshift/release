@@ -10,12 +10,12 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-#if [[ $TAG == "latest" ]]; then
-#    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-#else
-#    LATEST_TAG=$TAG
-#fi
-git clone -q https://github.com/rsevilla87/orion.git --depth 1
+if [[ $TAG == "latest" ]]; then
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+else
+    LATEST_TAG=$TAG
+fi
+git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -74,7 +74,7 @@ fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
-if ! curl -fsSLO https://github.com/rsevilla87/go-commons/releases/download/v1.2.4/ocp-metadata; then
+if ! curl -fsSLO --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64; then
     echo "Error: Failed to download ocp-metadata binary"
     exit 1
 fi
@@ -86,6 +86,8 @@ EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
     ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
 fi
+
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
 
 # Unset proxy so we can pip install, reach sippy, etc.
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
