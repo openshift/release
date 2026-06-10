@@ -42,12 +42,12 @@ images:
           git config --system user.name openshift-tests-private && \
           git config --system user.email openshift-tests-private@redhat.com && \
           tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
-          pip3 uninstall PyYAML -y && yum -y remove python3-requests && pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
+          pip3 uninstall PyYAML -y && yum -y remove subscription-manager sos python3-subscription-manager-rhsm python3-cloud-what python3-requests && pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
           sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
           yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
           sh -c 'echo -e "[google-cloud-cli]\nname=Google Cloud CLI\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=0\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
           yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-cli google-cloud-cli && \
-          yum -y install sos && \
+          yum -y install subscription-manager sos && \
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
           unzip -q awscliv2.zip && ./aws/install -b /bin && \
           rm -rf ./aws awscliv2.zip && \
@@ -93,8 +93,8 @@ images:
           curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
           echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
           chmod +x /usr/local/bin/yq && \
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-          yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
+          sh -c 'echo -e "[google-chrome]\nname=Google Chrome\nbaseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64\nenabled=0\ngpgcheck=1\ngpgkey=https://dl.google.com/linux/linux_signing_key.pub" > /etc/yum.repos.d/google-chrome.repo' && \
+          yum install -y --enablerepo=google-chrome google-chrome-stable && \
           yum clean all && rm -rf /var/cache/yum/* /tmp/*
     from: tools
     to: tests-private-baseui
