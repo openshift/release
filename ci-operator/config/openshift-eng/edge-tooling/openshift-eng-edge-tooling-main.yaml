@@ -115,6 +115,19 @@ tests:
       GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements,openshift/lvm-operator
       REQUIRED_LABELS: lgtm,approved,verified
     workflow: openshift-edge-tooling-gh-notifier
+- as: microshift-release-evaluation
+  cron: 0 16 * * 4,5
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |
+      :z-stream-investigation: *MicroShift Z-Stream Release Evaluation* ended with *{{.Status.State}}*.
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-release-evaluation/openshift-edge-tooling-microshift-release-evaluation/artifacts/precheck-results.txt|View results> | <{{.Status.URL}}|View logs> |
+  steps:
+    workflow: openshift-edge-tooling-microshift-release-evaluation
 zz_generated_metadata:
   branch: main
   org: openshift-eng
