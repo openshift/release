@@ -9,7 +9,8 @@ build_root:
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN yum install -y diffutils && yum clean all
-      RUN pip install --no-cache-dir ruff pip-audit
+      COPY requirements.lock.txt requirements-dev.txt /tmp/
+      RUN pip install --no-cache-dir -r /tmp/requirements.lock.txt -r /tmp/requirements-dev.txt
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -39,8 +40,7 @@ tests:
   container:
     from: src
 - as: unit
-  commands: pip install --user -r requirements.lock.txt -r requirements-dev.txt &&
-    make test
+  commands: make test
   container:
     from: src
 zz_generated_metadata:
