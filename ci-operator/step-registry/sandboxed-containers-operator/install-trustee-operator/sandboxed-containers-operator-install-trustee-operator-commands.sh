@@ -230,22 +230,18 @@ function install_trustee_operator() {
 
   # Render operator chart
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"
-  render_trustee_operator_chart "${charts_dir}" > "${operator_yaml}"
-
-  # Debug: show first 50 lines of generated YAML
-  echo ">>> Generated operator YAML (first 50 lines):"
-  head -50 "${operator_yaml}"
-
-  # Validate YAML syntax
-  if ! kubectl --dry-run=client apply -f "${operator_yaml}" 2>&1 | head -20; then
-    echo ">>> ERROR: Generated YAML is invalid"
-    echo ">>> Full YAML:"
-    cat "${operator_yaml}"
+  if ! render_trustee_operator_chart "${charts_dir}" > "${operator_yaml}"; then
+    echo ">>> ERROR: Failed to render operator chart"
     return 1
   fi
 
   # Apply operator chart
-  oc apply -f "${operator_yaml}"
+  if ! oc apply -f "${operator_yaml}" 2>&1; then
+    echo ">>> ERROR: Failed to apply operator manifests (oc apply failed)"
+    echo ">>> Full YAML:"
+    cat "${operator_yaml}"
+    return 1
+  fi
 }
 
 # Wait for operator installation through all OLM stages
@@ -372,22 +368,18 @@ function install_trustee_operands() {
 
   # Render operands chart
   local operands_yaml="${SCRATCH}/operands-manifests.yaml"
-  render_trustee_operands_chart "${charts_dir}" > "${operands_yaml}"
-
-  # Debug: show first 50 lines of generated YAML
-  echo ">>> Generated operands YAML (first 50 lines):"
-  head -50 "${operands_yaml}"
-
-  # Validate YAML syntax
-  if ! kubectl --dry-run=client apply -f "${operands_yaml}" 2>&1 | head -20; then
-    echo ">>> ERROR: Generated YAML is invalid"
-    echo ">>> Full YAML:"
-    cat "${operands_yaml}"
+  if ! render_trustee_operands_chart "${charts_dir}" > "${operands_yaml}"; then
+    echo ">>> ERROR: Failed to render operands chart"
     return 1
   fi
 
   # Apply operands chart
-  oc apply -f "${operands_yaml}"
+  if ! oc apply -f "${operands_yaml}" 2>&1; then
+    echo ">>> ERROR: Failed to apply operands manifests (oc apply failed)"
+    echo ">>> Full YAML:"
+    cat "${operands_yaml}"
+    return 1
+  fi
 }
 
 # Wait for operand deployments to become available
