@@ -128,6 +128,7 @@ OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
+FIPS=${FIPS:-false}
 SUBSCRIPTION_TYPE=${SUBSCRIPTION_TYPE:-"standard"}
 ENABLE_WIF=${ENABLE_WIF:-"no"}
 REGION=${REGION:-"${LEASED_RESOURCE}"}
@@ -266,6 +267,11 @@ if [[ "$SECURE_BOOT_FOR_SHIELDED_VMS" == "true" ]]; then
   SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH="--secure-boot-for-shielded-vms"
 fi
 
+FIPS_SWITCH=""
+if [[ "$FIPS" == "true" ]]; then
+  FIPS_SWITCH="--fips"
+fi
+
 PRIVATE_SWITCH=""
 if [[ "${PRIVATE}" == "yes" ]]; then
   PRIVATE_SWITCH="--private"
@@ -285,6 +291,7 @@ echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
 echo "  Secure boot for shielded VMs: ${SECURE_BOOT_FOR_SHIELDED_VMS}"
+echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
 echo "  WIF: ${ENABLE_WIF}"
 if [[ "${ENABLE_WIF}" == "yes" ]]; then
@@ -317,6 +324,7 @@ ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH} \
+${FIPS_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${SHARED_VPC_SWITCH:-}"
 
