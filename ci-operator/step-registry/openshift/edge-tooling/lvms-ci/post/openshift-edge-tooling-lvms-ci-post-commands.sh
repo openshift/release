@@ -9,7 +9,7 @@ else
 fi
 
 download_report() {
-    local -r report_name="lvm-operator-ci-doctor-report.html"
+    local -r report_name="report-lvm-operator-ci-doctor.html"
     local -r report_url="${GCSWEB_JOB_URL}/artifacts/lvms-ci-doctor/openshift-edge-tooling-lvms-ci-doctor/artifacts/${report_name}"
     local -r output_file="${ARTIFACT_DIR}/0-${report_name%.html}-summary.html"
 
