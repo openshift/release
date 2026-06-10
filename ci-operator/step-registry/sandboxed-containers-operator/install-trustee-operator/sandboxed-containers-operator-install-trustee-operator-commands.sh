@@ -107,13 +107,20 @@ function fetch_trustee_charts() {
 
     # Extract charts from the image
     mkdir -p "${charts_dir}"
-    if oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1; then
+    local extract_output
+    if extract_output=$(oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1); then
       echo ">>> Charts extracted from image (no network access needed)"
+      echo ">>> Extracted files:"
+      ls -lR "${charts_dir}" | head -50
       echo "${charts_dir}"
       return 0
     else
-      echo ">>> WARNING: Failed to extract charts from image, falling back to git clone"
+      echo ">>> ERROR: Failed to extract charts from image"
+      echo "$extract_output"
+      echo ">>> Falling back to git clone"
     fi
+  else
+    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback"
   fi
 
   # Option 2: Fallback to git clone (requires restrict_network_access: false)
@@ -177,7 +184,9 @@ function render_trustee_operator_chart() {
     return 1
   fi
 
-  echo ">>> Rendering trustee-operator chart"
+  echo ">>> Rendering trustee-operator chart from: ${operator_chart}"
+  echo ">>> Chart files:"
+  ls -la "${operator_chart}"
 
   # Build helm command with --set parameters
   local helm_args=(
@@ -192,10 +201,20 @@ function render_trustee_operator_chart() {
       "--set" "dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}"
       "--set" "catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
     )
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}, catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
+  else
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}"
   fi
 
-  # Render the chart
-  helm template "${helm_args[@]}"
+  # Render the chart and capture output for debugging
+  local helm_output
+  if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
+    echo ">>> ERROR: helm template failed"
+    echo "$helm_output"
+    return 1
+  fi
+
+  echo "$helm_output"
 }
 
 # Render trustee operands chart using helm template
@@ -208,14 +227,22 @@ function render_trustee_operands_chart() {
     return 1
   fi
 
-  echo ">>> Rendering trustee-operands chart"
+  echo ">>> Rendering trustee-operands chart from: ${operands_chart}"
+  echo ">>> Chart files:"
+  ls -la "${operands_chart}"
+  echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, clusterDomain=${CLUSTER_DOMAIN}"
 
-  # Render the chart with --set parameters (matching user's pattern)
-  # Note: The chart has leading spaces in templates that break YAML parsing
-  # Use sed to remove single leading space from each line
-  helm template trustee-operands "${operands_chart}" \
+  # Render the chart and capture output for debugging
+  local helm_output
+  if ! helm_output=$(helm template trustee-operands "${operands_chart}" \
     --set "namespaceOverride=${TRUSTEE_NAMESPACE}" \
-    --set "clusterDomain=${CLUSTER_DOMAIN}"
+    --set "clusterDomain=${CLUSTER_DOMAIN}" 2>&1); then
+    echo ">>> ERROR: helm template failed"
+    echo "$helm_output"
+    return 1
+  fi
+
+  echo "$helm_output"
 }
 
 #========================================
@@ -235,13 +262,22 @@ function install_trustee_operator() {
     return 1
   fi
 
+  echo ">>> Rendered operator YAML (first 30 lines):"
+  head -30 "${operator_yaml}"
+  echo ">>> Total YAML lines: $(wc -l < "${operator_yaml}")"
+
   # Apply operator chart
-  if ! oc apply -f "${operator_yaml}" 2>&1; then
-    echo ">>> ERROR: Failed to apply operator manifests (oc apply failed)"
-    echo ">>> Full YAML:"
+  local apply_output
+  if ! apply_output=$(oc apply -f "${operator_yaml}" 2>&1); then
+    echo ">>> ERROR: Failed to apply operator manifests"
+    echo "$apply_output"
+    echo ">>> Full operator YAML:"
     cat "${operator_yaml}"
     return 1
   fi
+
+  echo ">>> Apply output:"
+  echo "$apply_output"
 }
 
 # Wait for operator installation through all OLM stages
@@ -373,13 +409,22 @@ function install_trustee_operands() {
     return 1
   fi
 
+  echo ">>> Rendered operands YAML (first 30 lines):"
+  head -30 "${operands_yaml}"
+  echo ">>> Total YAML lines: $(wc -l < "${operands_yaml}")"
+
   # Apply operands chart
-  if ! oc apply -f "${operands_yaml}" 2>&1; then
-    echo ">>> ERROR: Failed to apply operands manifests (oc apply failed)"
-    echo ">>> Full YAML:"
+  local apply_output
+  if ! apply_output=$(oc apply -f "${operands_yaml}" 2>&1); then
+    echo ">>> ERROR: Failed to apply operands manifests"
+    echo "$apply_output"
+    echo ">>> Full operands YAML:"
     cat "${operands_yaml}"
     return 1
   fi
+
+  echo ">>> Apply output:"
+  echo "$apply_output"
 }
 
 # Wait for operand deployments to become available
