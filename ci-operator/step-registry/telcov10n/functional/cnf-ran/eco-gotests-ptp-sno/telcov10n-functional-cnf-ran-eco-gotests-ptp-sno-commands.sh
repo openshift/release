@@ -48,9 +48,6 @@ ssh -o ServerAliveInterval=60 \
 
 cd /eco-ci-cd
 
-# Write PTP_CONFIGS to a YAML file so Ansible parses it as a list of dicts.
-# Passing it inline via --extra-vars "key='[...]'" causes Ansible to treat the
-# single-quoted value as a plain string, not a list.
 printf 'ptp_cycle_configs: %s\n' "${PTP_CONFIGS}" > /tmp/ptp_cycle_configs.yml
 
 echo "Run eco-gotests PTP suite — all cycles"
