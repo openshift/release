@@ -10,6 +10,50 @@ echo ""
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+mirror_vault_image() {
+  echo "Mirroring Vault image to dev-scripts local registry..."
+
+  VAULT_IMAGE="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+  DEVSCRIPTS_VAULT_IMAGE="${DS_REGISTRY}/localimages/vault-enterprise:${VAULT_VERSION}"
+
+  echo "  Source: ${VAULT_IMAGE}"
+  echo "  Destination: ${DEVSCRIPTS_VAULT_IMAGE}"
+
+  # shellcheck disable=SC2087
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+set -euo pipefail
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json "${VAULT_IMAGE}" "${DEVSCRIPTS_VAULT_IMAGE}"
+EOF
+
+  VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
+  echo "Using mirrored Vault image repository: ${VAULT_IMAGE_REPOSITORY}"
+}
+
+setup_packet_cluster() {
+  if [[ -n "${CLUSTER_TYPE:-}" && "${CLUSTER_TYPE}" == equinix-ocp-metal ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/ds-vars.conf"
+
+    # For disconnected or otherwise unreachable environments, we want to
+    # have steps use an HTTP(S) proxy to reach the API server. This proxy
+    # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+    # environment variables, as well as their lowercase equivalents (note
+    # that libcurl doesn't recognize the uppercase variables).
+    if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+      # shellcheck source=/dev/null
+      source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+
+    # Always mirror on baremetal. Nodes often lack IPv6 egress to quay.io even when
+    # DS_IP_STACK=v4 (connected), while pods still use IPv6 addresses. The dev-scripts
+    # local registry is reachable from all metal nodes regardless of IP stack.
+    echo "mirroring Vault to local registry"
+    mirror_vault_image
+  fi
+}
+
 # Vault license secret name
 VAULT_LICENSE_SECRET_NAME="vault-license"
 
@@ -45,16 +89,24 @@ oc create secret generic "${VAULT_LICENSE_SECRET_NAME}" \
   --from-file=license=/var/run/vault/tests-private-account/kms-vault-license \
   -n "${VAULT_NAMESPACE}"
 
-# Add HashiCorp Helm repository
-echo "Adding HashiCorp Helm repository..."
+# Fetch the Helm chart before baremetalds proxy env is applied; hashicorp chart
+# downloads fail with Forbidden once proxy-conf.sh is sourced on metal jobs.
+echo "Fetching HashiCorp Vault Helm chart..."
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo update
+VAULT_CHART_ARCHIVE="/tmp/vault-${VAULT_CHART_VERSION}.tgz"
+helm pull hashicorp/vault --version "${VAULT_CHART_VERSION}" --destination /tmp
+echo "Chart downloaded to ${VAULT_CHART_ARCHIVE}"
 
 echo ""
 
+setup_packet_cluster
+
+VAULT_API_ADDR="https://vault.${VAULT_NAMESPACE}.svc:8200"
+
 # Install Vault via Helm with dev mode and TLS enabled
 echo "Installing Vault Enterprise v${VAULT_VERSION} in dev mode with TLS..."
-helm upgrade --install vault hashicorp/vault \
+helm upgrade --install vault "${VAULT_CHART_ARCHIVE}" \
   --namespace "${VAULT_NAMESPACE}" \
   --version "${VAULT_CHART_VERSION}" \
   --set global.enabled=true \
@@ -66,6 +118,7 @@ helm upgrade --install vault hashicorp/vault \
   --set injector.enabled=false \
   --set 'server.extraEnvironmentVars.VAULT_DISABLE_USER_LOCKOUT=true' \
   --set 'server.extraEnvironmentVars.VAULT_CACERT=/var/run/tls/vault-ca.pem' \
+  --set "server.extraEnvironmentVars.VAULT_API_ADDR=${VAULT_API_ADDR}" \
   --set "server.enterpriseLicense.secretName=${VAULT_LICENSE_SECRET_NAME}" \
   --set "server.enterpriseLicense.secretKey=license" \
   --set "server.extraArgs=-dev-tls -dev-tls-cert-dir=/var/run/tls -dev-tls-san=vault -dev-tls-san=vault.${VAULT_NAMESPACE}.svc" \
