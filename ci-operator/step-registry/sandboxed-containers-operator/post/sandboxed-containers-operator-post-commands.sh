@@ -12,7 +12,7 @@ cleanup_kata() {
 			# PeerPods enabled, delete the kataconfig
 			if ! oc delete kataconfig --all --wait; then
 				echo "Failed to delete kata-config, resources might be left-behind"
-				exit 1
+				return 1
 			fi
 			echo "All kata configs deleted"
 		else
@@ -21,7 +21,7 @@ cleanup_kata() {
 	else
 		echo "No kata configs found"
 	fi
-	exit 0
+	return 0
 }
 
 # Security groups created by the operator contain cross-references and can not
@@ -109,18 +109,19 @@ cleanup_aws() {
 	if ! oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o yaml; then
 		echo
 		echo '"oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm" failed, fallback to kata deletion'
-		cleanup_kata
+	else
+		cm_data=$(oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o jsonpath='{.data}')
+		ami_id=$(echo "${cm_data}" | jq -r '.PODVM_AMI_ID')
+		aws_region=$(echo "${cm_data}" | jq -r '.AWS_REGION')
 	fi
-
-	cm_data=$(oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o jsonpath='{.data}')
-	ami_id=$(echo "${cm_data}" | jq -r '.PODVM_AMI_ID')
-	aws_region=$(echo "${cm_data}" | jq -r '.AWS_REGION')
 
 	if [[ -z "${aws_region}" ]]; then
 		echo
 		echo "No AWS_REGION in cm/peer-pods-cm, fallback to kata-cleanup"
-		cleanup_kata
 	fi
+
+	# Delete kataconfig first to prevent the operator from creating new resources
+	cleanup_kata
 
 	# Clean up security group cross-references
 	prune_aws_security_groups "${aws_region}"
@@ -132,7 +133,6 @@ cleanup_aws() {
 		oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o yaml
 		echo
 		echo "Running kata-cleanup as fallback..."
-		cleanup_kata
 	fi
 
 	# Describe image to get snapshot ID
@@ -141,27 +141,26 @@ cleanup_aws() {
 	if [[ -z "${snapshot_id}" ]]; then
 		echo
 		echo "No snapshot found for AMI ${ami_id}, running kata-cleanup as fallback..."
-		cleanup_kata
 	fi
 
 	# Deregister AMI
 	if ! aws ec2 deregister-image --image-id "${ami_id}" --region "${aws_region}"; then
 		echo
 		echo "Failed to deregister image ${ami_id}, running kata-cleanup as fallback..."
-		cleanup_kata
+	else
+		echo "Deleted AMI: ${ami_id}"
 	fi
-	echo "Deleted AMI: ${ami_id}"
 
 	# Delete snapshot
 	if ! aws ec2 delete-snapshot --snapshot-id "${snapshot_id}" --region "${aws_region}"; then
 		echo
 		echo "Failed to delete snapshot ${snapshot_id}, running kata-cleanup as fallback..."
-		cleanup_kata
+	else 
+		echo "Deleted snapshot: ${snapshot_id}"
 	fi
-	echo "Deleted snapshot: ${snapshot_id}"
 
-	echo "Skipping kata-cleanup as the default resources were removed manually"
-	exit 0
+	cleanup_kata
+	exit $?
 }
 
 # Remove our NSG on ARO+peer-pods (do nothing on plain azure)
