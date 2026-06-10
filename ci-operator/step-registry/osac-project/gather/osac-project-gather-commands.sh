@@ -183,10 +183,22 @@ oc get lvmclusters -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmcl
 oc get lvmvolumegroups -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmvolumegroups.yaml" 2>&1 || true
 oc get events -n openshift-storage --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/storage/events-openshift-storage.txt" 2>&1 || true
 for pod in $(oc get pods -n openshift-storage -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    oc logs "${pod}" -n openshift-storage --tail=2000 > "${ARTIFACT_DIR}/storage/pod-${pod}.log" 2>&1 || true
+    for container in $(oc get pod "${pod}" -n openshift-storage -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
+        oc logs "${pod}" -n openshift-storage -c "${container}" --tail=5000 > "${ARTIFACT_DIR}/storage/pod-${pod}-${container}.log" 2>&1 || true
+        oc logs "${pod}" -n openshift-storage -c "${container}" --previous --tail=5000 > "${ARTIFACT_DIR}/storage/pod-${pod}-${container}-previous.log" 2>/dev/null || true
+    done
 done
 oc get pods -n openshift-storage -o wide > "${ARTIFACT_DIR}/storage/pods-openshift-storage.txt" 2>&1 || true
+oc describe pods -n openshift-storage > "${ARTIFACT_DIR}/storage/pods-describe-openshift-storage.txt" 2>&1 || true
 oc describe pv > "${ARTIFACT_DIR}/storage/pvs-describe.txt" 2>&1 || true
+for ns in openshift-storage kube-system; do
+    for pod in $(oc get pods -n "${ns}" -l app.kubernetes.io/name=topolvm-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        for container in $(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null); do
+            oc logs "${pod}" -n "${ns}" -c "${container}" --tail=5000 > "${ARTIFACT_DIR}/storage/topolvm-node-${pod}-${container}.log" 2>&1 || true
+            oc logs "${pod}" -n "${ns}" -c "${container}" --previous --tail=5000 > "${ARTIFACT_DIR}/storage/topolvm-node-${pod}-${container}-previous.log" 2>/dev/null || true
+        done
+    done
+done
 
 echo "=== Collecting node resource usage ==="
 oc adm top node > "${ARTIFACT_DIR}/node-resources.txt" 2>&1 || true
