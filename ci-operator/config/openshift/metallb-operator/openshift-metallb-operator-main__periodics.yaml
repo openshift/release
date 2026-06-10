@@ -1,0 +1,91 @@
+base_images:
+  metallb:
+    name: "5.0"
+    namespace: ocp
+    tag: metallb
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: metallb-operator
+  - dockerfile_path: bundleci.Dockerfile
+    to: metallb-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundleci.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-metallb:.*
+    with: pipeline:metallb
+  - pullspec: quay.io/openshift/origin-metallb-operator:.*
+    with: pipeline:metallb-operator
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-e2e-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  interval: 72h
+  reporter_config:
+    channel: '#team-metallb-ci-periodic'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        make operator-sdk
+        ./_cache/operator-sdk version
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        PATH=$PATH:$(pwd)/_cache hack/ocp_run_e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: metallb-operator
+  variant: periodics

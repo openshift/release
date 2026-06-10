@@ -53,7 +53,7 @@ tests:
       VAULT_SECRET_PROFILE: msft-test-tenant
     test:
     - ref: aro-hcp-deprovision-expired-app-registrations
-- as: delete-expired-dev-prow-resource-groups
+- as: delete-expired-dev-ci-shard0-resource-groups
   cron: 35 * * * *
   reporter_config:
     channel: '#aro-hcp-failures-dev'
@@ -66,6 +66,21 @@ tests:
     env:
       CLEANUP_MODE: no-rp
       CUSTOMER_SUBSCRIPTION: ARO HCP E2E Hosted Clusters (EA Subscription)
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-dev-ci-shard1-resource-groups
+  cron: 35 * * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: ARO HCP E2E Hosted Clusters 2 (EA Subscription)
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-dev-pers-resource-groups

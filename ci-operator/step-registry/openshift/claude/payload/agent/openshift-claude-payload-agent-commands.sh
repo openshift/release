@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# --- Gangway override ---
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
+    echo "Applying Gangway override: PAYLOAD_TAG=${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
+    PAYLOAD_TAG="${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
+fi
+
+if [[ -z "${PAYLOAD_TAG:-}" ]]; then
+    echo "ERROR: PAYLOAD_TAG is not set. This job must be triggered via Gangway with MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG."
+    exit 1
+fi
+
 echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
 echo "Model: ${CLAUDE_MODEL}"
 
