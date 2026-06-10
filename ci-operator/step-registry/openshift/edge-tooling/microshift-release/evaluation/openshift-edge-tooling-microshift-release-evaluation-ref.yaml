@@ -1,0 +1,51 @@
+ref:
+  as: openshift-edge-tooling-microshift-release-evaluation
+  from_image:
+    namespace: ci
+    name: edge-tooling-ai-helpers
+    tag: latest
+  commands: openshift-edge-tooling-microshift-release-evaluation-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: pr-creds
+    mount_path: /var/run/pr-creds
+  - namespace: test-credentials
+    name: microshift-dev-access-keys
+    mount_path: /var/run/microshift-dev-access-keys
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/token"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  - name: GITHUB_APP_ID_PATH
+    default: "/var/run/pr-creds/app_id"
+  - name: GITHUB_KEY_PATH
+    default: "/var/run/pr-creds/key.pem"
+  - name: JIRA_API_TOKEN_PATH
+    default: "/var/run/microshift-dev-access-keys/jira_token"
+  - name: JIRA_USERNAME_PATH
+    default: "/var/run/microshift-dev-access-keys/jira_username"
+  - name: JIRA_URL
+    default: "https://redhat.atlassian.net"
+  - name: PRECHECK_TIME_RANGE
+    default: "next week"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 30m0s
+  grace_period: 1m0s
+  documentation: |-
+    Evaluates upcoming OCP z-stream releases for MicroShift participation.
+    Uses Claude AI to resolve scheduled versions from Red Hat Product Pages
+    via MCP, then runs the precheck_xyz.py script to evaluate each version.
+    Outputs text results to SHARED_DIR for the send-slack post step.
