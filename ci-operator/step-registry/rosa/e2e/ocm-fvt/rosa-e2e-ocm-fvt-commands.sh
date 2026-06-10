@@ -68,7 +68,7 @@ fi
 
 fvt_output_dir="$(mktemp -d /tmp/fvt-output.XXXXXX)"
 podman_args+=(--rm)
-podman_args+=("-v" "${fvt_output_dir}:/ocmci-common/output:z")
+podman_args+=("-v" "${fvt_output_dir}:/ocm-backend-tests/output:z")
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
