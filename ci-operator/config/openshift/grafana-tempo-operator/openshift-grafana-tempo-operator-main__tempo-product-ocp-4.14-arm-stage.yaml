@@ -20,22 +20,19 @@ images:
     to: obs-tests-runner
 releases:
   arm64-latest:
-    candidate:
+    release:
       architecture: arm64
-      product: ocp
-      stream: nightly
+      channel: stable
       version: "4.14"
   latest:
-    candidate:
+    release:
       architecture: amd64
-      product: ocp
-      stream: nightly
+      channel: stable
       version: "4.14"
   target:
-    candidate:
+    release:
       architecture: multi
-      product: ocp
-      stream: nightly
+      channel: stable
       version: "4.14"
 resources:
   '*':
@@ -60,8 +57,11 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-bundle@sha256:90cfc733bf3815568738cf089ed13fa232561b0c24ce0c99b71154753254b1be
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.10
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -71,7 +71,10 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       SKIP_TESTS: tests/e2e/generate tests/e2e-openshift/monolithic-multitenancy-static
-        tests/e2e-openshift-serverless/* tests/e2e-openshift-object-stores/*
+        tests/e2e-openshift-serverless/* tests/e2e-openshift-object-stores/* tests/e2e-openshift-tls-profile/03-tls-profile
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
     test:
     - ref: idp-htpasswd
     - as: install-tempo-operator
@@ -86,6 +89,9 @@ tests:
         oc label namespace openshift-tempo-operator openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE"
         oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
+      env:
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE
       from: operator-sdk
       resources:
         requests:
