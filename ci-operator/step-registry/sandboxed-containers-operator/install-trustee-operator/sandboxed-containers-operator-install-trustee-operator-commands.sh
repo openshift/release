@@ -226,8 +226,24 @@ function install_trustee_operator() {
 
   echo ">>> Installing Trustee operator"
 
-  # Render and apply operator chart
-  render_trustee_operator_chart "${charts_dir}" | oc apply -f -
+  # Render operator chart
+  local operator_yaml="${SCRATCH}/operator-manifests.yaml"
+  render_trustee_operator_chart "${charts_dir}" > "${operator_yaml}"
+
+  # Debug: show first 50 lines of generated YAML
+  echo ">>> Generated operator YAML (first 50 lines):"
+  head -50 "${operator_yaml}"
+
+  # Validate YAML syntax
+  if ! kubectl --dry-run=client apply -f "${operator_yaml}" 2>&1 | head -20; then
+    echo ">>> ERROR: Generated YAML is invalid"
+    echo ">>> Full YAML:"
+    cat "${operator_yaml}"
+    return 1
+  fi
+
+  # Apply operator chart
+  oc apply -f "${operator_yaml}"
 }
 
 # Wait for operator installation through all OLM stages
@@ -352,8 +368,24 @@ function install_trustee_operands() {
 
   echo ">>> Installing Trustee operands (cluster domain: ${CLUSTER_DOMAIN})"
 
-  # Render and apply operands chart
-  render_trustee_operands_chart "${charts_dir}" | oc apply -f -
+  # Render operands chart
+  local operands_yaml="${SCRATCH}/operands-manifests.yaml"
+  render_trustee_operands_chart "${charts_dir}" > "${operands_yaml}"
+
+  # Debug: show first 50 lines of generated YAML
+  echo ">>> Generated operands YAML (first 50 lines):"
+  head -50 "${operands_yaml}"
+
+  # Validate YAML syntax
+  if ! kubectl --dry-run=client apply -f "${operands_yaml}" 2>&1 | head -20; then
+    echo ">>> ERROR: Generated YAML is invalid"
+    echo ">>> Full YAML:"
+    cat "${operands_yaml}"
+    return 1
+  fi
+
+  # Apply operands chart
+  oc apply -f "${operands_yaml}"
 }
 
 # Wait for operand deployments to become available
