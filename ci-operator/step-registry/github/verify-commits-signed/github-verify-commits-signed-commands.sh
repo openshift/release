@@ -2,11 +2,11 @@
 
 set -euo pipefail
 
-echo "Checking GPG signature status for PR #350 in openshift/must-gather-operator..."
+echo "Checking GPG signature status for PR #329 in openshift/must-gather-operator..."
 
 commits_json=$(curl -sS -f \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/openshift/must-gather-operator/pulls/350/commits?per_page=100")
+  "https://api.github.com/repos/openshift/must-gather-operator/pulls/329/commits?per_page=100")
 
 python3 -c '
 import json, sys
