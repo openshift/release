@@ -65,7 +65,7 @@ METRICS_FILE="/tmp/metrics/metrics.txt"
 echo "Collecting metrics"
 ansible-playbook ./playbooks/collect-metrics.yml \
   -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
+  --extra-vars "kubeconfig=${KUBECONFIG} \
     ci_lane='${REPORTER_LAUNCH_NAME}' \
     output_file=${METRICS_FILE} \
     metrics_list=${METRICS_LIST}" || true
