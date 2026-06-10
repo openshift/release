@@ -4,6 +4,10 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.23
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: lightspeed-agentic-operator
 resources:
   '*':
     limits:
@@ -29,6 +33,46 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache KUBECTL=oc make deploy IMG="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE=default
+        oc patch deployment controller-manager -n default --type=json -p '[
+          {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--agentic-sandbox-image=quay.io/openshift-lightspeed/ols-qe:lightspeed-mock-agent"}
+        ]'
+        oc create clusterrolebinding e2e-operator-admin --clusterrole=cluster-admin --serviceaccount=default:controller-manager
+        oc rollout status deployment controller-manager -n default --timeout=120s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: lightspeed-agentic-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache KUBECTL=oc make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
