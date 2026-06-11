@@ -1288,8 +1288,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     # hypershift's, so gitlint fails with "Invalid revision range".
     # Export them so all git push invocations (including retries) inherit them.
     git fetch upstream "${BASE_BRANCH}" 2>/dev/null || true
-    export PULL_BASE_SHA=$(git merge-base HEAD "upstream/${BASE_BRANCH}" 2>/dev/null || echo "HEAD~5")
-    export PULL_PULL_SHA=$(git rev-parse HEAD)
+    PULL_BASE_SHA=$(git merge-base HEAD "upstream/${BASE_BRANCH}" 2>/dev/null || echo "HEAD~5")
+    PULL_PULL_SHA=$(git rev-parse HEAD)
+    export PULL_BASE_SHA PULL_PULL_SHA
 
     PUSH_SYSTEM_PROMPT="You are in /tmp/hypershift on branch ${BRANCH_NAME}.
 Your task is to push the current branch to origin safely.
