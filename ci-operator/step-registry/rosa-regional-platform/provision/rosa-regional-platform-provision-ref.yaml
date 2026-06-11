@@ -51,9 +51,24 @@ ref:
         dependencies:
           - name: cert-manager
             version: v1.20.0
+  - name: ROSA_REGIONAL_EXTRA_OVERRIDES
+    default: ""
+    documentation: |-
+      YAML list of additional overrides to deep-merge into the RRP repo
+      before provisioning. Each entry has a 'target' (file path in the
+      repo) and 'override' (YAML content to deep-merge). Can hold any
+      number of entries. Does not support IMAGE_REPO/IMAGE_TAG
+      substitution — use literal values. Example:
+        - target: argocd/config/regional-cluster/foo/values.yaml
+          override:
+            fooChart:
+              helmValues:
+                image:
+                  tag: latest
   documentation: |-
     Provisions an ephemeral rosa-regional-platform environment. If
     ROSA_REGIONAL_HELM_OVERRIDE_YAML is set, it is written to a file with
     IMAGE_REPO/IMAGE_TAG placeholders replaced (if an image override exists),
     then passed to the ephemeral provider via --provision-override-file for
-    deep merge into the target file.
+    deep merge into the target file. Additional overrides can be passed via
+    ROSA_REGIONAL_EXTRA_OVERRIDES as a YAML list.

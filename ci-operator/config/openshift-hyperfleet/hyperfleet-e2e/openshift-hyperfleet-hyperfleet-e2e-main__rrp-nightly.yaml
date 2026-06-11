@@ -1,0 +1,55 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rrp-nightly
+  cron: 0 4 * * *
+  steps:
+    env:
+      ROSA_REGIONAL_EXTRA_OVERRIDES: |
+        - target: argocd/config/regional-cluster/hyperfleet-api-chart/values.yaml
+          override:
+            hyperfleet-api-chart:
+              source:
+                targetRevision: main
+              helmValues:
+                image:
+                  registry: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet
+                  repository: hyperfleet-api
+                  tag: dev
+                  pullPolicy: Always
+        - target: argocd/config/regional-cluster/hyperfleet-adapter1-chart/values.yaml
+          override:
+            hyperfleetAdapter1Chart:
+              source:
+                targetRevision: main
+              helmValues:
+                image:
+                  registry: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet
+                  repository: hyperfleet-adapter
+                  tag: dev
+                  pullPolicy: Always
+        - target: argocd/config/regional-cluster/hyperfleet-sentinel-chart/values.yaml
+          override:
+            hyperfleetSentinelChart:
+              source:
+                targetRevision: main
+              values:
+                image:
+                  registry: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet
+                  repository: hyperfleet-sentinel
+                  tag: dev
+                  pullPolicy: Always
+    workflow: rosa-regional-platform-ephemeral-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e
+  variant: rrp-nightly

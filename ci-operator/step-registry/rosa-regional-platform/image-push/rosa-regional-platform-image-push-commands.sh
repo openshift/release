@@ -3,8 +3,8 @@
 set -euo pipefail
 
 if [[ -z "${ROSA_REGIONAL_QUAY_DEST_REPO:-}" ]]; then
-  echo "ERROR: ROSA_REGIONAL_QUAY_DEST_REPO must be set" >&2
-  exit 1
+  echo "ROSA_REGIONAL_QUAY_DEST_REPO not set — skipping image push"
+  exit 0
 fi
 
 if [[ -z "${CI_COMPONENT_IMAGE:-}" ]]; then
