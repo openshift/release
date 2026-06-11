@@ -6,8 +6,85 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/fix
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-controller-main-fix
+    rerun_command: /test fix
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=fix
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )fix,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/govulncheck
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -79,6 +156,14 @@ presubmits:
     cluster: build11
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -132,6 +217,14 @@ presubmits:
     cluster: build11
     context: ci/prow/lint
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -193,6 +286,14 @@ presubmits:
     cluster: build11
     context: ci/prow/security
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -265,6 +366,14 @@ presubmits:
     cluster: build11
     context: ci/prow/unit
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -326,6 +435,14 @@ presubmits:
     cluster: build11
     context: ci/prow/verify-codegen-script
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -387,6 +504,14 @@ presubmits:
     cluster: build11
     context: ci/prow/verify-codegens-crds
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/release-controller-api/Dockerfile
+      - images/release-controller/Dockerfile
+      - images/release-mirror-cleanup-controller/Dockerfile
+      - images/release-payload-controller/Dockerfile
+      - images/release-reimport-controller/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

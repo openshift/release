@@ -5,6 +5,7 @@ set -eoux pipefail
 declare -r REGISTRY_PROXY_PORT="${KONFLUX_REGISTRY_PROXY_PORT:-6004}"
 declare -r DISCONNECTED="${DISCONNECTED:-false}"
 declare -r KONFLUX_DEPLOY_CATALOG_SOURCE="${KONFLUX_DEPLOY_CATALOG_SOURCE:-false}"
+declare -r METALLB_CATALOG_NAME="${METALLB_OPERATOR_SUB_SOURCE:-metallb-konflux}"
 
 function create_marketplace_namespace () {
     # Since OCP 4.11, the marketplace is optional. If it is not installed, we need to create the namespace manually.
@@ -26,7 +27,7 @@ EOF
 function create_metallb_catalogsource() {
     echo "Creating CatalogSource for metallb..."
 
-    local catalog_name="metallb-konflux"
+    local catalog_name="${METALLB_CATALOG_NAME}"
     local version
 
     version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d. -f1-2)

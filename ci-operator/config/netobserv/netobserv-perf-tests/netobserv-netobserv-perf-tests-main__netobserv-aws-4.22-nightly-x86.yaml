@@ -47,6 +47,16 @@ resources:
 tests:
 - as: node-density-heavy-25nodes
   cron: '@daily'
+  reporter_config:
+    channel: '#team-network-observability'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -58,7 +68,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
       COMPUTE_NODE_REPLICAS: "25"
-      COMPUTE_NODE_TYPE: m6i.4xlarge
+      COMPUTE_NODE_TYPE: m6a.2xlarge
       DISPLAY: noo_bundle_info
       ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
       ES_METADATA_INDEX: perf_scale_ci*
@@ -69,7 +79,6 @@ tests:
       LOKISTACK_SIZE: 1x.small
       LOOKBACK: "30"
       LOOKBACK_SIZE: "15"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"
@@ -97,6 +106,16 @@ tests:
     workflow: openshift-qe-installer-aws
 - as: node-density-heavy-25nodes-service-without-loki
   cron: '@weekly'
+  reporter_config:
+    channel: '#team-network-observability'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -107,7 +126,7 @@ tests:
       ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "25"
-      COMPUTE_NODE_TYPE: m6i.4xlarge
+      COMPUTE_NODE_TYPE: m6a.2xlarge
       DEPLOYMENT_MODEL: Service
       DISPLAY: noo_bundle_info
       ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
@@ -119,7 +138,6 @@ tests:
       LOKI_OPERATOR: None
       LOOKBACK: "30"
       LOOKBACK_SIZE: "15"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion-node-density-heavy-service.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deployment_model=Service
       PATCH_EBPFAGENT_IMAGE: "false"
@@ -147,6 +165,16 @@ tests:
     workflow: openshift-qe-installer-aws
 - as: cluster-density-v2-250nodes
   cron: 45 22 * * 6
+  reporter_config:
+    channel: '#team-network-observability'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -158,7 +186,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
       COMPUTE_NODE_REPLICAS: "250"
-      COMPUTE_NODE_TYPE: m6i.4xlarge
+      COMPUTE_NODE_TYPE: m6a.2xlarge
       DISPLAY: noo_bundle_info
       ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
       ES_METADATA_INDEX: perf_scale_ci*
@@ -171,7 +199,6 @@ tests:
       LOKISTACK_SIZE: 1x.medium
       LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
       ORION_CONFIG: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/netobserv-orion.yaml
       ORION_ENVS: PLATFORM=AWS,WORKERS=250,WORKLOAD=cluster-density-v2,deployment_model=Kafka
       PATCH_EBPFAGENT_IMAGE: "false"

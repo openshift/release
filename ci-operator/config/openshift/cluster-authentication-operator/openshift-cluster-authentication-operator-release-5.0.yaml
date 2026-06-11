@@ -3,6 +3,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  vault-enterprise:
+    name: vault-enterprise
+    namespace: ci
+    tag: 2.0.0-ent
+  vault_kube_kms:
+    name: vault-kube-kms
+    namespace: control-plane_vault
+    tag: 0.0.1
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -111,9 +119,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- always_run: false
+- always_run: true
   as: e2e-gcp-operator-disruptive
-  optional: true
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -149,25 +156,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
-- always_run: false
-  as: e2e-gcp-operator-encryption-kms
-  optional: true
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
-  steps:
-    cluster_profile: openshift-org-gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-oidc-techpreview
   run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
@@ -247,7 +235,7 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: idp-external-oidc-keycloak-aws
   timeout: 8h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-parallel-ote
   optional: true
   steps:
@@ -257,7 +245,7 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-serial-ote
   optional: true
   steps:
@@ -267,7 +255,7 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-serial-ote
   optional: true
   shard_count: 2
@@ -279,7 +267,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 4h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-rotation-serial-ote
   optional: true
   shard_count: 2
@@ -291,7 +279,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 4h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-perf-serial-ote
   optional: true
   shard_count: 2
@@ -303,15 +291,17 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 2h0m0s
-- always_run: true
-  as: e2e-aws-operator-encryption-kms-serial-ote
+- always_run: false
+  as: e2e-aws-operator-encryption-kms
   optional: true
-  shard_count: 2
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-aws
     env:
-      TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption-kms/serial
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms
     test:
+    - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 4h0m0s

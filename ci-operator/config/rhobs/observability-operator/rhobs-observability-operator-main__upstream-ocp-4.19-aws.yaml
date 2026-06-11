@@ -33,6 +33,18 @@ tests:
     timeout: 1h0m0s
     version: "4.19"
   cron: '@daily'
+  reporter_config:
+    channel: '#observability-operator-cicd'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      *COO image source:* `latest` upstream from Quay.io
+      *OCP Version:* 4.19
+      *Environment:* AWS
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     test:
     - as: obo-e2e

@@ -1,0 +1,57 @@
+base_images:
+  ci_hyperfleet-credential-provider_latest:
+    name: hyperfleet-credential-provider
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    inputs:
+      ci_hyperfleet-credential-provider_latest:
+        as:
+        - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
+    to: hyperfleet-e2e
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rc-e2e
+  cron: '@yearly'
+  reporter_config:
+    channel: '#hyperfleet-e2e-status'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      {{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}} *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      Build: #{{.Status.BuildID}}
+      Details: <{{.Status.URL}}|View logs> · <https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>
+  steps:
+    env:
+      ADAPTER_IMAGE_REPO: redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter
+      API_IMAGE_REPO: redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-api
+      CLUSTER_NAME: hyperfleet-dev-prow
+      IMAGE_REGISTRY: quay.io
+      LABEL_FILTER: tier0 || tier1
+      MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX: rc-e2e
+      MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG: latest
+      REGION: us-central1-a
+      SENTINEL_IMAGE_REPO: redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-sentinel
+    workflow: openshift-hyperfleet-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e
+  variant: rc-e2e

@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/tests-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-cnf-tests.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cnf-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
 
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
@@ -751,9 +759,43 @@ pushd $CNF_REPO_DIR
 status=0
 val_status=0
 
+rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-cnf-tests" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cnf-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CNF_BRANCH=${CNF_BRANCH:-unknown}
+export TEST_RUN_FEATURES=${TEST_RUN_FEATURES:-unknown}
+EOF
+
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
+    echo "Wait until number of nodes matches number of machines"
+    for _ in $(seq 30); do
+        nodes="$(oc get nodes --no-headers | wc -l)"
+        machines="$(oc get machines -A --no-headers | wc -l)"
+        [ "$machines" -le "$nodes" ] && break
+        sleep 30
+    done
+    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
+    [ "$machines" -le "$nodes" ]
+fi
+
+echo "Wait for MachineConfigPools to finish updating (verifies node reboots are complete)"
+oc wait mcp --all --for='condition=UPDATED=True' --timeout=30m || echo "WARNING: not all MachineConfigPools have UPDATED=True after 30m"
+oc wait mcp --all --for='condition=UPDATING=False' --timeout=30m || echo "WARNING: some MachineConfigPools still UPDATING after 30m"
+
+echo "Wait for nodes to be up and ready"
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || echo "WARNING: not all nodes are Ready after 10m"
+
+echo "Wait for cluster operators to be deployed and ready"
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m || echo "WARNING: some cluster operators still Progressing after 15m"
+oc wait clusteroperators --all --for=condition=Available=true --timeout=15m || echo "WARNING: not all cluster operators are Available after 15m"
+oc wait clusteroperators --all --for=condition=Degraded=false --timeout=15m || echo "WARNING: some cluster operators are Degraded after 15m"
+
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
@@ -764,32 +806,6 @@ if [[ ${val_status} -ne 0 ]]; then
     echo "Validations failed with status code $val_status"
     status=${val_status}
 fi
-
-if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-cnftests" ]]; then
-    echo "Wait until number of nodes matches number of machines"
-    # Wait until number of nodes matches number of machines
-    # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-    for _ in $(seq 30); do
-        nodes="$(oc get nodes --no-headers | wc -l)"
-        machines="$(oc get machines -A --no-headers | wc -l)"
-        [ "$machines" -le "$nodes" ] && break
-        sleep 30
-    done
-
-
-    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
-    [ "$machines" -le "$nodes" ]
-
-fi
-echo "Wait for nodes to be up and ready"
-# Wait for nodes to be ready
-# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-
-echo "Wait for cluster operators to be deployed and ready"
-# Waiting for clusteroperators to finish progressing
-# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
@@ -836,7 +852,12 @@ junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_
 [[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
+# Clean up large log files from SHARED_DIR to stay under the 1MB K8s Secret limit.
+# These logs are already saved to ARTIFACT_DIR by the tee commands above.
+rm -f ${SHARED_DIR}/cnf-tests-run.log ${SHARED_DIR}/cnf-validations-run.log
+gzip -c /tmp/tests-output.log > ${SHARED_DIR}/tests-output.log.gz 2>/dev/null || true
 set +x
 set -e
 
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests"
 exit ${status}

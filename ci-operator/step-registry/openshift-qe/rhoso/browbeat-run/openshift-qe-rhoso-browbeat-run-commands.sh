@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-ssh root@${bastion} "
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=240 root@${bastion} "
   set -o errexit
   set -o pipefail
   # Export CI metadata and ES host to the remote environment

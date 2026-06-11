@@ -17,9 +17,10 @@ GCLOUD_INSTALL_DIR="${HOME}/google-cloud-sdk"
 curl -sL "${GCLOUD_SDK_URL}" | tar -xzf - -C "${HOME}"
 export PATH="${GCLOUD_INSTALL_DIR}/bin:${PATH}"
 
-# Authenticate gcloud and set ADC for hypershift CLI
-gcloud auth activate-service-account --key-file="${CLUSTER_PROFILE_DIR}/credentials.json"
-export GOOGLE_APPLICATION_CREDENTIALS="${CLUSTER_PROFILE_DIR}/credentials.json"
+# Authenticate gcloud and set ADC for the hypershift CLI via WIF credential written
+# by hypershift-gcp-wif-auth step
+gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
+export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
 # Load configuration from provision step
 HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"

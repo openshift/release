@@ -41,11 +41,13 @@ tests:
   container:
     from: src
 - as: e2e-rosa-hcp-smoke
+  optional: true
   run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
   steps:
     cluster_profile: rosa-e2e-01
     env:
       CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Importance:Critical && Platform:HCP && (Area:ClusterLifecycle
@@ -55,6 +57,7 @@ tests:
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
 - as: e2e-rosa-classic-smoke
+  optional: true
   run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
   steps:
     cluster_profile: rosa-e2e-01
@@ -67,11 +70,6 @@ tests:
       OPENSHIFT_VERSION: "4.21"
       REPLICAS: "3"
     workflow: rosa-e2e-classic
-- as: rosa-ci-daily-status
-  commands: scripts/ci-status-report.sh
-  container:
-    from: src
-  cron: 0 14 * * *
 zz_generated_metadata:
   branch: main
   org: openshift-online

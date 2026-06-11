@@ -25,7 +25,7 @@ images:
   items:
   - dockerfile_literal: |-
       FROM ocp_4.22_base-rhel9
-      RUN dnf install -y make git python3 python3-pip patch
+      RUN dnf install -y make git python3 python3-pip patch nodejs npm
       RUN pip3 install pre-commit
 
       COPY --from=root:current /usr/lib/golang /usr/local/go
@@ -42,12 +42,12 @@ images:
       ENV PRE_COMMIT_HOME=/.cache/precommit
       ENV GOLANGCI_LINT_CACHE=/.cache/golangci
 
-      # Snyk
-      ENV SNYK_DIR=/tmp/snyk
-      RUN mkdir -p ${SNYK_DIR}
-      RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-      RUN chmod +x ${SNYK_DIR}/snyk
-      ENV PATH=$PATH:${SNYK_DIR}
+      COPY .pre-commit-config.yaml /tmp/pre-commit-config.yaml
+      RUN cd /tmp && git init && \
+          pre-commit install-hooks -c /tmp/pre-commit-config.yaml && \
+          rm -rf /tmp/.git && \
+          rm -rf /.cache/golangci && mkdir /.cache/golangci && \
+          chmod -R 777 /.cache
     from: ocp_4.22_base-rhel9
     inputs:
       root:
@@ -113,7 +113,7 @@ resources:
       memory: 200Mi
   precommit-check:
     requests:
-      cpu: 100m
+      cpu: "2"
       memory: 4Gi
 test_binary_build_commands: |
   go mod vendor
@@ -123,7 +123,9 @@ tests:
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
-    pre-commit run --all-files --show-diff-on-failure
+    export GOMEMLIMIT=3500MiB
+    export GOGC=50
+    pre-commit run --all-files --show-diff-on-failure --verbose
   container:
     clone: true
     from: lvms-pre-commit
@@ -147,28 +149,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-code
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-deps
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
@@ -297,135 +277,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
-- as: e2e-aws-sno-qe-integration-tests
-  cron: '@weekly'
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-    test:
-    - as: lvms-sno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 4h0m0s
-    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
-- as: e2e-aws-sno-arm-qe-integration-tests
-  cron: '@weekly'
-  steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      COMPUTE_NODE_TYPE: m6g.4xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      OCP_ARCH: arm64
-    test:
-    - as: lvms-sno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 4h0m0s
-    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
-- as: e2e-aws-mno-qe-integration-tests
-  cron: '@weekly'
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-    test:
-    - as: lvms-mno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 4h0m0s
-    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
-- as: e2e-aws-mno-arm-qe-integration-tests
-  cron: '@weekly'
-  steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      COMPUTE_NODE_TYPE: m6g.4xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      OCP_ARCH: arm64
-    test:
-    - as: lvms-mno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 4h0m0s
-    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
-- as: e2e-baremetalds-sno-dualstack-qe-integration-tests
-  capabilities:
-  - intranet
-  cron: '@weekly'
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "1"
-      workers: "0"
-    test:
-    - as: lvms-sno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-sno-lvms
-- as: e2e-baremetalds-mno-dualstack-qe-integration-tests
-  cron: '@weekly'
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-    test:
-    - as: lvms-mno-integration-test
-      cli: latest
-      commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-mno-lvms
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

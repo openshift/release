@@ -12,13 +12,9 @@ images:
     to: olm-catalogd
   - dockerfile_path: openshift/operator-controller.Dockerfile
     to: olm-operator-controller
-  - dockerfile_path: openshift/registry.Dockerfile
-    to: e2e-test-registry
 promotion:
   to:
-  - excluded_images:
-    - e2e-test-registry
-    name: 5.0-priv
+  - name: 5.0-priv
     namespace: ocp-private
 prowgen:
   private: true
@@ -85,18 +81,14 @@ tests:
     - as: upstream-e2e
       cli: latest
       commands: make -C openshift test-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- always_run: false
+- always_run: true
   as: openshift-e2e-aws-techpreview
-  optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -106,10 +98,6 @@ tests:
       cli: latest
       commands: |
         make -C openshift test-e2e
-        make -C openshift test-experimental-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:

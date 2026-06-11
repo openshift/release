@@ -2,9 +2,72 @@
 
 set -euo pipefail
 
-# Load GCP credentials from cluster profile
-GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
-gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
+# Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step.
+# If the file is missing (e.g., SHARED_DIR sync did not complete after a SIGTERM, or
+# wif-auth exited non-zero before the sync), re-derive the credential from wif-config.json
+# in the cluster profile, which is always available — same pattern as project ID fallback below.
+if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
+  echo "WARNING: ${SHARED_DIR}/wif-cred.json not found — re-deriving from cluster profile"
+  WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
+  if [[ ! -f "${WIF_CONFIG}" ]]; then
+    echo "ERROR: ${WIF_CONFIG} not found — cannot authenticate for cleanup"
+    exit 1
+  fi
+  SA_TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
+  SA_TOKEN_PAYLOAD=$(cut -d. -f2 < "${SA_TOKEN_FILE}")
+  MOD=$(( ${#SA_TOKEN_PAYLOAD} % 4 ))
+  if [[ $MOD -eq 2 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}=="; elif [[ $MOD -eq 3 ]]; then SA_TOKEN_PAYLOAD="${SA_TOKEN_PAYLOAD}="; fi
+  OIDC_ISSUER=$(echo "${SA_TOKEN_PAYLOAD}" | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r '.iss')
+  if [[ -z "${OIDC_ISSUER}" || "${OIDC_ISSUER}" == "null" ]]; then
+    echo "ERROR: Failed to extract OIDC issuer from SA token — cannot authenticate for cleanup"
+    exit 1
+  fi
+  PROJECT_NUMBER=$(jq -r '.project_number // empty' "${WIF_CONFIG}")
+  POOL_ID=$(jq -r '.pool_id // empty' "${WIF_CONFIG}")
+  SERVICE_ACCOUNT=$(jq -r '.service_account // empty' "${WIF_CONFIG}")
+  PROVIDER_ID=$(jq -r --arg iss "${OIDC_ISSUER}" '.issuer_map[$iss] // empty' "${WIF_CONFIG}")
+  if [[ -z "${PROJECT_NUMBER}" ]]; then
+    echo "ERROR: .project_number is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${POOL_ID}" ]]; then
+    echo "ERROR: .pool_id is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${SERVICE_ACCOUNT}" ]]; then
+    echo "ERROR: .service_account is missing or empty in ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  if [[ -z "${PROVIDER_ID}" ]]; then
+    echo "ERROR: OIDC issuer '${OIDC_ISSUER}' not found in .issuer_map of ${WIF_CONFIG} — cannot authenticate for cleanup"
+    exit 1
+  fi
+  cat > "${SHARED_DIR}/wif-cred.json" <<EOF
+{
+  "type": "external_account",
+  "audience": "//iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+  "token_url": "https://sts.googleapis.com/v1/token",
+  "credential_source": {
+    "file": "${SA_TOKEN_FILE}",
+    "format": {
+      "type": "text"
+    }
+  },
+  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SERVICE_ACCOUNT}:generateAccessToken"
+}
+EOF
+  echo "WIF credential re-derived successfully"
+fi
+if ! gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"; then
+  echo "ERROR: WIF login failed — cannot authenticate for cleanup"
+  echo "  project_number, pool_id, service_account, and issuer_map must all be correct"
+  if [[ -n "${OIDC_ISSUER:-}" ]]; then
+    echo "  OIDC issuer detected: ${OIDC_ISSUER}"
+    echo "  WIF provider mapped: ${PROVIDER_ID}"
+  fi
+  exit 1
+fi
 
 # Load cluster info from SHARED_DIR (written by provision step).
 # If SHARED_DIR files are missing (provision was aborted before the Secret was synced),

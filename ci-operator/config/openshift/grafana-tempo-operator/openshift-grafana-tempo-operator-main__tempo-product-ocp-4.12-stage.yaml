@@ -17,7 +17,7 @@ images:
   items:
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tempo-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
     candidate:
@@ -32,11 +32,20 @@ resources:
 tests:
 - as: tempo-stage-tests
   cron: 0 0 30 2 *
+  reporter_config:
+    channel: '#distributed-tracing-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: azure-observability
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
-      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1108102
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},

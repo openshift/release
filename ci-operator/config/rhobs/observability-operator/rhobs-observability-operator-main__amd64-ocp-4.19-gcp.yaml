@@ -36,6 +36,18 @@ resources:
 tests:
 - as: coo-stage
   cron: 30 0 * * 3
+  reporter_config:
+    channel: '#observability-operator-cicd'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      *COO image source:* FBC from Konflux
+      *OCP Version:* 4.19
+      *Environment:* GCP
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: gcp-observability
     env:

@@ -3,6 +3,10 @@ base_images:
     name: rhel-coreos-base
     namespace: coreos
     tag: "9.8"
+  rhel-coreos-base-10:
+    name: rhel-coreos-base
+    namespace: coreos
+    tag: "10.2"
 build_root:
   image_stream_tag:
     name: coreos-assembler
@@ -13,32 +17,71 @@ images:
   - build_args:
     - name: OPENSHIFT_CI
       value: "1"
+    - name: OPENSHIFT_VERSION
+      value: "5.0"
+    - name: YUM_REPO_NAMES
+      value: rhel-9.8-baseos,rhel-9.8-appstream,rhel-9.8-early-kernel,rhel-9.8-fast-datapath,rhel-9.8-server-ose-5.0
     - name: IMAGE_NAME
       value: openshift/ose-rhel-coreos-9
     - name: IMAGE_CPE
-      value: cpe:/a:redhat:openshift:4.22::el9
+      value: cpe:/a:redhat:openshift:5.0::el9
+    - name: STREAM_CLASS
+      value: rhel-9
     dockerfile_path: Containerfile
     inputs:
       rhel-coreos-base:
         as:
-        - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
         - ${IMAGE_FROM}
     to: rhel-coreos
   - build_args:
     - name: OPENSHIFT_CI
       value: "1"
+    - name: STREAM_CLASS
+      value: rhel-9
     dockerfile_path: extensions/Containerfile
     inputs:
       rhel-coreos:
         as:
-        - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+        - ${IMAGE_FROM}
     to: rhel-coreos-extensions
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    - name: OPENSHIFT_VERSION
+      value: "5.0"
+    - name: YUM_REPO_NAMES
+      value: rhel-10.2-baseos,rhel-10.2-appstream,rhel-10.2-early-kernel,rhel-10.2-fast-datapath,rhel-10.2-server-ose-5.0
+    - name: IMAGE_NAME
+      value: openshift/ose-rhel-coreos-10
+    - name: IMAGE_CPE
+      value: cpe:/a:redhat:openshift:5.0::el10
+    - name: STREAM_CLASS
+      value: rhel-10
+    dockerfile_path: Containerfile
+    inputs:
+      rhel-coreos-base-10:
+        as:
+        - ${IMAGE_FROM}
+    to: rhel-coreos-10
+  - build_args:
+    - name: OPENSHIFT_CI
+      value: "1"
+    - name: STREAM_CLASS
+      value: rhel-10
+    dockerfile_path: extensions/Containerfile
+    inputs:
+      rhel-coreos-10:
+        as:
+        - ${IMAGE_FROM}
+    to: rhel-coreos-10-extensions
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - excluded_images:
     - rhel-coreos
     - rhel-coreos-extensions
+    - rhel-coreos-10
+    - rhel-coreos-10-extensions
     name: "4.23"
     namespace: ocp
 releases:

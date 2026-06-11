@@ -3,6 +3,15 @@ base_images:
     name: redhat-appstudio
     namespace: ci
     tag: e2e-test-runner
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
+    to: konflux-overlay-install
 releases:
   latest:
     release:
@@ -47,7 +56,26 @@ tests:
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
   steps:
     test:
-    - ref: redhat-appstudio-e2e
+    - ref: konflux-ci-install-konflux
+    - ref: redhat-appstudio-conformance-tests
+    workflow: redhat-appstudio-claim-failure-analysis
+- always_run: false
+  as: appstudio-operator-overlay-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  run_if_changed: ^components/konflux-operator/
+  steps:
+    test:
+    - ref: redhat-appstudio-operator-overlay-install
+    - ref: redhat-appstudio-operator-overlay-e2e
     workflow: redhat-appstudio-claim-failure-analysis
 - as: konflux-openshift-upgrade-periodic
   cluster_claim:
@@ -60,6 +88,15 @@ tests:
     timeout: 1h0m0s
     version: "4.18"
   cron: 0 1 * * *
+  reporter_config:
+    channel: '#infra-deployments-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :greatsuccess: {{ else }}
+      :anger_meow: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
   steps:
     workflow: redhat-appstudio-openshift-upgrade
 - always_run: false
@@ -98,10 +135,20 @@ tests:
     timeout: 1h0m0s
     version: "4.18"
   cron: 0 0 * * *
+  reporter_config:
+    channel: '#infra-deployments-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{ if eq .Status.State "success" }} :success-kid: {{ else }}
+      :fuuuuuu: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>'
   steps:
     test:
-    - ref: redhat-appstudio-e2e
-    workflow: redhat-appstudio-claim
+    - ref: konflux-ci-install-konflux
+    - ref: redhat-appstudio-conformance-tests
+    workflow: redhat-appstudio-claim-failure-analysis
 - always_run: false
   as: konflux-e2e-v419-optional
   cluster_claim:

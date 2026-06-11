@@ -3,6 +3,10 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -30,90 +34,304 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: rosa-hcp-e2e-nightly-4-19
+- as: rosa-hcp-e2e-stable-4-19
   cron: 30 2 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.19"
+      REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
-- as: rosa-hcp-e2e-nightly-4-20
+- as: rosa-hcp-e2e-stable-4-20
   cron: 0 3 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.20"
+      REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
-- as: rosa-hcp-e2e-nightly-4-21
+- as: rosa-hcp-e2e-stable-4-21
   cron: 30 3 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.21"
+      REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
-- as: rosa-hcp-e2e-nightly-4-22
+- as: rosa-hcp-e2e-candidate-4-22
   cron: 0 4 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: candidate
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
 - as: rosa-hcp-e2e-nightly-5-0
-  cron: 0 5 * * *
+  cron: 30 4 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
       CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "5.0"
+      REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
-- as: rosa-sts-e2e-nightly-4-21
+- as: rosa-classic-sts-e2e-stable-4-19
   cron: 30 5 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic
+      LABEL_FILTER: Platform:Classic && !Access:MC
       OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.21"
-      REPLICAS: "3"
+      OPENSHIFT_VERSION: "4.19"
+      REPLICAS: "2"
+      STS: "true"
     workflow: rosa-e2e-classic
-- as: rosa-sts-e2e-nightly-4-22
+- as: rosa-classic-sts-e2e-stable-4-20
   cron: 0 6 * * *
   steps:
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.20"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-e2e-stable-4-21
+  cron: 30 6 * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-e2e-candidate-4-22
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
-      REPLICAS: "3"
+      REPLICAS: "2"
+      STS: "true"
     workflow: rosa-e2e-classic
+- as: rosa-hcp-fips-e2e-stable-4-19
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      FIPS: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp-fips
+- as: rosa-hcp-fips-e2e-stable-4-20
+  cron: 30 8 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      FIPS: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.20"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp-fips
+- as: rosa-hcp-fips-e2e-stable-4-21
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      FIPS: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp-fips
+- as: rosa-hcp-fips-e2e-candidate-4-22
+  cron: 30 9 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      FIPS: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp-fips
+- as: rosa-hcp-fips-e2e-nightly-5-0
+  cron: 0 10 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      FIPS: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "5.0"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp-fips
+- as: rosa-classic-sts-fips-e2e-stable-4-19
+  cron: 30 10 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      FIPS: "true"
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-fips-e2e-stable-4-20
+  cron: 0 11 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      FIPS: "true"
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.20"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-fips-e2e-stable-4-21
+  cron: 30 11 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      FIPS: "true"
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-fips-e2e-candidate-4-22
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_TOPOLOGY: classic
+      FIPS: "true"
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "2"
+      STS: "true"
+    workflow: rosa-e2e-classic
+- as: osd-gcp-e2e-candidate-4-22
+  cron: 30 7 * * *
+  steps:
+    cluster_profile: rosa-e2e-03
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_TOPOLOGY: osd-gcp
+      LABEL_FILTER: Platform:OSD-GCP && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east1
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    workflow: rosa-e2e-osd-gcp
+- as: osd-gcp-fips-e2e-candidate-4-22
+  cron: 30 12 * * 1
+  steps:
+    cluster_profile: rosa-e2e-03
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_TOPOLOGY: osd-gcp
+      FIPS: "true"
+      LABEL_FILTER: Platform:OSD-GCP && !Access:MC
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east1
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    workflow: rosa-e2e-osd-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-online

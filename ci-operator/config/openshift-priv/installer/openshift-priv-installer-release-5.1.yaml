@@ -35,6 +35,10 @@ base_images:
     name: nested-environment-builder
     namespace: ci
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ocp_4.10_cli:
     name: 5.1-priv
     namespace: ocp-private
@@ -311,6 +315,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-dualstack-ipv6-primary-techpreview
@@ -321,6 +328,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-proxy
@@ -915,7 +925,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 7h0m0s
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   run_if_changed: openstack
@@ -923,6 +933,13 @@ tests:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
 - as: e2e-vsphere-ovn
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
@@ -997,6 +1014,13 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-upi
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
@@ -1238,6 +1262,7 @@ tests:
 - as: e2e-agent-two-node-fencing-ipv4
   capabilities:
   - intranet
+  - nested-podman
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
@@ -1516,18 +1541,15 @@ tests:
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-3-quota-slice
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-public-ipv4-pool-disabled
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-us-east-1
     env:
       AWS_PUBLIC_IPV4_POOL_ID: none
     workflow: openshift-e2e-aws

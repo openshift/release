@@ -28,6 +28,18 @@ resources:
 tests:
 - as: coo-production
   cron: 8 8 29 2 *
+  reporter_config:
+    channel: '#observability-operator-cicd'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      *COO image source:* Red Hat Operators (stable)
+      *OCP Version:* 4.21
+      *Environment:* GCP
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: gcp-observability
     env:
@@ -41,7 +53,9 @@ tests:
         ]
     test:
     - ref: install-operators
+    - ref: rhobs-wait-for-coo-ready
     - ref: distributed-tracing-tests-tracing-ui-integration
+    - ref: monitoring-plugin-tests-monitoring-incidents-ui-integration
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:

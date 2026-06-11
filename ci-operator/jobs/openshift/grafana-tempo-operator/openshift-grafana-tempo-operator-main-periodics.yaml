@@ -1,15 +1,91 @@
 periodics:
 - agent: kubernetes
   cluster: build08
-  cron: 0 0 30 2 *
+  cron: 0 23 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
   - base_ref: main
     org: openshift
+    repo: grafana-tempo-operator
+  labels:
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-grafana-tempo-operator-main-periodics-rebasebot
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --target=rebasebot
+      - --variant=periodics
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 0 30 2 *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - tests/Dockerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-observability
@@ -99,12 +175,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-observability
@@ -194,12 +273,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-observability
@@ -289,12 +371,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/variant: tempo-product-ocp-4.16-ibm-z-stage
     ci.openshift.io/generator: prowgen
@@ -382,12 +467,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-observability
@@ -477,12 +565,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/variant: tempo-product-ocp-4.17-ibm-p-stage
     ci.openshift.io/generator: prowgen
@@ -570,12 +661,15 @@ periodics:
   cron: 30 3 * * 1
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-observability
@@ -665,12 +759,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/variant: tempo-product-ocp-4.19-stage
     ci.openshift.io/generator: prowgen
@@ -765,12 +862,15 @@ periodics:
   cron: 30 3 * * 1
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/variant: tempo-product-ocp-4.20-downstream
     ci.openshift.io/generator: prowgen
@@ -865,12 +965,15 @@ periodics:
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/variant: tempo-product-ocp-4.20-stage
     ci.openshift.io/generator: prowgen
@@ -961,16 +1064,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   cron: 30 3 * * 1
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
@@ -1056,16 +1162,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   cron: 0 0 30 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - tests/Dockerfile
   extra_refs:
   - base_ref: main
     org: openshift
     path_alias: github.com/grafana/tempo-operator
     repo: grafana-tempo-operator
+    sparse_checkout_files:
+    - tests/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-observability

@@ -12,6 +12,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -102,6 +106,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -183,6 +191,102 @@ presubmits:
     trigger: (?m)^/test( | .* )agentic-qe-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build11
+    context: ci/prow/e2e-agent-connected-ovn-ipv4-metal-backuprestore
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+    hidden: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-hcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-hypershift-release-4.22-e2e-agent-connected-ovn-ipv4-metal-backuprestore
+    optional: true
+    path_alias: github.com/openshift/hypershift
+    rerun_command: /test e2e-agent-connected-ovn-ipv4-metal-backuprestore
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-connected-ovn-ipv4-metal-backuprestore
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-connected-ovn-ipv4-metal-backuprestore,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     annotations:
       pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
     branches:
@@ -195,6 +299,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
@@ -287,6 +395,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
@@ -377,6 +489,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
@@ -470,6 +586,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       capability/build-tmpfs: build-tmpfs
@@ -563,6 +683,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       capability/build-tmpfs: build-tmpfs
@@ -654,6 +778,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -745,6 +873,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -836,6 +968,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -927,6 +1063,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       capability/build-tmpfs: build-tmpfs
@@ -1019,6 +1159,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -1112,6 +1256,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       capability/build-tmpfs: build-tmpfs
@@ -1203,6 +1351,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
@@ -1294,6 +1446,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1387,6 +1543,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-azure
@@ -1477,6 +1637,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -1561,99 +1725,6 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build01
-    context: ci/prow/e2e-gke
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      capability/build-tmpfs: build-tmpfs
-      ci-operator.openshift.io/cloud: hypershift-gcp
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift-gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-release-4.22-e2e-gke
-    optional: true
-    path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-gke
-    run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gke
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gke,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
     cluster: build10
     context: ci/prow/e2e-kubevirt-aws-ovn
     decorate: true
@@ -1661,6 +1732,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1754,6 +1829,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1844,6 +1923,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1928,6 +2011,102 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
+    cluster: build11
+    context: ci/prow/e2e-kubevirt-metal-ovn-backuprestore
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+    hidden: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-hcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-hypershift-release-4.22-e2e-kubevirt-metal-ovn-backuprestore
+    optional: true
+    path_alias: github.com/openshift/hypershift
+    rerun_command: /test e2e-kubevirt-metal-ovn-backuprestore
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-kubevirt-metal-ovn-backuprestore
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-kubevirt-metal-ovn-backuprestore,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
     cluster: build08
     context: ci/prow/e2e-openstack-aws
     decorate: true
@@ -1935,6 +2114,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2026,6 +2209,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2117,6 +2304,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2208,6 +2399,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2299,6 +2494,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2392,6 +2591,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2482,6 +2685,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2562,99 +2769,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-v2-aws-backuprestore,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build01
-    context: ci/prow/e2e-v2-gke
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      capability/build-tmpfs: build-tmpfs
-      ci-operator.openshift.io/cloud: hypershift-gcp
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift-gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hypershift-release-4.22-e2e-v2-gke
-    optional: true
-    path_alias: github.com/openshift/hypershift
-    rerun_command: /test e2e-v2-gke
-    run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-v2-gke
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-v2-gke,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.22$
@@ -2666,6 +2780,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -2729,6 +2847,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       capability/build-tmpfs: build-tmpfs
@@ -2821,6 +2943,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -2910,6 +3036,10 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen

@@ -59,12 +59,18 @@ images:
     from: ocp_os
     to: custom-os-image
   - dockerfile_literal: |
+      FROM src
+      RUN dnf install -y skopeo && dnf clean all
+    from: src
+    to: src-with-skopeo
+  - dockerfile_literal: |
       FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
     to: zacks-toolbox
 promotion:
   to:
   - excluded_images:
     - custom-os-image
+    - src-with-skopeo
     - zacks-toolbox
     name: 4.23-priv
     namespace: ocp-private
@@ -277,29 +283,31 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl-part1
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part1
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
       commands: make test-e2e-ocl-1of2
-      from: src
+      from: src-with-skopeo
       resources:
         requests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-ocl-part2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part2
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
       commands: make test-e2e-ocl-2of2
-      from: src
+      from: src-with-skopeo
       resources:
         requests:
           cpu: 100m
@@ -699,18 +707,38 @@ tests:
 - always_run: false
   as: e2e-aws-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure-ovn-multidisk-techpreview

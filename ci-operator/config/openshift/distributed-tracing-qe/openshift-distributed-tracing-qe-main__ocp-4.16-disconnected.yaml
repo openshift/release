@@ -20,7 +20,7 @@ images:
   items:
   - context_dir: .
     dockerfile_path: Dockerfile
-    to: distributed-tracing-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
     candidate:
@@ -35,11 +35,19 @@ resources:
 tests:
 - as: distributed-tracing-tests-disconnected
   cron: 0 0 30 2 *
+  reporter_config:
+    channel: '#distributed-tracing-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: gcp-observability
     env:
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1071440
-      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1075145
       OPERATORS: |
         [
             {"name": "amq-streams", "source": "cs-redhat-operator-index", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},

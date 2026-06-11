@@ -19,6 +19,7 @@ binary_build_commands: make production-install
 build_root:
   from_repository: true
 images:
+  build_if_affected: true
   items:
   - additional_architectures:
     - arm64
@@ -214,9 +215,7 @@ images:
         - destination_dir: .
           source_path: /go/bin/config-brancher
     to: config-brancher
-  - additional_architectures:
-    - arm64
-    context_dir: images/dptp-controller-manager
+  - context_dir: images/dptp-controller-manager
     from: os
     inputs:
       bin:
@@ -276,9 +275,7 @@ images:
         - destination_dir: .
           source_path: /go/bin/prcreator
     to: prcreator
-  - additional_architectures:
-    - arm64
-    context_dir: images/auto-config-brancher/
+  - context_dir: images/auto-config-brancher/
     from: os
     inputs:
       bin:
@@ -753,6 +750,13 @@ images:
         - destination_dir: .
           source_path: /usr/local/bin/oc
     to: multi-arch-builder-controller
+  reporter_config:
+    channel: '#ops-testplatform'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
 promotion:
   to:
   - namespace: ci
