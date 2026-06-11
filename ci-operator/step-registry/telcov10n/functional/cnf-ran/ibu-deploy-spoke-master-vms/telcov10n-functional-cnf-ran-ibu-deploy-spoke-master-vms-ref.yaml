@@ -1,0 +1,35 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-deploy-spoke-master-vms
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-deploy-spoke-master-vms-commands.sh
+  timeout: 5h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: SEED_CLUSTER_NAME
+      default: "kni-qe-108"
+      documentation: Cluster name for the IBU seed hub (spoke master VMs deployed first)
+    - name: TARGET_CLUSTER_NAME
+      default: "kni-qe-109"
+      documentation: Cluster name for the IBU target hub (spoke master VMs deployed second)
+  credentials:
+    # kni-qe-108 (seed hub) spoke master VM definition
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-108-spoke-master0
+      mount_path: /var/host_variables/kni-qe-108/spoke-master0
+    # kni-qe-109 (target hub) spoke master VM definition
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-109-spoke-master0
+      mount_path: /var/host_variables/kni-qe-109/spoke-master0
+  documentation: |-
+    Deploy spoke master VMs for both IBU seed and target hubs.
+    Group vars (all, bastions, hypervisors, nodes) and bastion/hypervisor host vars
+    are taken from SHARED_DIR written by the preceding hub-deploy steps.
+    Runs create-spoke-masters.yml twice: first for the seed hub (kni-qe-108),
+    then removes the seed spoke-master0 from inventory and runs again for
+    the target hub (kni-qe-109).
