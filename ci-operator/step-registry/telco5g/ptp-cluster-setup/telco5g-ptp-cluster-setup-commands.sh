@@ -151,6 +151,13 @@ cat << EOF > ~/fetch-kubeconfig.yml
       dest: $SHARED_DIR/kubeconfig
       flat: yes
 
+  - name: Save original kubeconfig before modification
+    copy:
+      src: $SHARED_DIR/kubeconfig
+      dest: $SHARED_DIR/kubeconfig.original
+      remote_src: false
+    delegate_to: localhost
+
   - name: Modify local copy of kubeconfig
     replace:
       path: $SHARED_DIR/kubeconfig

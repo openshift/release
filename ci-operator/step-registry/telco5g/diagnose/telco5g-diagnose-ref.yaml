@@ -1,0 +1,29 @@
+ref:
+  as: telco5g-diagnose
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  best_effort: true
+  commands: telco5g-diagnose-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: cikey
+    mount_path: /var/run/ci-key
+  env:
+  - name: T5CI_VERSION
+    default: ""
+    documentation: Version of OCP cluster.
+  - name: T5CI_JOB_TYPE
+    default: ""
+    documentation: Job type of Telco5G CI jobs.
+  timeout: 30m
+  documentation: |-
+    Run AI-assisted diagnostics on the cluster when a previous step failed.
+    Reads env vars from SHARED_DIR/diagnose-telco5g-* files and generates
+    a step-specific prompt. Reads step log from SHARED_DIR/setup-output.log
+    or tests-output.log.

@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/tests-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-origin-tests.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-origin-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=origintests
+EOF
+
 # shellcheck disable=SC1091
 source "$SHARED_DIR/main.env"
 
@@ -572,16 +581,35 @@ cat << EOF > run-openshift-tests.yml
 EOF
 
 # Run OpenShift's conformance test suite
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv
+status=0
 
-cd "$ARTIFACT_DIR"
-tar -xf openshift-tests.tar.gz
-rm openshift-tests.tar.gz
+rm -f "${SHARED_DIR}/diagnose-telco5g-origin-tests.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-origin-tests" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-origin-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=origintests
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+export TEST_SUITE=${TEST_SUITE:-unknown}
+EOF
 
-cd junit/
-for f in test-failures-summary_*.json; do
-    if [ -e "$f" ]; then
-        ln -s "$f" test-failures-summary.json
-        break
-    fi
-done
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv || status=$?
+
+if [[ -f "$ARTIFACT_DIR/openshift-tests.tar.gz" ]]; then
+    cd "$ARTIFACT_DIR"
+    tar -xf openshift-tests.tar.gz
+    rm openshift-tests.tar.gz
+
+    cd junit/
+    for f in test-failures-summary_*.json; do
+        if [ -e "$f" ]; then
+            ln -s "$f" test-failures-summary.json
+            break
+        fi
+    done
+fi
+
+gzip -c /tmp/tests-output.log > ${SHARED_DIR}/tests-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-origin-tests"
+exit ${status}

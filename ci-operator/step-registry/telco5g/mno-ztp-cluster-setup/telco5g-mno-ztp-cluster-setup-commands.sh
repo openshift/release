@@ -4,9 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# enable for debug
-# exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+exec > >(tee -i ${SHARED_DIR}/setup-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-mno-ztp-cluster-setup.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-mno-ztp-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
@@ -313,6 +318,18 @@ cat << EOF > ~/fetch-kubeconfig.yml
       dest: $SHARED_DIR/kubeconfig
       flat: yes
 
+  - name: Save the original of the kubeconfig of management cluster
+    fetch:
+      src: /home/kni/.kube/config_${SNO_NAME}
+      dest: $SHARED_DIR/mgmt-kubeconfig.original
+      flat: yes
+
+  - name: Save the original of the ZTP kubeconfig
+    fetch:
+      src: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+      dest: $SHARED_DIR/kubeconfig.original
+      flat: yes
+
   - name: Modify local copy of mgmt kubeconfig
     replace:
       path: $SHARED_DIR/mgmt-kubeconfig
@@ -346,6 +363,17 @@ fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
+
+rm -f "${SHARED_DIR}/diagnose-telco5g-mno-ztp-cluster-setup.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-mno-ztp-cluster-setup" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-mno-ztp-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+export SNO_NAME=${SNO_NAME:-unknown}
+export MGMT_VERSION=${MGMT_VERSION:-unknown}
+EOF
 
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     playbooks/mno_ztp.yml \
@@ -383,5 +411,8 @@ if [[ "$status" == "0" ]]; then
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
 
+gzip -c /tmp/setup-output.log > ${SHARED_DIR}/setup-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-mno-ztp-cluster-setup"
 echo "Exiting with status ${status}"
 exit ${status}
