@@ -16,31 +16,19 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 echo "Using subscription name='${CUSTOMER_SUBSCRIPTION}'"
 
-echo "DEBUG: VAULT_SECRET_PROFILE=${VAULT_SECRET_PROFILE}"
-echo "DEBUG: CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR}"
-echo "DEBUG: AZURE_CLIENT_ID=${AZURE_CLIENT_ID}"
-echo "DEBUG: AZURE_TENANT_ID=${AZURE_TENANT_ID}"
-
-echo "DEBUG: Azure account context:"
-az account show \
-  --query "{user:user.name, tenantId:tenantId, subscriptionId:id, subscriptionName:name}" \
-  -o table
-
-echo "DEBUG: Checking Key Vault access to aro-hcp-dev-svc-kv/firstPartyCert2"
-if az keyvault secret show \
-  --vault-name aro-hcp-dev-svc-kv \
-  --name firstPartyCert2 \
-  --query id \
-  -o tsv; then
-  echo "DEBUG: SUCCESS: Prow identity can access aro-hcp-dev-svc-kv/firstPartyCert2"
-else
-  echo "DEBUG: FAILURE: Prow identity cannot access aro-hcp-dev-svc-kv/firstPartyCert2"
-fi
-
-echo "DEBUG: stopping before cleanup for rehearsal"
-exit 0
-
 cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
+
+# Add FPA credentials if available (needed for SAL deletion in no-rp mode)
+FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-id"
+FPA_CERT_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-value"
+
+if [ -f "${FPA_CLIENT_ID_FILE}" ] && [ -f "${FPA_CERT_FILE}" ]; then
+  FPA_CLIENT_ID=$(cat "${FPA_CLIENT_ID_FILE}")
+  cmd="${cmd} --fpa-client-id ${FPA_CLIENT_ID} --fpa-cert-path ${FPA_CERT_FILE}"
+  echo "FPA credentials found - SAL deletion enabled"
+else
+  echo "FPA credentials not found - SAL deletion disabled"
+fi
 
 if [ -n "${CLEANUP_MODE}" ]; then
   cmd="${cmd} --mode ${CLEANUP_MODE}"
