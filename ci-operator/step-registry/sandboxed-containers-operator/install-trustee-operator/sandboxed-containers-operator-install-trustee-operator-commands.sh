@@ -112,7 +112,9 @@ function fetch_trustee_charts() {
       echo ">>> Charts extracted from image (no network access needed)" >&2
       echo ">>> Extracted files:" >&2
       ls -lR "${charts_dir}" | head -50 >&2
-      echo "${charts_dir}"
+      # The git repo structure is: charts/trustee-operator/, so image has /charts/charts/
+      # Return the nested charts directory
+      echo "${charts_dir}/charts"
       return 0
     else
       echo ">>> ERROR: Failed to extract charts from image" >&2
