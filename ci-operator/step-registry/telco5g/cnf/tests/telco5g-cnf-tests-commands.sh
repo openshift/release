@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/tests-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-cnf-tests.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cnf-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
 
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
@@ -751,6 +759,16 @@ pushd $CNF_REPO_DIR
 status=0
 val_status=0
 
+rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-cnf-tests" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cnf-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CNF_BRANCH=${CNF_BRANCH:-unknown}
+export TEST_RUN_FEATURES=${TEST_RUN_FEATURES:-unknown}
+EOF
+
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
@@ -834,7 +852,12 @@ junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_
 [[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
+# Clean up large log files from SHARED_DIR to stay under the 1MB K8s Secret limit.
+# These logs are already saved to ARTIFACT_DIR by the tee commands above.
+rm -f ${SHARED_DIR}/cnf-tests-run.log ${SHARED_DIR}/cnf-validations-run.log
+gzip -c /tmp/tests-output.log > ${SHARED_DIR}/tests-output.log.gz 2>/dev/null || true
 set +x
 set -e
 
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests"
 exit ${status}
