@@ -31,6 +31,12 @@ ref:
       Container image repository for Vault Enterprise.
       Mirrored from docker.io/hashicorp/vault-enterprise
       (docker.io is blocked in CI due to rate limiting and CI is not accessible in disconnected environments.)
+  - name: VAULT_SECONDARY_NAMESPACE
+    default: "vault-kms-2"
+    documentation: |-
+      Namespace for a second Vault Enterprise instance.
+      A second Vault instance is installed in this namespace
+      with a separate CA ConfigMap (vault-ca-bundle-2 in openshift-config).
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -41,6 +47,7 @@ ref:
     - Creates vault-license secret from mounted credential (if available)
     - Installs Vault Enterprise using Helm chart
     - Waits for Vault pod to be ready
+    - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
     Prerequisites:
     - OpenShift cluster with adequate resources
@@ -50,6 +57,9 @@ ref:
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
     - Vault pod: vault-0 (Ready state)
+    - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
+    - Second Vault service at: vault.${VAULT_SECONDARY_NAMESPACE}.svc:8200
+    - CA ConfigMap: vault-ca-bundle-2 (openshift-config namespace)
 
     Next step:
     - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS
