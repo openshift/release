@@ -1283,19 +1283,20 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     echo "Skipping push for PR #$PR_NUMBER because an earlier phase failed"
   elif [ "$PUSH_NEEDED" = "true" ]; then
     echo "Running Claude push phase for PR #$PR_NUMBER..."
-    # Compute correct PULL_BASE_SHA/PULL_PULL_SHA for gitlint.
+    # Export correct PULL_BASE_SHA/PULL_PULL_SHA for gitlint.
     # CI sets these to the rehearsal PR's commits (openshift/release), not
     # hypershift's, so gitlint fails with "Invalid revision range".
-    PUSH_MERGE_BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "HEAD~5")
-    PUSH_HEAD_SHA=$(git rev-parse HEAD)
+    # Export them so all git push invocations (including retries) inherit them.
+    git fetch upstream "${BASE_BRANCH}" 2>/dev/null || true
+    export PULL_BASE_SHA=$(git merge-base HEAD "upstream/${BASE_BRANCH}" 2>/dev/null || echo "HEAD~5")
+    export PULL_PULL_SHA=$(git rev-parse HEAD)
 
     PUSH_SYSTEM_PROMPT="You are in /tmp/hypershift on branch ${BRANCH_NAME}.
 Your task is to push the current branch to origin safely.
 
 REQUIREMENTS:
-- Push command: PULL_BASE_SHA=${PUSH_MERGE_BASE} PULL_PULL_SHA=${PUSH_HEAD_SHA} git push --force-with-lease origin ${BRANCH_NAME}
-  The PULL_BASE_SHA and PULL_PULL_SHA overrides are required because CI sets
-  these to commits from a different repo, which breaks gitlint in the pre-push hook.
+- Push command: git push --force-with-lease origin ${BRANCH_NAME}
+  PULL_BASE_SHA and PULL_PULL_SHA are already exported in the environment.
 - If push fails because of hooks or branch state, diagnose the exact error and fix it.
 - You may run tests/lint/verify and make minimal code or commit updates only when required to satisfy hook failures.
 - Keep changes minimal and related to the reported push/hook failure.
