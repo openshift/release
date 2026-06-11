@@ -769,7 +769,7 @@ INSTRUCTIONS:
   # Check if rebase completed (no longer in rebase state)
   if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
     echo "Claude could not fully resolve conflicts, aborting rebase"
-    git rebase --abort
+    git rebase --abort 2>/dev/null || true
     return 1
   fi
 
