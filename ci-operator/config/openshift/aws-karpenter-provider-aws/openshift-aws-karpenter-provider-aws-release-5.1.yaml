@@ -28,6 +28,19 @@ releases:
       include_built_images: true
       name: "5.1"
       namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "5.1"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -44,10 +57,12 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
     env:
-      CI_TESTS_RUN: ^TestKarpenter$
-      HYPERSHIFT_NODE_COUNT: "1"
-      TECH_PREVIEW_NO_UPGRADE: "true"
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
     workflow: hypershift-aws-e2e-nested
 - as: verify-deps
   steps:
