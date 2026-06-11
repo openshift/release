@@ -758,7 +758,7 @@ INSTRUCTIONS:
     --output-format stream-json \
     < /dev/null \
     2>&1 | tee "/tmp/claude-rebase-output.json"
-  local resolve_exit=$?
+  local resolve_exit=${PIPESTATUS[0]}
   set -e
 
   # Save artifact for debugging
@@ -1139,7 +1139,7 @@ ${SUBAGENT_PROMPT}"
 
     set +e
     echo "Starting Claude review processing..."
-    RESULT=$(claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
+    claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
       --system-prompt "$SKILL_CONTENT" \
       --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
       --max-turns 150 \
@@ -1148,8 +1148,8 @@ ${SUBAGENT_PROMPT}"
       --verbose \
       --output-format stream-json \
       < /dev/null \
-      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-output.json")
-    REVIEW_EXIT=$?
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-output.json"
+    REVIEW_EXIT=${PIPESTATUS[0]}
     set -e
     echo "Review processing complete. Output saved to /tmp/claude-pr-${PR_NUMBER}-output.json"
 
@@ -1163,15 +1163,15 @@ ${SUBAGENT_PROMPT}"
       echo "Review phase succeeded for PR #$PR_NUMBER"
       echo ""
       echo "--- Claude review output for PR #$PR_NUMBER ---"
-      echo "$RESULT" | tail -50
+      tail -50 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
       echo "--- End Claude review output ---"
       echo ""
     else
       PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.reviews.result = "failed"')
       PR_HAD_ERROR=true
-      echo "Review phase failed for PR #$PR_NUMBER"
+      echo "Review phase failed for PR #$PR_NUMBER (claude exit code: $REVIEW_EXIT)"
       echo "Error output (last 20 lines):"
-      echo "$RESULT" | tail -20
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
     fi
   fi
 
@@ -1225,7 +1225,7 @@ Reproduce each failure, fix the code, and verify the fix passes."
 
     set +e
     echo "Starting Claude CI fix processing..."
-    CI_RESULT=$(claude -p "$CI_FIX_PROMPT" \
+    claude -p "$CI_FIX_PROMPT" \
       --system-prompt "$CI_FIX_SYSTEM" \
       --allowedTools "Bash Read Write Edit Grep Glob" \
       --max-turns 150 \
@@ -1234,8 +1234,8 @@ Reproduce each failure, fix the code, and verify the fix passes."
       --verbose \
       --output-format stream-json \
       < /dev/null \
-      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json")
-    CI_FIX_EXIT=$?
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json"
+    CI_FIX_EXIT=${PIPESTATUS[0]}
     set -e
     echo "CI fix processing complete. Output saved to /tmp/claude-pr-${PR_NUMBER}-cifix-output.json"
 
@@ -1251,9 +1251,9 @@ Reproduce each failure, fix the code, and verify the fix passes."
     else
       PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.ci_fixes.result = "failed"')
       PR_HAD_ERROR=true
-      echo "CI fix phase failed for PR #$PR_NUMBER"
+      echo "CI fix phase failed for PR #$PR_NUMBER (claude exit code: $CI_FIX_EXIT)"
       echo "Error output (last 20 lines):"
-      echo "$CI_RESULT" | tail -20
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json" 2>/dev/null || true
     fi
   fi
 
@@ -1283,11 +1283,19 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     echo "Skipping push for PR #$PR_NUMBER because an earlier phase failed"
   elif [ "$PUSH_NEEDED" = "true" ]; then
     echo "Running Claude push phase for PR #$PR_NUMBER..."
+    # Compute correct PULL_BASE_SHA/PULL_PULL_SHA for gitlint.
+    # CI sets these to the rehearsal PR's commits (openshift/release), not
+    # hypershift's, so gitlint fails with "Invalid revision range".
+    PUSH_MERGE_BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "HEAD~5")
+    PUSH_HEAD_SHA=$(git rev-parse HEAD)
+
     PUSH_SYSTEM_PROMPT="You are in /tmp/hypershift on branch ${BRANCH_NAME}.
 Your task is to push the current branch to origin safely.
 
 REQUIREMENTS:
-- Push command: git push --force-with-lease origin ${BRANCH_NAME}
+- Push command: PULL_BASE_SHA=${PUSH_MERGE_BASE} PULL_PULL_SHA=${PUSH_HEAD_SHA} git push --force-with-lease origin ${BRANCH_NAME}
+  The PULL_BASE_SHA and PULL_PULL_SHA overrides are required because CI sets
+  these to commits from a different repo, which breaks gitlint in the pre-push hook.
 - If push fails because of hooks or branch state, diagnose the exact error and fix it.
 - You may run tests/lint/verify and make minimal code or commit updates only when required to satisfy hook failures.
 - Keep changes minimal and related to the reported push/hook failure.
@@ -1302,7 +1310,7 @@ LIMITS:
     PUSH_USER_PROMPT="Push branch ${BRANCH_NAME} for PR #${PR_NUMBER}. If push is rejected due to hooks or branch constraints, fix the issue and retry up to 3 times."
 
     set +e
-    PUSH_RESULT=$(claude -p "$PUSH_USER_PROMPT" \
+    claude -p "$PUSH_USER_PROMPT" \
       --system-prompt "$PUSH_SYSTEM_PROMPT" \
       --allowedTools "Bash Read Write Edit Grep Glob" \
       --max-turns 60 \
@@ -1311,8 +1319,8 @@ LIMITS:
       --verbose \
       --output-format stream-json \
       < /dev/null \
-      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-push-output.json")
-    PUSH_EXIT=$?
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-push-output.json"
+    PUSH_EXIT=${PIPESTATUS[0]}
     set -e
 
     if [ -f "/tmp/claude-pr-${PR_NUMBER}-push-output.json" ]; then
@@ -1324,13 +1332,13 @@ LIMITS:
       echo "Push phase succeeded for PR #$PR_NUMBER"
       echo ""
       echo "--- Claude push output for PR #$PR_NUMBER ---"
-      echo "$PUSH_RESULT" | tail -50
+      tail -50 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
       echo "--- End Claude push output ---"
       echo ""
     else
-      echo "Push phase failed for PR #$PR_NUMBER"
+      echo "Push phase failed for PR #$PR_NUMBER (claude exit code: $PUSH_EXIT)"
       echo "Error output (last 20 lines):"
-      echo "$PUSH_RESULT" | tail -20
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
       PR_HAD_ERROR=true
     fi
   else
