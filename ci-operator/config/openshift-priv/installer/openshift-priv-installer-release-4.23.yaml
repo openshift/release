@@ -35,6 +35,10 @@ base_images:
     name: nested-environment-builder
     namespace: ci
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ocp_4.10_cli:
     name: 4.23-priv
     namespace: ocp-private
@@ -311,6 +315,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-dualstack-ipv6-primary-techpreview
@@ -321,6 +328,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-proxy
@@ -1252,6 +1262,7 @@ tests:
 - as: e2e-agent-two-node-fencing-ipv4
   capabilities:
   - intranet
+  - nested-podman
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
