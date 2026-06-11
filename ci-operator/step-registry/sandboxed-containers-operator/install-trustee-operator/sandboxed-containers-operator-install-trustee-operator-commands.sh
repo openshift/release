@@ -50,6 +50,15 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
+# Install helm if not available
+if ! command -v helm &> /dev/null; then
+  echo ">>> Installing helm..." >&2
+  curl -sL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz -C /tmp
+  mv /tmp/linux-amd64/helm /usr/local/bin/
+  chmod +x /usr/local/bin/helm
+  echo ">>> Helm installed: $(helm version --short)" >&2
+fi
+
 # Show configuration
 echo ">>> Trustee charts: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
