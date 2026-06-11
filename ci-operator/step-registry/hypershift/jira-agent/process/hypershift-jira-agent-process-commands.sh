@@ -537,6 +537,17 @@ while IFS= read -r line; do
         REVIEW_FINDINGS=$(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt")
       fi
 
+      # Refresh tokens before Phase 3 since it pushes code.
+      # Phases 1-2 can exceed the 1-hour GitHub App token lifetime.
+      echo "Refreshing GitHub App tokens before Phase 3..."
+      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for fork"
+      else
+        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+        echo "Fork token refreshed"
+      fi
+
       PHASE3_START=$(date +%s)
 
       if [ -n "$REVIEW_FINDINGS" ]; then
@@ -602,11 +613,10 @@ IMPORTANT:
       echo "Phase 3 duration: ${PHASE3_DURATION}s"
       echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
 
-      # Regenerate GitHub App tokens before push/PR operations.
-      # Installation tokens expire after 1 hour, and phases 1-3 can
-      # easily exceed that. Refreshing here ensures push and PR
-      # creation use a valid token.
-      echo "Refreshing GitHub App tokens before push/PR..."
+      # Regenerate GitHub App tokens before Phase 4.
+      # Phase 3 may also have taken significant time, so refresh again
+      # to ensure PR creation uses a valid token.
+      echo "Refreshing GitHub App tokens before Phase 4..."
       GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
       if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
         echo "ERROR: Failed to refresh GitHub App token for fork"
@@ -648,7 +658,7 @@ IMPORTANT:
       set +e
       claude -p "$PR_PROMPT" \
         --allowedTools "Bash Read Grep Glob" \
-        --max-turns 15 \
+        --max-turns 30 \
         --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
