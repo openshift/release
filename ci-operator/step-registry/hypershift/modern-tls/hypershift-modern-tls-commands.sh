@@ -64,6 +64,16 @@ if (( SECONDS >= rollout_deadline )); then
   echo "kube-apiserver generation unchanged after 5m; continuing with TLS verification"
 fi
 
+echo "Waiting for all control plane deployments to finish rolling out..."
+HCP_DEPLOYMENTS=$(oc get deployments -n "${HCP_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}')
+for dep in ${HCP_DEPLOYMENTS}; do
+  echo "  Waiting for deployment/${dep}..."
+  oc rollout status deployment/"${dep}" -n "${HCP_NAMESPACE}" --timeout=15m || {
+    echo "  Warning: deployment/${dep} rollout did not complete within timeout"
+  }
+done
+echo "All control plane deployments rolled out."
+
 verify_modern_tls_endpoint() {
   local api_server api_host api_port
 

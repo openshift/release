@@ -150,6 +150,14 @@ kind: Pod
 metadata:
   name: tls-scanner
   namespace: ${NAMESPACE}
+  labels:
+    app: tls-scanner
+    # Required when running in an HCP namespace (OWNS_NAMESPACE=false): HyperShift's
+    # management-kas NetworkPolicy isolates pods without this label from the management
+    # cluster kube API (172.30.x.x service CIDR) via OVN ACLs that sit below standard
+    # NetworkPolicy. The label exempts the scanner so it can list pods via the
+    # management cluster API, which is the first thing tls-scanner does on startup.
+    hypershift.openshift.io/need-management-kas-access: "true"
 spec:
   serviceAccountName: default
   restartPolicy: Never
@@ -171,10 +179,9 @@ spec:
       SCAN_EXIT_CODE=\${PIPESTATUS[0]}
       echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
       touch /results/scan.done
-      # Keep pod alive for artifact collection
+      # Keep pod alive for artifact collection before exiting with the scanner's code.
       sleep 120
-      # We are intentionally ignoring the scanner exit code for the moment
-      # exit \${SCAN_EXIT_CODE}
+      exit \${SCAN_EXIT_CODE}
     resources:
       requests:
         cpu: "${scanner_cpu}"
@@ -258,15 +265,17 @@ EOF
 }
 
 if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
+  OVERALL_EXIT_CODE=0
   for label in management guest; do
     echo "=== TLS scanner: ${label} cluster ==="
     (
       export TLS_SCANNER_CLUSTER_LABEL="${label}"
       run_tls_scan
-    )
+    ) || OVERALL_EXIT_CODE=1
+    echo "=== TLS scanner: ${label} cluster complete ==="
   done
   echo "=== HyperShift TLS scanner complete (management + guest) ==="
-  exit 0
+  exit "${OVERALL_EXIT_CODE}"
 fi
 
 run_tls_scan
