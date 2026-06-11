@@ -267,8 +267,6 @@ for _ in {1..60}; do
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
-    echo "Sleeping 8h for debugging..."
-    sleep 8h
     exit 0
   fi
   sleep 15

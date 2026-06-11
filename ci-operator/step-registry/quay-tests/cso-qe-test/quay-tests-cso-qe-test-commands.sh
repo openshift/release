@@ -114,3 +114,5 @@ for _ in {1..60}; do
     sleep 10
 done
 echo "QE Test for Container Security Operator is passed"
+echo "Sleeping 8h for debugging..."
+sleep 8h
