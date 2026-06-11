@@ -112,7 +112,9 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: test-e2e-ci-build-downstream-4-20
+- always_run: false
+  as: test-e2e-ci-build-downstream-4-20
+  optional: true
   steps:
     cluster_profile: openshift-org-aws
     post:
@@ -143,7 +145,9 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
-- as: test-e2e-ci-build-upstream-4-20
+- always_run: false
+  as: test-e2e-ci-build-upstream-4-20
+  optional: true
   steps:
     cluster_profile: openshift-org-aws
     post:
@@ -174,9 +178,40 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
-- always_run: false
-  as: test-e2e-ci-build-upstream-4-21
-  optional: true
+- as: test-e2e-ci-build-downstream-4-21
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:4-21-latest
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - as: e2e-kueue
+      cli: latest
+      commands: make e2e-ci-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
+- as: test-e2e-ci-build-upstream-4-21
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
