@@ -54,8 +54,8 @@ fi
 if ! command -v helm &> /dev/null; then
   echo ">>> Installing helm..." >&2
   curl -sL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz -C /tmp
-  mv /tmp/linux-amd64/helm /usr/local/bin/
-  chmod +x /usr/local/bin/helm
+  export PATH="/tmp/linux-amd64:${PATH}"
+  chmod +x /tmp/linux-amd64/helm
   echo ">>> Helm installed: $(helm version --short)" >&2
 fi
 
