@@ -37,6 +37,22 @@ ref:
     default: "vault-kms-secondary"
     documentation: |-
       Namespace where the second Vault Enterprise instance will be installed.
+  - name: VAULT_KMS_PLUGIN_VERSION
+    default: "0.0.1"
+    documentation: |-
+      Tag of the vault-kube-kms KMS plugin image used by encryption-kms tests.
+      On baremetalds jobs the image is mirrored from VAULT_KMS_PLUGIN_IMAGE_SOURCE
+      to the dev-scripts local registry and an ImageContentSourcePolicy redirects node pulls.
+  - name: VAULT_KMS_PLUGIN_IMAGE_SOURCE
+    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms:0.0.1"
+    documentation: |-
+      Source image for the vault-kube-kms KMS plugin mirrored on baremetalds jobs.
+      Update this when the KMS plugin image changes.
+  - name: VAULT_KMS_PLUGIN_ICSP_SOURCE
+    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms"
+    documentation: |-
+      Upstream repository redirected by ImageContentSourcePolicy on baremetalds jobs.
+      Update this when the KMS plugin image repository changes.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -45,7 +61,8 @@ ref:
     - Adds HashiCorp Helm repository
     - Creates vault namespace with appropriate SCC (restricted)
     - Creates vault-license secret from mounted credential (if available)
-    - Mirrors Vault image to dev-scripts local registry on baremetalds jobs
+    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (SSH oc image mirror with retry)
+    - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
     - Installs Vault Enterprise using Helm chart
     - Waits for Vault pod to be ready
     - Installs a second instance in VAULT_SECONDARY_NAMESPACE
