@@ -297,13 +297,22 @@ function wait_for_operator() {
   # Stage 1: Wait for CatalogSource to be READY (60s)
   # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
-    echo ">>> Waiting for CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} to be READY..."
+    # Find the actual CatalogSource name that was created (helm chart creates trustee-operator-dev-catalog)
+    local actual_catalog_name
+    actual_catalog_name=$(oc get catalogsource -n openshift-marketplace -l olm.catalogSource!=redhat-operators -o name 2>/dev/null | grep -i trustee | head -1 | cut -d/ -f2 || echo "")
+
+    if [[ -z "$actual_catalog_name" ]]; then
+      # Fallback: try the name from env var
+      actual_catalog_name="${TRUSTEE_CATALOG_SOURCE_NAME}"
+    fi
+
+    echo ">>> Waiting for CatalogSource ${actual_catalog_name} to be READY..."
     local catalog_ready=false
     for i in {1..12}; do
       local state
-      state=$(oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
+      state=$(oc get catalogsource -n openshift-marketplace "${actual_catalog_name}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
       if [[ "${state}" == "READY" ]]; then
-        echo ">>> CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} is READY"
+        echo ">>> CatalogSource ${actual_catalog_name} is READY"
         catalog_ready=true
         break
       fi
@@ -311,10 +320,13 @@ function wait_for_operator() {
     done
 
     if [[ "${catalog_ready}" != "true" ]]; then
-      echo ">>> ERROR: CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME} not READY after 60s"
-      oc get catalogsource -n openshift-marketplace "${TRUSTEE_CATALOG_SOURCE_NAME}" -o yaml || true
-      oc get pods -n openshift-marketplace -l olm.catalogSource="${TRUSTEE_CATALOG_SOURCE_NAME}" || true
-      oc describe pods -n openshift-marketplace -l olm.catalogSource="${TRUSTEE_CATALOG_SOURCE_NAME}" | tail -50 || true
+      echo ">>> ERROR: CatalogSource ${actual_catalog_name} not READY after 60s"
+      echo ">>> All CatalogSources in openshift-marketplace:"
+      oc get catalogsource -n openshift-marketplace || true
+      echo ">>> Details of ${actual_catalog_name}:"
+      oc get catalogsource -n openshift-marketplace "${actual_catalog_name}" -o yaml || true
+      oc get pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" || true
+      oc describe pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" | tail -50 || true
       return 1
     fi
   else
