@@ -416,6 +416,41 @@ function wait_for_operator() {
     return 1
   fi
 
+  # Stage 6: Wait for pods to be Ready (120s for readiness probes)
+  echo ">>> Waiting for operator pods to be Ready (READY 1/1)..."
+  local pods_ready=false
+  for i in {1..24}; do
+    # Check if all pods have READY column showing "1/1" (not "0/1")
+    local ready_count
+    ready_count=$(oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[*].status.containerStatuses[0].ready}' 2>/dev/null | tr ' ' '\n' | grep -c "true" || echo "0")
+    local total_count
+    total_count=$(oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager --no-headers 2>/dev/null | wc -l)
+
+    if [[ "${ready_count}" -gt 0 ]] && [[ "${ready_count}" -eq "${total_count}" ]]; then
+      echo ">>> All operator pods are Ready (${ready_count}/${total_count})"
+      oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
+      pods_ready=true
+      break
+    fi
+
+    if [[ $((i % 6)) -eq 0 ]]; then
+      echo ">>> Pods ready: ${ready_count}/${total_count} (checking ${i}/24)..."
+      oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
+    fi
+    [[ ${i} -lt 24 ]] && sleep 5
+  done
+
+  if [[ "${pods_ready}" != "true" ]]; then
+    echo ">>> ERROR: Operator pods not Ready after 120s"
+    echo ">>> Pods:"
+    oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
+    echo ">>> Pod details:"
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager | tail -100 || true
+    echo ">>> Pod logs:"
+    oc logs -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager --tail=50 || true
+    return 1
+  fi
+
   echo ">>> Operator installation complete"
 }
 
