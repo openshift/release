@@ -2,7 +2,7 @@ base_images:
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
-    tag: v1.30.0
+    tag: v1.39.2
   pf-status-relay:
     name: 5.0-priv
     namespace: ocp-private
@@ -18,6 +18,7 @@ operator:
   bundles:
   - as: operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift/origin-pf-status-relay-operator:.*
     with: pipeline:pf-status-relay-operator
@@ -50,7 +51,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: make test
 tests:
 - as: unit
   commands: make test
@@ -75,7 +75,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
-        oc wait --for condition=Available -n openshift-pf-status-relay-operator deployment pf-status-relay-operator-controller-manager
+        oc wait --for condition=Available -n openshift-pf-status-relay-operator deployment pf-status-relay-operator-controller-manager --timeout=5m
+        oc logs -n openshift-pf-status-relay-operator deployment/pf-status-relay-operator-controller-manager --all-containers > "${ARTIFACT_DIR}/operator-controller-manager.log" 2>&1 || true
+        make e2e GINKGO_ARGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit_e2e.xml"
       from: src
       resources:
         requests:
