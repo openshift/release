@@ -1,0 +1,40 @@
+ref:
+  as: cnv-enable-nested-virtualization-aws
+  documentation: |-
+    Enable nested virtualization on AWS EC2 instances after OCP cluster
+    deployment. Non-metal instances from supported families (c8i, m8i, r8i)
+    require explicit CpuOptions enablement. Each node is cordoned, drained,
+    stopped, reconfigured, restarted, and uncordoned sequentially.
+    Bare-metal instances are skipped (native KVM). For compact/SNO clusters
+    (COMPUTE_NODE_REPLICAS=0), master nodes are processed instead.
+    Instance type is read from env vars, falling back to Machine API.
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: cnv-enable-nested-virtualization-aws-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: COMPUTE_NODE_TYPE
+    default: ""
+    documentation: |-
+      EC2 instance type for worker nodes (e.g. m8i.4xlarge). Used to
+      determine if nested virtualization is supported and needed.
+      If empty, auto-detected from Machine API objects.
+  - name: COMPUTE_NODE_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of worker nodes. Set to 0 for compact/SNO clusters where
+      masters run VM workloads.
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      EC2 instance type for control plane nodes. Only used when
+      COMPUTE_NODE_REPLICAS=0 (compact/SNO). If empty, auto-detected
+      from Machine API objects.
