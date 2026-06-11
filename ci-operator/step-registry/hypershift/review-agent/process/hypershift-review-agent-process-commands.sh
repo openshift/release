@@ -1163,7 +1163,7 @@ ${SUBAGENT_PROMPT}"
       echo "Review phase succeeded for PR #$PR_NUMBER"
       echo ""
       echo "--- Claude review output for PR #$PR_NUMBER ---"
-      tail -50 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
+      tail -10 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
       echo "--- End Claude review output ---"
       echo ""
     else
@@ -1330,22 +1330,15 @@ LIMITS:
 
     if [ $PUSH_EXIT -eq 0 ]; then
       echo "Push phase succeeded for PR #$PR_NUMBER"
-      echo ""
-      echo "--- Claude push output for PR #$PR_NUMBER ---"
-      tail -50 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
-      echo "--- End Claude push output ---"
-      echo ""
     else
       echo "Push phase failed for PR #$PR_NUMBER (claude exit code: $PUSH_EXIT)"
-      echo "Error output (last 20 lines):"
-      tail -20 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
       PR_HAD_ERROR=true
     fi
   else
     echo "No changes to push for PR #$PR_NUMBER"
   fi
 
-  # ---- Write per-PR actions JSON ----
+  # ---- Persist state early (before output dumps that can OOM the pod) ----
   echo "$PR_ACTIONS" > "${SHARED_DIR}/pr-${PR_NUMBER}-actions.json"
 
   if [ "$PR_HAD_ERROR" = "true" ]; then
@@ -1354,6 +1347,20 @@ LIMITS:
   else
     PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
     echo "$PR_NUMBER $TIMESTAMP SUCCESS" >> "$STATE_FILE"
+  fi
+
+  # ---- Dump phase outputs (after state is safely persisted) ----
+  if [ -f "/tmp/claude-pr-${PR_NUMBER}-push-output.json" ] && [ "$PUSH_NEEDED" = "true" ]; then
+    if [ "$PR_HAD_ERROR" != "true" ]; then
+      echo ""
+      echo "--- Claude push output (last 10 lines) for PR #$PR_NUMBER ---"
+      tail -10 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
+      echo "--- End Claude push output ---"
+      echo ""
+    else
+      echo "Error output (last 20 lines):"
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
+    fi
   fi
 
   TOTAL_PROCESSED=$((TOTAL_PROCESSED + 1))
