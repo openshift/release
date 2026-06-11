@@ -89,12 +89,12 @@ echo "  ✓ CA certificate extracted"
 
 # Create or update ConfigMap with CA certificate in openshift-config
 echo ""
-echo "Creating ConfigMap vault-ca-bundle in openshift-config..."
-oc create configmap vault-ca-bundle \
+echo "Creating ConfigMap ${VAULT_CONFIGMAP} in openshift-config..."
+oc create configmap "${VAULT_CONFIGMAP}" \
   --from-file=ca-bundle.crt="${CA_CERT_TMP}" \
   -n openshift-config \
   --dry-run=client -o yaml | oc apply -f -
-echo "  ✓ ConfigMap vault-ca-bundle created/updated"
+echo "  ✓ ConfigMap ${VAULT_CONFIGMAP} created/updated"
 
 # Clean up temporary CA file
 rm -f "${CA_CERT_TMP}"
@@ -112,7 +112,7 @@ echo "  - Pod: vault-0 (Ready)"
 echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
 echo "  - TLS CA: /var/run/tls/vault-ca.pem (inside pod)"
 echo "  - Enterprise License: Configured"
-echo "  - CA ConfigMap: vault-ca-bundle (openshift-config namespace)"
+echo "  - CA ConfigMap: ${VAULT_CONFIGMAP} (openshift-config namespace)"
 echo ""
 echo "Next step: Run etcd-encryption-vault-configure to configure Vault for KMS"
 echo ""

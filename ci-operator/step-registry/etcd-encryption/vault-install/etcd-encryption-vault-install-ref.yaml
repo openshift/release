@@ -25,6 +25,12 @@ ref:
     default: "vault-kms"
     documentation: |-
       Namespace where Vault Enterprise will be installed.
+      To create multiple Vault instances, call this step multiple times with different VAULT_NAMESPACE values.
+  - name: VAULT_CONFIGMAP
+    default: "vault-ca-bundle"
+    documentation: |-
+      Name of the ConfigMap to create in openshift-config namespace for storing Vault CA certificate.
+      Use different names for multiple Vault instances (e.g., "vault-ca-bundle-2", "vault-ca-bundle-new").
   - name: VAULT_IMAGE_REPOSITORY
     default: "docker.io/hashicorp/vault-enterprise"
     documentation: |-
@@ -39,6 +45,7 @@ ref:
     - Creates vault-license secret from mounted credential (if available)
     - Installs Vault Enterprise using Helm chart
     - Waits for Vault pod to be ready
+    - Creates namespace-specific CA ConfigMap in openshift-config
 
     Prerequisites:
     - OpenShift cluster with adequate resources
@@ -48,6 +55,24 @@ ref:
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
     - Vault pod: vault-0 (Ready state)
+    - CA ConfigMap: ${VAULT_CONFIGMAP} in openshift-config namespace (default: vault-ca-bundle)
+
+    Multiple Instances:
+    This step can be called multiple times with different VAULT_NAMESPACE and VAULT_CONFIGMAP
+    values to create multiple independent Vault instances. Each instance will have unique resources:
+    - Separate namespace
+    - Separate CA ConfigMap with custom name
+
+    Example usage for two instances:
+      pre:
+        - ref: etcd-encryption-vault-install
+          env:
+            VAULT_NAMESPACE: "vault-kms-primary"
+            # VAULT_CONFIGMAP: "vault-ca-bundle" (default)
+        - ref: etcd-encryption-vault-install
+          env:
+            VAULT_NAMESPACE: "vault-kms-secondary"
+            VAULT_CONFIGMAP: "vault-ca-bundle-2"
 
     Next step:
     - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS

@@ -1,0 +1,1 @@
+../vault-configure/etcd-encryption-vault-configure-commands.sh

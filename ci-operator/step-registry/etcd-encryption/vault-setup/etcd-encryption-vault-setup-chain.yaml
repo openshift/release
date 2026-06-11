@@ -14,6 +14,7 @@ chain:
        - Deploys Vault in dev mode to vault-kms namespace
        - Creates vault-license secret from mounted credentials
        - Waits for Vault pod to be ready
+       - Creates namespace-specific CA ConfigMap in openshift-config
 
     2. Configures Vault for KMS encryption (vault-configure step)
        - Creates Vault Enterprise namespace (default: admin)
@@ -27,13 +28,42 @@ chain:
     - Vault Enterprise license secret named 'tests-private-account' in test-credentials namespace
       containing the license file at key 'kms-vault-license'
 
-    Outputs:
+    Outputs (default configuration):
     - Vault service: vault.vault-kms.svc:8200
     - Vault pod: vault-0 (Ready state)
     - Credentials secret: vault-credentials in vault-kms namespace
       * role-id: AppRole role ID for KMS plugin
       * secret-id: AppRole secret ID for KMS plugin
       * root-token: Vault root token (dev mode)
+    - CA ConfigMap: vault-ca-bundle in openshift-config namespace
+
+    Multiple Vault Instances:
+    This chain can be called multiple times with different VAULT_NAMESPACE and VAULT_CONFIGMAP
+    values to create multiple independent Vault instances. Each instance will have unique resources.
+
+    Example usage for two Vault instances:
+      pre:
+        - chain: etcd-encryption-vault-setup
+          env:
+            VAULT_NAMESPACE: "vault-kms-primary"
+            VAULT_KMS_KEY_NAME: "kms-key-primary"
+            # VAULT_CONFIGMAP: "vault-ca-bundle" (default)
+        - chain: etcd-encryption-vault-setup
+          env:
+            VAULT_NAMESPACE: "vault-kms-secondary"
+            VAULT_KMS_KEY_NAME: "kms-key-secondary"
+            VAULT_CONFIGMAP: "vault-ca-bundle-2"
+
+    Instance-specific outputs:
+    - Vault service: vault.${VAULT_NAMESPACE}.svc:8200
+    - Credentials secret: vault-credentials in ${VAULT_NAMESPACE} namespace
+    - CA ConfigMap: ${VAULT_CONFIGMAP} in openshift-config namespace
+
+    Important notes for multiple instances:
+    - Each instance generates its own unique CA certificate (dev mode TLS auto-generation)
+    - Each instance requires its own CA ConfigMap reference for TLS verification
+    - Specify unique VAULT_CONFIGMAP names for each instance to avoid conflicts
+    - Vault addresses are namespace-specific
 
     Environment variables (inherited from vault-install step):
     - VAULT_VERSION: Vault Enterprise version (default: 2.0.0-ent)
