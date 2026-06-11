@@ -174,8 +174,6 @@ else
 
     # On RHEL 10, subscription-manager does not list RHEL 9 repos.
     # Configure rhocp and fast-datapath repos manually using entitlement certificates.
-    source /etc/os-release
-    rhel_major="${VERSION_ID%.*}"
     if [[ "${rhel_major}" == "10" ]]; then
         CERT=$(find /etc/pki/entitlement -name '[0-9]*.pem' ! -name '*-key.pem' | head -n1)
         KEY=$(find /etc/pki/entitlement -name '[0-9]*-key.pem' | head -n1)
@@ -183,11 +181,11 @@ else
             echo "No entitlement certificates found in /etc/pki/entitlement/" >&2
             exit 1
         fi
-        rhocp="rhocp-4.22-for-rhel-9-$(uname -m)-rpms"
+        rhocp="rhocp-${OCP_VERSION}-for-rhel-9-$(uname -m)-rpms"
         cat <<REPOEOF | sudo tee /etc/yum.repos.d/${rhocp}.repo
 [${rhocp}]
-name=Red Hat OpenShift 4.22 for RHEL 9
-baseurl=https://cdn.redhat.com/content/dist/layered/rhel9/$(uname -m)/rhocp/4.22/os
+name=Red Hat OpenShift ${OCP_VERSION} for RHEL 9
+baseurl=https://cdn.redhat.com/content/dist/layered/rhel9/$(uname -m)/rhocp/${OCP_VERSION}/os
 enabled=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
