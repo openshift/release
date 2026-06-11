@@ -24,9 +24,15 @@ images:
   - dockerfile_path: images/ci/Dockerfile
     from: base-rhel9
     to: cert-manager-operator
-  - dockerfile_path: images/ci/operand.Dockerfile
+  - dockerfile_path: images/ci/certmanager.Dockerfile
     from: base-rhel9
     to: cert-manager
+  - dockerfile_path: images/ci/istiocsr.Dockerfile
+    from: base-rhel9
+    to: cert-manager-istio-csr
+  - dockerfile_path: images/ci/trustmanager.Dockerfile
+    from: base-rhel9
+    to: cert-manager-trust-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -41,6 +47,10 @@ operator:
     with: pipeline:cert-manager
   - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
     with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-istio-csr:.*
+    with: pipeline:cert-manager-istio-csr
+  - pullspec: quay.io/jetstack/trust-manager:.*
+    with: pipeline:cert-manager-trust-manager
 prowgen:
   private: true
 releases:
@@ -76,6 +86,18 @@ tests:
   steps:
     dependencies:
       SCAN_IMAGE: cert-manager
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-istio-csr
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-istio-csr
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-trust-manager
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-trust-manager
     test:
     - ref: fips-check-image-scan
 - as: e2e-operator
