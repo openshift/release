@@ -56,10 +56,10 @@ find "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/" -mindepth 1 -type d | while re
   process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
-# fthub-01 and kni-qe-106 share the same hypervisor (hv16), but ci-operator
+# fthub-01, kni-qe-106 and kni-qe-110 share the same hypervisor (hv16), but ci-operator
 # cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-106" ]; then
-  echo "Processing shared hypervisor inventory for kni-qe-106 from fthub-01 mount"
+if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ]; then
+  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from fthub-01 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
