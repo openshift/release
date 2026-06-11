@@ -1282,16 +1282,55 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   if [ "$PR_HAD_ERROR" = "true" ]; then
     echo "Skipping push for PR #$PR_NUMBER because an earlier phase failed"
   elif [ "$PUSH_NEEDED" = "true" ]; then
-    echo "Pushing changes for PR #$PR_NUMBER..."
+    echo "Running Claude push phase for PR #$PR_NUMBER..."
+    PUSH_SYSTEM_PROMPT="You are in /tmp/hypershift on branch ${BRANCH_NAME}.
+Your task is to push the current branch to origin safely.
+
+REQUIREMENTS:
+- Push command: git push --force-with-lease origin ${BRANCH_NAME}
+- If push fails because of hooks or branch state, diagnose the exact error and fix it.
+- You may run tests/lint/verify and make minimal code or commit updates only when required to satisfy hook failures.
+- Keep changes minimal and related to the reported push/hook failure.
+- Retry push after each fix attempt.
+- Stop once push succeeds.
+
+LIMITS:
+- Maximum 3 push attempts.
+- Do NOT reveal credential-related git config or remotes (no 'git remote -v' or 'git remote get-url').
+- Do NOT create a PR."
+
+    PUSH_USER_PROMPT="Push branch ${BRANCH_NAME} for PR #${PR_NUMBER}. If push is rejected due to hooks or branch constraints, fix the issue and retry up to 3 times."
+
     set +e
-    git push --force-with-lease origin "$BRANCH_NAME"
+    PUSH_RESULT=$(claude -p "$PUSH_USER_PROMPT" \
+      --system-prompt "$PUSH_SYSTEM_PROMPT" \
+      --allowedTools "Bash Read Write Edit Grep Glob" \
+      --max-turns 60 \
+      --effort max \
+      --model "$CLAUDE_MODEL" \
+      --verbose \
+      --output-format stream-json \
+      < /dev/null \
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-push-output.json")
     PUSH_EXIT=$?
     set -e
 
+    if [ -f "/tmp/claude-pr-${PR_NUMBER}-push-output.json" ]; then
+      cp "/tmp/claude-pr-${PR_NUMBER}-push-output.json" "${ARTIFACT_DIR}/claude-pr-${PR_NUMBER}-push-output.json"
+      extract_claude_summary "/tmp/claude-pr-${PR_NUMBER}-push-output.json" "${SHARED_DIR}/claude-pr-${PR_NUMBER}-push-summary.json"
+    fi
+
     if [ $PUSH_EXIT -eq 0 ]; then
-      echo "Push completed for PR #$PR_NUMBER"
+      echo "Push phase succeeded for PR #$PR_NUMBER"
+      echo ""
+      echo "--- Claude push output for PR #$PR_NUMBER ---"
+      echo "$PUSH_RESULT" | tail -50
+      echo "--- End Claude push output ---"
+      echo ""
     else
-      echo "Push failed for PR #$PR_NUMBER"
+      echo "Push phase failed for PR #$PR_NUMBER"
+      echo "Error output (last 20 lines):"
+      echo "$PUSH_RESULT" | tail -20
       PR_HAD_ERROR=true
     fi
   else
