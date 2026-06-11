@@ -854,7 +854,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - always_run: false
-  as: tls-observed-config
+  as: e2e-aws-tls-observed-config
   optional: true
   steps:
     cluster_profile: openshift-org-aws
@@ -865,13 +865,28 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - always_run: false
-  as: tls-observed-config-hypershift
+  as: e2e-aws-tls-observed-config-hypershift
   optional: true
   steps:
     cluster_profile: hypershift-aws
     env:
       TEST_SUITE: openshift/tls-observed-config
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-tls-observed-config-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/tls-observed-config
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
