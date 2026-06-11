@@ -172,11 +172,50 @@ else
     rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/${el_version}/os"
     ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/${el_version}/os"
 
+    # On RHEL 10, subscription-manager does not list RHEL 9 repos.
+    # Configure rhocp and fast-datapath repos manually using entitlement certificates.
+    rhel_major=$(grep -oP '(?<=VERSION_ID=")[0-9]+' /etc/os-release)
+    if [[ "${rhel_major}" == "10" ]]; then
+        CERT=$(find /etc/pki/entitlement -name '[0-9]*.pem' ! -name '*-key.pem' | head -n1)
+        KEY=$(find /etc/pki/entitlement -name '[0-9]*-key.pem' | head -n1)
+        if [[ -z "${CERT}" || -z "${KEY}" ]]; then
+            echo "No entitlement certificates found in /etc/pki/entitlement/" >&2
+            exit 1
+        fi
+        rhocp="rhocp-4.22-for-rhel-9-$(uname -m)-rpms"
+        cat <<REPOEOF | sudo tee /etc/yum.repos.d/${rhocp}.repo
+[${rhocp}]
+name=Red Hat OpenShift 4.22 for RHEL 9
+baseurl=https://cdn.redhat.com/content/dist/layered/rhel9/$(uname -m)/rhocp/4.22/os
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify=1
+sslcacert=/etc/rhsm/ca/redhat-uep.pem
+sslclientcert=${CERT}
+sslclientkey=${KEY}
+REPOEOF
+        cat <<REPOEOF | sudo tee /etc/yum.repos.d/fast-datapath-rhel9.repo
+[fast-datapath-for-rhel-9]
+name=Fast Datapath for RHEL 9
+baseurl=https://cdn.redhat.com/content/dist/layered/rhel9/$(uname -m)/fast-datapath/os
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify=1
+sslcacert=/etc/rhsm/ca/redhat-uep.pem
+sslclientcert=${CERT}
+sslclientkey=${KEY}
+REPOEOF
+    fi
+
     # `dnf repoquery` returns 1 when the repository is not available,
     # but returns 0 when the repo is up and package is not present.
     released=$(sudo dnf repoquery microshift --quiet --latest-limit 1 --repo "${rhocp}" || true)
     if [[ -n "${released}" ]]; then
-        sudo subscription-manager repos --enable "${rhocp}"
+        if [[ "${rhel_major}" != "10" ]]; then
+            sudo subscription-manager repos --enable "${rhocp}"
+        fi
     elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-rc,${rc}"; then
         enable_mirror_repo "${rc}"
     elif sudo dnf repoquery microshift --quiet --latest-limit 1 --disablerepo '*' --repofrompath "microshift-ec,${ec}"; then
