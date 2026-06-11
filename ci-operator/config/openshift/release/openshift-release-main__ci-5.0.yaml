@@ -313,11 +313,18 @@ tests:
     env:
       COMPUTE_NODE_TYPE: Standard_D4s_v7
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v7
+      CUSTOM_AZURE_REGION: eastus
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - ref: ovn-conf
+    - chain: ipi-install-stableinitial
+    - ref: ipi-azure-rbac
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-upgrade-rhcos9-techpreview
   interval: 12h
