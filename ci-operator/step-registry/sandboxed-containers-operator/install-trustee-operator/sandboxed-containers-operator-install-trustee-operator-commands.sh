@@ -294,11 +294,11 @@ function install_trustee_operator() {
 # Wait for operator installation through all OLM stages
 # Stages: All CatalogSources READY → Subscription → InstallPlan → CSV → Deployment
 function wait_for_operator() {
-  # Stage 0: Wait for ALL CatalogSources to be READY (180s)
+  # Stage 0: Wait for ALL CatalogSources to be READY (600s / 10 minutes)
   # This prevents Subscription failures due to missing/unavailable catalogs
   echo ">>> Waiting for all CatalogSources to be READY..."
   local all_catalogs_ready=false
-  for i in {1..36}; do
+  for i in {1..120}; do
     # Get all catalogs and their states
     local catalog_states
     catalog_states=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{range .items[*]}{.metadata.name}={.status.connectionState.lastObservedState}{"\n"}{end}' 2>/dev/null || echo "")
@@ -323,15 +323,15 @@ function wait_for_operator() {
 
     # Show progress every 6 iterations (30 seconds)
     if [[ $((i % 6)) -eq 0 ]]; then
-      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} (checking ${i}/36)..."
+      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} (checking ${i}/120, $((i*5))s elapsed)..."
       echo "${catalog_states}" | grep -v "=READY" | head -5 || true
     fi
 
-    [[ ${i} -lt 36 ]] && sleep 5
+    [[ ${i} -lt 120 ]] && sleep 5
   done
 
   if [[ "${all_catalogs_ready}" != "true" ]]; then
-    echo ">>> ERROR: Not all CatalogSources are READY after 180s"
+    echo ">>> ERROR: Not all CatalogSources are READY after 600s"
     echo ">>> Current CatalogSource states:"
     oc get catalogsource -n openshift-marketplace -o custom-columns=NAME:.metadata.name,STATE:.status.connectionState.lastObservedState || true
     echo ">>> CatalogSource pods:"
@@ -429,11 +429,11 @@ function wait_for_operator() {
     return 1
   fi
 
-  # Stage 4: Wait for CSV to be Succeeded (60s)
+  # Stage 4: Wait for CSV to be Succeeded (600s / 10 minutes)
   echo ">>> Waiting for CSV to be Succeeded..."
   local csv_succeeded=false
   local csv_name=""
-  for i in {1..12}; do
+  for i in {1..120}; do
     local csv_phase
     csv_phase=$(oc get csv -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
     if [[ "${csv_phase}" == "Succeeded" ]]; then
@@ -442,11 +442,17 @@ function wait_for_operator() {
       csv_succeeded=true
       break
     fi
-    [[ ${i} -lt 12 ]] && sleep 5
+
+    # Show progress every 12 iterations (60 seconds)
+    if [[ $((i % 12)) -eq 0 ]]; then
+      echo ">>> CSV phase: ${csv_phase:-unknown} (${i}/120, $((i*5))s elapsed)..."
+    fi
+
+    [[ ${i} -lt 120 ]] && sleep 5
   done
 
   if [[ "${csv_succeeded}" != "true" ]]; then
-    echo ">>> ERROR: CSV not Succeeded after 60s"
+    echo ">>> ERROR: CSV not Succeeded after 600s"
     oc get csv -n "${TRUSTEE_NAMESPACE}" -o yaml || true
     return 1
   fi
@@ -454,30 +460,36 @@ function wait_for_operator() {
   # Export CSV name for kbs-client version mapping
   export TRUSTEE_CSV_NAME="${csv_name}"
 
-  # Stage 5: Wait for Deployment to be Available (60s)
+  # Stage 5: Wait for Deployment to be Available (600s / 10 minutes)
   echo ">>> Waiting for operator deployment to be Available..."
   local deployment_ready=false
-  for i in {1..12}; do
+  for i in {1..120}; do
     if oc get deployment -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q "True"; then
       echo ">>> Operator deployment is Available"
       deployment_ready=true
       break
     fi
-    [[ ${i} -lt 12 ]] && sleep 5
+
+    # Show progress every 12 iterations (60 seconds)
+    if [[ $((i % 12)) -eq 0 ]]; then
+      echo ">>> Still waiting for deployment (${i}/120, $((i*5))s elapsed)..."
+    fi
+
+    [[ ${i} -lt 120 ]] && sleep 5
   done
 
   if [[ "${deployment_ready}" != "true" ]]; then
-    echo ">>> ERROR: Operator deployment not Available after 60s"
+    echo ">>> ERROR: Operator deployment not Available after 600s"
     oc get deployment -n "${TRUSTEE_NAMESPACE}" || true
     oc get pods -n "${TRUSTEE_NAMESPACE}" || true
     oc describe pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
     return 1
   fi
 
-  # Stage 6: Wait for pods to be Ready (120s for readiness probes)
+  # Stage 6: Wait for pods to be Ready (600s / 10 minutes for readiness probes)
   echo ">>> Waiting for operator pods to be Ready (READY 1/1)..."
   local pods_ready=false
-  for i in {1..24}; do
+  for i in {1..120}; do
     # Check if all pods have READY column showing "1/1" (not "0/1")
     local ready_count
     ready_count=$(oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager -o jsonpath='{.items[*].status.containerStatuses[0].ready}' 2>/dev/null | tr ' ' '\n' | grep -c "true" || echo "0")
@@ -491,15 +503,15 @@ function wait_for_operator() {
       break
     fi
 
-    if [[ $((i % 6)) -eq 0 ]]; then
-      echo ">>> Pods ready: ${ready_count}/${total_count} (checking ${i}/24)..."
+    if [[ $((i % 12)) -eq 0 ]]; then
+      echo ">>> Pods ready: ${ready_count}/${total_count} (checking ${i}/120, $((i*5))s elapsed)..."
       oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
     fi
-    [[ ${i} -lt 24 ]] && sleep 5
+    [[ ${i} -lt 120 ]] && sleep 5
   done
 
   if [[ "${pods_ready}" != "true" ]]; then
-    echo ">>> ERROR: Operator pods not Ready after 120s"
+    echo ">>> ERROR: Operator pods not Ready after 600s"
     echo ">>> Pods:"
     oc get pods -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager || true
     echo ">>> Pod details:"
