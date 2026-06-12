@@ -212,7 +212,7 @@ def _deployment_resources(gendoc):
                 'namespace': context.config.rc_deployment_namespace,
             },
             'spec': {
-                'replicas': 3,
+                'replicas': 0,
                 'selector': {
                     'matchLabels': {
                         'app': 'release-payload-controller'

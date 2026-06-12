@@ -191,7 +191,7 @@ def _deployment_resources(gendoc, namespaces):
                 'namespace': context.config.rc_deployment_namespace,
             },
             'spec': {
-                'replicas': 1,
+                'replicas': 0,
                 'selector': {
                     'matchLabels': {
                         'app': 'release-mirror-cleanup-controller'
