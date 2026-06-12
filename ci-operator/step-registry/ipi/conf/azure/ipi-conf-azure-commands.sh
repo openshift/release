@@ -85,13 +85,20 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 if [ -n "${master_type_prefix}" ]; then
   if [ "${OCP_ARCH}" = "amd64" ]; then
-    master_type=${master_type_prefix}as_v5
+    if ! version_gt "${version}" "4.21"; then
+      master_type=${master_type_prefix}s_v3
+    else
+      master_type=${master_type_prefix}as_v5
+    fi
   elif [ "${OCP_ARCH}" = "arm64" ]; then
     master_type=${master_type_prefix}ps_v5
   fi
 fi
 if [[ -n "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
     master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
+fi
+if [ "${OCP_ARCH}" = "amd64" ] && ! version_gt "${version}" "4.21" && [[ "${COMPUTE_NODE_TYPE}" == "Standard_D4as_v5" ]]; then
+  COMPUTE_NODE_TYPE="Standard_D4s_v3"
 fi
 
 master_replicas=${CONTROL_PLANE_REPLICAS:-3}
