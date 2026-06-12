@@ -1,0 +1,205 @@
+# Chaibot Test Failure Triage Configuration
+# This config enables ci-chat-bot to monitor Slack channels for test failures
+# and provide automated triage analysis
+
+# Feature flag to enable/disable triage functionality
+enabled: true
+
+# Slack channels to monitor for test failures
+monitored_channels:
+  - name: "opp-discussion"
+    channel_id: "C01234567"  # Replace with actual channel ID
+    auto_respond: true
+    response_mode: "thread"  # Options: thread, channel, dm
+
+  # Additional channels can be added
+  # - name: "forum-ocp-testplatform"
+  #   channel_id: "C98765432"
+  #   auto_respond: false  # Require @mention to trigger
+
+# Patterns to detect test failure messages
+failure_detection:
+  # URL patterns that indicate Prow job failures
+  prow_job_patterns:
+    - "https://prow.ci.openshift.org/view/gs/"
+    - "https://prow.ci.openshift.org/?pr="
+    - "https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/"
+
+  # Keywords that indicate test failures
+  failure_keywords:
+    - "test failed"
+    - "job failed"
+    - "failure"
+    - "test timeout"
+    - "flaky test"
+    - "regression"
+    - "broken test"
+
+  # Message must contain job URL OR (keyword + context)
+  require_job_url: false
+
+# Analysis configuration
+analysis:
+  # Maximum time to spend analyzing a single failure (seconds)
+  timeout: 120
+
+  # AI provider configuration
+  ai_provider: "openai"  # Options: openai, anthropic, none
+  model: "gpt-4"
+
+  # What to analyze
+  analyze_components:
+    - job_metadata        # Job name, duration, timestamp
+    - failure_logs        # Pod logs, junit output
+    - historical_data     # Sippy integration for past failures
+    - infrastructure      # Cloud provider issues, cluster state
+    - known_issues        # JIRA search for similar failures
+
+  # Categorization rules
+  failure_categories:
+    infrastructure:
+      patterns:
+        - "InsufficientInstanceCapacity"
+        - "RequestLimitExceeded"
+        - "could not create instance"
+        - "timeout waiting for"
+        - "connection refused"
+      confidence_threshold: 0.7
+
+    flaky_test:
+      patterns:
+        - "race condition"
+        - "intermittent"
+        - "sometimes fails"
+        - "timeout.*eventually"
+      confidence_threshold: 0.6
+
+    product_bug:
+      patterns:
+        - "panic:"
+        - "nil pointer"
+        - "assertion failed"
+        - "unexpected error"
+      confidence_threshold: 0.8
+
+    configuration:
+      patterns:
+        - "missing environment"
+        - "invalid configuration"
+        - "could not find image"
+        - "secret.*not found"
+      confidence_threshold: 0.75
+
+# Response formatting
+response:
+  # Template for Slack message response
+  include_sections:
+    - summary           # Brief one-line summary
+    - root_cause        # Identified root cause with confidence
+    - evidence          # Key log excerpts and patterns
+    - historical        # Similar past failures from Sippy
+    - recommendations   # Suggested actions
+    - related_issues    # JIRA issues or documentation
+
+  # Emoji indicators for quick visual parsing
+  use_emojis: true
+  emoji_map:
+    infrastructure: ":cloud:"
+    flaky_test: ":game_die:"
+    product_bug: ":bug:"
+    configuration: ":wrench:"
+    unknown: ":question:"
+
+  # Add interactive buttons
+  include_actions:
+    - label: "View Full Logs"
+      action: "open_url"
+    - label: "Retest"
+      action: "trigger_retest"
+    - label: "Create JIRA"
+      action: "create_issue"
+    - label: "Mark Flaky"
+      action: "mark_flaky"
+
+# Integration settings
+integrations:
+  # Sippy integration for historical failure data
+  sippy:
+    enabled: true
+    base_url: "https://sippy.dptools.openshift.org"
+    lookback_days: 7
+    min_occurrences: 2  # Minimum failures to show pattern
+
+  # JIRA integration for known issues
+  jira:
+    enabled: true
+    endpoint: "https://redhat.atlassian.net"
+    search_projects:
+      - "OCPBUGS"
+      - "DPTP"
+    max_results: 5
+
+  # Prow/GCS access for log fetching
+  prow:
+    enabled: true
+    gcs_bucket: "gs://origin-ci-test"
+    max_log_size_mb: 50
+    fetch_artifacts:
+      - "build-log.txt"
+      - "junit*.xml"
+      - "e2e-events*.json"
+
+  # OpenAI/Anthropic API
+  ai_api:
+    enabled: true
+    secret_name: "chaibot-openai-key"  # Kubernetes secret
+    secret_namespace: "ci"
+    rate_limit_rpm: 50  # Requests per minute
+
+# Rate limiting and abuse prevention
+rate_limiting:
+  max_analyses_per_hour: 100
+  max_analyses_per_user_per_hour: 10
+  max_concurrent_analyses: 5
+  cooldown_seconds: 30  # Min time between analyses for same job
+
+# Monitoring and observability
+monitoring:
+  metrics_enabled: true
+  metrics_port: 9090
+  log_level: "info"  # Options: debug, info, warn, error
+
+  # Prometheus metrics to export
+  metrics:
+    - chaibot_messages_processed_total
+    - chaibot_failures_detected_total
+    - chaibot_analyses_completed_total
+    - chaibot_analysis_duration_seconds
+    - chaibot_api_errors_total
+    - chaibot_category_detections_total
+
+# Prompt template for AI analysis
+ai_prompts:
+  system_prompt: |
+    You are Chaibot, an expert CI/CD test failure analyst for OpenShift.
+    Analyze test failures and provide concise, actionable triage information.
+    Focus on root cause identification and practical next steps.
+    Categorize failures as: infrastructure, flaky_test, product_bug, or configuration.
+    Be confident but acknowledge uncertainty when appropriate.
+
+  analysis_prompt: |
+    Analyze this OpenShift CI test failure:
+
+    Job: {job_name}
+    Status: {status}
+    Duration: {duration}
+
+    Error Logs:
+    {error_excerpt}
+
+    Provide:
+    1. Root Cause (category + confidence %)
+    2. Brief Analysis (2-3 sentences)
+    3. Key Evidence (specific log excerpts)
+    4. Recommendations (numbered action items)
+    5. Classification (transient vs persistent issue)

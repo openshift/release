@@ -1,0 +1,109 @@
+# This file contains the necessary additions to ci-chat-bot deployment
+# to enable Chaibot test failure triage functionality
+#
+# Apply these changes to clusters/app.ci/ci-chat-bot/ci-chat-bot.yaml
+
+---
+# Additional volume for triage config
+# Add to spec.template.spec.volumes in the Deployment:
+
+# - name: triage-config
+#   configMap:
+#     name: ci-chat-bot-triage-config
+
+# - name: chaibot-secrets
+#   secret:
+#     secretName: ci-chat-bot-chaibot-secrets
+#     items:
+#       - key: openai-api-key
+#         path: openai-api-key
+
+---
+# Additional volumeMount for the bot container
+# Add to spec.template.spec.containers[name=bot].volumeMounts:
+
+# - name: triage-config
+#   mountPath: /etc/triage-config
+#   readOnly: true
+
+# - name: chaibot-secrets
+#   mountPath: /etc/chaibot-secrets
+#   readOnly: true
+
+---
+# Additional command-line arguments
+# Add to spec.template.spec.containers[name=bot].args:
+
+# --enable-triage=true \
+# --triage-config-path=/etc/triage-config/triage-config.yaml \
+
+---
+# Additional environment variables
+# Add to spec.template.spec.containers[name=bot].env:
+
+# - name: CHAIBOT_ENABLED
+#   value: "true"
+# - name: OPENAI_API_KEY
+#   valueFrom:
+#     secretKeyRef:
+#       name: ci-chat-bot-chaibot-secrets
+#       key: openai-api-key
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-chat-bot-chaibot-secrets
+  namespace: ci
+type: Opaque
+stringData:
+  # Replace with actual OpenAI API key
+  # This should be managed via ci-secret-bootstrap
+  openai-api-key: "REPLACE_WITH_ACTUAL_KEY"
+---
+# ServiceMonitor update to include new metrics
+# The existing ServiceMonitor already scrapes port 9090,
+# so chaibot metrics will be automatically collected
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chaibot-alerts
+  namespace: ci
+spec:
+  groups:
+    - name: chaibot
+      interval: 30s
+      rules:
+        - alert: ChaibotHighErrorRate
+          expr: |
+            rate(chaibot_api_errors_total[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            team: test-platform
+          annotations:
+            summary: "Chaibot experiencing high error rate"
+            description: "Chaibot has {{ $value }} errors per second over the last 5 minutes."
+            runbook_url: "https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/chaibot.md"
+
+        - alert: ChaibotAnalysisTimeout
+          expr: |
+            histogram_quantile(0.95, rate(chaibot_analysis_duration_seconds_bucket[5m])) > 120
+          for: 15m
+          labels:
+            severity: warning
+            team: test-platform
+          annotations:
+            summary: "Chaibot analysis taking too long"
+            description: "95th percentile analysis duration is {{ $value }}s, exceeding 120s timeout."
+
+        - alert: ChaibotDown
+          expr: |
+            up{job="ci-chat-bot"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: test-platform
+          annotations:
+            summary: "Chaibot service is down"
+            description: "ci-chat-bot service (including Chaibot) has been down for 5 minutes."

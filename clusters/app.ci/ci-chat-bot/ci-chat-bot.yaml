@@ -286,6 +286,15 @@ spec:
                 path: rosa-admin-ocm
         - name: runtimedir
           emptyDir: { }
+        - name: triage-config
+          configMap:
+            name: ci-chat-bot-triage-config
+        - name: chaibot-secrets
+          secret:
+            secretName: ci-chat-bot-chaibot-secrets
+            items:
+              - key: openai-api-key
+                path: openai-api-key
       initContainers:
         - name: git-sync-init
           command:
@@ -373,6 +382,12 @@ spec:
               readOnly: true
             - mountPath: /runtimedir
               name: runtimedir
+            - name: triage-config
+              mountPath: /etc/triage-config
+              readOnly: true
+            - name: chaibot-secrets
+              mountPath: /etc/chaibot-secrets
+              readOnly: true
           env:
             - name: BOT_TOKEN
               valueFrom:
@@ -412,6 +427,13 @@ spec:
               value: us-east-1
             - name: XDG_RUNTIME_DIR
               value: /runtimedir
+            - name: CHAIBOT_ENABLED
+              value: "true"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-chaibot-secrets
+                  key: openai-api-key
           command: ["/bin/sh"]
           args:
             - -c
@@ -434,4 +456,6 @@ spec:
               --rosa-cluster-limit=30 \\
               --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids \\
               --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id \\
-              --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
+              --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id \\
+              --enable-triage=true \\
+              --triage-config-path=/etc/triage-config/triage-config.yaml
