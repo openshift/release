@@ -28,7 +28,17 @@ echo -n '{"auths": {"quay.io/mcoqe": {"auth": "'"$(base64 -w 0 /var/run/vault/mc
 
 # Add the mcoqe credentials to the custer's pull-secret
 echo "Merge mcoqe credentials and the global cluster pull secret"
-jq -s '.[0] * .[1]' "$cluster_pull_secret_file" "$mcoqe_pull_secret_file" > "$merged_pull_secret_file"
+python3 -c "
+import json, sys
+def deep_merge(a, b):
+    r = dict(a)
+    for k, v in b.items():
+        r[k] = deep_merge(a.get(k, {}), v) if isinstance(v, dict) else v
+    return r
+with open(sys.argv[1]) as f: a = json.load(f)
+with open(sys.argv[2]) as f: b = json.load(f)
+print(json.dumps(deep_merge(a, b)))
+" "$cluster_pull_secret_file" "$mcoqe_pull_secret_file" > "$merged_pull_secret_file"
 
 # Update the cluster's pull-secret with the new value
 echo "Update the global cluster pull secret with the new merged credentials"
