@@ -292,9 +292,54 @@ function install_trustee_operator() {
 }
 
 # Wait for operator installation through all OLM stages
-# Stages: CatalogSource READY → Subscription → InstallPlan → CSV → Deployment
+# Stages: All CatalogSources READY → Subscription → InstallPlan → CSV → Deployment
 function wait_for_operator() {
-  # Stage 1: Wait for CatalogSource to be READY (60s)
+  # Stage 0: Wait for ALL CatalogSources to be READY (180s)
+  # This prevents Subscription failures due to missing/unavailable catalogs
+  echo ">>> Waiting for all CatalogSources to be READY..."
+  local all_catalogs_ready=false
+  for i in {1..36}; do
+    # Get all catalogs and their states
+    local catalog_states
+    catalog_states=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{range .items[*]}{.metadata.name}={.status.connectionState.lastObservedState}{"\n"}{end}' 2>/dev/null || echo "")
+
+    if [[ -z "${catalog_states}" ]]; then
+      echo ">>> WARNING: Unable to get catalog states (attempt ${i}/36)"
+      [[ ${i} -lt 36 ]] && sleep 5
+      continue
+    fi
+
+    # Count total vs ready catalogs
+    local total_catalogs
+    total_catalogs=$(echo "${catalog_states}" | wc -l)
+    local ready_catalogs
+    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || echo "0")
+
+    if [[ ${ready_catalogs} -eq ${total_catalogs} && ${ready_catalogs} -gt 0 ]]; then
+      echo ">>> All CatalogSources are READY (${ready_catalogs}/${total_catalogs})"
+      all_catalogs_ready=true
+      break
+    fi
+
+    # Show progress every 6 iterations (30 seconds)
+    if [[ $((i % 6)) -eq 0 ]]; then
+      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} (checking ${i}/36)..."
+      echo "${catalog_states}" | grep -v "=READY" | head -5 || true
+    fi
+
+    [[ ${i} -lt 36 ]] && sleep 5
+  done
+
+  if [[ "${all_catalogs_ready}" != "true" ]]; then
+    echo ">>> ERROR: Not all CatalogSources are READY after 180s"
+    echo ">>> Current CatalogSource states:"
+    oc get catalogsource -n openshift-marketplace -o custom-columns=NAME:.metadata.name,STATE:.status.connectionState.lastObservedState || true
+    echo ">>> CatalogSource pods:"
+    oc get pods -n openshift-marketplace || true
+    return 1
+  fi
+
+  # Stage 1: Wait for Trustee CatalogSource to be READY (60s)
   # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
     # Find the actual CatalogSource name that was created (helm chart creates trustee-operator-dev-catalog)
@@ -306,13 +351,13 @@ function wait_for_operator() {
       actual_catalog_name="${TRUSTEE_CATALOG_SOURCE_NAME}"
     fi
 
-    echo ">>> Waiting for CatalogSource ${actual_catalog_name} to be READY..."
+    echo ">>> Verifying Trustee CatalogSource ${actual_catalog_name} is READY..."
     local catalog_ready=false
     for i in {1..12}; do
       local state
       state=$(oc get catalogsource -n openshift-marketplace "${actual_catalog_name}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
       if [[ "${state}" == "READY" ]]; then
-        echo ">>> CatalogSource ${actual_catalog_name} is READY"
+        echo ">>> Trustee CatalogSource ${actual_catalog_name} is READY"
         catalog_ready=true
         break
       fi
@@ -320,7 +365,7 @@ function wait_for_operator() {
     done
 
     if [[ "${catalog_ready}" != "true" ]]; then
-      echo ">>> ERROR: CatalogSource ${actual_catalog_name} not READY after 60s"
+      echo ">>> ERROR: Trustee CatalogSource ${actual_catalog_name} not READY after 60s"
       echo ">>> All CatalogSources in openshift-marketplace:"
       oc get catalogsource -n openshift-marketplace || true
       echo ">>> Details of ${actual_catalog_name}:"
@@ -330,7 +375,7 @@ function wait_for_operator() {
       return 1
     fi
   else
-    echo ">>> Using existing CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME}, skipping readiness check"
+    echo ">>> Using existing CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME}"
   fi
 
   # Stage 2: Wait for Subscription to reference an InstallPlan (60s)
