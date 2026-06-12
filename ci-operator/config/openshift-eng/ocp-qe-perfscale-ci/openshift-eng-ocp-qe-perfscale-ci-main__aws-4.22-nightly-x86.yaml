@@ -3,6 +3,10 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+images:
+  items:
+  - dockerfile_path: prow/Dockerfile
+    to: ocp-qe-perfscale-ci
 releases:
   latest:
     candidate:
@@ -15,6 +19,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: test-perfscale-image-from
+  steps:
+    test:
+    - as: test-perfscale-image-from
+      commands: |
+        echo "Hello, World!" && \
+        cat /etc/os-release && \
+        rosa version && \
+        oc version
+      from: ocp-qe-perfscale-ci
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
 - as: netpol-24nodes
   cron: 0 12 6,13,20,27 * *
   reporter_config:
