@@ -31,14 +31,14 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.59.0
-  ocp_4.10_cli:
-    name: "4.17"
-    namespace: ocp
-    tag: cli
-  ocp_4.17_base-rhel9:
+  ocp_base-rhel9:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
+  ocp_cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
 build_root:
   from_repository: true
 images:
@@ -69,7 +69,7 @@ images:
       RUN mkdir /.cache -m 0777
     from: src
     inputs:
-      ocp_4.10_cli:
+      ocp_cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
@@ -85,7 +85,7 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       curl http://base-openstack-4-17.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-17.repo
-    from: ocp_4.17_base-rhel9
+    from: ocp_base-rhel9
     to: openstack-base
 releases:
   initial:
