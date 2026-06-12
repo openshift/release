@@ -411,12 +411,14 @@ tests:
     - as: e2e-kserve-module
       cli: latest
       commands: |-
-        ln -s "$(which oc)" /usr/local/bin/kubectl
-        cat > /usr/local/bin/kustomize <<'WRAP'
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
         #!/bin/sh
         exec oc kustomize "$@"
         WRAP
-        chmod +x /usr/local/bin/kustomize
+        chmod +x kustomize
+        popd
         pip install pytest pyyaml
         make e2e-setup-kserve-module PLATFORM=ocp E2E_IMG=${KSERVE_MODULE_CONTROLLER_IMAGE}
         make e2e-kserve-module
