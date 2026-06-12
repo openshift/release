@@ -43,6 +43,15 @@ function pass_test() {
   exit 0
 }
 
+echo "Adding tmp to path..."
+export PATH=/tmp/:$PATH
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 echo "============================================"
 echo "MCO Day1 OCL Verification"
 echo "============================================"
