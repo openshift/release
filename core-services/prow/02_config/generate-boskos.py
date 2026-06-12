@@ -314,6 +314,7 @@ CONFIG = {
     'aro-hcp-dev-shard0-slot': {},
     'aro-hcp-dev-shard2-slot': {},
     'aro-hcp-dev-shard3-slot': {},
+    'aro-hcp-int-shard0-slot': {},
     'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -784,6 +785,8 @@ for i in range(1):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
