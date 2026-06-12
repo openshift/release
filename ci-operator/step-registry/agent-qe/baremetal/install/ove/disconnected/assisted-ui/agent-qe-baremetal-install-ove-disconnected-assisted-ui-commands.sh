@@ -38,8 +38,12 @@ cp "/tmp/kubeconfig" "${SHARED_DIR}/kubeconfig"
 cp "/tmp/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
 
 export KUBECONFIG=/tmp/kubeconfig
-echo "Forcing a 2.5-hour delay to allow other machines to join the bootstrap node."
-sleep 2.5h
+wait_time=2.5h
+if [ "${VENDOR:-dell}" = "hpe" ]; then
+  wait_time=1h
+fi
+echo "Forcing a $wait_time delay to allow other machines to join the bootstrap node."
+sleep "$wait_time"
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

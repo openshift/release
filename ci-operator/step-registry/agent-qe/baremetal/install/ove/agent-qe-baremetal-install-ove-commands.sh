@@ -20,7 +20,8 @@ fi
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
-yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
+HOST_ID=$(yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml")
+echo "$HOST_ID" >"${SHARED_DIR}"/host-id.txt
 
 function mount_virtual_media() {
   local host="${1}"
@@ -45,6 +46,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   (
+   bmc_user=$(echo "$bmhost" | jq -r '.bmc_user')
+   bmc_pass=$(echo "$bmhost" | jq -r '.bmc_pass')
+   bmc_address=$(echo "$bmhost" | jq -r '.bmc_address')
+   vendor=$(echo "$bmhost" | jq -r '.vendor')
+
    name=$(echo "$bmhost" | jq -r '.name')
    host=$(echo "$bmhost" | jq -r '.host')
    transfer_protocol_type=$(echo "$bmhost" | jq -r '.transfer_protocol_type // ""')
@@ -61,10 +67,20 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${AGENT_ISO}"
      fi
    fi
-   mount_virtual_media "${host}" "${iso_path}"
-
+   boot_selection="http"
+   if [ "${vendor}" == "dell" ]; then
+     mount_virtual_media "${host}" "${iso_path}"
+     boot_selection="vcd"
+   fi
    echo "Power on #${host} (${name})..."
-   if ! timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"; then
+   HOST_ADDRESS=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
+   if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" -p $((14000+"${HOST_ID}")) root@access."${HOST_ADDRESS}" prepare_host_for_boot \
+          --host "$bmc_address" \
+          --user "$bmc_user" \
+          --password "$bmc_pass" \
+          --vendor "$vendor" \
+          --bootmode "$boot_selection" \
+          --iso "$iso_path"; then
      echo "Failed to power on ${host} (${name})"
    fi
   ) &
