@@ -33,6 +33,10 @@ ref:
       (docker.io is blocked in CI due to rate limiting and CI is not accessible in disconnected environments.)
       On baremetalds jobs the image is mirrored to the dev-scripts local registry
       before Helm install.
+  - name: VAULT_SECONDARY_NAMESPACE
+    default: "vault-kms-secondary"
+    documentation: |-
+      Namespace where the second Vault Enterprise instance will be installed.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -44,6 +48,7 @@ ref:
     - Mirrors Vault image to dev-scripts local registry on baremetalds jobs
     - Installs Vault Enterprise using Helm chart
     - Waits for Vault pod to be ready
+    - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
     Prerequisites:
     - OpenShift cluster with adequate resources
@@ -53,6 +58,10 @@ ref:
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
     - Vault pod: vault-0 (Ready state)
+    - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
+    - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
+    - Second Vault pod: vault-secondary-0 (Ready state)
+    - CA ConfigMap: vault-ca-bundle-secondary (openshift-config namespace)
 
     Next step:
     - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS
