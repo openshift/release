@@ -71,9 +71,20 @@ jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Ke
 echo "--------------------------------"
 
 cnt=$(jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Key == $k and .Value == $v))] | length' $out)
-expect_cnt=$(echo ${ic_subnets} | wc -w)
+
+# Calculate expected count based on whether Edge Zones are enabled
+if [[ ${ENABLE_AWS_EDGE_ZONE:-no} == "yes" ]]; then
+  # For Edge Zone scenarios, exclude subnets tagged as 'kubernetes.io/cluster/unmanaged:true'
+  unmanaged_cnt=$(jq -r '[.Subnets[] | select(any(.Tags[]; .Key == "kubernetes.io/cluster/unmanaged" and .Value == "true"))] | length' $out)
+  total_subnets=$(echo ${ic_subnets} | wc -w)
+  expect_cnt=$((total_subnets - unmanaged_cnt))
+  echo "INFO: Edge Zone enabled - total subnets=${total_subnets}, unmanaged subnets=${unmanaged_cnt}, expecting managed subnets=${expect_cnt}"
+else
+  expect_cnt=$(echo ${ic_subnets} | wc -w)
+fi
+
 if [[ "${cnt}" != "${expect_cnt}" ]]; then
-  echo "FAIL: check tag $kv_str, found ${cnt}, but expect ${expect_cnt}, please check following subents:"
+  echo "FAIL: check tag $kv_str, found ${cnt}, but expect ${expect_cnt}, please check following subnets:"
   jq --arg k $expect_k --arg v $expect_v -r '[.Subnets[] | select(any(.Tags[]; .Key == $k and .Value == $v) | not) | {subnet: .SubnetId, tags: .Tags}]' $out
   ret=$((ret+1))
 else
