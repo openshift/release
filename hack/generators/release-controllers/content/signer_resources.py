@@ -59,7 +59,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
             }
         },
         'spec': {
-            'replicas': 0,
+            'replicas': 1,
             'selector': {
                 'matchLabels': {
                     'app': 'release-controller-signer'

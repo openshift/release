@@ -136,7 +136,7 @@ def _add_origin_resources(gendoc):
                 "namespace": "ci",
             },
             "spec": {
-                "replicas": 0,
+                "replicas": 1,
                 "selector": {
                     "matchLabels": {
                         "app": "release-controller"
@@ -262,7 +262,7 @@ def _add_origin_resources(gendoc):
                 "namespace": "ci",
             },
             "spec": {
-                "replicas": 0,
+                "replicas": 3,
                 "selector": {
                     "matchLabels": {
                         "app": "release-controller-api"
