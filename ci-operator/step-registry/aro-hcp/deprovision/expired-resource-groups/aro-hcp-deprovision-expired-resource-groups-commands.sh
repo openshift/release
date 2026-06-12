@@ -22,7 +22,7 @@ cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
 FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-id"
 FPA_CERT_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-value"
 
-if [ -f "${FPA_CLIENT_ID_FILE}" ] && [ -f "${FPA_CERT_FILE}" ]; then
+if [ -s "${FPA_CLIENT_ID_FILE}" ] && [ -s "${FPA_CERT_FILE}" ]; then
   FPA_CLIENT_ID=$(cat "${FPA_CLIENT_ID_FILE}")
   cmd="${cmd} --fpa-client-id ${FPA_CLIENT_ID} --fpa-cert-path ${FPA_CERT_FILE}"
   echo "FPA credentials found - SAL deletion enabled"
