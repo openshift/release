@@ -42,5 +42,4 @@ if [ -n "${EXCLUDE_LOCATION}" ]; then
   cmd="${cmd} --exclude-location ${EXCLUDE_LOCATION}"
 fi
 
-echo "Running: ${cmd}"
 eval "${cmd}"
