@@ -5,7 +5,7 @@ set -Eeuo pipefail
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 export PATH=/usr/libexec/origin:$PATH
 
-declare TEST_ARGS=''
+declare TEST_ARGS="${TEST_ARGS:-}"
 
 # Force the IPv6 endpoint
 if [[ "${CONFIG_TYPE}" == *"singlestackv6"* ]]; then
