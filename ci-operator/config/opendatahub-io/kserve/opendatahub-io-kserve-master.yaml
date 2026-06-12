@@ -388,10 +388,10 @@ tests:
       best_effort: true
       cli: latest
       commands: |-
-        kubectl logs deployment/kserve-module-controller-manager -n opendatahub --tail=500 > "${ARTIFACT_DIR}/kserve-module-controller.log" 2>&1 || true
-        kubectl get kserve -A -o yaml > "${ARTIFACT_DIR}/kserve-cr.yaml" 2>&1 || true
-        kubectl get pods -n opendatahub -o wide > "${ARTIFACT_DIR}/pods-opendatahub.txt" 2>&1 || true
-        kubectl get events -n opendatahub --sort-by='.lastTimestamp' > "${ARTIFACT_DIR}/events-opendatahub.txt" 2>&1 || true
+        oc logs deployment/kserve-module-controller-manager -n opendatahub --tail=500 > "${ARTIFACT_DIR}/kserve-module-controller.log" 2>&1 || true
+        oc get kserve -A -o yaml > "${ARTIFACT_DIR}/kserve-cr.yaml" 2>&1 || true
+        oc get pods -n opendatahub -o wide > "${ARTIFACT_DIR}/pods-opendatahub.txt" 2>&1 || true
+        oc get events -n opendatahub --sort-by='.lastTimestamp' > "${ARTIFACT_DIR}/events-opendatahub.txt" 2>&1 || true
       from: src
       resources:
         requests:
@@ -411,6 +411,12 @@ tests:
     - as: e2e-kserve-module
       cli: latest
       commands: |-
+        ln -s "$(which oc)" /usr/local/bin/kubectl
+        cat > /usr/local/bin/kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x /usr/local/bin/kustomize
         pip install pytest pyyaml
         make e2e-setup-kserve-module PLATFORM=ocp E2E_IMG=${KSERVE_MODULE_CONTROLLER_IMAGE}
         make e2e-kserve-module
