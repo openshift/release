@@ -89,6 +89,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-autonode
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+      RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-multi
   cron: 0 2 * * *
   steps:
@@ -170,7 +184,6 @@ tests:
       OCP_IMAGE_PREVIOUS: release:latest-4-20
     env:
       CI_TESTS_RUN: ^TestUpgradeControlPlane.*
-      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-conformance-cilium
   minimum_interval: 168h
@@ -244,17 +257,6 @@ tests:
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
-- as: e2e-kubevirt-aws-ovn
-  cron: 0 0,6,12,18 * * *
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: c5n.metal
-      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
-    workflow: hypershift-kubevirt-e2e-aws
 - as: e2e-kubevirt-azure
   cron: 0 0 1 1 *
   steps:

@@ -7,6 +7,10 @@ base_images:
     name: observability-operator-test-harness
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -34,10 +38,12 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: |-
+      *COO image source:* FBC from Konflux
+      *OCP Version:* 4.21
+      *Environment:* Azure
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: azure-observability
     env:
@@ -56,10 +62,12 @@ tests:
     - ref: rhobs-konflux-catalogsource
     - ref: rhobs-acm-patch-node
     - ref: install-operators
+    - ref: rhobs-wait-for-coo-ready
     - ref: acm-mch
     - ref: rhobs-acm-setup-observability
     - ref: rhobs-acm-alerting-ui-test
     - ref: distributed-tracing-tests-tracing-ui-integration
+    - ref: monitoring-plugin-tests-monitoring-incidents-ui-integration
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:

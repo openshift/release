@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build08
-  cron: 0 17 * * 0
+  cluster: build13
+  cron: 30 6 * * 1,2,4
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -25,9 +25,11 @@ periodics:
       - success
       - failure
       - error
-      report_template: |
-        :robot_face: *LVMS CI Doctor* ended with *{{.Status.State}}*.
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/lvms-ci-doctor/openshift-edge-tooling-lvms-ci-doctor/artifacts/lvm-operator-ci-doctor-report.html|View report> | <{{.Status.URL}}|View logs> |
+      report_template: |-
+        :robot_face: *LVMS CI Doctor* ended with *{{.Status.State}}*.{{"\n"}}
+        {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/lvms-ci-doctor/openshift-edge-tooling-lvms-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
+        {{- $rp := printf "%s%s" $ab "report-lvm-operator-ci-doctor.html" -}}
+        | <{{$rp}}|Report> | <{{.Status.URL}}|Logs> |
   spec:
     containers:
     - args:
@@ -86,7 +88,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build08
+  cluster: build12
   cron: 0 8,14 * * 1-5
   decorate: true
   decoration_config:
@@ -111,9 +113,14 @@ periodics:
       - success
       - failure
       - error
-      report_template: |
-        :ai-intensifies: *MicroShift CI Doctor* ended with *{{.Status.State}}*.
-        | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/microshift-ci-doctor-report.html|View report> | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/analyze-ci-create-bugs-merged.txt|View bugs> | <{{.Status.URL}}|View logs> |
+      report_template: |-
+        :robot_face: *MicroShift CI Doctor* ended with *{{.Status.State}}*.{{"\n"}}
+        {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/microshift-ci-doctor/openshift-edge-tooling-microshift-ci-doctor/artifacts/" .Spec.Job .Status.BuildID -}}
+        {{- $rp := printf "%s%s" $ab "report-microshift-ci-doctor.html" -}}
+        {{- $bg := printf "%s%s" $ab "report-create-bugs.txt" -}}
+        {{- $st := printf "%s%s" $ab "report-close-stale-bugs.txt" -}}
+        {{- $pr := printf "%s%s" $ab "report-fix-test-bugs.txt" -}}
+        | <{{$rp}}|Report> | <{{$bg}}|Bugs(+)> | <{{$st}}|Bugs(-)> | <{{$pr}}|PRs> | <{{.Status.URL}}|Logs> |
   spec:
     containers:
     - args:
@@ -172,7 +179,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build08
+  cluster: build12
   cron: 0 7 * * 1-5
   decorate: true
   decoration_config:
@@ -256,7 +263,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build08
+  cluster: build12
   cron: 0 7 * * 0-5
   decorate: true
   decoration_config:

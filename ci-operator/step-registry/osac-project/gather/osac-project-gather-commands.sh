@@ -71,9 +71,41 @@ oc get datavolumes -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/datavolu
 oc get pvc -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/cnv/pvcs.txt" 2>&1 || true
 oc get events -n openshift-cnv --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/cnv/events-openshift-cnv.txt" 2>&1 || true
 
+# VMs with networkAttachments live in subnet namespaces, not E2E_NAMESPACE.
+# Gather VM/DataVolume diagnostics from every namespace referenced by compute instances.
+VM_NAMESPACES=$(oc get computeinstances -n "${E2E_NAMESPACE}" \
+    -o jsonpath='{.items[*].status.virtualMachineReference.namespace}' 2>/dev/null | tr ' ' '\n' | sort -u)
+for ns in ${VM_NAMESPACES}; do
+    [[ -z "${ns}" || "${ns}" == "${E2E_NAMESPACE}" ]] && continue
+    echo "  Gathering VM diagnostics from subnet namespace ${ns}..."
+    mkdir -p "${ARTIFACT_DIR}/cnv/${ns}"
+    oc get vms -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/vms.txt" 2>&1 || true
+    oc get vms -n "${ns}" -o yaml > "${ARTIFACT_DIR}/cnv/${ns}/vms.yaml" 2>&1 || true
+    oc get vmis -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/vmis.txt" 2>&1 || true
+    oc get datavolumes -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/datavolumes.txt" 2>&1 || true
+    oc get datavolumes -n "${ns}" -o yaml > "${ARTIFACT_DIR}/cnv/${ns}/datavolumes.yaml" 2>&1 || true
+    oc get pvc -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/pvcs.txt" 2>&1 || true
+    oc get events -n "${ns}" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/cnv/${ns}/events.txt" 2>&1 || true
+    oc get networkpolicies -n "${ns}" -o yaml > "${ARTIFACT_DIR}/cnv/${ns}/networkpolicies.yaml" 2>&1 || true
+done
+
 echo "=== Collecting compute instance status ==="
 oc get computeinstances -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/computeinstances.txt" 2>&1 || true
 oc get computeinstances -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/computeinstances.yaml" 2>&1 || true
+
+echo "=== Collecting networking status ==="
+oc get virtualnetworks -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/virtualnetworks.txt" 2>&1 || true
+oc get virtualnetworks -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/virtualnetworks.yaml" 2>&1 || true
+oc get subnets -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/subnets.txt" 2>&1 || true
+oc get subnets -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subnets.yaml" 2>&1 || true
+oc get securitygroups -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/securitygroups.txt" 2>&1 || true
+oc get clusteruserdefinednetwork -o yaml > "${ARTIFACT_DIR}/clusteruserdefinednetwork.yaml" 2>&1 || true
+
+echo "=== Collecting cert-manager status ==="
+oc get certificates -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/certificates.txt" 2>&1 || true
+oc get certificates -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/certificates.yaml" 2>&1 || true
+oc get routes -n "${E2E_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/routes.txt" 2>&1 || true
+oc get routes -n keycloak -o wide > "${ARTIFACT_DIR}/routes-keycloak.txt" 2>&1 || true
 
 echo "=== Collecting node resource usage ==="
 oc adm top node > "${ARTIFACT_DIR}/node-resources.txt" 2>&1 || true
@@ -88,6 +120,47 @@ oc get csv -n openshift-cnv -o wide > "${ARTIFACT_DIR}/cnv/csv.txt" 2>&1 || true
 echo "=== Collecting AAP operator status ==="
 oc get ansibleautomationplatform -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-status.yaml" 2>&1 || true
 oc get automationcontroller -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/automationcontroller-status.yaml" 2>&1 || true
+
+echo "=== Collecting AAP job stdout ==="
+mkdir -p "${ARTIFACT_DIR}/aap-jobs"
+AAP_ROUTE=$(oc get route osac-aap -n "${E2E_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null)
+AAP_ADMIN_PW=$(oc get secret osac-aap-controller-admin-password -n "${E2E_NAMESPACE}" \
+    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)
+if [[ -n "${AAP_ROUTE}" && -n "${AAP_ADMIN_PW}" ]]; then
+    AAP_AUTH=(-sk -u "admin:${AAP_ADMIN_PW}")
+    page=1
+    while true; do
+        page_file="${ARTIFACT_DIR}/aap-jobs/jobs-page-${page}.json"
+        curl "${AAP_AUTH[@]}" \
+            "https://${AAP_ROUTE}/api/controller/v2/jobs/?page=${page}&page_size=50&order_by=id" \
+            > "${page_file}" 2>&1 || break
+        jq -e '.results' "${page_file}" &>/dev/null || break
+        for job_id in $(jq -r '.results[]?.id // empty' "${page_file}" 2>/dev/null); do
+            status=$(jq -r ".results[] | select(.id == ${job_id}) | .status // \"unknown\"" "${page_file}" 2>/dev/null)
+            name=$(jq -r ".results[] | select(.id == ${job_id}) | .name // \"unknown\"" "${page_file}" 2>/dev/null)
+            curl "${AAP_AUTH[@]}" \
+                "https://${AAP_ROUTE}/api/controller/v2/jobs/${job_id}/stdout/?format=txt" \
+                > "${ARTIFACT_DIR}/aap-jobs/job-${job_id}-${status}-${name}.txt" 2>&1 || true
+        done
+        next=$(jq -r '.next // empty' "${page_file}" 2>/dev/null)
+        [[ -z "${next}" || "${next}" == "null" ]] && break
+        page=$((page + 1))
+    done
+    echo "  Captured stdout for $(ls "${ARTIFACT_DIR}/aap-jobs"/job-*.txt 2>/dev/null | wc -l) AAP jobs"
+    curl "${AAP_AUTH[@]}" \
+        "https://${AAP_ROUTE}/api/controller/v2/project_updates/?page_size=50&order_by=id" \
+        > "${ARTIFACT_DIR}/aap-jobs/project-updates.json" 2>&1 || true
+    for pu_id in $(jq -r '.results[]?.id // empty' "${ARTIFACT_DIR}/aap-jobs/project-updates.json" 2>/dev/null); do
+        status=$(jq -r ".results[] | select(.id == ${pu_id}) | .status // \"unknown\"" \
+            "${ARTIFACT_DIR}/aap-jobs/project-updates.json" 2>/dev/null)
+        curl "${AAP_AUTH[@]}" \
+            "https://${AAP_ROUTE}/api/controller/v2/project_updates/${pu_id}/stdout/?format=txt" \
+            > "${ARTIFACT_DIR}/aap-jobs/project-update-${pu_id}-${status}.txt" 2>&1 || true
+    done
+    echo "  Captured $(ls "${ARTIFACT_DIR}/aap-jobs"/project-update-*.txt 2>/dev/null | wc -l) AAP project updates"
+else
+    echo "  AAP route or admin password not found, skipping job stdout capture"
+fi
 
 echo "Log collection complete"
 REMOTE_EOF

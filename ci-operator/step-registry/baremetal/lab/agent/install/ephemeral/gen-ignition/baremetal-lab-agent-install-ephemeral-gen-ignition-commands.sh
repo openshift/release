@@ -147,4 +147,4 @@ oinst agent create image
 
 ### Copy the CoreOS image to the auxiliary host, it will be used to generate the unconfigured agent image
 echo -e "\nCopying the CoreOS ISO image into the bastion host..."
-scp "${SSHOPTS[@]}" "${CACHED_COREOS_IMAGE_PATH}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}"
+scp "${SSHOPTS[@]}" "${CACHED_COREOS_IMAGE_PATH}" "root@${AUX_HOST}:/var/mnt/data-storage/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}"

@@ -17,7 +17,7 @@ images:
   items:
   - context_dir: .
     dockerfile_path: ./tests/e2e-openshift/Dockerfile
-    to: opentelemetry-tests-runner
+    to: obs-tests-runner
 releases:
   arm64-latest:
     candidate:
@@ -78,14 +78,15 @@ tests:
     - as: install-opentelemetry-operator
       cli: latest
       commands: |
+        if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE:-}" ]]; then
+          echo "ERROR: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
+          exit 1
+        fi
         oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/otel-icsp.yaml
-        oc create namespace openshift-opentelemetry-operator
-        oc label namespace openshift-opentelemetry-operator openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-opentelemetry-operator "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
-        oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
-      env:
-      - default: quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle@sha256:299677474d73be959b3b229c7e534c7d1f88aafc5265850c0dcd62874d38a119
-        name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       from: operator-sdk
       resources:
         requests:

@@ -94,7 +94,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260518-1704362c7 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260610-80cc06929 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -367,7 +367,7 @@ config_updater_vault_secret:  build_farm_credentials_folder
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_applyconfig_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
-		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(CURDIR)/clusters/build-clusters/build-shared:/manifests$(VOLUME_MOUNT_FLAGS)" \
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		quay.io/openshift/ci-public:ci_applyconfig_latest \
 		--config-dir=/manifests \
@@ -409,7 +409,7 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/crd/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/build-clusters/build-shared/crd/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
 	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
@@ -425,7 +425,7 @@ sed_cmd := gsed
 timeout_cmd := gtimeout
 endif
 
-crds = 'clusters/build-clusters/common/crd/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
+crds = 'clusters/build-clusters/build-shared/crd/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
 
 $(crds):
 	@#remove the empty lines at the beginning of the file. We do this to pass the yaml lint

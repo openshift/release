@@ -87,6 +87,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -716,6 +720,28 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: agent-e2e-two-node-fencing-ipv4
+- as: e2e-agent-ovn-two-node-fencing-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=TNF_IPV4
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+      OSSTREAM: rhel-10
+    workflow: agent-e2e-two-node-fencing-ipv4
+- as: e2e-metal-ovn-two-node-fencing-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
@@ -913,6 +939,15 @@ tests:
   cron: 29 0,10 * * *
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-extended
+- as: e2e-metal-ovn-two-node-fencing-private-tests-rhcos10-tp
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-fencing-extended
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
@@ -2403,6 +2438,20 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
+- as: e2e-aws-public-ipv4-pool
+  cron: '@monthly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: aws-us-east-1
+    env:
+      AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
+    workflow: openshift-e2e-aws
 - as: metal-ovn-single-node-recert-cluster-rename
   cron: '@weekly'
   steps:
@@ -2423,6 +2472,15 @@ tests:
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
+    workflow: ipi-aws
+- as: tls-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-external-aws
   cron: '@weekly'

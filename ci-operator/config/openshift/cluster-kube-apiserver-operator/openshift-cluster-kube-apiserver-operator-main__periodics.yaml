@@ -11,6 +11,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: upi-installer
+  vault-enterprise:
+    name: vault-enterprise
+    namespace: ci
+    tag: 2.0.0-ent
   vault_kube_kms:
     name: vault-kube-kms
     namespace: control-plane_vault
@@ -126,65 +130,51 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-metal-encryption-kms
-  capabilities:
-  - intranet
   cron: 12 0 * * 1,4
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: equinix-ocp-metal
     env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FEATURE_SET: TechPreviewNoUpgrade
-      RESERVE_BOOTSTRAP: "false"
+      DEVSCRIPTS_CONFIG: |
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
-      architecture: amd64
-      masters: "3"
-      workers: "2"
     test:
     - chain: etcd-encryption-vault-setup
-    - ref: openshift-e2e-test
-    workflow: baremetal-lab-ipi-virtual-media
+    - ref: baremetalds-e2e-test
+    workflow: baremetalds-e2e
 - as: e2e-metal-encryption-kms-ipv6
-  capabilities:
-  - intranet
   cron: 12 8 * * 2,5
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: equinix-ocp-metal
     env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FEATURE_SET: TechPreviewNoUpgrade
-      RESERVE_BOOTSTRAP: "false"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
-      architecture: amd64
-      masters: "3"
-      workers: "2"
     test:
     - chain: etcd-encryption-vault-setup
-    - ref: openshift-e2e-test
-    workflow: baremetal-lab-ipi-virtual-media-ipv6-static
+    - ref: baremetalds-e2e-test
+    workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-encryption-kms-dual
-  capabilities:
-  - intranet
   cron: 12 16 * * 3,6
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: equinix-ocp-metal
     env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      FEATURE_SET: TechPreviewNoUpgrade
-      RESERVE_BOOTSTRAP: "false"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
-      architecture: amd64
-      masters: "3"
-      workers: "2"
     test:
     - chain: etcd-encryption-vault-setup
-    - ref: openshift-e2e-test
-    workflow: baremetal-lab-upi-dual-stack
+    - ref: baremetalds-e2e-test
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-encryption-kms-single-node
   interval: 12h
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --cluster-stability=Disruptive
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
     test:
     - chain: etcd-encryption-vault-setup

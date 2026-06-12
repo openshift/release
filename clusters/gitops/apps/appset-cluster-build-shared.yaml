@@ -37,6 +37,8 @@ spec:
             name: build11
           - cluster: build12
             name: build12
+          - cluster: build13
+            name: build13
       - git:
           directories:
           - path: clusters/build-clusters/build-shared/*
@@ -52,6 +54,17 @@ spec:
       destination:
         name: '{{.name}}'
         namespace: openshift-gitops
+      ignoreDifferences:
+        - group: rbac.authorization.k8s.io
+          jsonPointers:
+            - /rules
+          kind: ClusterRole
+          name: ci-admins-aggregated
+        - group: '*'
+          jsonPointers:
+            - /imagePullSecrets
+            - /secrets
+          kind: ServiceAccount
       project: build-clusters-common
       source:
         directory:

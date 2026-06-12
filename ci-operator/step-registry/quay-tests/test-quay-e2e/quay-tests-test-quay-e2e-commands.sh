@@ -116,4 +116,4 @@ else
     export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 fi
 
-NO_COLOR=1 npm run smoke || true
+NO_COLOR=1 node_modules/.bin/cypress run -b electron --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='smoke',grepFilterSpecs=true || true

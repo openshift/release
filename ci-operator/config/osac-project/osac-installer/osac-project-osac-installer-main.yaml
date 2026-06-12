@@ -18,7 +18,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -27,7 +27,10 @@ images:
       ADD . /installer
       WORKDIR /installer
 
-      RUN dnf install -y git jq
+      RUN dnf install -y git jq && \
+          curl -fsSL https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz | tar xz -C /tmp && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+          curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin
       RUN git submodule update --init --recursive
 
       RUN cp oc /usr/local/bin/oc

@@ -22,6 +22,10 @@ hyperfleet-credential-provider generate-kubeconfig \
   --cluster-name="$CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig" 
 
+# Resolve Gangway-overridable params (prefix is required for ci-operator to
+# inject overrides; bare names are used by downstream scripts and deploy-clm.sh).
+NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
+
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
@@ -40,30 +44,24 @@ export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
 # Export image parameters for the deployment
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export API_IMAGE_REPO="${API_IMAGE_REPO:-ci/hyperfleet-api}"
-export API_IMAGE_TAG="${API_IMAGE_TAG:-latest}"
+export API_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG:-latest}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
-export SENTINEL_IMAGE_TAG="${SENTINEL_IMAGE_TAG:-latest}"
+export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 
-# Build E2E from a specific ref if requested (RC/release testing)
-E2E_REF="${E2E_REF:-}"
+# Use ref-specific deploy scripts if E2E_REF is set (RC/release testing)
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
 if [ -n "$E2E_REF" ]; then
-  log "=== Building E2E from ref: ${E2E_REF} ==="
+  log "=== Cloning E2E deploy scripts from ref: ${E2E_REF} ==="
   git clone --branch "$E2E_REF" --depth 1 \
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
-  cd /tmp/e2e-src
-  make build
-  cp bin/hyperfleet-e2e "${SHARED_DIR}/hyperfleet-e2e"
-  cp -r deploy-scripts "${SHARED_DIR}/deploy-scripts"
-  cp -r testdata "${SHARED_DIR}/testdata"
-  cp -r configs "${SHARED_DIR}/configs"
-  cd -
-  log "=== E2E build complete ==="
   mkdir -p /tmp/e2e
-  cp -r "${SHARED_DIR}/deploy-scripts" /tmp/e2e/deploy-scripts
-  cp -r "${SHARED_DIR}/testdata" /tmp/e2e/testdata
-  cp -r "${SHARED_DIR}/configs" /tmp/e2e/configs
+  cp -r /tmp/e2e-src/deploy-scripts /tmp/e2e/deploy-scripts
+  cp -r /tmp/e2e-src/testdata /tmp/e2e/testdata
+  cp -r /tmp/e2e-src/configs /tmp/e2e/configs
+  rm -rf /tmp/e2e-src
+  log "=== E2E deploy scripts ready ==="
 else
   cp -r /e2e/ /tmp/
 fi

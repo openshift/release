@@ -620,6 +620,7 @@ periodics:
       - |-
         --query=repo:openshift/hypershift
         repo:openshift-eng/ai-helpers
+        repo:openshift-kni/cnf-features-deploy
         is:pr
         is:open
         comments:<2500
@@ -680,6 +681,7 @@ periodics:
       - |-
         --query=repo:openshift/hypershift
         repo:openshift-eng/ai-helpers
+        repo:openshift-kni/cnf-features-deploy
         is:pr
         is:open
         comments:<2500
@@ -741,6 +743,7 @@ periodics:
       - |-
         --query=repo:openshift/hypershift
         repo:openshift-eng/ai-helpers
+        repo:openshift-kni/cnf-features-deploy
         is:pr
         is:open
         comments:<2500
@@ -860,17 +863,9 @@ periodics:
     containers:
     - args:
       - --config=core-services/prow/02_config/_release-bumper.yaml
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260610-80cc06929
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -878,12 +873,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: github-app-credentials
+        name: token
         readOnly: true
     volumes:
-    - name: github-app-credentials
+    - name: token
       secret:
-        secretName: openshift-prow-github-app
+        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: 0 22 * * 3
@@ -903,17 +898,9 @@ periodics:
     containers:
     - args:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
       command:
       - /ko-app/generic-autobumper
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260610-80cc06929
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -921,12 +908,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: github-app-credentials
+        name: token
         readOnly: true
     volumes:
-    - name: github-app-credentials
+    - name: token
       secret:
-        secretName: openshift-prow-github-app
+        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: 0 */4 * * 1-5
@@ -1222,7 +1209,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1279,7 +1266,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1371,7 +1358,7 @@ periodics:
           --github-allowed-burst=600 \
           --allow-repo-archival \
           --ignore-enterprise-teams
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1403,7 +1390,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1518,6 +1505,7 @@ periodics:
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
       - --git-name=openshift-merge-robot
       - --git-email=openshift-merge-robot@redhat.com
+      - --exclude-branch-pattern=^konflux/
       command:
       - private-org-sync
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_private-org-sync_latest
@@ -1839,6 +1827,8 @@ periodics:
       - --bw-allow-unused=dptp/gitops-cluster-build09
       - --bw-allow-unused=dptp/gitops-cluster-build10
       - --bw-allow-unused=dptp/gitops-cluster-build11
+      - --bw-allow-unused=dptp/gitops-cluster-build12
+      - --bw-allow-unused=dptp/gitops-cluster-build13
       - --bw-allow-unused=dptp/gitops-cluster-core-ci
       - --bw-allow-unused=dptp/gitops-cluster-hosted-mgmt
       - --bw-allow-unused=dptp/gitops-cluster-app.ci
@@ -1969,7 +1959,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2001,7 +1991,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2033,7 +2023,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260518-1704362c7
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260610-80cc06929
       imagePullPolicy: Always
       name: ""
       resources:

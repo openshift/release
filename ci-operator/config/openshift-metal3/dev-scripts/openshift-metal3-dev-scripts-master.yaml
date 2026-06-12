@@ -1,8 +1,13 @@
+base_images:
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_path: images/Dockerfile.ci
@@ -15,12 +20,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -28,6 +33,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: shellcheck
+  commands: |
+    set -x
+    echo "Searching for shell scripts..."
+    find . -type f -name "*.sh" -exec shellcheck -x -s bash {} \;
+    echo "Shellcheck completed successfully"
+  container:
+    from: shellcheck
 - as: e2e-metal-ipi-bm
   capabilities:
   - intranet

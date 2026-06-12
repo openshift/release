@@ -154,7 +154,7 @@ def _deployment_resources(gendoc, namespaces):
                 'namespace': context.config.rc_deployment_namespace,
             },
             'spec': {
-                'replicas': 1,
+                'replicas': 0,
                 'selector': {
                     'matchLabels': {
                         'app': 'release-reimport-controller'
@@ -172,7 +172,7 @@ def _deployment_resources(gendoc, namespaces):
                                 "resources": {
                                     "limits": {
                                         "cpu": "500m",
-                                        "memory": "4Gi"
+                                        "memory": "8Gi"
                                     },
                                     "requests": {
                                         "cpu": "250m",

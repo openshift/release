@@ -1,8 +1,8 @@
 #!/bin/bash
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
+export HTTP_PROXY=${proxy}
+export HTTPS_PROXY=${proxy}
 
 # OVE automation requires setting serial console parameters to certain values
 # See https://docs.google.com/presentation/d/1d3heMS5JAFmubJpW_8YuHa5r3AlCvj2tW0akQ6b8EQw/edit?usp=sharing

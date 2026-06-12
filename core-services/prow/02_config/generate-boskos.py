@@ -117,6 +117,12 @@ CONFIG = {
     'metal-perfscale-osp-quota-slice': {
         'metal-perfscale-osp-rdu2': 1,
     },
+    'metal-perfscale-osp-nfv-quota-slice': {
+        'metal-perfscale-osp-nfv-bos2': 1,
+    },
+    'metal-perfscale-osp-selfsched-quota-slice': {
+        'metal-perfscale-osp-selfsched': 3,
+    },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
     },
@@ -155,6 +161,9 @@ CONFIG = {
     },
     'aws-rhdh-performance-quota-slice': {
         'eu-west-1': 10
+    },
+    'aws-rhdh-disconnected-quota-slice': {
+        'us-east-2': 5
     },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
@@ -301,8 +310,10 @@ CONFIG = {
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
     # BEGIN ARO-HCP E2E SLOT TYPES
-    'aro-hcp-dev-shard0-centralus-slot': {},
-    'aro-hcp-dev-shard1-centralus-slot': {},
+    'aro-hcp-dev-shard1-slot': {},
+    'aro-hcp-dev-shard0-slot': {},
+    'aro-hcp-dev-shard2-slot': {},
+    'aro-hcp-dev-shard3-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
@@ -374,6 +385,7 @@ CONFIG = {
         'libvirt-s390x-amd64-0-0': 1
     },
     'libvirt-s390x-vpn-quota-slice': {},
+    'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -682,6 +694,11 @@ for i in range(3):
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 
+# Orange zone (OZ) M83 LPARs lnxocp11-14: four concurrent clusters per LPAR
+for i in range(4):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
+
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
@@ -758,10 +775,14 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(1):
-    CONFIG['aro-hcp-dev-shard0-centralus-slot']['aro-hcp-dev-shard0-centralus-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(7):
-    CONFIG['aro-hcp-dev-shard1-centralus-slot']['aro-hcp-dev-shard1-centralus-slot-{i:0>2}'.format(i=i)] = 1
+    CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(15):
+    CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1

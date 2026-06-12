@@ -347,9 +347,11 @@ fi
 TAG_Author=${TAG_Author:-"periodic"}
 TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
 TAG_Job_Type=$JOB_TYPE
+TAG_Job_Name=$(echo "${JOB_SPEC}" | jq -r '.job // empty' || true)
+TAG_Job_Name=${TAG_Job_Name:-"unknown"}
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
-TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type},usage-job-name:${TAG_Job_Name}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi

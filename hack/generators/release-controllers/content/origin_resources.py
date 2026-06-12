@@ -136,7 +136,7 @@ def _add_origin_resources(gendoc):
                 "namespace": "ci",
             },
             "spec": {
-                "replicas": 1,
+                "replicas": 0,
                 "selector": {
                     "matchLabels": {
                         "app": "release-controller"
@@ -262,7 +262,7 @@ def _add_origin_resources(gendoc):
                 "namespace": "ci",
             },
             "spec": {
-                "replicas": 3,
+                "replicas": 0,
                 "selector": {
                     "matchLabels": {
                         "app": "release-controller-api"
@@ -286,8 +286,8 @@ def _add_origin_resources(gendoc):
                                     "--release-architecture=amd64",
                                     "--enable-jira",
                                     "--jira-endpoint=https://redhat.atlassian.net",
-                                    "--jira-username=brawilli@redhat.com",
-                                    "--jira-password-file=/etc/jira/password",
+                                    "--jira-username=openshift-release-controller-jira-bot@redhat.com",
+                                    "--jira-password-file=/etc/jira/bot-password",
                                     "-v=4"
                                 ],
                                 'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',

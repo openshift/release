@@ -25,6 +25,17 @@ data:
           origin:
             plugins:
             - name: ready-for-humans
+      openshift-eng:
+        repos:
+          ship-hook:
+            plugins:
+            - name: ready-for-humans
+          two-node-toolbox:
+            plugins:
+            - name: ready-for-humans
+          edge-tooling:
+            plugins:
+            - name: ready-for-humans
 ---
 apiVersion: v1
 kind: Service
@@ -105,6 +116,7 @@ spec:
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --config-path=/etc/ship-hook/config.yaml
+        - --cyborg.credentials-file=/etc/cyborg/prow-ship-hook
         env:
         - name: GITHUB_APP_ID
           valueFrom:
@@ -127,6 +139,9 @@ spec:
           readOnly: true
         - name: ship-hook-config
           mountPath: /etc/ship-hook
+          readOnly: true
+        - name: cyborg-credentials
+          mountPath: /etc/cyborg
           readOnly: true
         resources:
           requests:
@@ -158,3 +173,9 @@ spec:
       - name: ship-hook-config
         configMap:
           name: ship-hook-config
+      - name: cyborg-credentials
+        secret:
+          secretName: ship-hook-cyborg-credentials
+          items:
+          - key: prow-ship-hook
+            path: prow-ship-hook

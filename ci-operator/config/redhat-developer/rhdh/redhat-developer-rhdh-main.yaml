@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -8,8 +13,8 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: fast
-      version: "4.20"
+      channel: stable
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -51,6 +56,36 @@ tests:
     timeout: 1h0m0s
     version: "4.18"
   cron: 0 4 * * *
+  optional: true
+  presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-helm-localization-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 0 3 * * *
+  max_concurrency: 1
   optional: true
   presubmit: true
   reporter_config:
@@ -161,6 +196,62 @@ tests:
     test:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-disconnected-helm-nightly
+  cron: 0 3 31 12 *
+  max_concurrency: 4
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-rhdh-disconnected
+    env:
+      BASE_DOMAIN: rhdh-qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      ENABLE_IDMS: "yes"
+      OCP_ARCH: amd64
+      PROPAGATE_USER_TAGS: "yes"
+      USER_TAGS: |
+        app-code rhdh-003
+        service-phase dev
+        cost-center 726
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-ocp-disconnected-operator-nightly
+  cron: 0 4 31 12 *
+  max_concurrency: 4
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-rhdh-disconnected
+    env:
+      BASE_DOMAIN: rhdh-qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      ENABLE_IDMS: "yes"
+      OCP_ARCH: amd64
+      PROPAGATE_USER_TAGS: "yes"
+      USER_TAGS: |
+        app-code rhdh-003
+        service-phase dev
+        cost-center 726
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-operator-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: e2e-aks-helm-nightly
   cron: 50 3 * * TUE,THU,SAT,SUN
