@@ -378,28 +378,35 @@ function wait_for_operator() {
     echo ">>> Using existing CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME}"
   fi
 
-  # Stage 2: Wait for Subscription to reference an InstallPlan (60s)
+  # Stage 2: Wait for Subscription to reference an InstallPlan (300s)
   echo ">>> Waiting for Subscription to reference InstallPlan..."
   local installplan_ref=""
-  for i in {1..12}; do
+  for i in {1..60}; do
     installplan_ref=$(oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null || echo "")
     if [[ -n "${installplan_ref}" ]]; then
       echo ">>> Subscription references InstallPlan: ${installplan_ref}"
       break
     fi
-    [[ ${i} -lt 12 ]] && sleep 5
+
+    # Show progress every 12 iterations (60 seconds)
+    if [[ $((i % 12)) -eq 0 ]]; then
+      echo ">>> Still waiting for InstallPlan reference (${i}/60, $((i*5))s elapsed)..."
+      oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o jsonpath='{.status}' 2>/dev/null | head -5 || true
+    fi
+
+    [[ ${i} -lt 60 ]] && sleep 5
   done
 
   if [[ -z "${installplan_ref}" ]]; then
-    echo ">>> ERROR: Subscription has no InstallPlan reference after 60s"
+    echo ">>> ERROR: Subscription has no InstallPlan reference after 300s"
     oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml || true
     return 1
   fi
 
-  # Stage 3: Wait for InstallPlan to be Complete (60s)
+  # Stage 3: Wait for InstallPlan to be Complete (300s)
   echo ">>> Waiting for InstallPlan ${installplan_ref} to be Complete..."
   local installplan_complete=false
-  for i in {1..12}; do
+  for i in {1..60}; do
     local phase
     phase=$(oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
     if [[ "${phase}" == "Complete" ]]; then
@@ -407,11 +414,17 @@ function wait_for_operator() {
       installplan_complete=true
       break
     fi
-    [[ ${i} -lt 12 ]] && sleep 5
+
+    # Show progress every 12 iterations (60 seconds)
+    if [[ $((i % 12)) -eq 0 ]]; then
+      echo ">>> InstallPlan phase: ${phase:-unknown} (${i}/60, $((i*5))s elapsed)..."
+    fi
+
+    [[ ${i} -lt 60 ]] && sleep 5
   done
 
   if [[ "${installplan_complete}" != "true" ]]; then
-    echo ">>> ERROR: InstallPlan not Complete after 60s"
+    echo ">>> ERROR: InstallPlan not Complete after 300s"
     oc get installplan -n "${TRUSTEE_NAMESPACE}" "${installplan_ref}" -o yaml || true
     return 1
   fi
