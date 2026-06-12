@@ -84,7 +84,9 @@ resources:
       memory: 4Gi
 tests:
 - as: test
-  commands: make test
+  commands: |
+    make test
+    go test -v ./test/envtest/... -timeout 5m
   container:
     from: src
 - as: test-generate
@@ -97,6 +99,8 @@ tests:
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
+    GOFLAGS="-mod=mod"
+    make lint-api
   container:
     clone: true
     from: kueue-operator-src
