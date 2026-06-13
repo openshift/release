@@ -212,6 +212,7 @@ fi
 set +e
 set -o pipefail
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
+export jobname="*${JOB_NAME}*"
 export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{.data.install-config}' | yq -r '.fips // false')}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
