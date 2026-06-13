@@ -77,7 +77,7 @@ workers: ${WORKERS:-0}
 
 ctlplane:
   numcpus: ${CTLPLANE_CPUS:-6}
-  memory: ${CTLPLANE_MEMORY:-18432}
+  memory: ${CTLPLANE_MEMORY:-24576}
 
 worker:
   numcpus: ${WORKER_CPUS:-4}
