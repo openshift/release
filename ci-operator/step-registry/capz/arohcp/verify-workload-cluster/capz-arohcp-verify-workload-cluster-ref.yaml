@@ -1,0 +1,44 @@
+ref:
+  as: capz-arohcp-verify-workload-cluster
+  from: root
+  commands: capz-arohcp-verify-workload-cluster-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: ARO_REPO_URL
+    default: "https://github.com/stolostron/cluster-api-installer.git"
+    documentation: Git URL for the cluster-api-installer repository.
+  - name: ARO_REPO_BRANCH
+    default: "main"
+    documentation: Branch of the cluster-api-installer repository to clone.
+  - name: ARO_REPO_DIR
+    default: "/tmp/cluster-api-installer-pro"
+    documentation: Directory to clone the cluster-api-installer repository into.
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  timeout: 20m
+  documentation: |-
+    Runs CAPZ test suite Phase 06 (verify workload cluster) to validate
+    nodes, cluster operators, and overall health of the deployed cluster.

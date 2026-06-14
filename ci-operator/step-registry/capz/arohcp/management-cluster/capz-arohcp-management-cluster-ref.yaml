@@ -1,0 +1,58 @@
+ref:
+  as: capz-arohcp-management-cluster
+  from: root
+  commands: capz-arohcp-management-cluster-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  - namespace: test-credentials
+    name: stolostron-capi-tests-quay-credentials
+    mount_path: /etc/quay-pull-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: ARO_REPO_URL
+    default: "https://github.com/stolostron/cluster-api-installer.git"
+    documentation: Git URL for the cluster-api-installer repository.
+  - name: ARO_REPO_BRANCH
+    default: "main"
+    documentation: Branch of the cluster-api-installer repository to clone.
+  - name: ARO_REPO_DIR
+    default: "/tmp/cluster-api-installer-pro"
+    documentation: Directory to clone the cluster-api-installer repository into.
+  - name: DEPLOY_CHARTS
+    default: "false"
+    documentation: |-
+      When "true", deploys CAPI/CAPZ/ASO controllers to the cluster
+      via deploy-charts.sh instead of expecting pre-installed controllers.
+  - name: USE_KIND
+    default: "false"
+    documentation: |-
+      When "true", deploy-charts.sh uses -kind suffixed Helm charts
+      designed for vanilla Kubernetes clusters (AKS, Kind) instead of
+      OpenShift-specific charts.
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  timeout: 45m
+  documentation: |-
+    Validates the management cluster (AKS or IPI-provisioned) and deploys
+    CAPI/CAPZ/ASO controllers via DEPLOY_CHARTS=true using deploy-charts.sh.

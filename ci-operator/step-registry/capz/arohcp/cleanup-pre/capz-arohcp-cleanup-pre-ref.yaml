@@ -1,0 +1,36 @@
+ref:
+  as: capz-arohcp-cleanup-pre
+  from: root
+  commands: capz-arohcp-cleanup-pre-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  timeout: 30m
+  documentation: |-
+    Pre-test cleanup safety net for CAPZ test suite. Runs before deploying
+    workload cluster CRs to clean up leftovers from previously aborted jobs
+    (resource groups, ARM resources, soft-deleted Key Vaults, AD apps, SPs).

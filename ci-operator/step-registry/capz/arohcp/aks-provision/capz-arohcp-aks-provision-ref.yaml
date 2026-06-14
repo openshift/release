@@ -1,0 +1,47 @@
+ref:
+  as: capz-arohcp-aks-provision
+  from: root
+  commands: capz-arohcp-aks-provision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m
+  grace_period: 5m
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: LOCATION
+    default: "uksouth"
+    documentation: Azure region for the AKS cluster.
+  - name: AKS_NODE_COUNT
+    default: "1"
+    documentation: Number of nodes for the AKS management cluster.
+  - name: AKS_NODE_VM_SIZE
+    default: "Standard_D4s_v3"
+    documentation: VM size for AKS management cluster nodes.
+  - name: AKS_K8S_VERSION
+    default: ""
+    documentation: |-
+      Kubernetes version for the AKS cluster. When empty, uses the
+      latest non-preview version available in the region.
+  documentation: |-
+    Provisions a minimal AKS cluster for use as a CAPZ management cluster.
+    Writes the kubeconfig to ${SHARED_DIR}/kubeconfig, the cluster name to
+    ${SHARED_DIR}/cluster-name, and the resource group to
+    ${SHARED_DIR}/resourcegroup_aks.

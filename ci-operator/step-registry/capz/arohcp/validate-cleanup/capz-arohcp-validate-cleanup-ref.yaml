@@ -1,0 +1,36 @@
+ref:
+  as: capz-arohcp-validate-cleanup
+  from: root
+  commands: capz-arohcp-validate-cleanup-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: WORKLOAD_CLUSTER_NAMESPACE
+    default: ""
+    documentation: |-
+      Fixed namespace for workload cluster resources. When set, all steps
+      use this value instead of generating a timestamp-based namespace.
+  timeout: 20m
+  documentation: |-
+    Runs CAPZ test suite Phase 08 (validate cleanup) to verify cleanup
+    operations for local resources and Azure resources. This phase is
+    informational and does not delete any resources.

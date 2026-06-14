@@ -1,0 +1,363 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+
+      # Tool versions
+      ARG KUBECTL_VERSION=v1.35.2
+      ARG HELM_VERSION=v3.16.0
+      ARG CLUSTERCTL_VERSION=v1.12.8
+      ARG CLUSTERCTL_SHA256=19679fd674731c7f48276b633874834958a62b0e93cb870b87a2df240d6a7ce0
+      ARG GOTESTSUM_VERSION=v1.13.0
+
+      # Install OpenShift CLI
+      ARG OC_VERSION=latest
+      RUN curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/oc.tar.gz && \
+          tar xz -C /usr/local/bin -f /tmp/oc.tar.gz oc && \
+          chmod +x /usr/local/bin/oc && \
+          rm -f /tmp/oc.tar.gz
+
+      # Install Azure CLI and other tools
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          printf '%s\n' \
+            '[azure-cli]' \
+            'name=Azure CLI' \
+            'baseurl=https://packages.microsoft.com/yumrepos/azure-cli' \
+            'enabled=1' \
+            'gpgcheck=1' \
+            'gpgkey=https://packages.microsoft.com/keys/microsoft.asc' \
+            > /etc/yum.repos.d/azure-cli.repo && \
+          if [ -d /etc/yum.repos.art/ci ]; then \
+            cp /etc/yum.repos.d/azure-cli.repo /etc/yum.repos.art/ci/; \
+          fi && \
+          dnf install -y azure-cli jq gettext libxml2 bc python3-cffi podman && dnf clean all
+
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+      # Install kubectl
+      RUN curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+          curl -Lo /tmp/kubectl.sha256 "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" && \
+          echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum -c && \
+          chmod +x /usr/local/bin/kubectl && rm -f /tmp/kubectl.sha256
+
+      # Install helm
+      RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz && \
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" -o /tmp/helm.sha256sum && \
+          echo "$(awk '{print $1}' /tmp/helm.sha256sum)  /tmp/helm.tar.gz" | sha256sum -c && \
+          tar xz -C /tmp -f /tmp/helm.tar.gz && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && chmod +x /usr/local/bin/helm && \
+          rm -rf /tmp/helm.tar.gz /tmp/helm.sha256sum /tmp/linux-amd64
+
+      # Install gotestsum
+      RUN GOFLAGS='' GOBIN=/usr/local/bin go install gotest.tools/gotestsum@${GOTESTSUM_VERSION}
+
+      # Install clusterctl
+      RUN curl -Lo /usr/local/bin/clusterctl "https://github.com/kubernetes-sigs/cluster-api/releases/download/${CLUSTERCTL_VERSION}/clusterctl-linux-amd64" && \
+          echo "${CLUSTERCTL_SHA256}  /usr/local/bin/clusterctl" | sha256sum -c && \
+          chmod +x /usr/local/bin/clusterctl
+
+      # Clone capi-tests source
+      RUN git clone --depth 1 https://github.com/stolostron/capi-tests.git /go/src/capi-tests
+      WORKDIR /go/src/capi-tests
+
+      # Replace upstream openshift-ci/capz-test-env.sh with release-repo controlled version
+      RUN rm -rf openshift-ci && mkdir -p openshift-ci
+      COPY <<'CAPZEOF' openshift-ci/capz-test-env.sh
+      # Shared environment variables for all CAPZ test steps in Prow.
+      # Sourced by each step command script to ensure consistent configuration.
+
+      # Source Azure credentials from the CI cluster profile (when available).
+      if [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" ]]; then
+        { set +o xtrace; } 2>/dev/null
+        AZURE_CLIENT_ID=$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+        AZURE_CLIENT_SECRET=$(jq -r .clientSecret "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+        AZURE_TENANT_ID=$(jq -r .tenantId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+        AZURE_SUBSCRIPTION_ID=$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+        for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+          if [[ -z "${!var}" || "${!var}" == "null" ]]; then
+            echo "[capz-test-env] ERROR: ${var} is missing or null in ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" >&2
+            exit 1
+          fi
+        done
+        export AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID
+        echo "[capz-test-env] Azure credentials loaded from cluster profile: ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+      fi
+
+      # Override with CAPZ-specific Azure credentials from Vault (when available).
+      CAPZ_CREDS_DIR="/var/run/capz-azure-credentials"
+      if [[ -d "${CAPZ_CREDS_DIR}" && -f "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID" ]]; then
+        { set +o xtrace; } 2>/dev/null
+        AZURE_CLIENT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID")
+        AZURE_CLIENT_SECRET=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_SECRET")
+        AZURE_TENANT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_TENANT_ID")
+        AZURE_SUBSCRIPTION_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_SUBSCRIPTION_ID")
+        for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+          if [[ -z "${!var}" || "${!var}" == "null" ]]; then
+            echo "[capz-test-env] ERROR: ${var} is missing or null in ${CAPZ_CREDS_DIR}" >&2
+            exit 1
+          fi
+        done
+        export AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID
+        echo "[capz-test-env] Azure credentials overridden from $CAPZ_CREDS_DIR"
+      fi
+
+      # Override with ARO-HCP vault profile credentials (int/stg/prod/dev).
+      if [[ -n "${VAULT_SECRET_PROFILE:-}" && -d "/var/run/aro-hcp-${VAULT_SECRET_PROFILE}" ]]; then
+        export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+        { set +o xtrace; } 2>/dev/null
+        AZURE_CLIENT_ID="$(cat "${CLUSTER_PROFILE_DIR}/client-id")"
+        AZURE_CLIENT_SECRET="$(cat "${CLUSTER_PROFILE_DIR}/client-secret")"
+        AZURE_TENANT_ID="$(cat "${CLUSTER_PROFILE_DIR}/tenant")"
+        AZURE_SUBSCRIPTION_ID="$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")"
+        for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+          if [[ -z "${!var}" || "${!var}" == "null" ]]; then
+            echo "[capz-test-env] ERROR: ${var} is missing or null in ${CLUSTER_PROFILE_DIR}" >&2
+            exit 1
+          fi
+        done
+        export AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID
+        echo "[capz-test-env] Azure credentials overridden from ${CLUSTER_PROFILE_DIR}"
+      fi
+
+      : "${GOCACHE:=/tmp/go-cache}"
+      if [[ ! -d "${GOCACHE}" ]] || [[ ! -w "${GOCACHE}" ]]; then
+        echo "[capz-test-env] GOCACHE=${GOCACHE} is not writable, falling back to /tmp/go-cache" >&2
+        GOCACHE=/tmp/go-cache
+      else
+        echo "[capz-test-env] GOCACHE=${GOCACHE}"
+      fi
+      export GOCACHE
+
+      : "${INFRA_PROVIDER:=aro}"
+      : "${CAPI_USER:=prow}"
+      : "${DEPLOYMENT_ENV:=ci}"
+      export INFRA_PROVIDER CAPI_USER DEPLOYMENT_ENV
+      : "${REGION:=uksouth}"
+      export REGION
+      : "${OPERATORS_UAMIS_SUFFIX_FILE:=/tmp/operators-uamis-suffix.txt}"
+      export OPERATORS_UAMIS_SUFFIX_FILE
+      : "${ARO_REPO_URL:=https://github.com/stolostron/cluster-api-installer.git}"
+      : "${ARO_REPO_BRANCH:=main}"
+      : "${ARO_REPO_DIR:=/tmp/cluster-api-installer-pro}"
+      export ARO_REPO_URL ARO_REPO_BRANCH ARO_REPO_DIR
+
+      if [[ -n "${SHARED_DIR:-}" && -z "${USE_KUBECONFIG:-}" ]]; then
+        export USE_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+      fi
+
+      : "${USE_K8S:=false}"
+      export USE_K8S
+
+      : "${DEPLOYMENT_TIMEOUT:=90m}"
+      export DEPLOYMENT_TIMEOUT
+
+      NAME_PREFIX_FILE="${SHARED_DIR:-/tmp}/name-prefix"
+      if [[ -f "$NAME_PREFIX_FILE" ]]; then
+        export NAME_PREFIX=$(cat "$NAME_PREFIX_FILE")
+      else
+        export NAME_PREFIX="capz-$(openssl rand -hex 3)"
+        echo "$NAME_PREFIX" > "$NAME_PREFIX_FILE"
+      fi
+
+      RESOURCEGROUPNAME_FILE="${SHARED_DIR:-/tmp}/resource-group-name"
+      if [[ -f "$RESOURCEGROUPNAME_FILE" ]]; then
+        RESOURCEGROUPNAME="$(cat "$RESOURCEGROUPNAME_FILE")"
+        export RESOURCEGROUPNAME
+      else
+        RESOURCEGROUPNAME="capz-tests-$(openssl rand -hex 3)-resgroup"
+        export RESOURCEGROUPNAME
+        echo "$RESOURCEGROUPNAME" > "$RESOURCEGROUPNAME_FILE"
+      fi
+
+      # Extract MSI resource group from Boskos lease (when available).
+      if [[ -n "${LEASED_MSI_CONTAINERS:-}" && -z "${MSI_RESOURCEGROUPNAME:-}" ]]; then
+        read -r MSI_RESOURCEGROUPNAME _ <<< "${LEASED_MSI_CONTAINERS}"
+        export MSI_RESOURCEGROUPNAME
+        echo "[capz-test-env] Using pre-existing MSI from Boskos pool: ${MSI_RESOURCEGROUPNAME}"
+      fi
+
+      echo "[capz-test-env] INFRA_PROVIDER=${INFRA_PROVIDER} CAPI_USER=${CAPI_USER} DEPLOYMENT_ENV=${DEPLOYMENT_ENV}"
+      echo "[capz-test-env] REGION=${REGION} USE_K8S=${USE_K8S} DEPLOYMENT_TIMEOUT=${DEPLOYMENT_TIMEOUT}"
+      echo "[capz-test-env] ARO_REPO_URL=${ARO_REPO_URL} ARO_REPO_BRANCH=${ARO_REPO_BRANCH} ARO_REPO_DIR=${ARO_REPO_DIR}"
+      echo "[capz-test-env] NAME_PREFIX=${NAME_PREFIX} RESOURCEGROUPNAME=${RESOURCEGROUPNAME}"
+      CAPZEOF
+images:
+  items:
+  - dockerfile_literal: |
+      FROM aro-hcp-e2e-tests
+    from: aro-hcp-e2e-tests
+    to: aro-hcp-e2e-tools
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: backend/Dockerfile
+    to: aro-hcp-backend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: frontend/Dockerfile
+    to: aro-hcp-frontend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: admin/Dockerfile
+    to: aro-hcp-admin-api
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: sessiongate/Dockerfile
+    to: aro-hcp-sessiongate
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: fleet/Dockerfile
+    to: aro-hcp-fleet
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: mgmt-agent/Dockerfile
+    to: aro-hcp-mgmt-agent
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: kube-applier/Dockerfile
+    to: aro-hcp-kube-applier
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: hcp-recovery/Dockerfile
+    from: src
+    to: aro-hcp-hcp-recovery
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: dev
+  run_if_changed: ^$
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: westus3
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: dev
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-dev-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-dev
+    - count: 1
+      env: LEASED_MSI_MOCK_SP
+      resource_type: aro-hcp-msi-mock-cs-sp-dev
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-aks-deprovision
+    - ref: aro-hcp-gather-provision-failure
+    - ref: aro-hcp-gather-visualization
+    - ref: aro-hcp-gather-custom-link-tools
+    - ref: aro-hcp-gather-observability
+    - ref: aro-hcp-deprovision-environment
+    pre:
+    - ref: aro-hcp-write-config
+    - ref: aro-hcp-provision-environment
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    - ref: capz-arohcp-dev-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
+- as: production
+  cron: 0 20 * * 1-5
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: uksouth
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: prod
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-aks-deprovision
+    pre:
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: capz-e2e

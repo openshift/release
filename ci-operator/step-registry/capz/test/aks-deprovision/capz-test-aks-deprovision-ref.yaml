@@ -1,0 +1,29 @@
+ref:
+  as: capz-test-aks-deprovision
+  from: src
+  commands: capz-test-aks-deprovision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-int
+    mount_path: /var/run/aro-hcp-int
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-stg
+    mount_path: /var/run/aro-hcp-stg
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-prod
+    mount_path: /var/run/aro-hcp-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m
+  grace_period: 5m
+  best_effort: true
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "stg"
+    documentation: |-
+      Selects which environment's cluster secrets to use (int, stg, prod).
+  documentation: |-
+    Tears down the AKS management cluster and its resource group.
+    Reads the resource group name from ${SHARED_DIR}/resourcegroup_aks.
