@@ -194,16 +194,20 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 14,
-        'eastus': 14,
-        'eastus2': 14,
-        'westus': 14
+        'centralus': 8,
+        'eastus': 8,
+        'eastus2': 8,
+        'westus': 8,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-2-quota-slice': {
-        'centralus': 33,
-        'eastus': 33,
-        'eastus2': 33,
-        'westus': 33
+        'centralus': 21,
+        'eastus': 21,
+        'eastus2': 21,
+        'westus': 21,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
