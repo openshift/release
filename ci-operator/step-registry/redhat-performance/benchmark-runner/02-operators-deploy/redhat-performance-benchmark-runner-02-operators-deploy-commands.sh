@@ -4,39 +4,29 @@ set -euo pipefail
 
 # --- Step 02: Operators Deployment ---
 # Mirrors Jenkins 02-PerfCI-Operators-Deployment
-# SSHes through jump host (jump host) to cluster and installs CNV, LSO, ODF,
-# Infra, Custom operators via the benchmark-runner container.
+# SSHes to cluster and installs CNV, LSO, ODF, Infra, Custom operators
+# via the benchmark-runner container.
 
-# SSH setup — two-hop: Prow → jump host → cluster
-if [[ ! -s /secret/jh_priv_ssh_key ]] || [[ ! -s /secret/bastion_address ]]; then
-  echo "ERROR: missing SSH credentials (jh_priv_ssh_key / bastion_address)" >&2
+# SSH setup: direct (cluster_address) primary, bastion fallback
+if [[ -s /secret/cluster_address ]] && [[ -s /secret/provision_private_key ]]; then
+  CLUSTER_IP=$(<"/secret/cluster_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/provision_private_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
+elif [[ -s /secret/bastion_address ]] && [[ -s /secret/jh_priv_ssh_key ]]; then
+  CLUSTER_IP=$(<"/secret/bastion_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/jh_priv_ssh_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
+else
+  echo "ERROR: need cluster_address+provision_private_key or bastion_address+jh_priv_ssh_key" >&2
   exit 1
 fi
-cp /secret/jh_priv_ssh_key /tmp/provision_key
-chmod 600 /tmp/provision_key
 
-JUMPHOST=$(<"/secret/bastion_address")
-JUMPHOST="${JUMPHOST%$'\n'}"
-SSH_ARGS="-i /tmp/provision_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
-
-CLUSTER_IP=""
-[[ -s /secret/cluster_address ]] && CLUSTER_IP=$(<"/secret/cluster_address") && CLUSTER_IP="${CLUSTER_IP%$'\n'}"
-
-# SCP RSA key to jump host for second hop
-if [[ -s /secret/provision_private_key ]]; then
-  scp ${SSH_ARGS} /secret/provision_private_key root@"${JUMPHOST}":/tmp/provision_private_key
-else
-  scp ${SSH_ARGS} /secret/jh_priv_ssh_key root@"${JUMPHOST}":/tmp/provision_private_key
-fi
-ssh ${SSH_ARGS} root@"${JUMPHOST}" "chmod 600 /tmp/provision_private_key"
-
-if [[ -n "${CLUSTER_IP}" ]]; then
-  REMOTE_SSH="ssh ${SSH_ARGS} root@${JUMPHOST} ssh -i /tmp/provision_private_key -oStrictHostKeyChecking=no root@${CLUSTER_IP}"
-  PROVISION_IP="${CLUSTER_IP}"
-else
-  REMOTE_SSH="ssh ${SSH_ARGS} root@${JUMPHOST}"
-  PROVISION_IP="${JUMPHOST}"
-fi
+REMOTE_SSH="ssh ${SSH_ARGS} root@${CLUSTER_IP}"
+PROVISION_IP="${CLUSTER_IP}"
 
 QUAY_REPO="${QUAY_REPOSITORY}"
 
@@ -81,13 +71,8 @@ if [[ ! -s /secret/cnv_nightly_registered ]] || [[ ! -s /secret/cnv_nightly_cata
   exit 1
 fi
 echo "=== Applying CNV nightly catalog source ==="
-# SCP files to jump host first, then to cluster
-scp ${SSH_ARGS} /secret/cnv_nightly_registered root@"${JUMPHOST}":/tmp/cnv_registered.sh
-scp ${SSH_ARGS} /secret/cnv_nightly_catalog_source root@"${JUMPHOST}":/tmp/catalog_source.yaml
-if [[ -n "${CLUSTER_IP}" ]]; then
-  ssh ${SSH_ARGS} root@"${JUMPHOST}" "scp -i /tmp/provision_private_key -oStrictHostKeyChecking=no /tmp/cnv_registered.sh root@${CLUSTER_IP}:/tmp/cnv_registered.sh"
-  ssh ${SSH_ARGS} root@"${JUMPHOST}" "scp -i /tmp/provision_private_key -oStrictHostKeyChecking=no /tmp/catalog_source.yaml root@${CLUSTER_IP}:/tmp/catalog_source.yaml"
-fi
+scp ${SSH_ARGS} /secret/cnv_nightly_registered root@"${CLUSTER_IP}":/tmp/cnv_registered.sh
+scp ${SSH_ARGS} /secret/cnv_nightly_catalog_source root@"${CLUSTER_IP}":/tmp/catalog_source.yaml
 
 ${REMOTE_SSH} "export CNV_VERSION='${CNV_VERSION}'; bash -s" <<'NIGHTLY_EOF'
 chmod +x /tmp/cnv_registered.sh
@@ -99,14 +84,20 @@ rm -f /tmp/cnv_registered.sh /tmp/catalog_source.yaml
 NIGHTLY_EOF
 echo "=== CNV nightly catalog applied ==="
 
-# --- Copy RSA key to cluster for podman container mount ---
-if [[ -n "${CLUSTER_IP}" ]]; then
-  ssh ${SSH_ARGS} root@"${JUMPHOST}" "scp -i /tmp/provision_private_key -oStrictHostKeyChecking=no /tmp/provision_private_key root@${CLUSTER_IP}:/tmp/provision_private_key"
+# --- Copy SSH key to cluster for podman container mount ---
+if [[ -s /secret/provision_private_key ]]; then
+  scp ${SSH_ARGS} /secret/provision_private_key root@"${CLUSTER_IP}":/tmp/provision_private_key
+else
+  scp ${SSH_ARGS} /tmp/cluster_key root@"${CLUSTER_IP}":/tmp/provision_private_key
 fi
+${REMOTE_SSH} "chmod 600 /tmp/provision_private_key"
 
 # --- Install operators sequentially (on cluster) ---
 # CNV first: creates "-virtualization" storage class needed for Windows bootstorm
 OPERATORS=("cnv" "lso" "odf" "infra" "custom")
+
+QUOTED_EXPECTED_NODES=$(printf '%q' "${EXPECTED_NODES}")
+QUOTED_WORKER_DISK_IDS=$(printf '%q' "${WORKER_DISK_IDS}")
 
 for operator in "${OPERATORS[@]}"; do
   echo "=== Installing operator: ${operator} ==="
@@ -114,7 +105,7 @@ for operator in "${OPERATORS[@]}"; do
     "podman run --rm \
       -e INSTALL_OCP_RESOURCES='True' \
       -e INSTALL_RESOURCES_LIST='${operator}' \
-      -e EXPECTED_NODES='${EXPECTED_NODES}' \
+      -e EXPECTED_NODES=${QUOTED_EXPECTED_NODES} \
       -e CNV_VERSION='${CNV_VERSION}' \
       -e LSO_VERSION='${LSO_VERSION}' \
       -e ODF_VERSION='${ODF_VERSION}' \
@@ -124,7 +115,7 @@ for operator in "${OPERATORS[@]}"; do
       -e CONTAINER_PRIVATE_KEY_PATH='/root/.ssh/provision_private_key' \
       -e PROVISION_USER='root' \
       -e PROVISION_PORT='22' \
-      -e WORKER_DISK_IDS='${WORKER_DISK_IDS}' \
+      -e WORKER_DISK_IDS=${QUOTED_WORKER_DISK_IDS} \
       -e WORKER_DISK_PREFIX='${WORKER_DISK_PREFIX}' \
       -e PROVISION_TIMEOUT='${PROVISION_TIMEOUT}' \
       -e log_level='INFO' \

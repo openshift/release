@@ -4,37 +4,29 @@ set -euo pipefail
 
 # --- Step 05: Backup & Report ---
 # Mirrors Jenkins 05-PerfCI-Backup-Report-Deployment
-# SSHes through jump host to cluster to run:
+# SSHes to cluster to run:
 # 1. CI pod deployment (ES, Kibana, Grafana, JupyterLab for summary reports)
 # 2. Google Drive backup of artifacts
 
-# SSH setup — two-hop: Prow → jump host → cluster
-if [[ ! -s /secret/jh_priv_ssh_key ]] || [[ ! -s /secret/bastion_address ]]; then
-  echo "ERROR: missing SSH credentials (jh_priv_ssh_key / bastion_address)" >&2
+# SSH setup: direct (cluster_address) primary, bastion fallback
+if [[ -s /secret/cluster_address ]] && [[ -s /secret/provision_private_key ]]; then
+  CLUSTER_IP=$(<"/secret/cluster_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/provision_private_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
+elif [[ -s /secret/bastion_address ]] && [[ -s /secret/jh_priv_ssh_key ]]; then
+  CLUSTER_IP=$(<"/secret/bastion_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp /secret/jh_priv_ssh_key /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
+else
+  echo "ERROR: need cluster_address+provision_private_key or bastion_address+jh_priv_ssh_key" >&2
   exit 1
 fi
-cp /secret/jh_priv_ssh_key /tmp/provision_key
-chmod 600 /tmp/provision_key
 
-JUMPHOST=$(<"/secret/bastion_address")
-JUMPHOST="${JUMPHOST%$'\n'}"
-SSH_ARGS="-i /tmp/provision_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oServerAliveInterval=30 -oServerAliveCountMax=5"
-
-# Cluster address for two-hop SSH (scripts run on cluster, not jump host)
-CLUSTER_IP=""
-[[ -s /secret/cluster_address ]] && CLUSTER_IP=$(<"/secret/cluster_address") && CLUSTER_IP="${CLUSTER_IP%$'\n'}"
-
-# SCP RSA key to jump host for second hop
-if [[ -s /secret/provision_private_key ]]; then
-  scp ${SSH_ARGS} /secret/provision_private_key root@"${JUMPHOST}":/tmp/provision_private_key
-  ssh ${SSH_ARGS} root@"${JUMPHOST}" "chmod 600 /tmp/provision_private_key"
-fi
-
-if [[ -n "${CLUSTER_IP}" ]]; then
-  REMOTE_SSH="ssh ${SSH_ARGS} root@${JUMPHOST} ssh -i /tmp/provision_private_key -oStrictHostKeyChecking=no root@${CLUSTER_IP}"
-else
-  REMOTE_SSH="ssh ${SSH_ARGS} root@${JUMPHOST}"
-fi
+REMOTE_SSH="ssh ${SSH_ARGS} root@${CLUSTER_IP}"
 
 # Read script paths from Vault
 DEPLOYMENT_POD_SCRIPT=""
