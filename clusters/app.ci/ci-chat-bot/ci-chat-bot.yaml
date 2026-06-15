@@ -286,6 +286,15 @@ spec:
                 path: rosa-admin-ocm
         - name: runtimedir
           emptyDir: { }
+        - name: triage-config
+          configMap:
+            name: ci-chat-bot-triage-config
+        - name: chaibot-secrets
+          secret:
+            secretName: cluster-secrets-chaibot-ship-help
+            items:
+              - key: ship-help-token
+                path: ship-help-token
       initContainers:
         - name: git-sync-init
           command:
@@ -373,6 +382,12 @@ spec:
               readOnly: true
             - mountPath: /runtimedir
               name: runtimedir
+            - name: triage-config
+              mountPath: /etc/triage-config
+              readOnly: true
+            - name: chaibot-secrets
+              mountPath: /etc/chaibot-secrets
+              readOnly: true
           env:
             - name: BOT_TOKEN
               valueFrom:
@@ -412,6 +427,15 @@ spec:
               value: us-east-1
             - name: XDG_RUNTIME_DIR
               value: /runtimedir
+            - name: CHAIBOT_ENABLED
+              value: "true"
+            - name: SHIP_HELP_MCP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cluster-secrets-chaibot-ship-help
+                  key: ship-help-token
+            - name: SHIP_HELP_MCP_URL
+              value: "https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
           command: ["/bin/sh"]
           args:
             - -c
@@ -434,4 +458,6 @@ spec:
               --rosa-cluster-limit=30 \\
               --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids \\
               --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id \\
-              --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
+              --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id \\
+              --enable-triage=true \\
+              --triage-config-path=/etc/triage-config/triage-config.yaml
