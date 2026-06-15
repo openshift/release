@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+export CLAUDE_CONFIG_DIR
+
 # --- Gangway override ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
     echo "Applying Gangway override: PAYLOAD_TAG=${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
@@ -227,13 +230,8 @@ tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print -quit)")
 echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
 
-# Use a temporary config dir so we install plugins from the test fork
-CLAUDE_CONFIG_DIR=$(mktemp -d)
-export CLAUDE_CONFIG_DIR
-
 # Install additional plugins
 echo "Installing plugins..."
-claude plugin marketplace add not-stbenjam/ai-helpers
 claude plugin install must-gather@ai-helpers
 claude plugin install prow-agent@ai-helpers
 echo "Plugins installed."
@@ -241,7 +239,7 @@ echo "Plugins installed."
 # Locate prow-agent plugin scripts
 PROW_AGENT_DIR=$(dirname "$(find "${CLAUDE_CONFIG_DIR}" -type d -path "*/prow-agent/scripts" 2>/dev/null | head -1)")
 if [[ ! -d "${PROW_AGENT_DIR}/scripts" ]]; then
-    echo "ERROR: prow-agent plugin not found in ${CLAUDE_CONFIG_DIR}"
+    echo "ERROR: prow-agent plugin not found"
     exit 1
 fi
 OTEL_COLLECTOR="${PROW_AGENT_DIR}/scripts/otel_collector.py"
