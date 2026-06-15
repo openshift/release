@@ -398,13 +398,16 @@ else
 fi
 
 echo "Asking Claude to summarize findings for Slack..."
-SUMMARY=$(claude \
+SLACK_LOG=$(mktemp)
+claude \
     --model "${CLAUDE_MODEL}" \
     --continue \
-    --output-format text \
+    --output-format stream-json \
     --max-turns 5 \
     -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-    2>/dev/null) || SUMMARY=""
+    --verbose 2>&1 | tee -a "${CLAUDE_OUTPUT_LOG}" > "${SLACK_LOG}" || true
+SUMMARY=$(jq -r 'select(.type == "result") | .result // empty' "${SLACK_LOG}" 2>/dev/null | head -1) || SUMMARY=""
+rm -f "${SLACK_LOG}"
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then
     SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
