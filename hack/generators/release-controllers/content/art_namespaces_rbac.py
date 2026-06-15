@@ -16,6 +16,13 @@ def get_private_release_pullers():
         'kind': 'Group',
         'name': 'test-platform-ci-admins'
     })
+    # Admins of the openshift-priv org who need access to private
+    # release controllers and deck-internal.
+    puller_subjects.append({
+        'apiGroup': 'rbac.authorization.k8s.io',
+        'kind': 'Group',
+        'name': 'openshift-priv-admins'
+    })
     # This group contains members of the OpenShift release team (ART) with some extra capabilities
     puller_subjects.append({
         'apiGroup': 'rbac.authorization.k8s.io',
