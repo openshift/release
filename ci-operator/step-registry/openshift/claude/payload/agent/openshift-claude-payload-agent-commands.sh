@@ -216,7 +216,8 @@ SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print 
 echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
 
 # Use a temporary config dir so we install plugins from the test fork
-export CLAUDE_CONFIG_DIR=$(mktemp -d)
+CLAUDE_CONFIG_DIR=$(mktemp -d)
+export CLAUDE_CONFIG_DIR
 
 # Install additional plugins
 echo "Installing plugins..."
@@ -241,7 +242,20 @@ python3 "${OTEL_COLLECTOR}" \
     --port-file "${OTEL_PORT_FILE}" \
     --log-file "${OTEL_LOG}" &
 COLLECTOR_PID=$!
-while [ ! -s "${OTEL_PORT_FILE}" ]; do sleep 0.1; done
+OTEL_WAIT=0
+while [[ ! -s "${OTEL_PORT_FILE}" ]]; do
+    if ! kill -0 "${COLLECTOR_PID}" 2>/dev/null; then
+        echo "ERROR: OTEL collector exited before writing port file."
+        exit 1
+    fi
+    if [[ "${OTEL_WAIT}" -ge 300 ]]; then
+        echo "ERROR: Timed out waiting for OTEL collector port file."
+        kill "${COLLECTOR_PID}" 2>/dev/null || true
+        exit 1
+    fi
+    sleep 0.1
+    OTEL_WAIT=$((OTEL_WAIT + 1))
+done
 OTEL_PORT=$(cat "${OTEL_PORT_FILE}")
 echo "OTEL collector started on port ${OTEL_PORT} (PID ${COLLECTOR_PID})"
 
