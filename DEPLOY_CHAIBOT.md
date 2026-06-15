@@ -87,7 +87,7 @@ oc get secret cluster-secrets-chaibot-openai-key -n ci
   to:
     - cluster: app.ci
       namespace: ci
-      name: ci-chat-bot-chaibot-secrets
+      name: cluster-secrets-chaibot-openai-key
 
 # 3. Submit PR to openshift/release
 # 4. After merge, ci-secret-bootstrap will sync the secret
