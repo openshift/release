@@ -11,8 +11,20 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
 fi
 
 if [[ -z "${PAYLOAD_TAG:-}" ]]; then
-    echo "ERROR: PAYLOAD_TAG is not set. This job must be triggered via Gangway with MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG."
-    exit 1
+    echo "PAYLOAD_TAG not set, fetching latest rejected nightly from release controller..."
+    LATEST_VERSION=$(curl -sf "https://sippy.dptools.openshift.org/api/releases" | jq -r '.releases[] | select(test("^[0-9]+\\.[0-9]+$"))' | head -1)
+    if [[ -z "${LATEST_VERSION}" ]]; then
+        echo "ERROR: Could not determine latest OCP version from Sippy."
+        exit 1
+    fi
+    LATEST_STREAM="${LATEST_VERSION}.0-0.nightly"
+    PAYLOAD_TAG=$(curl -sf "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
+        | jq -r '[.tags[] | select(.phase == "Rejected")] | .[0].name // empty')
+    if [[ -z "${PAYLOAD_TAG}" ]]; then
+        echo "ERROR: No rejected nightly found for ${LATEST_STREAM}."
+        exit 1
+    fi
+    echo "Auto-selected: ${PAYLOAD_TAG}"
 fi
 
 echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
