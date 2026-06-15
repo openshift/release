@@ -5,35 +5,31 @@ set -o errexit
 set -o pipefail
 
 CNV_STORAGE_CLASS="${CNV_STORAGE_CLASS:-lvms-vg1}"
-CNV_VOLUME_MODE="${CNV_VOLUME_MODE:-Filesystem}"
+CNV_VOLUME_MODE="${CNV_VOLUME_MODE:-Block}"
 
-echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}"
+echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}, volume mode: ${CNV_VOLUME_MODE}"
 
 oc whoami --show-console
-
-COLLECTOR_CONF_FILE="${ARTIFACT_DIR}/containerized-data-collector.yaml"
-cat << __EOF__ | tee "${COLLECTOR_CONF_FILE}"
-data_collector_base_directory: "/${ARTIFACT_DIR}/tests-collected-info"
-collect_data_function: "ocp_wrapper_data_collector.data_collector.collect_data"
-collect_pod_logs: true
-__EOF__
 
 START_TIME=$(date "+%s")
 
 poetry run pytest tests \
-  --pytest-log-file="${ARTIFACT_DIR}/pytest.log" \
-  --data-collector="${COLLECTOR_CONF_FILE}" \
-  --junit-xml="${ARTIFACT_DIR}/junit_results.xml" \
-  --tc-file=tests/global_config.py \
-  --tc-format=python \
-  --tc=check_http_server_connectivity:false \
+  -s \
+  -o log_cli=true \
+  -o cache_dir=/tmp/cache-pytest \
+  -m 'smoke and not rwx_default_storage' \
+  --tc-file=tests/global_config_lvms.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
+  --storage-class-matrix="${CNV_STORAGE_CLASS}" \
   --latest-rhel \
   --tb=native \
-  --storage-class-matrix="${CNV_STORAGE_CLASS}" \
-  -o log_cli=true \
-  -m smoke || /bin/true
+  --data-collector \
+  --jira \
+  --junit-xml="${ARTIFACT_DIR}/xunit_results.xml" \
+  --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" \
+  --html="${ARTIFACT_DIR}/report.html" \
+  --self-contained-html || /bin/true
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME - START_TIME))
