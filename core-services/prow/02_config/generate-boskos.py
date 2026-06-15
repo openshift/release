@@ -243,7 +243,7 @@ CONFIG = {
         'centralus': 15
     },
     'azure-observability-quota-slice': {
-        'westus': 3
+        'westus': 25
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -350,7 +350,7 @@ CONFIG = {
         'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 25,
     },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
