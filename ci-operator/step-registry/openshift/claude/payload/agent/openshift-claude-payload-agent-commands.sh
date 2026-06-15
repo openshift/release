@@ -236,14 +236,8 @@ claude plugin install must-gather@ai-helpers
 claude plugin install prow-agent@ai-helpers
 echo "Plugins installed."
 
-# Locate prow-agent plugin scripts
-PROW_AGENT_DIR=$(dirname "$(find "${CLAUDE_CONFIG_DIR}" -type d -path "*/prow-agent/scripts" 2>/dev/null | head -1)")
-if [[ ! -d "${PROW_AGENT_DIR}/scripts" ]]; then
-    echo "ERROR: prow-agent plugin not found"
-    exit 1
-fi
-OTEL_COLLECTOR="${PROW_AGENT_DIR}/scripts/otel_collector.py"
-EXTRACT_METRICS="${PROW_AGENT_DIR}/scripts/extract_metrics.py"
+OTEL_COLLECTOR="/opt/ai-helpers/plugins/prow-agent/scripts/otel_collector.py"
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 
 # Start OTEL collector for Claude Code telemetry
 OTEL_PORT_FILE=$(mktemp)
