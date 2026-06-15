@@ -197,14 +197,20 @@ CONFIG = {
         'centralus': 8,
         'eastus': 8,
         'eastus2': 8,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
         'westus': 8,
         'westus2': 12,
         'westus3': 12
     },
     'azure-2-quota-slice': {
         'centralus': 21,
-        'eastus': 21,
+        'eastus': 12,
         'eastus2': 21,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
         'westus': 21,
         'westus2': 12,
         'westus3': 12
