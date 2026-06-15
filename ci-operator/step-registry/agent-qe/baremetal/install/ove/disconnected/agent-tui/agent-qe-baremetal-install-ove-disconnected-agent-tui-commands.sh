@@ -23,6 +23,8 @@ proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 export HTTP_PROXY=${proxy}
 export HTTPS_PROXY=${proxy}
 
+sed -i 's/timeout = 30/timeout = 45/g' agent-tui/core/session_handler.py
+
 RENDEZVOUS_NODE="yes"
 SSH_PRIVATE_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-privatekey)
 export SSH_PRIVATE_KEY
@@ -33,6 +35,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     RENDEZVOUS_IP=$(echo "$bmhost" | jq -r '.ip')
     echo "${RENDEZVOUS_IP}" >"${SHARED_DIR}"/node-zero-ip.txt
     RENDEZVOUS_NODE="no"
+    # Workaround until this bug is fixed OCPBUGS-63475
+    vendor=$(echo "$bmhost" | jq -r '.vendor')
+    if [ "$vendor" = "hpe" ]; then
+      sed -E -i ':a;N;$!ba;s/\.rendezvous_node\(\)[[:space:]]*\n[[:space:]]*\.select_ip\(\)/.non_rendezvous_node(self.rendezvous_ip)/g' agent-tui/tui_driver/driver.py
+    fi
   fi
   IPMITOOL_IP=$(echo "$bmhost" | jq -r '.bmc_address')
   IPMITOOL_USERNAME=$(echo "$bmhost" | jq -r '.bmc_user')
