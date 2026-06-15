@@ -189,12 +189,6 @@ copy_reports() {
         find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
-    # Extract session metrics (cost, tokens, duration) for BigQuery
-    EXTRACT_METRICS=$(find ~/.claude/plugins -type f -path "*/prow-agent/scripts/extract_metrics.py" 2>/dev/null | head -1)
-    if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
-        python3 "${EXTRACT_METRICS}" "${CLAUDE_OUTPUT_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" || echo "Warning: Failed to extract session metrics."
-    fi
-
     # Archive the full Claude session directory (including subagent logs) for session continuation.
     CLAUDE_HOME="/home/claude/.claude"
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
@@ -356,16 +350,33 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
+# Extract session metrics (cost, tokens, duration) for BigQuery
+METRICS_CASE=""
+METRICS_TEST_COUNT=0
+EXTRACT_METRICS=$(find ~/.claude/plugins -type f -path "*/prow-agent/scripts/extract_metrics.py" 2>/dev/null | head -1)
+if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
+    METRICS_TEST_COUNT=1
+    if python3 "${EXTRACT_METRICS}" "${CLAUDE_OUTPUT_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json"; then
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
+    else
+        FAILURE_COUNT=$((FAILURE_COUNT + 1))
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\">
+    <failure message=\"Failed to extract session metrics\">extract_metrics.py exited with an error. Check the output log.</failure>
+  </testcase>"
+    fi
+fi
+
 PHASE_COUNT=3
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     PHASE_COUNT=$((PHASE_COUNT + 1))
 fi
-TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
+TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT + METRICS_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="claude-ci" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
 ${PHASE_CASES}
 ${TIMEOUT_CASES}
+${METRICS_CASE}
 </testsuite>
 EOF
 
