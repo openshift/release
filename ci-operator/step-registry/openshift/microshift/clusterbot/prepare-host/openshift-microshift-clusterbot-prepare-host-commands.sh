@@ -174,7 +174,8 @@ else
 
     # On RHEL 10, subscription-manager does not list RHEL 9 repos.
     # Configure rhocp and fast-datapath repos manually using entitlement certificates.
-    rhel_major=$(grep -oP '(?<=VERSION_ID=")[0-9]+' /etc/os-release)
+    source /etc/os-release
+    rhel_major="${VERSION_ID%.*}"
     if [[ "${rhel_major}" == "10" ]]; then
         CERT=$(find /etc/pki/entitlement -name '[0-9]*.pem' ! -name '*-key.pem' | head -n1)
         KEY=$(find /etc/pki/entitlement -name '[0-9]*-key.pem' | head -n1)
