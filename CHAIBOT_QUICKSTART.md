@@ -75,7 +75,7 @@ Edit `clusters/app.ci/ci-chat-bot/ci-chat-bot.yaml` and add:
 - name: OPENAI_API_KEY
   valueFrom:
     secretKeyRef:
-      name: ci-chat-bot-chaibot-secrets
+      name: cluster-secrets-chaibot-openai-key
       key: openai-api-key
 
 # Add to spec.template.spec.containers[name=bot].args:
