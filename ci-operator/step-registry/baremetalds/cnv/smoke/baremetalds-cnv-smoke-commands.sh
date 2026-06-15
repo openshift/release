@@ -18,18 +18,14 @@ poetry run pytest tests \
   -o log_cli=true \
   -o cache_dir=/tmp/cache-pytest \
   -m 'smoke and not rwx_default_storage' \
-  --tc-file=tests/global_config_lvms.py \
+  --tc-file=tests/global_config.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
   --storage-class-matrix="${CNV_STORAGE_CLASS}" \
   --latest-rhel \
   --tb=native \
-  --data-collector \
-  --jira \
   --junit-xml="${ARTIFACT_DIR}/xunit_results.xml" \
-  --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" \
-  --html="${ARTIFACT_DIR}/report.html" \
-  --self-contained-html || /bin/true
+  --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" || /bin/true
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME - START_TIME))
