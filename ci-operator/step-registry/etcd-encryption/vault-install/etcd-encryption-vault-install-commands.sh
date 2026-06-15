@@ -3,23 +3,88 @@ set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-mirror_vault_image() {
-  echo "Mirroring Vault image to dev-scripts local registry..."
+mirror_vault_images() {
+  if [[ -z "${VAULT_KMS_PLUGIN_VERSION:-}" ]]; then
+    echo "Error: VAULT_KMS_PLUGIN_VERSION is required"
+    exit 1
+  fi
+  if [[ -z "${VAULT_KMS_PLUGIN_IMAGE_SOURCE:-}" ]]; then
+    echo "Error: VAULT_KMS_PLUGIN_IMAGE_SOURCE is required"
+    exit 1
+  fi
 
-  VAULT_IMAGE="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
-  DEVSCRIPTS_VAULT_IMAGE="${DS_REGISTRY}/localimages/vault-enterprise:${VAULT_VERSION}"
+  local vault_enterprise_src="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+  local vault_enterprise_dst="${DS_REGISTRY}/localimages/vault-enterprise:${VAULT_VERSION}"
+  local vault_kms_plugin_version="${VAULT_KMS_PLUGIN_VERSION}"
+  local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE_SOURCE}"
+  local vault_kms_dst="${DS_REGISTRY}/localimages/vault-kube-kms:${vault_kms_plugin_version}"
 
-  echo "  Source: ${VAULT_IMAGE}"
-  echo "  Destination: ${DEVSCRIPTS_VAULT_IMAGE}"
+  echo "Mirroring vault images to local registry..."
+  echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
+  echo "  ${vault_kms_src} -> ${vault_kms_dst}"
 
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -euo pipefail
-oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json "${VAULT_IMAGE}" "${DEVSCRIPTS_VAULT_IMAGE}"
+
+MAX_RETRIES=3
+CURRENT_RETRY=1
+SUCCESS=false
+
+function run-vault-image-mirror() {
+  oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+    "${vault_enterprise_src}" "${vault_enterprise_dst}" || return 1
+  oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+    "${vault_kms_src}" "${vault_kms_dst}" || return 1
+}
+
+while [ \$SUCCESS = false ] && [ \$CURRENT_RETRY -le \$MAX_RETRIES ]; do
+  echo "Mirroring vault images attempt \$CURRENT_RETRY"
+  run-vault-image-mirror
+  if [ \$? -eq 0 ]; then
+    SUCCESS=true
+  else
+    echo "Mirroring vault images attempt \$CURRENT_RETRY failed. Trying again..."
+    CURRENT_RETRY=\$(( CURRENT_RETRY + 1 ))
+    sleep 5
+  fi
+done
+
+if [ \$SUCCESS = false ]; then
+  echo "Mirroring vault images failed after \$MAX_RETRIES attempts."
+  exit 1
+fi
 EOF
 
   VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
   echo "Using mirrored Vault image repository: ${VAULT_IMAGE_REPOSITORY}"
+}
+
+apply_vault_icsp() {
+  if [[ -z "${VAULT_KMS_PLUGIN_ICSP_SOURCE:-}" ]]; then
+    echo "Error: VAULT_KMS_PLUGIN_ICSP_SOURCE is required"
+    exit 1
+  fi
+
+  echo "Applying ImageContentSourcePolicy for vault images..."
+  oc apply -f - <<EOF
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: vault-mirror
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${DS_REGISTRY}/localimages/vault-enterprise
+    source: quay.io/openshifttest/vault-enterprise
+  - mirrors:
+    - ${DS_REGISTRY}/localimages/vault-kube-kms
+    source: ${VAULT_KMS_PLUGIN_ICSP_SOURCE}
+EOF
+
+  echo "Waiting for ICSP to propagate to nodes..."
+  oc wait machineconfigpool/master --for=condition=Updated=True --timeout=10m
+  oc wait machineconfigpool/worker --for=condition=Updated=True --timeout=10m
 }
 
 setup_packet_cluster() {
@@ -43,7 +108,8 @@ setup_packet_cluster() {
     # DS_IP_STACK=v4 (connected), while pods still use IPv6 addresses. The dev-scripts
     # local registry is reachable from all metal nodes regardless of IP stack.
     echo "mirroring Vault to local registry"
-    mirror_vault_image
+    mirror_vault_images
+    apply_vault_icsp
   fi
 }
 
