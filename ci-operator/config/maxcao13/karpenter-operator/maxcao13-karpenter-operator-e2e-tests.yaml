@@ -1,0 +1,56 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: karpenter-operator
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: e2e-operator
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: verify
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: e2e-tests
+  org: maxcao13
+  repo: karpenter-operator
