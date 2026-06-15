@@ -231,6 +231,7 @@ After completing your analysis, you MUST use the Skill tool to invoke ci:payload
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
+export CLAUDE_OUTPUT_LOG="${ARTIFACT_DIR}/claude-output.log"
 timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
@@ -238,7 +239,7 @@ timeout 3600 claude \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
     -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
+    --verbose 2>&1 | tee "${CLAUDE_OUTPUT_LOG}" || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
