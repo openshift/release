@@ -70,13 +70,9 @@ vi clusters/app.ci/ci-chat-bot/chaibot-configmap.yaml
 
 ```bash
 # Create the secret directly
-oc create secret generic ci-chat-bot-chaibot-secrets \
-  --from-literal=openai-api-key="sk-YOUR-ACTUAL-KEY-HERE" \
-  -n ci \
-  --dry-run=client -o yaml | oc apply -f -
-
-# Verify
-oc get secret ci-chat-bot-chaibot-secrets -n ci
+# The secret is managed by secretsync from the vault item.
+# Verify it exists:
+oc get secret cluster-secrets-chaibot-openai-key -n ci
 ```
 
 **Option B: Via ci-secret-bootstrap (for production)**
