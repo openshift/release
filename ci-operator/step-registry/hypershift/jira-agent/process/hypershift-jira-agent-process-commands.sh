@@ -415,7 +415,7 @@ while IFS= read -r line; do
   claude -p "$ISSUE_KEY origin --ci. $FORK_CONTEXT" \
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
-    --max-turns 100 \
+    --max-turns 300 \
     --effort max \
     --model "$CLAUDE_MODEL" \
     --verbose \
@@ -482,7 +482,7 @@ while IFS= read -r line; do
         --plugin-dir "${REVIEW_PLUGIN_DIR}" \
         --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob Task" \
-        --max-turns 75 \
+        --max-turns 225 \
         --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
@@ -567,7 +567,7 @@ IMPORTANT:
         set +e
         claude -p "$FIX_PROMPT" \
           --allowedTools "Bash Read Write Edit Grep Glob" \
-          --max-turns 75 \
+          --max-turns 225 \
           --effort max \
           --model "$CLAUDE_MODEL" \
           --verbose \
@@ -658,7 +658,7 @@ IMPORTANT:
       set +e
       claude -p "$PR_PROMPT" \
         --allowedTools "Bash Read Grep Glob" \
-        --max-turns 30 \
+        --max-turns 90 \
         --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
