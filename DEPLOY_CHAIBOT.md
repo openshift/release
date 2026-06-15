@@ -234,7 +234,7 @@ oc logs -n ci deployment/ci-chat-bot -c bot -f | grep -i "chaibot\|triage"
 oc describe pod -n ci -l app=ci-chat-bot
 
 # Common issues:
-# - Missing secret: ci-chat-bot-chaibot-secrets
+# - Missing secret: cluster-secrets-chaibot-openai-key
 # - Missing configmap: ci-chat-bot-triage-config
 # - Invalid YAML syntax in configmap
 ```
