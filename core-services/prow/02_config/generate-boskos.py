@@ -195,7 +195,7 @@ CONFIG = {
     },
     'azure4-quota-slice': {
         'centralus': 8,
-        'eastus': 12,
+        'eastus': 8,
         'eastus2': 8,
         'northcentralus': 12,
         'southcentralus': 8,
