@@ -243,8 +243,13 @@ load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
-SRC_DIR="${EDGE_TOOLING_DIR}"
+# SRC_DIR="${EDGE_TOOLING_DIR}"
+# PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
+# cd "${SRC_DIR}"
+
+SRC_DIR=/tmp/edge-tooling
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
+git clone https://github.com/ggiguash/edge-tooling.git -b ci-doctor-analyse-workflow "${SRC_DIR}"
 cd "${SRC_DIR}"
 
 # Configure the GitHub token for MicroShift repo operations
