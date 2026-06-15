@@ -1103,85 +1103,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-upgrade-out-of-change,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/evals-eval
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: evals
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-api-master-evals-eval
-    optional: true
-    rerun_command: /test evals-eval
-    run_if_changed: ^(\.claude/skills/api-review/|tests/eval/|tests/Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=eval
-        - --variant=evals
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )evals-eval,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
     annotations:
-      pipeline_run_if_changed: ^(machine/v1beta1/types_vsphereprovider\.go|config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-Default\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-Default\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-Default\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-Default\.crd\.yaml)$
+      pipeline_run_if_changed: ^(config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-Default\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-Default\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-Default\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-Default\.crd\.yaml)$
     branches:
     - ^master$
     - ^master-
@@ -1267,7 +1190,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_run_if_changed: ^(machine/v1beta1/types_vsphereprovider\.go|config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-TechPreviewNoUpgrade\.crd\.yaml)$
+      pipeline_run_if_changed: ^(config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-TechPreviewNoUpgrade\.crd\.yaml)$
     branches:
     - ^master$
     - ^master-
@@ -1350,6 +1273,83 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/evals-eval
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: evals
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-api-master-evals-eval
+    optional: true
+    rerun_command: /test evals-eval
+    run_if_changed: ^(\.claude/skills/api-review/|tests/eval/|tests/Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=eval
+        - --variant=evals
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )evals-eval,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
