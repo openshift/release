@@ -215,10 +215,11 @@ tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print -quit)")
 echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
 
-# Install the must-gather plugin for analyzing must-gather archives
-echo "Installing must-gather plugin..."
+# Install additional plugins
+echo "Installing plugins..."
 claude plugin install must-gather@ai-helpers
-echo "must-gather plugin installed."
+claude plugin install prow-agent@ai-helpers
+echo "Plugins installed."
 
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
