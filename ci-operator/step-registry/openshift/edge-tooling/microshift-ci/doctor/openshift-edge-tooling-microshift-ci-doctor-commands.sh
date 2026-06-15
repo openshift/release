@@ -268,7 +268,7 @@ echo "Automatic closing of duplicate rebase PRs completed"
 # Run analysis on all releases and open rebase PRs (45m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
-timeout 2700 claude \
+timeout 2700 claude-latest \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
