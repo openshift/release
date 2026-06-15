@@ -6,7 +6,7 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
 es_host=$(cat ${CLUSTER_PROFILE_DIR}/elastic_host)
 kubeconfig=$(cat ${CLUSTER_PROFILE_DIR}/kubeconfig)
