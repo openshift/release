@@ -77,6 +77,7 @@ fi
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 
 	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
 	if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
