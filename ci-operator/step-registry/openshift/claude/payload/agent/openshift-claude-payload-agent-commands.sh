@@ -293,6 +293,7 @@ PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 # Validate structured output files, retry up to 3 times if missing/invalid
 VALIDATE_YAML="/opt/ai-helpers/plugins/ci/skills/payload-results-yaml/scripts/validate.py"
 VALIDATE_JSON="/opt/ai-helpers/plugins/ci/skills/payload-autodl-json/scripts/validate.py"
+VALIDATION_FAILED=0
 
 for attempt in 1 2 3; do
     YAML_OK=false
@@ -316,7 +317,8 @@ for attempt in 1 2 3; do
     if [[ "${attempt}" -eq 3 ]]; then
         echo "ERROR: Structured outputs still invalid after 3 attempts."
         PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
-        exit 1
+        VALIDATION_FAILED=1
+        break
     fi
 
     MISSING=""
@@ -460,4 +462,8 @@ _Model: ${CLAUDE_MODEL}_"
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
         curl -sf -X POST -H 'Content-type: application/json' -d @- \
         "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+fi
+
+if [[ "${VALIDATION_FAILED}" -eq 1 ]]; then
+    exit 1
 fi
