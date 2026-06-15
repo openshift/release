@@ -8,7 +8,7 @@ An AI-powered Slack workflow that automatically triages test failures in #opp-di
 
 ## Files Created
 
-```
+```text
 core-services/ci-chat-bot/
 ├── triage-config.yaml          # Main config (ship-help MCP settings)
 └── CHAIBOT.md                  # Quick reference
@@ -93,7 +93,7 @@ oc logs -n ci deployment/ci-chat-bot -c bot --tail=100 | grep -i chaibot
 ### Step 5: Test
 
 Post in #opp-discussion:
-```
+```text
 This job failed: https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
 ```
 
@@ -101,7 +101,7 @@ Chaibot should respond in thread within 30-60 seconds with analysis.
 
 ## Example Output
 
-```
+```text
 Chaibot [BOT]: ✅ Failure Analysis Complete
 
 Job: periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws
