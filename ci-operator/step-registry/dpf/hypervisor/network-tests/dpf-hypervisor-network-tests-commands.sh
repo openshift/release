@@ -100,10 +100,13 @@ else
 fi
 
 
-
 echo "=== Run DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
 # Run kubernetes traffic flow test
-# Need to run cmds or script on hypervisor to discover worker node names after being renamed
+
+# Need to export the doca8 dpu-workers after they are renamed, on hypervisor:
+# export TFT_SERVER_NODE=worker-303ea713ea90
+# export TFT_CLIENT_NODE=worker-303ea713ea94
+
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   ls -ltr; \
   env; \
@@ -111,9 +114,17 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo \${LAST_OPENSHIFT_DPF}; \
   env; \
   cd \${LAST_OPENSHIFT_DPF}; \
-  cat .env; \
-  export TFT_SERVER_NODE=worker-303ea712f414; \
-  export TFT_CLIENT_NODE=worker-303ea712f378; \
+  pwd; \
+  ls -ltra; \
+  set -e;\
+  export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+  oc get nodes; \
+  export TFT_SERVER_NODE=\$(oc get nodes | grep worker-dpu | awk 'NR==1 {print \$1}'); \
+  echo \${TFT_SERVER_NODE} ;\
+  export TFT_CLIENT_NODE=\$(oc get nodes | grep worker-dpu | awk 'NR==2 {print \$1}'); \
+  echo \${TFT_CLIENT_NODE} ; \
+  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+  echo \${LAST_OPENSHIFT_DPF}; \
   make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then
 
   echo "Kubernetes Network Traffic Flow Iperf Tests Passed";
