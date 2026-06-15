@@ -74,6 +74,130 @@ PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PA
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
 
+# Generate autodl JSON deterministically for accepted payloads (no Claude needed).
+# Uses the same schema as rejected-payload autodl but with empty job/candidate fields.
+generate_accepted_autodl() {
+    local phase="${1:-Accepted}"
+    local analyzed_at
+    analyzed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+    local autodl_file="${ARTIFACT_DIR}/payload-analysis-${PAYLOAD_TAG}-autodl.json"
+
+    jq -n \
+        --arg payload_tag "${PAYLOAD_TAG}" \
+        --arg version "${VERSION}" \
+        --arg stream "${STREAM}" \
+        --arg phase "${phase}" \
+        --arg release_controller_url "${PAYLOAD_URL}" \
+        --arg analyzed_at "${analyzed_at}" \
+        --arg total_blocking_jobs "${TOTAL}" \
+        --arg failed_blocking_jobs "${FAILED}" \
+        '{
+            table_name: "payload_triage",
+            schema: {
+                payload_tag: "string",
+                version: "string",
+                stream: "string",
+                architecture: "string",
+                phase: "string",
+                release_controller_url: "string",
+                analyzed_at: "string",
+                rejection_streak: "int64",
+                total_blocking_jobs: "int64",
+                failed_blocking_jobs: "int64",
+                force_accept_recommended: "int64",
+                job_name: "string",
+                prow_url: "string",
+                failure_type: "string",
+                root_cause_summary: "string",
+                streak_length: "int64",
+                is_new_failure: "int64",
+                originating_payload_tag: "string",
+                candidate_pr_url: "string",
+                candidate_title: "string",
+                candidate_repo: "string",
+                candidate_confidence_score: "int64",
+                candidate_rationale: "string",
+                revert_pr_url: "string",
+                revert_pr_status: "string"
+            },
+            rows: [
+                {
+                    payload_tag: $payload_tag,
+                    version: $version,
+                    stream: $stream,
+                    architecture: "amd64",
+                    phase: $phase,
+                    release_controller_url: $release_controller_url,
+                    analyzed_at: $analyzed_at,
+                    rejection_streak: "0",
+                    total_blocking_jobs: $total_blocking_jobs,
+                    failed_blocking_jobs: $failed_blocking_jobs,
+                    force_accept_recommended: "0",
+                    job_name: "",
+                    prow_url: "",
+                    failure_type: "",
+                    root_cause_summary: "",
+                    streak_length: "0",
+                    is_new_failure: "0",
+                    originating_payload_tag: $payload_tag,
+                    candidate_pr_url: "",
+                    candidate_title: "",
+                    candidate_repo: "",
+                    candidate_confidence_score: "0",
+                    candidate_rationale: "",
+                    revert_pr_url: "",
+                    revert_pr_status: ""
+                }
+            ]
+        }' > "${autodl_file}"
+
+    echo "Generated autodl JSON: ${autodl_file}"
+}
+
+# Generate a zero-cost session metrics autodl for accepted payloads (no Claude invocation).
+generate_accepted_session_metrics() {
+    local analyzed_at
+    analyzed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    local metrics_file="${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
+
+    jq -n --arg analyzed_at "${analyzed_at}" '{
+        table_name: "claude_session_metrics",
+        schema: {
+            session_id: "string", model: "string", claude_code_version: "string",
+            permission_mode: "string", entrypoint: "string", prompt: "string",
+            plugins_loaded: "string", analyzed_at: "string",
+            duration_ms: "int64", duration_api_ms: "int64", ttft_ms: "int64",
+            num_turns: "int64", total_cost_usd: "float64",
+            input_tokens: "int64", output_tokens: "int64",
+            cache_read_input_tokens: "int64", cache_creation_input_tokens: "int64",
+            cache_hit_rate_pct: "float64", total_tool_calls: "int64",
+            tool_call_breakdown: "string", skills_invoked: "string",
+            files_written: "int64", num_thinking_blocks: "int64",
+            num_subagents: "int64", subagent_total_tool_uses: "int64",
+            subagent_total_duration_ms: "int64", is_error: "int64",
+            terminal_reason: "string", stop_reason: "string"
+        },
+        schema_mapping: null, rows: [{
+            session_id: "", model: "", claude_code_version: "",
+            permission_mode: "", entrypoint: "", prompt: "",
+            plugins_loaded: "", analyzed_at: $analyzed_at,
+            duration_ms: "0", duration_api_ms: "0", ttft_ms: "0",
+            num_turns: "0", total_cost_usd: "0.000000",
+            input_tokens: "0", output_tokens: "0",
+            cache_read_input_tokens: "0", cache_creation_input_tokens: "0",
+            cache_hit_rate_pct: "0.0", total_tool_calls: "0",
+            tool_call_breakdown: "{}", skills_invoked: "",
+            files_written: "0", num_thinking_blocks: "0",
+            num_subagents: "0", subagent_total_tool_uses: "0",
+            subagent_total_duration_ms: "0", is_error: "0",
+            terminal_reason: "accepted", stop_reason: ""
+        }], chunk_size: 0, expiration_days: 0, partition_column: ""
+    }' > "${metrics_file}"
+
+    echo "Generated session metrics: ${metrics_file}"
+}
+
 # Poll until blocking jobs finish OR the payload reaches a terminal state.
 # The release controller can report jobs as Pending even after they complete
 # in Prow, so also check the payload phase as a fallback. The phase can be
@@ -148,6 +272,8 @@ _Model: ${CLAUDE_MODEL}_"
                     "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
             fi
 
+            generate_accepted_autodl "Accepted"
+            generate_accepted_session_metrics
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
@@ -166,6 +292,8 @@ _Model: ${CLAUDE_MODEL}_"
                 break
             elif [[ "${PHASE}" == "Accepted" ]]; then
                 echo "Payload was accepted. No analysis needed."
+                generate_accepted_autodl "Accepted"
+                generate_accepted_session_metrics
                 exit 0
             fi
         fi
