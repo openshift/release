@@ -1,4 +1,8 @@
 base_images:
+  aws-efs-csi-operator-create-efs:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -146,6 +150,43 @@ tests:
     - ref: odf-prepare-cluster
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-apply-storage-cluster
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-sbr-aws-efs
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      ECO_TEST_FEATURES: sbr-operator
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+    post:
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - chain: ipi-aws-post
+    test:
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: storage-create-csi-aws-efs-sts-operator-role
+    - ref: storage-subscribe-aws-efs-csi-driver
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
     - as: e2e-test
       cli: latest
       commands: make run-tests
