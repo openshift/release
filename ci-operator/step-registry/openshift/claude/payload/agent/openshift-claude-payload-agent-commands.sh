@@ -189,6 +189,12 @@ copy_reports() {
         find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
+    # Extract session metrics (cost, tokens, duration) for BigQuery
+    EXTRACT_METRICS=$(find ~/.claude/plugins -type f -path "*/prow-agent/scripts/extract_metrics.py" 2>/dev/null | head -1)
+    if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
+        python3 "${EXTRACT_METRICS}" "${CLAUDE_OUTPUT_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" || echo "Warning: Failed to extract session metrics."
+    fi
+
     # Archive the full Claude session directory (including subagent logs) for session continuation.
     CLAUDE_HOME="/home/claude/.claude"
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
