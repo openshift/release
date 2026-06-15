@@ -118,5 +118,5 @@ fi
 
 NO_COLOR=1 node_modules/.bin/cypress run -b electron --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='smoke',grepFilterSpecs=true || true
 
-echo "DEBUG: Sleeping 6 hours for cluster inspection..."
-sleep 6h
+echo "DEBUG: Sleeping 7 hours for cluster inspection..."
+sleep 7h
