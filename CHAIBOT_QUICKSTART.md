@@ -59,7 +59,7 @@ Edit `clusters/app.ci/ci-chat-bot/ci-chat-bot.yaml` and add:
     name: ci-chat-bot-triage-config
 - name: chaibot-secrets
   secret:
-    secretName: ci-chat-bot-chaibot-secrets
+    secretName: cluster-secrets-chaibot-openai-key
 
 # Add to spec.template.spec.containers[name=bot].volumeMounts:
 - name: triage-config
