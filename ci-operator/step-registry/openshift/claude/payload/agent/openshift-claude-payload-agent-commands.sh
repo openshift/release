@@ -215,11 +215,43 @@ tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print -quit)")
 echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
 
+# Use a temporary config dir so we install plugins from the test fork
+export CLAUDE_CONFIG_DIR=$(mktemp -d)
+
 # Install additional plugins
 echo "Installing plugins..."
+claude plugin marketplace add not-stbenjam/ai-helpers
 claude plugin install must-gather@ai-helpers
 claude plugin install prow-agent@ai-helpers
 echo "Plugins installed."
+
+# Locate prow-agent plugin scripts
+PROW_AGENT_DIR=$(dirname "$(find "${CLAUDE_CONFIG_DIR}" -type d -path "*/prow-agent/scripts" 2>/dev/null | head -1)")
+if [[ ! -d "${PROW_AGENT_DIR}/scripts" ]]; then
+    echo "ERROR: prow-agent plugin not found in ${CLAUDE_CONFIG_DIR}"
+    exit 1
+fi
+OTEL_COLLECTOR="${PROW_AGENT_DIR}/scripts/otel_collector.py"
+EXTRACT_METRICS="${PROW_AGENT_DIR}/scripts/extract_metrics.py"
+
+# Start OTEL collector for Claude Code telemetry
+OTEL_PORT_FILE=$(mktemp)
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+python3 "${OTEL_COLLECTOR}" \
+    --port-file "${OTEL_PORT_FILE}" \
+    --log-file "${OTEL_LOG}" &
+COLLECTOR_PID=$!
+while [ ! -s "${OTEL_PORT_FILE}" ]; do sleep 0.1; done
+OTEL_PORT=$(cat "${OTEL_PORT_FILE}")
+echo "OTEL collector started on port ${OTEL_PORT} (PID ${COLLECTOR_PID})"
+
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:${OTEL_PORT}"
+export OTEL_METRIC_EXPORT_INTERVAL=10000
 
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
@@ -350,13 +382,20 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
+# Stop OTEL collector
+kill ${COLLECTOR_PID} 2>/dev/null; wait ${COLLECTOR_PID} 2>/dev/null || true
+echo "OTEL collector stopped."
+
 # Extract session metrics (cost, tokens, duration) for BigQuery
 METRICS_CASE=""
 METRICS_TEST_COUNT=0
-EXTRACT_METRICS=$(find ~/.claude/plugins -type f -path "*/prow-agent/scripts/extract_metrics.py" 2>/dev/null | head -1)
-if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
+if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
     METRICS_TEST_COUNT=1
-    if python3 "${EXTRACT_METRICS}" "${CLAUDE_OUTPUT_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json"; then
+    METRICS_ARGS=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
+    if [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
+        METRICS_ARGS+=("--stream-log" "${CLAUDE_OUTPUT_LOG}")
+    fi
+    if python3 "${EXTRACT_METRICS}" "${METRICS_ARGS[@]}"; then
         METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
     else
         FAILURE_COUNT=$((FAILURE_COUNT + 1))
