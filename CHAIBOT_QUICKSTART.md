@@ -224,4 +224,4 @@ oc rollout restart deployment/ci-chat-bot -n ci
 ⚠️ This implementation requires code in openshift/ci-tools (pkg/chaibot, cmd/ci-chat-bot).  
 The config is ready, but the bot logic needs the Go code provided in this PR.
 
-See `analyzer.go` and `main-integration.go` for implementation details.
+See `pkg/chaibot/analyzer.go` and `cmd/ci-chat-bot/main.go` for implementation details.
