@@ -20,9 +20,8 @@ images:
     to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.17"
 resources:
   '*':
@@ -43,10 +42,12 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
-    cluster_profile: azure-observability
+    cluster_profile: gcp-observability
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1155558
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -58,12 +59,15 @@ tests:
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/oidcauthextension
         tests/e2e-openshift/export-to-cluster-logging-lokistack tests/e2e-otel/google*
-        tests/e2e/smoke-ports
+        tests/e2e/smoke-ports tests/e2e-instrumentation/instrumentation-go
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-stage
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
