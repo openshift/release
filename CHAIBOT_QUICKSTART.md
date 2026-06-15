@@ -185,7 +185,7 @@ oc get configmap ci-chat-bot-triage-config -n ci -o yaml
 **API errors?**
 ```bash
 # Check secret exists
-oc get secret ci-chat-bot-chaibot-secrets -n ci
+oc get secret cluster-secrets-chaibot-openai-key -n ci
 
 # View metrics for errors
 curl http://ci-chat-bot.ci.svc:9090/metrics | grep chaibot_api_errors
