@@ -10,6 +10,9 @@ ref:
       memory: 256Mi
   timeout: 8h
   env:
+  - name: GINKGO_FOCUS_FILTER
+    default: ""
+    documentation: Ginkgo focus filter expression for test selection to be passed as string match to --focus ginkgo arg (e.g. --focus=Sanity).
   - name: GINKGO_LABEL_FILTER
     default: ""
     documentation: Ginkgo label filter expression for test selection (e.g. "smoke && !slow").
@@ -18,6 +21,15 @@ ref:
     documentation: |-
       Regex to filter tests by source file path. When set, only tests defined
       in matching files will run. Typically computed from PR changed files.
+  - name: GINKGO_SKIP_FILTER
+    default: "88334|63839|88455"
+    documentation: |-
+      String to match against test descriptions for exclusion, passed as --skip ginkgo arg.
+      Use | to skip multiple tests (e.g. "TestFoo|TestBar|flaky").
+      Known bugs:
+      88334 - bug https://redhat.atlassian.net/browse/NETOBSERV-2839
+      63839 - multitenancy test fails for missing htpasswd from the image
+      88455 - TLS tracking test timing out.
   - name: GINKGO_TIMEOUT
     default: "8h"
     documentation: Timeout for the full ginkgo test suite execution.
@@ -27,6 +39,11 @@ ref:
       Controls test execution behavior. "premerge" skips execution when no
       test files changed (for PR pre-merge jobs). "periodic" always runs
       all tests regardless of changed files (for periodic/nightly jobs).
+  - name: MULTISTAGE_PARAM_OVERRIDE_NETOBSERV_CS_IMAGE
+    default: ""
+    documentation: |-
+      Override the Network Observability CatalogSource image used by Cypress tests.
+      Useful for z-stream testing against a specific catalog image.
   documentation: |-
     Runs pre-compiled netobserv backend e2e tests using ginkgo from the
     e2etests image. Supports selective test execution via label filters or
