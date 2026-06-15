@@ -7,6 +7,10 @@ base_images:
     name: "4.12"
     namespace: origin
     tag: operator-sdk
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -32,9 +36,8 @@ operator:
     with: pipeline:tempo-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.12"
 resources:
   '*':
@@ -42,16 +45,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: security-sast-tempo
-  steps:
-    env:
-      PROJECT_NAME: tempo-operator
-    workflow: openshift-ci-security
 - as: tempo-upstream-tests
   steps:
     cluster_profile: gcp-observability
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -60,6 +58,9 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       SKIP_TESTS: tests/e2e-openshift-object-stores/*
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     test:
     - as: install
       cli: latest
