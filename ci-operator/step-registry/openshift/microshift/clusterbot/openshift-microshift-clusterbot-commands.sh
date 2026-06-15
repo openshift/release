@@ -23,6 +23,8 @@ allowed_os=(
 	"rhel-9.3"
 	"rhel-9.4"
 	"rhel-9.6"
+	"rhel-9.8"
+	"rhel-10.2"
 )
 
 # shellcheck disable=SC2153  # possible misspelling
