@@ -13,6 +13,7 @@ EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -f /tmp/aws_cred_output' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 REGION="${LEASED_RESOURCE}"
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
