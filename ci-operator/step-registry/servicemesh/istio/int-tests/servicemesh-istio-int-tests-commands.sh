@@ -119,6 +119,8 @@ clean_test_run() {
     oc delete ztunnel --all -n ztunnel --wait=true --timeout=120s
     oc delete istio --all -n istio-system --wait=true --timeout=120s
     oc delete namespace istio-system istio-cni ztunnel
+
+    rm -rf sail-operator
   else
     curl -sL https://istio.io/downloadIstioctl | sh -
     export PATH=$HOME/.istioctl/bin:$PATH
