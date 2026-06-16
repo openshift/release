@@ -38,7 +38,7 @@ cp "/tmp/kubeconfig" "${SHARED_DIR}/kubeconfig"
 cp "/tmp/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
 
 export KUBECONFIG=/tmp/kubeconfig
-wait_time=2.5h
+wait_time=3h
 if [ "${VENDOR:-dell}" = "hpe" ]; then
   wait_time=1h
 fi
