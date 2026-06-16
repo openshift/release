@@ -19,7 +19,7 @@ echo "Using subscription name='${CUSTOMER_SUBSCRIPTION}'"
 cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
 
 # Add FPA credentials if available (needed for SAL deletion in no-rp mode)
-FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-id"
+FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/first-party-app-client-id"
 FPA_CERT_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-value"
 
 if [ -s "${FPA_CLIENT_ID_FILE}" ] && [ -s "${FPA_CERT_FILE}" ]; then
