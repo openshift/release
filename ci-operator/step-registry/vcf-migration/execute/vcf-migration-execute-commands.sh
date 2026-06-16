@@ -88,19 +88,57 @@ if [[ -z "${infra_id}" ]]; then
   exit 1
 fi
 
-# Extract templates from target failure domains provided by VCM lease
+if [[ ! -f "${SHARED_DIR}/ova_url.txt" ]]; then
+  log "ova_url.txt not found in ${SHARED_DIR}"
+  exit 1
+fi
+
+ova_url="$(<"${SHARED_DIR}/ova_url.txt")"
+vm_template="${ova_url##*/}"
+log "using RHCOS OVA template: ${vm_template}"
+
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc_target.sh"
+
+# Import RHCOS OVA template into each target datacenter if not present
 declare -A templates_by_datacenter
 while IFS= read -r fd; do
   datacenter="$(jq -r '.topology.datacenter' <<< "${fd}")"
-  template="$(jq -r '.topology.template' <<< "${fd}")"
+  datastore="$(jq -r '.topology.datastore' <<< "${fd}")"
+  cluster="$(jq -r '.topology.computeCluster' <<< "${fd}")"
+  network="$(jq -r '.topology.networks[0]' <<< "${fd}")"
 
-  if [[ -z "${template}" || "${template}" == "null" ]]; then
-    log "target failure domain for datacenter ${datacenter} has no template defined"
-    exit 1
+  log "checking for template ${vm_template} in datacenter ${datacenter}"
+
+  export GOVC_DATACENTER="${datacenter}"
+  export GOVC_DATASTORE="${datastore}"
+  export GOVC_RESOURCE_POOL="${cluster}/Resources"
+
+  if [[ "$(govc vm.info "${vm_template}" 2>/dev/null | wc -c)" -eq 0 ]]; then
+    log "importing OVA ${ova_url} into datacenter ${datacenter}"
+
+    cat > /tmp/rhcos-import-${datacenter}.json <<EOF
+{
+  "DiskProvisioning": "thin",
+  "MarkAsTemplate": false,
+  "PowerOn": false,
+  "InjectOvfEnv": false,
+  "WaitForIP": false,
+  "Name": "${vm_template}",
+  "NetworkMapping": [{"Name": "VM Network", "Network": "${network}"}]
+}
+EOF
+
+    curl -sL -o /tmp/rhcos.ova "${ova_url}"
+    govc import.ova -options="/tmp/rhcos-import-${datacenter}.json" /tmp/rhcos.ova
+    rm -f /tmp/rhcos.ova
+  else
+    log "template ${vm_template} already exists in datacenter ${datacenter}"
   fi
 
-  templates_by_datacenter["${datacenter}"]="${template}"
-  log "target datacenter ${datacenter} will use template ${template}"
+  template_path="/${datacenter}/vm/${vm_template}"
+  templates_by_datacenter["${datacenter}"]="${template_path}"
+  log "target datacenter ${datacenter} will use template ${template_path}"
 done < <(jq -c '.[]' "${SHARED_DIR}/vcf-migration-target-fds.json")
 
 rendered_fds="${ARTIFACT_DIR}/vcf-migration-target-fds.rendered.json"
