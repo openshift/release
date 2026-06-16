@@ -1,6 +1,8 @@
 workflow:
   as: cucushift-agent-vsphere-install-day2-add-nodes
   steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     pre:
       - ref: ipi-install-rbac
       - ref: ipi-conf
@@ -13,10 +15,10 @@ workflow:
       - ref: cucushift-agent-vsphere-provision
       - ref: cucushift-agent-vsphere-day2-add-nodes
     post:
-      - ref: cucushift-agent-gather
-      - ref: ipi-deprovision-vsphere-dns
-      - ref: cucushift-agent-vsphere-deprovision
-      - ref: ipi-deprovision-vsphere-lease
+      - chain: gather
+        optional_on_success: true
+      - chain: cucushift-agent-vsphere-dualstack-deprovision
+        best_effort: true
   documentation: |-
     The ABI workflow provides pre- and post-steps that provision, deprovision, and perform day-2 operations, such as
     adding nodes to an OpenShift cluster with a default configuration on vSphere, allowing job authors to inject their
