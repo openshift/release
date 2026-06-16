@@ -304,8 +304,8 @@ bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
-openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
-openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
+openshift_install_tarball = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
+openshift_client_tarball  = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
 release_image_override    = "${TARGET_VERSION}"
 
 use_zone_info_for_names    = true
