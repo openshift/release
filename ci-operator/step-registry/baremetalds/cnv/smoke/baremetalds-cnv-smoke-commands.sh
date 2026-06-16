@@ -7,6 +7,9 @@ set -o pipefail
 CNV_STORAGE_CLASS="${CNV_STORAGE_CLASS:-lvms-vg1}"
 CNV_VOLUME_MODE="${CNV_VOLUME_MODE:-Block}"
 
+export UV_CACHE_DIR=/tmp/uv-cache
+export HOME=/tmp
+
 echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}, volume mode: ${CNV_VOLUME_MODE}"
 
 oc whoami --show-console
@@ -18,7 +21,7 @@ uv run pytest tests \
   -o log_cli=true \
   -o cache_dir=/tmp/cache-pytest \
   -m 'smoke and not rwx_default_storage' \
-  --tc-file=tests/global_config.py \
+  --tc-file=tests/global_config_lvms.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
   --storage-class-matrix="${CNV_STORAGE_CLASS}" \
