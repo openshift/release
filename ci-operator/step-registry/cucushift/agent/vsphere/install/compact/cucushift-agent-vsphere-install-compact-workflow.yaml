@@ -1,6 +1,8 @@
 workflow:
   as: cucushift-agent-vsphere-install-compact
   steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     env:
       MASTERS: "3"
       WORKERS: "0"
@@ -17,10 +19,10 @@ workflow:
       - ref: cucushift-agent-vsphere-postinstall
       - ref: ipi-install-vsphere-registry
     post:
-      - ref: cucushift-agent-gather
-      - ref: ipi-deprovision-vsphere-dns
-      - ref: cucushift-agent-vsphere-deprovision
-      - ref: ipi-deprovision-vsphere-lease
+      - chain: gather
+        optional_on_success: true
+      - chain: cucushift-agent-vsphere-dualstack-deprovision
+        best_effort: true
   documentation: |-
     The ABI workflow provides pre- and post- steps that provision and deprovision an OpenShift cluster
     with a default configuration on vSphere, allowing job authors to inject their own end-to-end test logic.
