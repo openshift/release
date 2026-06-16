@@ -128,7 +128,9 @@ for mcp in $MCPS; do
       FAILURES="${FAILURES}\nCould not retrieve machine-config-daemon-firstboot.service logs from node $node (MCP: $mcp)"
     else
       # Check if the rebase message appears in the logs
-      if echo "$LOGS" | grep -qF "$SEARCH_STRING"; then
+      # Use here-string (<<<) instead of echo|grep to avoid SIGPIPE with pipefail
+      # when grep -q exits early on large output
+      if grep -qF "$SEARCH_STRING" <<< "$LOGS"; then
         echo "    ✓ Found '$SEARCH_STRING' in logs"
         CHECKS_PASSED=$((CHECKS_PASSED + 1))
       else
@@ -153,7 +155,7 @@ for mcp in $MCPS; do
       FAILURES="${FAILURES}\nCould not retrieve rpm-ostree status from node $node (MCP: $mcp)"
     else
       # Check if the rendered repository appears in rpm-ostree status
-      if echo "$OSTREE_STATUS" | grep -q "$RENDERED_REPOSITORY"; then
+      if grep -q "$RENDERED_REPOSITORY" <<< "$OSTREE_STATUS"; then
         echo "    ✓ Node is using image from $RENDERED_REPOSITORY"
         CHECKS_PASSED=$((CHECKS_PASSED + 1))
       else
@@ -205,7 +207,7 @@ for mcp in $ALL_MCPS; do
       echo "    WARNING: Could not retrieve logs from $node"
     else
       # Check that the rebase message does NOT appear in the logs
-      if echo "$LOGS" | grep -qF "$SEARCH_STRING"; then
+      if grep -qF "$SEARCH_STRING" <<< "$LOGS"; then
         echo "    ✗ Found '$SEARCH_STRING' in logs (should not be present)"
         echo "    DEBUG: Printing machine-config-daemon-firstboot.service logs from node $node:"
         echo "    =================================================="
@@ -229,7 +231,7 @@ for mcp in $ALL_MCPS; do
       echo "    WARNING: Could not retrieve rpm-ostree status from $node"
     else
       # Check that the rendered repository does NOT appear in rpm-ostree status
-      if echo "$OSTREE_STATUS" | grep -q "$RENDERED_REPOSITORY"; then
+      if grep -q "$RENDERED_REPOSITORY" <<< "$OSTREE_STATUS"; then
         echo "    ✗ Node is using image from $RENDERED_REPOSITORY (should not be present)"
         echo "    DEBUG: Printing rpm-ostree status from node $node:"
         echo "    =================================================="
