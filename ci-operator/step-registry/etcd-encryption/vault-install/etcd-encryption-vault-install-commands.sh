@@ -3,21 +3,70 @@ set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-mirror_vault_images() {
-  if [[ -z "${VAULT_KMS_PLUGIN_VERSION:-}" ]]; then
-    echo "Error: VAULT_KMS_PLUGIN_VERSION is required"
+resolve_image_repo() {
+  local image="$1"
+  if [[ "${image}" == *@* ]]; then
+    echo "${image%%@*}"
+  else
+    echo "${image%:*}"
+  fi
+}
+
+resolve_image_tag() {
+  local image="$1"
+  if [[ "${image}" == *@* ]]; then
+    echo "${image##*@}"
+  else
+    echo "${image##*:}"
+  fi
+}
+
+resolve_image_mirror_destination() {
+  local local_repo="$1"
+  local image="$2"
+  if [[ "${image}" == *@* ]]; then
+    # oc image mirror requires a tag on DST or a blank tag to push by digest only.
+    echo "${local_repo}"
+  else
+    echo "${local_repo}:$(resolve_image_tag "${image}")"
+  fi
+}
+
+record_vault_images() {
+  if [[ -z "${VAULT_ENTERPRISE_IMAGE:-}" ]]; then
+    echo "Error: VAULT_ENTERPRISE_IMAGE is required"
     exit 1
   fi
-  if [[ -z "${VAULT_KMS_PLUGIN_IMAGE_SOURCE:-}" ]]; then
-    echo "Error: VAULT_KMS_PLUGIN_IMAGE_SOURCE is required"
+  if [[ -z "${VAULT_KMS_PLUGIN_IMAGE:-}" ]]; then
+    echo "Error: VAULT_KMS_PLUGIN_IMAGE is required"
     exit 1
   fi
 
-  local vault_enterprise_src="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
-  local vault_enterprise_dst="${DS_REGISTRY}/localimages/vault-enterprise:${VAULT_VERSION}"
-  local vault_kms_plugin_version="${VAULT_KMS_PLUGIN_VERSION}"
-  local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE_SOURCE}"
-  local vault_kms_dst="${DS_REGISTRY}/localimages/vault-kube-kms:${vault_kms_plugin_version}"
+  VAULT_IMAGE_REPOSITORY="$(resolve_image_repo "${VAULT_ENTERPRISE_IMAGE}")"
+  VAULT_VERSION="$(resolve_image_tag "${VAULT_ENTERPRISE_IMAGE}")"
+  export VAULT_IMAGE_REPOSITORY VAULT_VERSION
+
+  echo "Vault Enterprise image: ${VAULT_ENTERPRISE_IMAGE}"
+  echo "  Helm repository: ${VAULT_IMAGE_REPOSITORY}"
+  echo "  Helm tag: ${VAULT_VERSION}"
+  echo "  ICSP source: $(resolve_image_repo "${VAULT_ENTERPRISE_IMAGE}")"
+  echo "${VAULT_ENTERPRISE_IMAGE}" > "${SHARED_DIR}/vault-enterprise-image"
+
+  echo "Vault KMS plugin image: ${VAULT_KMS_PLUGIN_IMAGE}"
+  echo "  ICSP source: $(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE}")"
+  if [[ "${VAULT_KMS_PLUGIN_IMAGE}" == *@* ]]; then
+    echo "  local mirror: push by digest to localimages/vault-kube-kms"
+  fi
+  echo "${VAULT_KMS_PLUGIN_IMAGE}" > "${SHARED_DIR}/vault-kms-plugin-image"
+}
+
+mirror_vault_images() {
+  local vault_enterprise_src="${VAULT_ENTERPRISE_IMAGE}"
+  local vault_enterprise_dst
+  local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE}"
+  local vault_kms_dst
+  vault_enterprise_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-enterprise" "${VAULT_ENTERPRISE_IMAGE}")"
+  vault_kms_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-kube-kms" "${VAULT_KMS_PLUGIN_IMAGE}")"
 
   echo "Mirroring vault images to local registry..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
@@ -57,14 +106,15 @@ fi
 EOF
 
   VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
+  export VAULT_IMAGE_REPOSITORY
   echo "Using mirrored Vault image repository: ${VAULT_IMAGE_REPOSITORY}"
 }
 
 apply_vault_icsp() {
-  if [[ -z "${VAULT_KMS_PLUGIN_ICSP_SOURCE:-}" ]]; then
-    echo "Error: VAULT_KMS_PLUGIN_ICSP_SOURCE is required"
-    exit 1
-  fi
+  local vault_enterprise_icsp_source
+  local vault_kms_icsp_source
+  vault_enterprise_icsp_source="$(resolve_image_repo "${VAULT_ENTERPRISE_IMAGE}")"
+  vault_kms_icsp_source="$(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE}")"
 
   echo "Applying ImageContentSourcePolicy for vault images..."
   oc apply -f - <<EOF
@@ -76,10 +126,10 @@ spec:
   repositoryDigestMirrors:
   - mirrors:
     - ${DS_REGISTRY}/localimages/vault-enterprise
-    source: quay.io/openshifttest/vault-enterprise
+    source: ${vault_enterprise_icsp_source}
   - mirrors:
     - ${DS_REGISTRY}/localimages/vault-kube-kms
-    source: ${VAULT_KMS_PLUGIN_ICSP_SOURCE}
+    source: ${vault_kms_icsp_source}
 EOF
 
   echo "Waiting for ICSP to propagate to nodes..."
@@ -147,14 +197,14 @@ install_vault() {
   echo "========================================="
   echo "Vault Enterprise Installation via Helm"
   echo "========================================="
-  echo "Version: ${VAULT_VERSION}"
+  echo "Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "Namespace: ${namespace}"
   echo ""
 
   local vault_api_addr="https://${release_name}.${namespace}.svc:8200"
 
   # Install Vault via Helm with dev mode and TLS enabled
-  echo "Installing Vault Enterprise v${VAULT_VERSION} in dev mode with TLS..."
+  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} in dev mode with TLS..."
   helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
     --namespace "${namespace}" \
     --version "${VAULT_CHART_VERSION}" \
@@ -208,7 +258,7 @@ install_vault() {
   echo ""
   echo "Summary:"
   echo "  - Namespace: ${namespace}"
-  echo "  - Version: ${VAULT_VERSION}"
+  echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "  - Service: https://${release_name}.${namespace}.svc:8200"
   echo "  - Pod: ${pod_name} (Ready)"
   echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
@@ -240,6 +290,8 @@ else
 fi
 
 echo ""
+
+record_vault_images
 
 setup_vault_namespace "${VAULT_NAMESPACE}" "vault"
 setup_vault_namespace "${VAULT_SECONDARY_NAMESPACE}" "vault-secondary"
