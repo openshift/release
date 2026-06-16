@@ -13,7 +13,7 @@ oc whoami --show-console
 
 START_TIME=$(date "+%s")
 
-poetry run pytest tests \
+pytest tests \
   -s \
   -o log_cli=true \
   -o cache_dir=/tmp/cache-pytest \
