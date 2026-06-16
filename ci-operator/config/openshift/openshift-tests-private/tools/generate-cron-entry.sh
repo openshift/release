@@ -52,12 +52,12 @@ let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
 
-if [[ "${TEST_NAME}" =~ baremetal- ]] ; then
-	# Raleigh working hours, 8~17 (in UTC, 13~22)
-	WK_HOUR_BEGIN=13
-	WK_HOUR_END=22
-	if [[ $HOUR -lt $WK_HOUR_BEGIN ]] || [[ $HOUR -ge $WK_HOUR_END ]] ; then
-		let HOUR=HOUR%$((WK_HOUR_END-WK_HOUR_BEGIN))+WK_HOUR_BEGIN
+if [[ "${TEST_NAME}" =~ ^metal- ]] ; then
+	# Restrict to overnight hours: 15:00 UTC to 06:00 UTC next morning
+	# Allowed hours: 15-23, 0-6
+	# Disallowed hours: 7-14
+	if [[ $HOUR -ge 7 ]] && [[ $HOUR -le 14 ]] ; then
+		let HOUR=HOUR%8+15
 	fi
 fi
 
