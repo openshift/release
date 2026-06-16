@@ -14,6 +14,7 @@ az login --service-principal \
   -p "${AZURE_CLIENT_SECRET}" \
   --tenant "${AZURE_TENANT_ID}" \
   --output none
+az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
 RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
 echo "Deleting resource group ${RESOURCEGROUP}"
