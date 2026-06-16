@@ -39,10 +39,11 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'on_exit' EXIT TERM
 
 export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
+export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
   echo "Setting AWS credential with minimal permision for installer"
   export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
-elif [[ -z "${AWS_CONFIG_FILE:-}" ]]; then
+else
   export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
 fi
 
