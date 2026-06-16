@@ -10,6 +10,15 @@ CNV_VOLUME_MODE="${CNV_VOLUME_MODE:-Block}"
 export UV_CACHE_DIR=/tmp/uv-cache
 export HOME=/tmp
 
+unset KUBERNETES_SERVICE_PORT_HTTPS
+unset KUBERNETES_SERVICE_PORT
+unset KUBERNETES_PORT_443_TCP
+unset KUBERNETES_PORT_443_TCP_PROTO
+unset KUBERNETES_PORT_443_TCP_ADDR
+unset KUBERNETES_SERVICE_HOST
+unset KUBERNETES_PORT
+unset KUBERNETES_PORT_443_TCP_PORT
+
 echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}, volume mode: ${CNV_VOLUME_MODE}"
 
 oc whoami --show-console
