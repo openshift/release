@@ -34,7 +34,7 @@ log "deploying operator image ${VCF_MIGRATION_OPERATOR_IMAGE}"
 make deploy IMG="${VCF_MIGRATION_OPERATOR_IMAGE}"
 
 log "waiting for controller deployment availability"
-oc wait --for=condition=Available=True \
+kubectl wait --for=condition=Available=True \
   --timeout=10m \
   deployment/vcf-migration-operator-controller-manager \
   -n openshift-vcf-migration
