@@ -18,6 +18,25 @@ echo "Using subscription name='${CUSTOMER_SUBSCRIPTION}'"
 
 cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
 
+# Add FPA credentials if available (needed for SAL deletion in no-rp mode)
+FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/first-party-app-client-id"
+FPA_CERT_FILE="${CLUSTER_PROFILE_DIR}/fpa-cert2-value"
+
+if [ -s "${FPA_CLIENT_ID_FILE}" ] && [ -s "${FPA_CERT_FILE}" ]; then
+  FPA_CLIENT_ID=$(cat "${FPA_CLIENT_ID_FILE}")
+
+  # Convert base64-encoded PFX to PEM format (Azure KV stores certs as base64-encoded PFX)
+  FPA_CERT_PFX="/tmp/fpa-cert.pfx"
+  FPA_CERT_PEM="/tmp/fpa-cert.pem"
+  base64 -d "${FPA_CERT_FILE}" > "${FPA_CERT_PFX}"
+  openssl pkcs12 -in "${FPA_CERT_PFX}" -out "${FPA_CERT_PEM}" -nodes -passin pass:
+
+  cmd="${cmd} --fpa-client-id ${FPA_CLIENT_ID} --fpa-cert-path ${FPA_CERT_PEM}"
+  echo "FPA credentials found - SAL deletion enabled"
+else
+  echo "FPA credentials not found - SAL deletion disabled"
+fi
+
 if [ -n "${CLEANUP_MODE}" ]; then
   cmd="${cmd} --mode ${CLEANUP_MODE}"
 fi
@@ -30,5 +49,4 @@ if [ -n "${EXCLUDE_LOCATION}" ]; then
   cmd="${cmd} --exclude-location ${EXCLUDE_LOCATION}"
 fi
 
-echo "Running: ${cmd}"
 eval "${cmd}"
