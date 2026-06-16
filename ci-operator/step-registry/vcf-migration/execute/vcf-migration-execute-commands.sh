@@ -88,29 +88,20 @@ if [[ -z "${infra_id}" ]]; then
   exit 1
 fi
 
-source_template="$(oc -n openshift-machine-api get machinesets.machine.openshift.io -o json | jq -r '.items[] | .spec.template.spec.providerSpec.value.template // empty' | sed '/^$/d' | sed -n '1p')"
-if [[ -z "${source_template}" ]]; then
-  log "failed to determine the source template from MachineSets"
-  exit 1
-fi
-
-source_template_name="$(basename "${source_template}")"
-log "discovered source template basename ${source_template_name}"
-
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc_target.sh"
-
+# Extract templates from target failure domains provided by VCM lease
 declare -A templates_by_datacenter
-mapfile -t target_datacenters < <(jq -r '.[].topology.datacenter' "${SHARED_DIR}/vcf-migration-target-fds.json" | sort -u)
-for datacenter in "${target_datacenters[@]}"; do
-  discovered_template="$(govc find "/${datacenter}/vm" -type m -name "${source_template_name}" | sed -n '1p')"
-  if [[ -z "${discovered_template}" ]]; then
-    log "failed to discover template ${source_template_name} in target datacenter ${datacenter}"
+while IFS= read -r fd; do
+  datacenter="$(jq -r '.topology.datacenter' <<< "${fd}")"
+  template="$(jq -r '.topology.template' <<< "${fd}")"
+
+  if [[ -z "${template}" || "${template}" == "null" ]]; then
+    log "target failure domain for datacenter ${datacenter} has no template defined"
     exit 1
   fi
-  templates_by_datacenter["${datacenter}"]="${discovered_template}"
-  log "target datacenter ${datacenter} will use template ${discovered_template}"
-done
+
+  templates_by_datacenter["${datacenter}"]="${template}"
+  log "target datacenter ${datacenter} will use template ${template}"
+done < <(jq -c '.[]' "${SHARED_DIR}/vcf-migration-target-fds.json")
 
 rendered_fds="${ARTIFACT_DIR}/vcf-migration-target-fds.rendered.json"
 cp "${SHARED_DIR}/vcf-migration-target-fds.json" "${rendered_fds}"
