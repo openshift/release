@@ -88,14 +88,17 @@ if [[ -z "${infra_id}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${SHARED_DIR}/ova_url.txt" ]]; then
-  log "ova_url.txt not found in ${SHARED_DIR}"
+log "determining RHCOS OVA URL from release payload"
+installer_bin="$(which openshift-install)"
+ova_url="$("${installer_bin}" coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location')"
+if [[ -z "${ova_url}" || "${ova_url}" == "null" ]]; then
+  log "failed to determine OVA URL from release payload"
   exit 1
 fi
 
-ova_url="$(<"${SHARED_DIR}/ova_url.txt")"
 vm_template="${ova_url##*/}"
-log "using RHCOS OVA template: ${vm_template}"
+log "using RHCOS OVA: ${ova_url}"
+log "template name: ${vm_template}"
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc_target.sh"
