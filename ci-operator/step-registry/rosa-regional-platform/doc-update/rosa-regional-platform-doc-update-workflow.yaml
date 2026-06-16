@@ -1,0 +1,29 @@
+workflow:
+  as: rosa-regional-platform-doc-update
+  steps:
+    pre:
+      - ref: rosa-regional-platform-doc-update-setup
+    test:
+      - ref: rosa-regional-platform-doc-update-process
+    post:
+      - ref: rosa-regional-platform-doc-update-report
+  documentation: |-
+    Periodic workflow that detects stale documentation across all rosa-regional-platform repositories.
+
+    This workflow:
+    1. Setup: Verifies Claude CLI is available and configured
+    2. Process: Auto-closes stale PRs across all repos, analyzes merged PRs from all four repositories,
+       invokes documentation-updater agent to check cross-repository doc impact, creates update PRs
+       in each affected repository
+    3. Report: Generates HTML report with per-repository processing results
+
+    The workflow analyzes rosa-regional-platform repositories:
+    - rosa-regional-platform (main platform with architecture docs)
+    - rosa-regional-platform-api (API server)
+    - rosa-regional-platform-cli (CLI tool)
+    - rosa-regional-platform-internal (optional, excluded by default since it's private)
+
+    The workflow uses the .claude/agents/documentation-updater.md agent for analysis.
+    Documentation updates are opened as PRs via fork with [docs-agent] prefix in each affected repo.
+
+    Schedule: Weekly on Mondays at 14:00 UTC (9:00 AM ET)
