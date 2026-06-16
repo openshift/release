@@ -150,7 +150,7 @@ function make_up_ansible_playbook {
       - name: Building Podman container image at bastion host
         vars:
           _base_img: quay.io/centos/centos:stream9
-          _oc_bin_url: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.18/openshift-client-linux.tar.gz
+          _oc_bin_url: https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/stable-4.18/openshift-client-linux.tar.gz
         ansible.builtin.shell: |
           cat << EO-Containerfile > {{ _remote_container_file }}
           FROM quay.io/centos/centos:stream9

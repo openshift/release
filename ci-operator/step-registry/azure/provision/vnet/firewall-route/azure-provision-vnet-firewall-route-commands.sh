@@ -138,7 +138,7 @@ redhat_fqdns_list="${redhat_fqdns_list} registry.redhat.io access.redhat.com qua
 # For Telemetry
 redhat_fqdns_list="${redhat_fqdns_list} cert-api.access.redhat.com api.access.redhat.com infogw.api.openshift.com console.redhat.com" 
 # Other allowlist
-redhat_fqdns_list="${redhat_fqdns_list} mirror.openshift.com storage.googleapis.com *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} quayio-production-s3.s3.amazonaws.com api.openshift.com rhcos.mirror.openshift.com console.redhat.com sso.redhat.com"
+redhat_fqdns_list="${redhat_fqdns_list} mirror.openshift.com openshift-mirror-list.ci-systems.workers.dev storage.googleapis.com *.apps.${CLUSTER_NAME}.${BASE_DOMAIN} quayio-production-s3.s3.amazonaws.com api.openshift.com rhcos.mirror.openshift.com console.redhat.com sso.redhat.com"
 # Other allowlist for optional third-party content
 redhat_fqdns_list="${redhat_fqdns_list} registry.connect.redhat.com *.s3.dualstack.us-east-1.amazonaws.com *.s3-us-west-2.amazonaws.com"
 if [[ "${ENABLE_FIREWALL_FULLLIST}" == "yes" ]]; then

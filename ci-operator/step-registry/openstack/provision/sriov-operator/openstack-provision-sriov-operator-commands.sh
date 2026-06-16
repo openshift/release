@@ -78,7 +78,7 @@ function wait_for_sriov_network_node_state() {
 }
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-ocp_url="curl -o /dev/null -s -w '%{http_code}\n' https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/"
+ocp_url="curl -o /dev/null -s -w '%{http_code}\n' https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable-${oc_version}/"
 
 if [ "$(eval "${ocp_url}")" != "200" ]; then
     echo "${oc_version} is not a supported version of the sriov-network-operator yet, will deploy it from source"

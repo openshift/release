@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
+curl -sSL "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
 
 # generate array with current version + previous one, this is needed for non-GA releases where Butane doesn't support yet the latest version
 VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F. -v OFS=. '{$2=$2-1; print $1,$2".0"}')

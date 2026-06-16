@@ -169,8 +169,8 @@ else
     el_version="el${rhel_major}"
 
     rhocp="rhocp-${OCP_VERSION}-for-rhel-${rhel_major}-$(uname -m)-rpms"
-    rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/${el_version}/os"
-    ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/${el_version}/os"
+    rc="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/${el_version}/os"
+    ec="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/${el_version}/os"
 
     # `dnf repoquery` returns 1 when the repository is not available,
     # but returns 0 when the repo is up and package is not present.

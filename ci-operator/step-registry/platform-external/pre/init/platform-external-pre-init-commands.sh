@@ -94,7 +94,7 @@ export -f install_butane
 function install_oc() {
   log "Checking/installing oc..."
   if ! command -v oc &> /dev/null; then
-    cd /tmp && curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && tar xzvf oc.tar.gz
+    cd /tmp && curl -L https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && tar xzvf oc.tar.gz
   fi
   log "Installing oc done"
   which oc

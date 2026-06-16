@@ -431,7 +431,7 @@ cat > ${BASTION_CI_SCRIPTS_DIR}/setup-sno.sh << EOF
 # \$CLUSTER_NAME \$BASE_DOMAIN \$MACHINE_NETWORK \$INSTALLATION_DISK are required to create install-config.yaml to generate the ignition via single-node-ignition-config openshift-install command
 # MAC, IP and ISO URLs are required to download and setup the net boot for SNO node
 #
-# Sample usage: ./setup-sno.sh test-cluster ocp-dev-ppc64le.com 192.168.140.0/24 /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2 https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-rootfs.ppc64le.img https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-kernel-ppc64le https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-initramfs.ppc64le.img http://rh-sno-ci-bastion.ocp-dev-ppc64le.com fa:c2:10:e3:5a:20 192.168.140.105
+# Sample usage: ./setup-sno.sh test-cluster ocp-dev-ppc64le.com 192.168.140.0/24 /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2 https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-rootfs.ppc64le.img https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-kernel-ppc64le https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-initramfs.ppc64le.img http://rh-sno-ci-bastion.ocp-dev-ppc64le.com fa:c2:10:e3:5a:20 192.168.140.105
 #
 
 set -euox pipefail
@@ -480,7 +480,7 @@ download_installer() {
     if [[ ! -z \${INSTALLER_URL} ]]; then
         curl -s \${INSTALLER_URL} -o \${install_tar_file}
     else
-      root_path="https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients"
+      root_path="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/clients"
       install_path="\${root_path}/ocp/latest-\${OCP_VERSION}/\${install_tar_file}"
       rc_install_path="\${root_path}/ocp/candidate-\${OCP_VERSION}/\${install_tar_file}"
       echo "Download GA release"

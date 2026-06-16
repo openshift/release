@@ -28,7 +28,7 @@ else
   exit 1
 fi
 echo "Installing oc...."
-wget -q -O $HOME/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
+wget -q -O $HOME/openshift-client-linux.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
 tar -xzf $HOME/openshift-client-linux.tar.gz -C /tmp/bin
 which oc
 if [ $? -eq 0 ]; then

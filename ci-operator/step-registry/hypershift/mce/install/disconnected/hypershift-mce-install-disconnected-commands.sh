@@ -66,7 +66,7 @@ skopeo copy "docker://${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --remo
 
 echo "4: get oc-mirror from stable clients"
 if [[ ! -f /home/oc-mirror ]]; then
-    MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
+    MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
     # TODO: as for https://issues.redhat.com/browse/OCPBUGS-30859
     # the oc-mirror lost rhel8 compatibility with OCP 4.15.3 release
     # choose the appropriate rhel8/rhel9 binary at runtime once available.
