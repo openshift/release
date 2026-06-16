@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 AZURE_LOCATION="${LOCATION}"
 

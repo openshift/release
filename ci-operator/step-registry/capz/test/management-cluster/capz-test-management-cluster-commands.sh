@@ -2,13 +2,10 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 export INIT_KIND=false
 export USE_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-{ set +o xtrace; } 2>/dev/null
-IMAGE_PULL_SECRET_B64=$(base64 -w0 < /etc/quay-pull-credentials/.dockerconfigjson)
-export IMAGE_PULL_SECRET_B64
 
 if [[ -f "${SHARED_DIR}/dev_endpoint" ]]; then
   DEV_ENDPOINT=$(cat "${SHARED_DIR}/dev_endpoint")

@@ -2,7 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 export INIT_KIND=false
 export USE_KUBECONFIG="${SHARED_DIR}/kubeconfig"

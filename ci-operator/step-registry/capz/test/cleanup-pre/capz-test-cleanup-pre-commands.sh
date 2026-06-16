@@ -1,7 +1,7 @@
 #!/bin/bash
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 # Pre-test cleanup: safety net for aborted previous jobs.
 # Cleans up any leftover Azure resources (resource groups, ARM resources,

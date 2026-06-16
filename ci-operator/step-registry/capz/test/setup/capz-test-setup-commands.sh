@@ -2,7 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 # Phase 02: Setup
 # Clones cluster-api-installer repository and verifies scripts.

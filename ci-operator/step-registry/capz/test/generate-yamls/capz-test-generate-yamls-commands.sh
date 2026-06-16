@@ -2,7 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 if [[ -d "${ARO_REPO_DIR}" ]]; then
   echo "Repository already exists at ${ARO_REPO_DIR}"

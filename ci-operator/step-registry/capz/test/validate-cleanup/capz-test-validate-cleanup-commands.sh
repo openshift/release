@@ -2,7 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 export TEST_RESULTS_DIR="${ARTIFACT_DIR}"
 script -e -q -c "make _validate-cleanup RESULTS_DIR=\"${ARTIFACT_DIR}\"" /dev/null

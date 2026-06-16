@@ -1,7 +1,7 @@
 #!/bin/bash
 set -o nounset
 set -o pipefail
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 # Collect controller logs before cleanup (post step - always runs).
 if [[ -n "${USE_KUBECONFIG:-}" && -f "${USE_KUBECONFIG}" ]]; then
