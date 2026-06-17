@@ -545,10 +545,16 @@ tests:
   steps:
     test:
     - ref: aro-hcp-images-push
-- always_run: false
-  as: cspr-pipeline-postsubmit
+- as: cspr-pipeline-postsubmit
   max_concurrency: 4
-  optional: true
+  postsubmit: true
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     env:
       DEPLOY_ENV: cspr
