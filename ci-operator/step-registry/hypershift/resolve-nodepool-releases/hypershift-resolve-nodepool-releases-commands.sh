@@ -35,11 +35,24 @@ resolve_from_stream() {
 
 verify_image_pullable() {
     local pullspec=$1
+    local auth_args=""
     if [[ -f "${REGISTRY_AUTH}" ]]; then
-        oc image info --filter-by-os linux/amd64 -a "${REGISTRY_AUTH}" "${pullspec}" &>/dev/null
-    else
-        oc image info --filter-by-os linux/amd64 "${pullspec}" &>/dev/null
+        auth_args="-a ${REGISTRY_AUTH}"
     fi
+
+    # Check 1: release tag manifest exists and is the right architecture
+    # shellcheck disable=SC2086
+    oc image info --filter-by-os linux/amd64 ${auth_args} "${pullspec}" &>/dev/null || return 1
+
+    # Check 2: internal component digests are still alive in the registry.
+    # The release tag can outlive its component digests when the CI registry
+    # garbage-collects old images. Extract the MCO digest from the release
+    # metadata and verify it is actually pullable.
+    local mco_digest
+    # shellcheck disable=SC2086
+    mco_digest=$(oc adm release info ${auth_args} "${pullspec}" --image-for=machine-config-operator 2>/dev/null) || return 1
+    # shellcheck disable=SC2086
+    oc image info --filter-by-os linux/amd64 ${auth_args} "${mco_digest}" &>/dev/null || return 1
 }
 
 resolve_release_image() {
