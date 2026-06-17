@@ -219,7 +219,7 @@ function cnv::reimport_datavolumes() {
 }
 
 binFolder="$(mktemp -d /tmp/bin.XXXX)"
-ocUrl='https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz'
+ocUrl='https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz'
 
 # Exports
 export PATH="${binFolder}:${PATH}"

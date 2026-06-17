@@ -35,14 +35,18 @@ base_images:
     name: nested-environment-builder
     namespace: ci
     tag: latest
-  ocp_4.10_cli:
-    name: "5.0"
-    namespace: ocp
-    tag: cli
-  ocp_4.22_base-rhel9:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  ocp_base-rhel9:
     name: "5.0"
     namespace: ocp
     tag: base-rhel9
+  ocp_cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -88,7 +92,7 @@ images:
       RUN mkdir /.cache -m 0777
     from: src
     inputs:
-      ocp_4.10_cli:
+      ocp_cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
@@ -101,7 +105,7 @@ images:
       COPY openshift-install /usr/bin/openshift-install
     from: src
     inputs:
-      ocp_4.10_cli:
+      ocp_cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
@@ -124,8 +128,8 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-openstack-4-22.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-22.repo
-    from: ocp_4.22_base-rhel9
+      curl http://base-openstack-5-0.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-5-0.repo
+    from: ocp_base-rhel9
     to: openstack-base
 releases:
   initial:
@@ -309,6 +313,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-dualstack-ipv6-primary-techpreview
@@ -319,6 +326,9 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
+      TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
+        Secondary IP Family \[LinuxOnly\] should function for service endpoints using
+        hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-proxy
@@ -1151,6 +1161,21 @@ tests:
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
+- always_run: false
+  as: e2e-powervc-ovn-multi-p-p
+  capabilities:
+  - intranet
+  - power-s2s-dns
+  optional: true
+  restrict_network_access: false
+  steps:
+    cluster_profile: powervc-1
+    env:
+      ARCH: ppc64le
+      BRANCH: "5.0"
+      INSTALLER: powervc
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervc-ipi
 - as: integration-tests-nodejoiner
   run_if_changed: ^(cmd|pkg|data).*/(agent|node-joiner)/
   steps:
@@ -1250,6 +1275,7 @@ tests:
 - as: e2e-agent-two-node-fencing-ipv4
   capabilities:
   - intranet
+  - nested-podman
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:

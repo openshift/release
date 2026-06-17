@@ -1,6 +1,6 @@
 ref:
   as: etcd-encryption-vault-install
-  from: cli
+  from: tests
   commands: etcd-encryption-vault-install-commands.sh
   credentials:
   - namespace: test-credentials
@@ -11,11 +11,13 @@ ref:
       cpu: 100m
       memory: 200Mi
   env:
-  - name: VAULT_VERSION
-    default: "2.0.0-ent"
+  - name: VAULT_ENTERPRISE_IMAGE
+    default: "quay.io/openshifttest/vault-enterprise:2.0.0-ent"
     documentation: |-
-      Version of Vault Enterprise to install via Helm.
-      Check https://hub.docker.com/r/hashicorp/vault-enterprise/tags for available versions.
+      Full reference for the Vault Enterprise image installed via Helm in encryption-kms jobs.
+      Override at job level to trial a new Vault Enterprise image. On baremetalds jobs the
+      repository, mirror source, Helm repository/tag, and local mirror tag are derived from
+      this value.
   - name: VAULT_CHART_VERSION
     default: "0.28.1"
     documentation: |-
@@ -25,10 +27,18 @@ ref:
     default: "vault-kms"
     documentation: |-
       Namespace where Vault Enterprise will be installed.
-  - name: VAULT_IMAGE_REPOSITORY
-    default: "docker.io/hashicorp/vault-enterprise"
+  - name: VAULT_SECONDARY_NAMESPACE
+    default: "vault-kms-secondary"
     documentation: |-
-      Container image repository for Vault Enterprise.
+      Namespace where the second Vault Enterprise instance will be installed.
+  - name: VAULT_KMS_PLUGIN_IMAGE
+    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms@sha256:33599dd6eee61dcf9a60138759fafda3d88593a3c2072585156882c6b5bd3fa5"
+    documentation: |-
+      Full reference for the vault-kube-kms plugin image used by encryption-kms tests.
+      Must match the image configured in library-go test helpers until those read this
+      environment variable directly. Override at job level to trial a new plugin image.
+      On baremetalds jobs the repository, mirror source, and local mirror tag are all
+      derived from this value.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -37,8 +47,11 @@ ref:
     - Adds HashiCorp Helm repository
     - Creates vault namespace with appropriate SCC (restricted)
     - Creates vault-license secret from mounted credential (if available)
+    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (SSH oc image mirror with retry)
+    - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
     - Installs Vault Enterprise using Helm chart
     - Waits for Vault pod to be ready
+    - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
     Prerequisites:
     - OpenShift cluster with adequate resources
@@ -48,6 +61,10 @@ ref:
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
     - Vault pod: vault-0 (Ready state)
+    - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
+    - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
+    - Second Vault pod: vault-secondary-0 (Ready state)
+    - CA ConfigMap: vault-ca-bundle-secondary (openshift-config namespace)
 
     Next step:
     - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS

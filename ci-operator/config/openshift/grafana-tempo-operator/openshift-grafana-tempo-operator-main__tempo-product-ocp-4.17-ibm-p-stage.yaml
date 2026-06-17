@@ -20,9 +20,8 @@ images:
     to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.17"
 resources:
   '*':
@@ -44,7 +43,10 @@ tests:
       {{end}}'
   steps:
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       FIPS_ENABLED: "false"
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-bundle@sha256:90cfc733bf3815568738cf089ed13fa232561b0c24ce0c99b71154753254b1be
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.10
       OCP_CLUSTER_VERSION: stable-4.17
       OPERATORS: |
         [
@@ -57,6 +59,9 @@ tests:
         ]
       SKIP_TESTS: tests/e2e/generate tests/e2e/gateway tests/e2e-openshift/monolithic-multitenancy-static
         tests/e2e-openshift-ossm/* tests/e2e-openshift-object-stores/* tests/e2e-openshift-serverless/*
+    post:
+    - ref: openshift-observability-qe-agent
+    - ref: openshift-observability-ibm-p-cluster-destroy
     test:
     - ref: idp-htpasswd
     - as: install-tempo-operator
@@ -71,6 +76,9 @@ tests:
         oc label namespace openshift-tempo-operator openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE"
         oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
+      env:
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE
       from: operator-sdk
       resources:
         requests:
@@ -78,7 +86,6 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-stage
-    - ref: distributed-tracing-tests-tracing-ui-integration
     workflow: openshift-observability-ibm-p
 zz_generated_metadata:
   branch: main

@@ -89,6 +89,19 @@ releases:
       product: ocp
       stream: ci
       version: "4.23"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.23"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.23"
   n1minor:
     candidate:
       product: ocp
@@ -211,25 +224,50 @@ tests:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 - always_run: false
-  as: e2e-azure-self-managed
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
+  as: e2e-kubevirt-metal-ovn-backuprestore
+  capabilities:
+  - intranet
+  optional: true
   steps:
-    cluster_profile: hypershift-azure
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
+    cluster_profile: equinix-ocp-hcp
     env:
-      CI_TESTS_RUN: ^(TestCreateCluster$|TestAutoscaling|TestNodePool|TestUpgradeControlPlane|TestHAEtcdChaos|TestAzureOAuthLoadBalancer|TestAzurePrivateTopology)$
-      E2E_RESOURCE_REQUEST_OVERRIDES: "1"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: centralus
-    post:
-    - ref: hypershift-analyze-e2e-failure
-    - chain: hypershift-destroy-nested-management-cluster
-    workflow: hypershift-azure-e2e-self-managed
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      KONFLUX_TARGET_FBC_TAGS: ocp__4.22__metallb-rhel9-operator,ocp__4.22__ose-local-storage-rhel9-operator,oadp-operator-fbc-1.6.0-20260327171703
+      KONFLUX_TARGET_OPERATORS: ""
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: ocp--4.22--ose-local-storage-rhel9-operator-konflux
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MCE_VERSION: "2.17"
+      METALLB_OPERATOR_SUB_SOURCE: ocp--4.22--metallb-rhel9-operator-konflux
+      OADP_OPERATOR_SUB_CHANNEL: stable
+      OADP_OPERATOR_SUB_SOURCE: oadp-operator-fbc-1.6.0-20260327171703-konflux
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-21
+      REDHAT_OPERATORS_INDEX_TAG: v4.21
+    workflow: hypershift-mce-kubevirt-baremetalds-backuprestore
+- always_run: false
+  as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      KONFLUX_TARGET_FBC_TAGS: ocp__4.22__metallb-rhel9-operator,oadp-operator-fbc-1.6.0-20260327171703
+      KONFLUX_TARGET_OPERATORS: ""
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      MCE_VERSION: "2.17"
+      METALLB_OPERATOR_SUB_SOURCE: ocp--4.22--metallb-rhel9-operator-konflux
+      OADP_OPERATOR_SUB_SOURCE: oadp-operator-fbc-1.6.0-20260327171703-konflux
+    workflow: hypershift-mce-agent-metal3-backuprestore
 - always_run: false
   as: e2e-azure-v2-self-managed
-  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-azure
     dependencies:
@@ -375,6 +413,24 @@ tests:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - always_run: false
+  as: e2e-aws-ovn-conformance-techpreview
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      PUBLIC_ONLY: "true"
+    workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-ovn-conformance-ccm
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      PUBLIC_ONLY: "true"
+      TEST_SKIPS: ""
+    workflow: hypershift-aws-conformance
+- always_run: false
   as: e2e-azure-kubevirt-ovn
   optional: true
   steps:
@@ -474,15 +530,13 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
     env:
-      CI_TESTS_RUN: ^TestKarpenter$
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-nested
 - as: verify-deps
   steps:

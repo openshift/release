@@ -232,7 +232,9 @@ chain:
           # time for nodes to join.
           sleep 300
         else
-          num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          replicas_per_np=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          num_zones=$(echo "${HC_ZONES}" | tr ',' '\n' | wc -l)
+          num_nodes_expected=$((replicas_per_np * num_zones))
           export num_nodes_expected
           export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
           set +e
