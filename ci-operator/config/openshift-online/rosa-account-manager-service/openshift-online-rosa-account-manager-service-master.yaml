@@ -1,32 +1,8 @@
-base_images:
-  nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-4.23
-images:
-  items:
-  - dockerfile_literal: |
-      FROM nested-podman
-      COPY src/ /opt/app-root/src
-      WORKDIR /opt/app-root/src/rosa-account-manager-service
-      USER root
-      RUN dnf install -y git make gcc jq && dnf clean all
-      RUN curl -LO https://go.dev/dl/go1.26.3.linux-amd64.tar.gz && \
-          tar -C /usr/local -xzf go1.26.3.linux-amd64.tar.gz && \
-          rm go1.26.3.linux-amd64.tar.gz
-      ENV PATH="/usr/local/go/bin:${PATH}"
-    from: nested-podman
-    inputs:
-      src:
-        paths:
-        - destination_dir: src
-          source_path: /go/src/github.com/openshift-online/rosa-account-manager-service
-    to: golang-plus
+    name: ams-ci-v6
+    namespace: ci
+    tag: latest
 prowgen:
   expose: true
   private: true
@@ -38,14 +14,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    make verify
+    make lint
+  container:
+    from: src
 - as: unit-test
   capabilities:
   - nested-podman
   commands: |
     unset GOFLAGS
     echo "Go Version: $(go version)"
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -54,7 +36,7 @@ tests:
     sleep 5
     make test
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -64,8 +46,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -74,7 +54,7 @@ tests:
     sleep 5
     make test-fedramp
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -84,8 +64,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -94,7 +72,7 @@ tests:
     sleep 5
     make test-xcm
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -104,8 +82,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -117,7 +93,7 @@ tests:
     sleep 5
     make test-integration-shard-0
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -127,8 +103,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -140,7 +114,7 @@ tests:
     sleep 5
     make test-integration-shard-1
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -150,8 +124,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -159,12 +131,11 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
-    echo "Secret files in secrets/: $(ls secrets/ | wc -l)"
     make db/setup
     sleep 5
     make test-integration-shard-2
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -174,8 +145,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -187,7 +156,7 @@ tests:
     sleep 5
     make test-integration-shard-3
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -197,8 +166,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -210,7 +177,7 @@ tests:
     sleep 5
     make test-integration-shard-4
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets
@@ -220,8 +187,6 @@ tests:
   - nested-podman
   commands: |
     unset GOFLAGS
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
     cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
@@ -233,7 +198,7 @@ tests:
     sleep 5
     make test-integration-shard-5
   container:
-    from: golang-plus
+    from: src
   nested_podman: true
   secrets:
   - mount_path: /opt/app-root/ams-secrets

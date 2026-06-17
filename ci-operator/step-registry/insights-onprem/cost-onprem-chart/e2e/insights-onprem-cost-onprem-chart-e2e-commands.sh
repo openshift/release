@@ -188,14 +188,61 @@ check_devel_support() {
     fi
 }
 
-# Resolve latest RC tag from git
-get_latest_rc_tag() {
-    # Ensure we have the origin remote (ci-operator may not set it up)
+# Ensure git origin remote exists and tags are fetched
+ensure_git_setup() {
     if ! git remote get-url origin &>/dev/null; then
         echo "Adding origin remote for tag fetch..." >&2
         git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
     fi
     git fetch --tags origin 2>/dev/null
+}
+
+# Get chart version from Helm repo
+# Args: $1 = "stable" or "devel"
+get_helm_chart_version() {
+    local mode="${1:-stable}"
+    local helm_args=("search" "repo" "cost-onprem/cost-onprem" "--output" "json")
+    
+    if [[ "$mode" == "devel" ]]; then
+        helm_args+=("--devel")
+    fi
+    
+    # Add the Helm repo if not already added
+    if ! helm repo list 2>/dev/null | grep -q "cost-onprem"; then
+        echo "Adding cost-onprem Helm repo..." >&2
+        helm repo add cost-onprem https://insights-onprem.github.io/cost-onprem-chart >&2
+        helm repo update >&2
+    fi
+    
+    local version
+    version=$(helm "${helm_args[@]}" 2>/dev/null | jq -r '.[0].version // empty')
+    echo "$version"
+}
+
+# Checkout git tag matching chart version
+# Args: $1 = chart version (e.g., "0.2.19" or "0.2.20-rc4")
+checkout_matching_tag() {
+    local chart_version="$1"
+    local tag_name="cost-onprem-${chart_version}"
+    
+    ensure_git_setup
+    
+    if git rev-parse "${tag_name}" &>/dev/null; then
+        echo "Checking out test code matching chart version: ${tag_name}"
+        git checkout "${tag_name}"
+        echo "Test code now at: $(git describe --tags --always)"
+        return 0
+    else
+        echo "ERROR: Git tag ${tag_name} not found for chart version ${chart_version}" >&2
+        echo "Available tags:" >&2
+        git tag -l "cost-onprem-*" | tail -10 >&2
+        return 1
+    fi
+}
+
+# Resolve latest RC tag from git (fallback when Helm lookup fails)
+get_latest_rc_tag() {
+    ensure_git_setup
     
     # Find latest RC tag (e.g., cost-onprem-0.2.20-rc1)
     local latest_rc
@@ -211,9 +258,24 @@ if [[ -n "${CHART_REF:-}" ]]; then
     case "${CHART_REF}" in
         release)
             echo "Testing latest RELEASED chart from Helm repo"
-            # Helm will fetch the latest stable (non-prerelease) version by default
+            
+            # Get the chart version that Helm will deploy
+            CHART_VERSION=$(get_helm_chart_version "stable")
+            if [[ -z "$CHART_VERSION" ]]; then
+                echo "ERROR: Could not determine chart version from Helm repo"
+                exit 1
+            fi
+            echo "Helm repo has stable version: ${CHART_VERSION}"
+            
+            # Checkout matching git tag so tests align with chart version
+            if ! checkout_matching_tag "$CHART_VERSION"; then
+                echo "ERROR: Cannot checkout matching tag for release ${CHART_VERSION}"
+                exit 1
+            fi
+            
+            # Deploy from Helm repo (tests real published artifact)
             USE_LOCAL_CHART="false"
-            CHART_REF_RESOLVED="release"
+            CHART_REF_RESOLVED="${CHART_VERSION}"
             ;;
         rc)
             echo "Testing latest RC chart..."
@@ -222,12 +284,34 @@ if [[ -n "${CHART_REF:-}" ]]; then
             if [[ "$DEVEL_SUPPORTED" == "true" ]]; then
                 # Deploy script supports --devel, use Helm repo
                 echo "Deploy script supports --devel flag - will use Helm repo with pre-release resolution"
-                USE_LOCAL_CHART="false"
-                USE_HELM_DEVEL="true"
-                CHART_REF_RESOLVED="rc"
-            else
-                # Fallback: checkout latest RC tag and use local chart
-                echo "Deploy script does not support --devel - falling back to git tag checkout"
+                
+                # Get the RC version that Helm will deploy
+                CHART_VERSION=$(get_helm_chart_version "devel")
+                if [[ -z "$CHART_VERSION" ]]; then
+                    echo "WARNING: Could not determine RC version from Helm repo, falling back to git"
+                    DEVEL_SUPPORTED="false"
+                elif [[ "$CHART_VERSION" != *-* ]]; then
+                    # helm --devel returns stable versions when no prerelease exists
+                    echo "WARNING: Helm returned stable version ${CHART_VERSION} (no prerelease available), falling back to git"
+                    DEVEL_SUPPORTED="false"
+                else
+                    echo "Helm repo has RC version: ${CHART_VERSION}"
+                    
+                    # Checkout matching git tag so tests align with chart version
+                    if ! checkout_matching_tag "$CHART_VERSION"; then
+                        echo "WARNING: Cannot checkout matching tag, falling back to git RC tag"
+                        DEVEL_SUPPORTED="false"
+                    else
+                        USE_LOCAL_CHART="false"
+                        USE_HELM_DEVEL="true"
+                        CHART_REF_RESOLVED="${CHART_VERSION}"
+                    fi
+                fi
+            fi
+            
+            # Fallback: checkout latest RC tag and use local chart
+            if [[ "$DEVEL_SUPPORTED" != "true" ]]; then
+                echo "Falling back to git tag checkout for RC"
                 LATEST_RC_TAG=$(get_latest_rc_tag)
                 
                 if [[ -n "$LATEST_RC_TAG" ]]; then
@@ -251,13 +335,18 @@ if [[ -n "${CHART_REF:-}" ]]; then
             echo "Testing explicit chart reference: ${CHART_REF}"
             # Could be a specific version like "0.2.19" or "0.2.20-rc1"
             # Assume it's a git tag, checkout and use local
-            if ! git remote get-url origin &>/dev/null; then
-                git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
-            fi
-            git fetch --tags origin 2>/dev/null
-            if git rev-parse "${CHART_REF}" &>/dev/null; then
+            ensure_git_setup
+            if git rev-parse "cost-onprem-${CHART_REF}" &>/dev/null; then
+                git checkout "cost-onprem-${CHART_REF}"
+                echo "Checked out: $(git describe --tags --always)"
+            elif git rev-parse "${CHART_REF}" &>/dev/null; then
                 git checkout "${CHART_REF}"
                 echo "Checked out: $(git describe --tags --always)"
+            else
+                echo "ERROR: Could not find tag cost-onprem-${CHART_REF} or ${CHART_REF}"
+                echo "Available tags:" >&2
+                git tag -l "cost-onprem-*" | tail -10 >&2
+                exit 1
             fi
             USE_LOCAL_CHART="true"
             CHART_REF_RESOLVED="${CHART_REF}"
