@@ -269,7 +269,7 @@ timeout 2700 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
+    --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "doctor" 45
 
 # Run bug creation for failed jobs (15m and 50 turns).
@@ -281,7 +281,7 @@ timeout 900 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
-    --verbose 2>&1 | tee "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
+    --verbose &> "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
 
 # Close stale bugs that are no longer linked to current failures (10m and 20 turns).
@@ -293,7 +293,7 @@ timeout 600 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:close-stale-bugs --close" \
-    --verbose 2>&1 | tee "${CLAUDE_CLOSE_STALE_BUGS_LOG}" || CLAUDE_RC=$?
+    --verbose &> "${CLAUDE_CLOSE_STALE_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "close-stale-bugs" 10
 
 # Run bug fix for test bugs (15m and 50 turns).
@@ -306,7 +306,7 @@ timeout 900 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
-    --verbose 2>&1 | tee "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
+    --verbose &> "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
 
 # Run HTML report refresh to include the new bugs (10m and 20 turns).
@@ -318,7 +318,7 @@ timeout 600 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
+    --verbose &> "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
