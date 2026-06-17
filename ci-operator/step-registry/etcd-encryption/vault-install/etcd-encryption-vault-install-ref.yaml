@@ -11,11 +11,13 @@ ref:
       cpu: 100m
       memory: 200Mi
   env:
-  - name: VAULT_VERSION
-    default: "2.0.0-ent"
+  - name: VAULT_ENTERPRISE_IMAGE
+    default: "quay.io/openshifttest/vault-enterprise:2.0.0-ent"
     documentation: |-
-      Version of Vault Enterprise to install via Helm.
-      Check https://hub.docker.com/r/hashicorp/vault-enterprise/tags for available versions.
+      Full reference for the Vault Enterprise image installed via Helm in encryption-kms jobs.
+      Override at job level to trial a new Vault Enterprise image. On baremetalds jobs the
+      repository, mirror source, Helm repository/tag, and local mirror tag are derived from
+      this value.
   - name: VAULT_CHART_VERSION
     default: "0.28.1"
     documentation: |-
@@ -25,34 +27,18 @@ ref:
     default: "vault-kms"
     documentation: |-
       Namespace where Vault Enterprise will be installed.
-  - name: VAULT_IMAGE_REPOSITORY
-    default: "quay.io/openshifttest/vault-enterprise"
-    documentation: |-
-      Container image repository for Vault Enterprise.
-      Mirrored from docker.io/hashicorp/vault-enterprise
-      (docker.io is blocked in CI due to rate limiting and CI is not accessible in disconnected environments.)
-      On baremetalds jobs the image is mirrored to the dev-scripts local registry
-      before Helm install.
   - name: VAULT_SECONDARY_NAMESPACE
     default: "vault-kms-secondary"
     documentation: |-
       Namespace where the second Vault Enterprise instance will be installed.
-  - name: VAULT_KMS_PLUGIN_VERSION
-    default: "0.0.1"
+  - name: VAULT_KMS_PLUGIN_IMAGE
+    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms@sha256:33599dd6eee61dcf9a60138759fafda3d88593a3c2072585156882c6b5bd3fa5"
     documentation: |-
-      Tag of the vault-kube-kms KMS plugin image used by encryption-kms tests.
-      On baremetalds jobs the image is mirrored from VAULT_KMS_PLUGIN_IMAGE_SOURCE
-      to the dev-scripts local registry and an ImageContentSourcePolicy redirects node pulls.
-  - name: VAULT_KMS_PLUGIN_IMAGE_SOURCE
-    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms:0.0.1"
-    documentation: |-
-      Source image for the vault-kube-kms KMS plugin mirrored on baremetalds jobs.
-      Update this when the KMS plugin image changes.
-  - name: VAULT_KMS_PLUGIN_ICSP_SOURCE
-    default: "registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms"
-    documentation: |-
-      Upstream repository redirected by ImageContentSourcePolicy on baremetalds jobs.
-      Update this when the KMS plugin image repository changes.
+      Full reference for the vault-kube-kms plugin image used by encryption-kms tests.
+      Must match the image configured in library-go test helpers until those read this
+      environment variable directly. Override at job level to trial a new plugin image.
+      On baremetalds jobs the repository, mirror source, and local mirror tag are all
+      derived from this value.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
