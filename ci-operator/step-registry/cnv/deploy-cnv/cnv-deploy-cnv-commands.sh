@@ -199,6 +199,61 @@ resolve_iib_from_map () {
     echo "${result}"
 }
 
+function apply_cnv_idms() {
+    local cnv_version_dash="v${CNV_VERSION/./-}"
+    local cnv_idms_file_url="https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/hack/cnv_idms.yaml"
+    curl -sL "${cnv_idms_file_url}" \
+      | sed "s/__CNV_VERSION__/${cnv_version_dash}/" | oc apply -f -
+}
+
+function apply_brew_idms() {
+    local brew_idms_file_url="https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/hack/brew_idms.yaml"
+    curl -sL "${brew_idms_file_url}" | oc apply -f -
+}
+
+# Wait until master and worker MCP are Updated
+# or timeout after 90min (default).
+wait_for_mcp_to_update() {
+
+    local timeout_minutes=${1:-90}
+    local poll_interval_seconds=30
+    local max_attempts=$(( timeout_minutes * 60 / poll_interval_seconds ))
+    local attempt=0
+
+    echo "Waiting for MCPs to update (timeout: ${timeout_minutes} minutes)"
+
+    while true; do
+        attempt=$((attempt+1))
+
+        if oc wait mcp --all --for condition=updated --timeout=1m; then
+            echo "MCPs are updated."
+            return 0
+        fi
+
+        if (( attempt >= max_attempts )); then
+            echo "Error: MCPs did not update within ${timeout_minutes} minutes." >&2
+            return 1
+        fi
+
+        echo "Attempt ${attempt}/${max_attempts}: MCPs not yet updated, waiting ${poll_interval_seconds} seconds..."
+        sleep "${poll_interval_seconds}"
+    done
+}
+
+mcp.pause()
+{
+    #shellcheck disable=SC2046
+    oc patch --type=merge --patch='{"spec":{"paused": true}}' $(oc get mcp -o name)
+}
+
+# Resume master and worker MCP.
+mcp.resume()
+{
+    #shellcheck disable=SC2046
+    oc patch --type=merge --patch='{"spec":{"paused": false}}' $(oc get mcp -o name)
+}
+
+
 ### MAIN ###################################################################################
 
 env_hashed | grep -i cnv | sort
@@ -219,6 +274,19 @@ if [[ -z ${CNV_CATALOG_IMAGE} && -n ${CNV_CATALOG_SOURCE} && ${CNV_CATALOG_SOURC
     create_cnv_catalog_source "${CNV_IIB_CATALOG_NAME}" "${CNV_CATALOG_IMAGE}"
     make_sure_all_catalog_source_are_healthy 600 10
 fi
+
+echo_debug "Pausing MCPs"
+mcp.pause
+
+echo_debug "Applying IDMS"
+apply_cnv_idms
+apply_brew_idms
+
+echo_debug "Resuming MCPs"
+mcp.resume
+
+echo_debug "Waiting for MCPs to update"
+wait_for_mcp_to_update 90
 
 echo_debug "Creating install namespace"
 oc apply -f - <<EOF
