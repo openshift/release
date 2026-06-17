@@ -1,0 +1,34 @@
+ref:
+  as: netobserv-ginkgo-tests
+  from: e2etests
+  cli: latest
+  grace_period: 5m
+  commands: netobserv-ginkgo-tests-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 60m
+  env:
+  - name: GINKGO_LABEL_FILTER
+    default: ""
+    documentation: Ginkgo label filter expression for test selection (e.g. "smoke && !slow").
+  - name: GINKGO_FOCUS_FILE
+    default: ""
+    documentation: |-
+      Regex to filter tests by source file path. When set, only tests defined
+      in matching files will run. Typically computed from PR changed files.
+  - name: GINKGO_TIMEOUT
+    default: "50m"
+    documentation: Timeout for ginkgo test execution.
+  - name: TEST_RUN_MODE
+    default: "periodic"
+    documentation: |-
+      Controls test execution behavior. "premerge" skips execution when no
+      test files changed (for PR pre-merge jobs). "periodic" always runs
+      all tests regardless of changed files (for periodic/nightly jobs).
+  documentation: |-
+    Runs pre-compiled netobserv backend e2e tests using ginkgo from the
+    e2etests image. Supports selective test execution via label filters or
+    focus-file expressions derived from PR changed files. Set TEST_RUN_MODE
+    to "periodic" for nightly/periodic jobs that should always run all tests.

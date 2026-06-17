@@ -26,6 +26,10 @@ images:
   - dockerfile_path: Dockerfile
     from: ubi
     to: netobserv-operator
+  - context_dir: integration-tests/backend
+    dockerfile_path: Dockerfile
+    from: ubi
+    to: e2etests
 operator:
   bundles:
   - as: noo-bundle
@@ -57,6 +61,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  e2etests:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  e2etests-lint-fmt:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
 tests:
 - as: e2e-operator
   optional: true
@@ -159,6 +175,77 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: e2etests-lint-fmt
+  commands: |
+    export HOME=/tmp/home
+    export GOCACHE=/tmp/gocache
+    export GOPATH=/tmp/gopath
+    export GOLANGCI_LINT_CACHE=/tmp/golangci-lint-cache
+    export GOWORK=off
+    export GOFLAGS=-mod=mod
+    cd integration-tests/backend/
+    go mod tidy
+    make prereqs
+    make lint
+    echo -e "\n###############  gofmt  ####################"
+    bad_gofmt_files=$(gofmt -s -l ./)
+    if [[ -n "${bad_gofmt_files}" ]]; then
+        echo "ERROR:"
+        echo "!!! gofmt needs to be run on the listed files"
+        echo "${bad_gofmt_files}"
+        echo "Try running 'gofmt -s [file_path]' Or autocorrect with 'gofmt -s -w [file_path]'"
+        exit 1
+    else
+        echo "gofmt SUCCESS"
+    fi
+
+    echo -e "\n###############  yamllint  ####################"
+    go install github.com/google/yamlfmt/cmd/yamlfmt@latest
+    find testdata/ -name '*.yaml' -o -name '*.yml' | while read -r f; do
+      if ! yamlfmt -lint "$f" 2>&1; then
+        echo "ERROR: YAML lint failed for $f"
+        exit 1
+      fi
+    done
+    echo "yamllint SUCCESS"
+  container:
+    from: src
+  run_if_changed: integration-tests/backend/.*\.(yaml|go)
+- as: e2etest
+  run_if_changed: integration-tests/backend/.*\.(yaml|go)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
+      TEST_RUN_MODE: premerge
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
+        echo "====> Patching CSV to scrape metrics"
+        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
+        ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index("DOWNSTREAM_DEPLOYMENT")')
+        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: compute-changed-tests
+      commands: |
+        git diff --name-only HEAD~1 -- integration-tests/backend/ > "${SHARED_DIR}/changed_files"
+        echo "Changed files:"
+        cat "${SHARED_DIR}/changed_files"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: netobserv-ginkgo-tests
     workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
