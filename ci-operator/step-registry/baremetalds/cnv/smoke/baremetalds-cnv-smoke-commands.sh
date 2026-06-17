@@ -25,10 +25,13 @@ oc whoami --show-console
 
 START_TIME=$(date "+%s")
 
-uv run pytest tests \
+export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
+
+uv --verbose --cache-dir /tmp/uv-cache \
+  run pytest tests \
   -s \
   -o log_cli=true \
-  -o cache_dir=/tmp/cache-pytest \
+  -o cache_dir=/tmp/pytest-cache \
   -m 'smoke and not rwx_default_storage' \
   --tc-file=tests/global_config_lvms.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
@@ -36,7 +39,7 @@ uv run pytest tests \
   --storage-class-matrix="${CNV_STORAGE_CLASS}" \
   --latest-rhel \
   --tb=native \
-  --junit-xml="${ARTIFACT_DIR}/xunit_results.xml" \
+  --junitxml="${ARTIFACT_DIR}/xunit_results.xml" \
   --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" || /bin/true
 
 FINISH_TIME=$(date "+%s")
