@@ -187,6 +187,17 @@ tests:
     cd integration-tests/backend/
     go mod tidy
     make prereqs
+    echo -e "\n###############  yamllint  ####################"
+    export PATH=$GOPATH/bin:$PATH
+    go install github.com/google/yamlfmt/cmd/yamlfmt@latest
+    find testdata/ -name '*.yaml' -o -name '*.yml' | while read -r f; do
+      if ! yamlfmt -lint "$f" 2>&1; then
+        echo "ERROR: YAML lint failed for $f"
+        exit 1
+      fi
+    done
+    echo "yamllint SUCCESS"
+
     make lint
     echo -e "\n###############  gofmt  ####################"
     bad_gofmt_files=$(gofmt -s -l ./)
@@ -199,16 +210,6 @@ tests:
     else
         echo "gofmt SUCCESS"
     fi
-
-    echo -e "\n###############  yamllint  ####################"
-    go install github.com/google/yamlfmt/cmd/yamlfmt@latest
-    find testdata/ -name '*.yaml' -o -name '*.yml' | while read -r f; do
-      if ! yamlfmt -lint "$f" 2>&1; then
-        echo "ERROR: YAML lint failed for $f"
-        exit 1
-      fi
-    done
-    echo "yamllint SUCCESS"
   container:
     from: src
   run_if_changed: integration-tests/backend/.*\.(yaml|go)
@@ -247,6 +248,7 @@ tests:
           cpu: 100m
     - ref: netobserv-ginkgo-tests
     workflow: optional-operators-ci-operator-sdk-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: netobserv
