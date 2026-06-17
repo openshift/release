@@ -19,6 +19,12 @@ unset KUBERNETES_SERVICE_HOST
 unset KUBERNETES_PORT
 unset KUBERNETES_PORT_443_TCP_PORT
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
 echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}, volume mode: ${CNV_VOLUME_MODE}"
 
 oc whoami --show-console
