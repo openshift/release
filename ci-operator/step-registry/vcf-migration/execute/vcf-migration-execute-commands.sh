@@ -81,13 +81,6 @@ fi
 target_vcenter="$(<"${SHARED_DIR}/vcf-migration-target-vcenter.txt")"
 target_username="$(jq -r '.username' < "${SHARED_DIR}/vcf-migration-target-creds.json")"
 target_password="$(jq -r '.password' < "${SHARED_DIR}/vcf-migration-target-creds.json")"
-infra_id="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')"
-
-if [[ -z "${infra_id}" ]]; then
-  log "failed to determine infrastructure ID"
-  exit 1
-fi
-
 log "determining RHCOS OVA URL from release payload"
 installer_bin="$(which openshift-install)"
 ova_url="$("${installer_bin}" coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location')"
@@ -150,11 +143,9 @@ for datacenter in "${!templates_by_datacenter[@]}"; do
   jq \
     --arg datacenter "${datacenter}" \
     --arg template "${templates_by_datacenter[${datacenter}]}" \
-    --arg infraID "${infra_id}" \
     'map(
       if .topology.datacenter == $datacenter then
-        .topology.folder = (.topology.folder // ("/" + $datacenter + "/vm/" + $infraID))
-        | .topology.template = $template
+        .topology.template = $template
       else
         .
       end
