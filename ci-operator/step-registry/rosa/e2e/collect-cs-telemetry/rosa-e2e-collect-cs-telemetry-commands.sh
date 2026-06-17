@@ -49,24 +49,28 @@ TOKEN=$(curl -sf -X POST "$ISSUER_URL" \
 
 QUERY="{k8s_namespace_name=\"${CS_NAMESPACE}\"} |= \"[ROSA HCP -\""
 
-TELEMETRY=$(curl -sf --max-time 120 \
+RAW_FILE="${ARTIFACT_DIR}/cs-telemetry-raw.json"
+
+if ! curl -sf --max-time 120 \
     -H "Authorization: Bearer $TOKEN" \
     --data-urlencode "query=$QUERY" \
     --data-urlencode "start=${START_TIME}000000000" \
     --data-urlencode "end=${END_TIME}000000000" \
     --data-urlencode "limit=5000" \
     --data-urlencode "direction=forward" \
-    -G "$LOKI_BASE/query_range" 2>/dev/null) || {
+    -G "$LOKI_BASE/query_range" \
+    -o "$RAW_FILE" 2>/dev/null; then
   echo "WARNING: Telemetry query failed, skipping"
   exit 0
-}
+fi
 
-python3 - "$TELEMETRY" "$CS_NAMESPACE" "$START_TIME" "$END_TIME" "$RHOBS_ENV" > "${ARTIFACT_DIR}/cs-telemetry.log" <<'PYEOF'
+python3 - "$RAW_FILE" "$CS_NAMESPACE" "$START_TIME" "$END_TIME" "$RHOBS_ENV" > "${ARTIFACT_DIR}/cs-telemetry.log" <<'PYEOF'
 import sys, json, re
 from datetime import datetime, timezone
 from collections import defaultdict
 
-telemetry = json.loads(sys.argv[1])
+with open(sys.argv[1], "r") as f:
+    telemetry = json.load(f)
 cs_ns = sys.argv[2]
 start_ts = int(sys.argv[3])
 end_ts = int(sys.argv[4])
@@ -172,11 +176,9 @@ if not entries:
 print("=" * 80)
 PYEOF
 
-echo "$TELEMETRY" > "${ARTIFACT_DIR}/cs-telemetry-raw.json"
-
 EVENT_COUNT=$(python3 -c "
 import json
-d=json.loads(open('${ARTIFACT_DIR}/cs-telemetry-raw.json').read())
+d=json.load(open('${ARTIFACT_DIR}/cs-telemetry-raw.json'))
 print(sum(len(r.get('values',[])) for r in d.get('data',{}).get('result',[])))
 " 2>/dev/null || echo "?")
 
