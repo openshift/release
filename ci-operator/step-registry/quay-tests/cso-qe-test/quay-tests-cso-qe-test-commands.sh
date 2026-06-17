@@ -77,7 +77,7 @@ spec:
       containers:
         - name: nodejs-sample
           image: >-
-            quay.io/quay-qetest/nodejs-sample@sha256:e3ffe0cbaeebdcddbfe1ee7bca9b564a92863a8386d5b99a3d72677b3667b61d
+            quay.io/quay-qetest/nodejs-sample@sha256:14237f12c482dcca294e766fc57163d0c0adac43ae690d1328fdc578f4792b95
           ports:
             - containerPort: 8080
               protocol: TCP
@@ -105,7 +105,7 @@ done
 
 ##check IMV
 for _ in {1..60}; do
-    IMV=$(oc -n test-cso get imagemanifestvuln sha256.e3ffe0cbaeebdcddbfe1ee7bca9b564a92863a8386d5b99a3d72677b3667b61d || true)
+    IMV=$(oc -n test-cso get imagemanifestvuln sha256.14237f12c482dcca294e766fc57163d0c0adac43ae690d1328fdc578f4792b95 || true)
     if [[ -n "$IMV" ]]; then
         echo "$IMV"
         exit 0
@@ -114,5 +114,3 @@ for _ in {1..60}; do
     sleep 10
 done
 echo "QE Test for Container Security Operator is passed"
-echo "Sleeping 8h for debugging..."
-sleep 8h
