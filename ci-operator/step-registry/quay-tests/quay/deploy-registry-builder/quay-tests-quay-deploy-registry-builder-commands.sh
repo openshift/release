@@ -117,3 +117,13 @@ for i in {1..60}; do
   echo "Wait for quay registry ready $((i*15))s"
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Collecting debug info before sleep..." >&2
+oc -n ${QUAYNAMESPACE} get pods -o wide >"$ARTIFACT_DIR/debug_pods.txt" 2>&1 || true
+oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/debug_quayregistries.yaml" 2>&1 || true
+oc -n ${QUAYNAMESPACE} get events --sort-by='.lastTimestamp' >"$ARTIFACT_DIR/debug_events.txt" 2>&1 || true
+for pod in $(oc -n ${QUAYNAMESPACE} get pods -o name 2>/dev/null); do
+  podname=$(basename "$pod")
+  oc -n ${QUAYNAMESPACE} logs "$pod" --all-containers >"$ARTIFACT_DIR/debug_logs_${podname}.txt" 2>&1 || true
+done
+echo "Debug sleep 8h - connect to cluster to investigate" >&2
+sleep 8h
