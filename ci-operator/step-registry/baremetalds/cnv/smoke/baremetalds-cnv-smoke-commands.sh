@@ -10,6 +10,16 @@ CNV_VOLUME_MODE="${CNV_VOLUME_MODE:-Block}"
 export UV_CACHE_DIR=/tmp/uv-cache
 export HOME=/tmp
 
+BW_PATH="${BW_PATH:-/bw}"
+set +x
+ACCESS_TOKEN=$(head -1 "${BW_PATH}"/bitwarden-client-secret)
+ORGANIZATION_ID=$(head -1 "${BW_PATH}"/bitwarden-org-id)
+ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
+ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
+ARTIFACTORY_SERVER=$(head -1 "${BW_PATH}"/artifactory-server)
+set -x
+export ACCESS_TOKEN ORGANIZATION_ID ARTIFACTORY_USER ARTIFACTORY_TOKEN ARTIFACTORY_SERVER
+
 unset KUBERNETES_SERVICE_PORT_HTTPS
 unset KUBERNETES_SERVICE_PORT
 unset KUBERNETES_PORT_443_TCP
