@@ -80,6 +80,11 @@ echo "Copying inventory to SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
 cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
 
+echo "Preserving seed hub inventory with seed- prefix for later restore"
+for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
+  [[ -f "${SHARED_DIR}/${key}" ]] && cp "${SHARED_DIR}/${key}" "${SHARED_DIR}/seed-${key}"
+done
+
 echo "Getting hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
