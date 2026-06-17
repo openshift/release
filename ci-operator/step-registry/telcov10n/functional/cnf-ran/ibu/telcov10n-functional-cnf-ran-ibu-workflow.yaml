@@ -2,9 +2,10 @@ workflow:
   as: telcov10n-functional-cnf-ran-ibu
   documentation: |-
     IBU (Image Based Upgrade) workflow for CNF RAN testing.
-    Pre: deploy seed hub (kni-qe-108) and target hub (kni-qe-109) at VERSION, install operators on both, 
-         mirrors operators and OCP release images to target bastion's disconnected registry, 
-         deploy MinIO on target bastion, deploy spoke master VMs for both seed and target hubs.
+    Pre: deploy seed hub (kni-qe-108) and target hub (kni-qe-109) at VERSION, install operators on both,
+         mirrors operators and OCP release images to target bastion's disconnected registry,
+         deploy MinIO on target bastion, deploy spoke master VMs for both seed and target hubs,
+         then deploy the SNO spoke cluster on the seed hub via ZTP.
     Test: run IBU upgrade and post-upgrade eco-gotests, report results.
     Post: notify Slack, trigger next job in chain.
   steps:
@@ -20,5 +21,9 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
     - ref: telcov10n-functional-cnf-ran-ibu-target-deploy-minio
     - ref: telcov10n-functional-cnf-ran-ibu-deploy-spoke-master-vms
+    # Restore seed hub (kni-qe-108) flat inventory overwritten by ibu-target-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-ibu-restore-seed-inventory
+    # Deploy SNO spoke on seed hub (kni-qe-108) via ZTP
+    - ref: telcov10n-functional-cnf-ran-deploy-spoke-sno
     post: []
 
