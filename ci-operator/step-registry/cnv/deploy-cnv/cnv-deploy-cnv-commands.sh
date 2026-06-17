@@ -191,6 +191,14 @@ create_cnv_catalog_source() {
 __EOF__
 }
 
+resolve_iib_from_map () {
+    local iib_map_file_url="https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/version-mapping.json"
+    local result
+    result=$(curl -sL "${iib_map_file_url}" \
+      | jq --arg version "${CNV_VERSION}" -r '.[$version].index_image // empty') || true
+    echo "${result}"
+}
+
 ### MAIN ###################################################################################
 
 env_hashed | grep -i cnv | sort
@@ -199,6 +207,17 @@ if [[ -n $CNV_CATALOG_IMAGE ]]; then
   CNV_CATALOG_SOURCE=${CNV_IIB_CATALOG_NAME}
   create_cnv_catalog_source "${CNV_IIB_CATALOG_NAME}" "${CNV_CATALOG_IMAGE}"
   make_sure_all_catalog_source_are_healthy 600 10
+fi
+
+if [[ -z ${CNV_CATALOG_IMAGE} && -n ${CNV_CATALOG_SOURCE} && ${CNV_CATALOG_SOURCE} == "${CNV_IIB_CATALOG_NAME}" ]]; then
+    CNV_CATALOG_IMAGE=$(resolve_iib_from_map)
+    if [[ -z ${CNV_CATALOG_IMAGE} ]]; then
+        echo "Error: Failed to resolve IIB image for version ${CNV_VERSION}"
+        exit 1
+    fi
+    echo "Resolved IIB image for version ${CNV_VERSION}: ${CNV_CATALOG_IMAGE}"
+    create_cnv_catalog_source "${CNV_IIB_CATALOG_NAME}" "${CNV_CATALOG_IMAGE}"
+    make_sure_all_catalog_source_are_healthy 600 10
 fi
 
 echo_debug "Creating install namespace"
