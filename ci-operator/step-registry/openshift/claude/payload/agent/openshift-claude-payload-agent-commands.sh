@@ -363,14 +363,32 @@ EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 
 # agentic-ci manages OTEL collector lifecycle per invocation; collect JSONL after each run
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
-collect_otel() {
+ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+
+run_claude() {
+    local agentic_args=()
+    while [[ "$1" == --no-streaming ]]; do
+        agentic_args+=("$1"); shift
+    done
+    local prompt="$1"; shift
+    agentic-ci run \
+        --backend local \
+        --harness claude-code \
+        --model "${CLAUDE_MODEL}" \
+        --workdir "${WORKDIR}" \
+        "${agentic_args[@]+"${agentic_args[@]}"}" \
+        "${prompt}" \
+        -- \
+        --allowedTools "${ALLOWED_TOOLS}" \
+        --verbose \
+        "$@"
+    local rc=$?
     for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
         [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
     done
     rm -rf /tmp/agentic-ci-run.*
+    return $rc
 }
-
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
 
@@ -380,19 +398,11 @@ After completing your analysis, you MUST use the Skill tool to invoke ci:payload
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 3600 agentic-ci run \
-    --backend local \
-    --harness claude-code \
-    --model "${CLAUDE_MODEL}" \
-    --workdir "${WORKDIR}" \
+timeout 3600 run_claude \
     "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
-    -- \
-    --allowedTools "${ALLOWED_TOOLS}" \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    --verbose \
     || CLAUDE_EXIT=$?
-collect_otel
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
@@ -400,19 +410,11 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 agentic-ci run \
-        --backend local \
-        --harness claude-code \
-        --model "${CLAUDE_MODEL}" \
-        --workdir "${WORKDIR}" \
+    timeout 600 run_claude \
         "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
-        -- \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
         --max-turns 20 \
-        --verbose \
         || NUDGE_EXIT=$?
-    collect_otel
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
@@ -452,19 +454,11 @@ for attempt in 1 2 3; do
     if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
     echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
 
-    timeout 600 agentic-ci run \
-        --backend local \
-        --harness claude-code \
-        --model "${CLAUDE_MODEL}" \
-        --workdir "${WORKDIR}" \
+    timeout 600 run_claude \
         "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
-        -- \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
         --max-turns 10 \
-        --verbose \
         || true
-    collect_otel
 done
 
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
@@ -564,19 +558,11 @@ fi
 
 echo "Asking Claude to summarize findings for Slack..."
 SLACK_LOG=$(mktemp)
-agentic-ci run \
-    --backend local \
-    --harness claude-code \
-    --model "${CLAUDE_MODEL}" \
-    --workdir "${WORKDIR}" \
-    --no-streaming \
+run_claude --no-streaming \
     "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-    -- \
     --continue \
     --max-turns 5 \
-    --verbose \
     > "${SLACK_LOG}" 2>&1 || true
-collect_otel
 SUMMARY=$(jq -r 'select(.type == "result") | .result // empty' "${SLACK_LOG}" 2>/dev/null | head -1) || SUMMARY=""
 rm -f "${SLACK_LOG}"
 
