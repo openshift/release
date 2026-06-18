@@ -4,9 +4,9 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 build_root:
   image_stream_tag:
     name: builder
@@ -76,7 +76,7 @@ tests:
         oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/otel-icsp.yaml
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
         oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       env:
       - default: ""
