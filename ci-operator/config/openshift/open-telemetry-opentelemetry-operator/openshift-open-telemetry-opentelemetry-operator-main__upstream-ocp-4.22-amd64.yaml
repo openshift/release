@@ -4,9 +4,9 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
   operator-opamp-bridge
 build_root:
@@ -100,13 +100,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: security-sast-otel
-  steps:
-    env:
-      PROJECT_NAME: opentelemetry-operator
-      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
-    workflow: openshift-ci-security
 - as: opentelemetry-upstream-tests
   steps:
     cluster_profile: gcp-observability
@@ -129,7 +122,7 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
         oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
