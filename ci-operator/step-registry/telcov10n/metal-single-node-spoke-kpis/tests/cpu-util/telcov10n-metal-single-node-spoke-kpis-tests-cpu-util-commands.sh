@@ -83,6 +83,7 @@ set +x
 ls -rtlhZ
 pwd
 set -x
+export WORKSPACE=\${kpi_tests_repo}
 export STORAGE_CLASS=""
 export NETWORKS=""
 export ACCELERATOR_MODEL=""
@@ -231,11 +232,17 @@ function run_ansible_playbook {
 
 function setup_test_result_for_component_readiness {
 
+  if ! ls "${test_results_artifacts_append}"*.xml &>/dev/null; then
+    echo "ERROR: No XML result files found matching ${test_results_artifacts_append}*.xml" >&2
+    echo "ERROR: The cpu-util test may have failed to produce results" >&2
+    return 1
+  fi
+
   set -x
   sed -E \
     -e 's/(<testsuite name=")[^"]+/\1telco-verification/' \
     -e "s/<testcase name=\"([^\"]+)\"/<testcase name='${TEST_COMPONENT} \1'/" \
-    ${test_results_artifacts_append}*.xml \
+    "${test_results_artifacts_append}"*.xml \
       >| "${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME// /-}_telco_kpi_test_results.xml"
   set +x
 
