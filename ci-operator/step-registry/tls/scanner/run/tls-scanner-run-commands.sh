@@ -101,7 +101,6 @@ run_tls_scan() {
           oc delete namespace "${NAMESPACE}" --ignore-not-found --wait=false || true
       else
           oc delete pod/tls-scanner -n "${NAMESPACE}" --ignore-not-found --wait=false || true
-          oc delete networkpolicy/tls-scanner-allow-kube-api-egress -n "${NAMESPACE}" --ignore-not-found --wait=false || true
       fi
   }
   trap cleanup EXIT
@@ -146,34 +145,6 @@ run_tls_scan() {
   echo "Waiting for RBAC/SCC changes to propagate..."
   sleep 10
 
-  # When the scanner pod runs inside the HCP namespace (OWNS_NAMESPACE=false), HyperShift's
-  # egress NetworkPolicies block the pod from reaching the management cluster kube API at
-  # the kubernetes.default.svc ClusterIP. Create a targeted egress policy for the scanner
-  # pod so it can list pods/endpoints via the management cluster API.
-  if [[ "${OWNS_NAMESPACE}" == "false" ]]; then
-      KUBE_API_IP=$(oc get svc kubernetes -n default -o jsonpath='{.spec.clusterIP}')
-      cat <<NETPOL | oc apply -f -
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: tls-scanner-allow-kube-api-egress
-  namespace: ${NAMESPACE}
-spec:
-  podSelector:
-    matchLabels:
-      app: tls-scanner
-  policyTypes:
-  - Egress
-  egress:
-  - ports:
-    - port: 443
-      protocol: TCP
-    to:
-    - ipBlock:
-        cidr: ${KUBE_API_IP}/32
-NETPOL
-  fi
-
   # Create the scanner pod
   cat <<EOF | oc create -f -
 apiVersion: v1
@@ -183,6 +154,12 @@ metadata:
   namespace: ${NAMESPACE}
   labels:
     app: tls-scanner
+    # Required when running in an HCP namespace (OWNS_NAMESPACE=false): HyperShift's
+    # management-kas NetworkPolicy isolates pods without this label from the management
+    # cluster kube API (172.30.x.x service CIDR) via OVN ACLs that sit below standard
+    # NetworkPolicy. The label exempts the scanner so it can list pods via the
+    # management cluster API, which is the first thing tls-scanner does on startup.
+    hypershift.openshift.io/need-management-kas-access: "true"
 spec:
   serviceAccountName: default
   restartPolicy: Never
