@@ -1,0 +1,28 @@
+ref:
+  as: rosa-pool-checkin
+  from: cli
+  best_effort: true
+  grace_period: 1m
+  commands: rosa-pool-checkin-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  timeout: 5m0s
+  credentials:
+  - namespace: test-credentials
+    name: rosa-pool-manager
+    mount_path: /etc/rosa-pool-manager
+  env:
+  - name: POOL_NAMESPACE
+    default: "rosa-pool"
+    documentation: Namespace on the pool host cluster where pool ConfigMaps live.
+  documentation: |-
+    Returns a ROSA cluster to the standby pool after testing.
+
+    Reads the pool claim from SHARED_DIR/pool-claim (written by
+    rosa-pool-checkout) and patches the ConfigMap back to available
+    status, clearing the holder and build-id annotations.
+
+    Runs as best_effort so job cleanup always proceeds even if
+    checkin fails. A periodic health check job recovers stale leases.
