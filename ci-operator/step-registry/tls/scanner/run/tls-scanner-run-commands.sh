@@ -101,6 +101,7 @@ run_tls_scan() {
           oc delete namespace "${NAMESPACE}" --ignore-not-found --wait=false || true
       else
           oc delete pod/tls-scanner -n "${NAMESPACE}" --ignore-not-found --wait=false || true
+          oc delete networkpolicy/tls-scanner-allow-kube-api-egress -n "${NAMESPACE}" --ignore-not-found --wait=false || true
       fi
   }
   trap cleanup EXIT
@@ -113,10 +114,22 @@ run_tls_scan() {
       HOST_NETWORK="false"
       HOST_PID="false"
       PRIVILEGED_CONTAINER="false"
+      # PodSecurity restricted-compliant securityContext for HCP namespace scans.
+      # The scanner binary only needs kube API access in pod-mode, so root is not required.
+      SECURITY_CONTEXT_YAML="      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 65532
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault"
   else
       HOST_NETWORK="true"
       HOST_PID="true"
       PRIVILEGED_CONTAINER="true"
+      SECURITY_CONTEXT_YAML="      privileged: true
+      runAsUser: 0"
   fi
 
   # Grant cluster-admin to the default service account for full API access
@@ -133,6 +146,34 @@ run_tls_scan() {
   echo "Waiting for RBAC/SCC changes to propagate..."
   sleep 10
 
+  # When the scanner pod runs inside the HCP namespace (OWNS_NAMESPACE=false), HyperShift's
+  # egress NetworkPolicies block the pod from reaching the management cluster kube API at
+  # the kubernetes.default.svc ClusterIP. Create a targeted egress policy for the scanner
+  # pod so it can list pods/endpoints via the management cluster API.
+  if [[ "${OWNS_NAMESPACE}" == "false" ]]; then
+      KUBE_API_IP=$(oc get svc kubernetes -n default -o jsonpath='{.spec.clusterIP}')
+      cat <<NETPOL | oc apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tls-scanner-allow-kube-api-egress
+  namespace: ${NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: tls-scanner
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 443
+      protocol: TCP
+    to:
+    - ipBlock:
+        cidr: ${KUBE_API_IP}/32
+NETPOL
+  fi
+
   # Create the scanner pod
   cat <<EOF | oc create -f -
 apiVersion: v1
@@ -140,6 +181,8 @@ kind: Pod
 metadata:
   name: tls-scanner
   namespace: ${NAMESPACE}
+  labels:
+    app: tls-scanner
 spec:
   serviceAccountName: default
   restartPolicy: Never
@@ -173,8 +216,7 @@ spec:
         cpu: "${scanner_cpu}"
         memory: ${scanner_memory}
     securityContext:
-      privileged: ${PRIVILEGED_CONTAINER}
-      runAsUser: 0
+${SECURITY_CONTEXT_YAML}
     volumeMounts:
     - name: results
       mountPath: /results
@@ -242,6 +284,10 @@ EOF
   echo "=== TLS Scanner Complete ==="
   echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
   ls -la "${SCANNER_ARTIFACT_DIR}" || true
+
+  # Unregister the trap so it doesn't fire after the function returns (local
+  # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
+  trap - EXIT
 }
 
 if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
