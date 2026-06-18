@@ -12,6 +12,27 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset
+      USER 0
+      RUN dnf install -y git make jq && \
+          dnf install -y 'dnf-command(config-manager)' && \
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+          dnf install -y gh && \
+          dnf clean all
+      WORKDIR /app
+      RUN git clone --depth 1 -b OAPE-752 https://github.com/openshift-eng/oape-ai-e2e.git /tmp/oape && \
+          cp -r /tmp/oape/scripts /app/scripts && \
+          cp -r /tmp/oape/plugins /plugins && \
+          mkdir -p /config && cp -r /tmp/oape/config/* /config/ && \
+          rm -rf /tmp/oape
+      RUN go install golang.org/x/tools/cmd/goimports@latest && \
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin
+      RUN git config --global user.name "openshift-app-platform-shift-bot" && \
+          git config --global user.email "267347085+openshift-app-platform-shift-bot@users.noreply.github.com"
+      RUN chmod -R g=u /opt/app-root/src
+      USER 1001
+    to: ci-monitor-agent
   - dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
@@ -28,7 +49,9 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - name: "5.0"
+  - excluded_images:
+    - ci-monitor-agent
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -197,6 +220,57 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: true
+  as: oape-ci-monitor
+  optional: true
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+        INST_ID=$(curl -sf -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation" \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+        export GH_TOKEN=$(curl -sf -X POST -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens" \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        export GOOGLE_APPLICATION_CREDENTIALS="/var/run/gcloud-adc/application_default_credentials.json"
+        export CLAUDE_CODE_USE_VERTEX="1"
+        export CLOUD_ML_REGION="global"
+        export ANTHROPIC_VERTEX_PROJECT_ID="itpc-gcp-hcm-pe-eng-claude"
+
+        export PR_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}"
+        export SKIP_POLL="false"
+        export SELF_JOB_NAME="oape-ci-monitor"
+        export BUILD_ID="${BUILD_ID:-}"
+        export OAPE_RUN_URL="${BUILD_LOG_URL:-}"
+
+        gh auth setup-git
+        /app/scripts/ci-monitor/monitor.sh
+        /app/scripts/ci-monitor/dispatch.sh
+      credentials:
+      - mount_path: /var/run/gcloud-adc
+        name: oap-lts-claude-gcp-vertex-sa
+        namespace: test-credentials
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      from: ci-monitor-agent
+      resources:
+        requests:
+          cpu: "1"
+          memory: 500Mi
+      timeout: 2h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift
