@@ -27,13 +27,18 @@ ES_SERVER="https://${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}@${OPENSEARCH_HO
 
 pip install .
 
-# Print Orion version
-orion_version=$(orion --version 2>&1)
-orion_version_exit=$?
-if [ "$orion_version_exit" -ne 0 ]; then
-  echo "orion version prior to v0.1.7"
+# fix issue where fork doesn't have --version option
+if [[ $LATEST_TAG == "fix-tags" ]]; then
+    echo "Skipping Orion version check"
 else
-  echo "Orion version: $orion_version"
+    # Print Orion version
+    orion_version=$(orion --version 2>&1)
+    orion_version_exit=$?
+    if [ "$orion_version_exit" -ne 0 ]; then
+    echo "orion version prior to v0.1.7"
+    else
+    echo "Orion version: $orion_version"
+    fi
 fi
 
 export EXTRA_FLAGS=" --hunter-analyze"
