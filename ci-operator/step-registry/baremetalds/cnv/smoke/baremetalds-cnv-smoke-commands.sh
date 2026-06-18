@@ -56,6 +56,7 @@ uv --verbose --cache-dir /tmp/uv-cache \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
   --storage-class-matrix="${CNV_STORAGE_CLASS}" \
+  --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
   --latest-rhel \
   --tb=native \
   --junitxml="${ARTIFACT_DIR}/xunit_results.xml" \
