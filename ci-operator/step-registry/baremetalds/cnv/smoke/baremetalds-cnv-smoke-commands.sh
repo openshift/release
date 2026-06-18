@@ -31,6 +31,9 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
+  NO_PROXY="${NO_PROXY},bitwarden.com,bitwarden.eu"
+  no_proxy="${no_proxy},bitwarden.com,bitwarden.eu"
+  export NO_PROXY no_proxy
 fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
