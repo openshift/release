@@ -26,8 +26,8 @@ images:
           cp -r /tmp/oape/plugins /plugins && \
           mkdir -p /config && cp -r /tmp/oape/config/* /config/ && \
           rm -rf /tmp/oape
-      RUN go install golang.org/x/tools/cmd/goimports@latest && \
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin
+      RUN go install golang.org/x/tools/cmd/goimports@v0.33.0 && \
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.1.6/install.sh | sh -s -- -b /usr/local/bin v2.1.6
       RUN git config --global user.name "openshift-app-platform-shift-bot" && \
           git config --global user.email "267347085+openshift-app-platform-shift-bot@users.noreply.github.com"
       RUN chmod -R g=u /opt/app-root/src
@@ -239,10 +239,11 @@ tests:
 
         INST_ID=$(curl -sf -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
           "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation" \
-          | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-        export GH_TOKEN=$(curl -sf -X POST -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          | jq -er '.id')
+        GH_TOKEN=$(curl -sf -X POST -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
           "https://api.github.com/app/installations/${INST_ID}/access_tokens" \
-          | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          | jq -er '.token')
+        export GH_TOKEN
 
         export GOOGLE_APPLICATION_CREDENTIALS="/var/run/gcloud-adc/application_default_credentials.json"
         export CLAUDE_CODE_USE_VERTEX="1"
