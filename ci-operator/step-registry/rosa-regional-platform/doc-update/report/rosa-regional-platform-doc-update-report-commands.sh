@@ -3,6 +3,12 @@ set -euo pipefail
 
 echo "=== Rosa Regional Platform Documentation Update Report ==="
 
+# HTML escape function to prevent script/markup injection
+html_escape() {
+  local input="$1"
+  echo "$input" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&#39;/g'
+}
+
 OUTPUT_FILE="${SHARED_DIR:-/tmp}/claude-output.json"
 REPORT_FILE="${ARTIFACT_DIR:-/tmp/artifacts}/doc-update-report.html"
 
@@ -91,14 +97,20 @@ cat > "${REPORT_FILE}" <<EOF
 EOF
 
 if [ "${UPDATES_NEEDED}" = "true" ]; then
+  # Escape REPOS_UPDATED
+  REPOS_UPDATED_ESCAPED=$(html_escape "${REPOS_UPDATED}")
+  # Escape stale docs
+  STALE_DOCS_ESCAPED=$(echo "${STALE_DOCS}" | jq -r 'to_entries[] | "\(.key):\n" + (.value | map("  - " + .) | join("\n"))' 2>/dev/null || echo "No stale docs list")
+  STALE_DOCS_ESCAPED=$(html_escape "${STALE_DOCS_ESCAPED}")
+
   cat >> "${REPORT_FILE}" <<EOF
   <p class="warning"><strong>Documentation updates were needed and processed.</strong></p>
 
   <h3>Repositories Updated</h3>
-  <p>${REPOS_UPDATED}</p>
+  <p>${REPOS_UPDATED_ESCAPED}</p>
 
   <h3>Stale Documentation Files by Repository</h3>
-  <pre>$(echo "${STALE_DOCS}" | jq -r 'to_entries[] | "\(.key):\n" + (.value | map("  - " + .) | join("\n"))' 2>/dev/null || echo "No stale docs list")</pre>
+  <pre>${STALE_DOCS_ESCAPED}</pre>
 
   <h3>Pull Requests Created</h3>
 EOF
@@ -112,7 +124,21 @@ EOF
       <th>URL</th>
     </tr>
 EOF
-    echo "${PRS_CREATED}" | jq -r '.[] | "<tr><td>\(.repo)</td><td>#\(.number)</td><td>\(.title)</td><td><a href=\"\(.url)\">Link</a></td></tr>"' >> "${REPORT_FILE}"
+    # Escape PR fields before inserting into HTML
+    echo "${PRS_CREATED}" | jq -r '.[]' | while IFS= read -r pr_json; do
+      REPO=$(echo "$pr_json" | jq -r '.repo')
+      NUMBER=$(echo "$pr_json" | jq -r '.number')
+      TITLE=$(echo "$pr_json" | jq -r '.title')
+      URL=$(echo "$pr_json" | jq -r '.url')
+
+      REPO_ESCAPED=$(html_escape "$REPO")
+      TITLE_ESCAPED=$(html_escape "$TITLE")
+      URL_ESCAPED=$(html_escape "$URL")
+
+      cat >> "${REPORT_FILE}" <<PRROW
+    <tr><td>${REPO_ESCAPED}</td><td>#${NUMBER}</td><td>${TITLE_ESCAPED}</td><td><a href="${URL_ESCAPED}">Link</a></td></tr>
+PRROW
+    done
     cat >> "${REPORT_FILE}" <<EOF
   </table>
 EOF
@@ -126,8 +152,9 @@ else
   <p class="success"><strong>No documentation updates needed.</strong></p>
 EOF
   if [ -n "${REASON}" ] && [ "${REASON}" != "null" ]; then
+    REASON_ESCAPED=$(html_escape "${REASON}")
     cat >> "${REPORT_FILE}" <<EOF
-  <p><em>Reason:</em> ${REASON}</p>
+  <p><em>Reason:</em> ${REASON_ESCAPED}</p>
 EOF
   fi
 fi
@@ -141,8 +168,9 @@ if [ "${ERROR_COUNT}" -gt 0 ]; then
   <ul>
 EOF
   echo "${ERRORS}" | jq -r '.[]' | while read -r error; do
+    ERROR_ESCAPED=$(html_escape "$error")
     cat >> "${REPORT_FILE}" <<EOF
-    <li class="error">${error}</li>
+    <li class="error">${ERROR_ESCAPED}</li>
 EOF
   done
   cat >> "${REPORT_FILE}" <<EOF
@@ -150,11 +178,14 @@ EOF
 EOF
 fi
 
-# Add raw JSON output
+# Add raw JSON output (escaped)
+RAW_JSON=$(jq '.' "${OUTPUT_FILE}" 2>/dev/null || cat "${OUTPUT_FILE}")
+RAW_JSON_ESCAPED=$(html_escape "$RAW_JSON")
+
 cat >> "${REPORT_FILE}" <<EOF
 
   <h2>Raw Results</h2>
-  <pre>$(jq '.' "${OUTPUT_FILE}" 2>/dev/null || cat "${OUTPUT_FILE}")</pre>
+  <pre>${RAW_JSON_ESCAPED}</pre>
 </body>
 </html>
 EOF

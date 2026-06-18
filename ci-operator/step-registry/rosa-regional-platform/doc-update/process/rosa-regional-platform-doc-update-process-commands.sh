@@ -265,17 +265,30 @@ echo "Total PRs to analyze across all repos: ${TOTAL_PR_COUNT}"
 echo ""
 echo "=== Step 3: Syncing all forks with upstream ==="
 
+# Associative array to store default branch for each repo
+declare -A REPO_DEFAULT_BRANCH
+
 for REPO_NAME in "${REPOS[@]}"; do
   if [ -d "${REPO_NAME}" ]; then
     echo "Syncing ${REPO_NAME}..."
     cd "${REPO_NAME}"
-    git checkout main 2>/dev/null || git checkout master 2>/dev/null || {
+
+    # Determine default branch (try main first, fallback to master)
+    if git checkout main 2>/dev/null; then
+      REPO_DEFAULT_BRANCH["${REPO_NAME}"]="main"
+    elif git checkout master 2>/dev/null; then
+      REPO_DEFAULT_BRANCH["${REPO_NAME}"]="master"
+    else
       echo "WARNING: Could not checkout main/master for ${REPO_NAME}"
       cd ..
       continue
-    }
+    fi
+
+    DEFAULT_BRANCH="${REPO_DEFAULT_BRANCH[${REPO_NAME}]}"
+    echo "  Default branch: ${DEFAULT_BRANCH}"
+
     git fetch upstream || git fetch origin
-    git reset --hard upstream/main 2>/dev/null || git reset --hard upstream/master 2>/dev/null || git reset --hard origin/main 2>/dev/null || git reset --hard origin/master
+    git reset --hard upstream/${DEFAULT_BRANCH} 2>/dev/null || git reset --hard origin/${DEFAULT_BRANCH}
     git push origin HEAD --force 2>/dev/null || echo "WARNING: Failed to push to fork for ${REPO_NAME}, continuing anyway"
     cd ..
   fi
@@ -339,11 +352,8 @@ ${MERGED_PRS_LIST}
 
 ## Your Task
 
-You are currently in /tmp/doc-update with all four repositories cloned:
-- rosa-regional-platform/
-- rosa-regional-platform-api/
-- rosa-regional-platform-cli/
-- rosa-regional-platform-internal/
+You are currently in /tmp/doc-update with the following ${#REPOS[@]} repositories cloned:
+$(printf '- %s/\n' "${REPOS[@]}")
 
 Follow the procedure defined in .claude/agents/documentation-updater.md:
 
@@ -385,6 +395,8 @@ For EACH repository that needs doc updates:
 
 For each repository with updates:
 - cd into the repository
+- Determine the default branch for this repository:
+  $(for REPO_NAME in "${REPOS[@]}"; do echo "  - ${REPO_NAME}: ${REPO_DEFAULT_BRANCH[${REPO_NAME}]:-main}"; done)
 - Create a PR with:
   - Title: "[docs-agent] Update <area> documentation"
   - Body should include:
@@ -392,7 +404,8 @@ For each repository with updates:
     - List of PRs that triggered the update (with repo#PR format, e.g., rosa-regional-platform-api#45)
     - /cc mentions for relevant PR authors
     - Note if updates were triggered by changes in a different repository
-  - Use: gh pr create --repo ${UPSTREAM_OWNER}/<repository-name> --head ${FORK_OWNER}:<branch> --base main --title "..." --body "..."
+  - Use the appropriate base branch for each repository when creating the PR
+  - Example: gh pr create --repo ${UPSTREAM_OWNER}/<repository-name> --head ${FORK_OWNER}:<branch> --base <default-branch> --title "..." --body "..."
 - Return to /tmp/doc-update
 
 ### Phase 5: Output Results
@@ -432,8 +445,10 @@ OUTPUT_FILE="${SHARED_DIR:-/tmp}/claude-output.json"
 # Invoke Claude
 echo "Invoking Claude with documentation-updater agent..."
 
-# Disable tracing for Claude invocation to avoid token leakage
+# Save current tracing state and disable tracing for Claude invocation to avoid token leakage
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
+
 claude \
   --allowedTools "Bash,Read,Edit,Write,Grep,Glob" \
   --maxTurns 100 \
@@ -442,11 +457,28 @@ claude \
   --prompt "${CLAUDE_PROMPT}" \
   > "${OUTPUT_FILE}" 2>&1 || {
     echo "ERROR: Claude invocation failed"
+    # Ensure claude-output.json contains valid JSON for downstream jq parsing
+    # Save raw output for debugging
+    mv "${OUTPUT_FILE}" "${OUTPUT_FILE}.raw" 2>/dev/null || true
+    # Write valid JSON error structure
+    cat > "${OUTPUT_FILE}" <<ERRORJSON
+{
+  "updates_needed": false,
+  "analyzed_prs": ${TOTAL_PR_COUNT},
+  "repositories_updated": [],
+  "prs_created": [],
+  "stale_docs": {},
+  "errors": ["Claude invocation failed. See ${OUTPUT_FILE}.raw for details."]
+}
+ERRORJSON
     echo "Output saved to: ${OUTPUT_FILE}"
-    cat "${OUTPUT_FILE}" || true
+    echo "Raw output saved to: ${OUTPUT_FILE}.raw"
+    cat "${OUTPUT_FILE}.raw" || true
     exit 1
   }
-set -x
+
+# Restore previous tracing state
+$WAS_TRACING && set -x || true
 
 echo "Claude processing complete"
 echo "Output saved to: ${OUTPUT_FILE}"
