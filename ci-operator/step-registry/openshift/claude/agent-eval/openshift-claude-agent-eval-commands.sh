@@ -21,6 +21,16 @@ set -o pipefail
 
 echo "Starting claude-agent-eval"
 
+# Load GitHub token for gh CLI access (same secret as payload-agent)
+set +x
+if [ -f "${GITHUB_TOKEN_PATH:-}" ]; then
+    export GITHUB_TOKEN
+    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    echo "GitHub token loaded."
+else
+    echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH:-<unset>}. gh CLI will run unauthenticated."
+fi
+
 # The repo is at /opt/ai-helpers; WORKDIR is /workspace
 cd /opt/ai-helpers
 
