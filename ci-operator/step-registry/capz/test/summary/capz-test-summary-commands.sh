@@ -2,8 +2,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
-
 source "${SHARED_DIR}/capz-test-env.sh"
 
 # Collect all JUnit XMLs from SHARED_DIR into ARTIFACT_DIR

@@ -90,6 +90,7 @@ fi
 # Write resolved environment to SHARED_DIR (sourced by subsequent steps).
 { set +o xtrace; } 2>/dev/null
 cat > "${ENV_FILE}" << ENVEOF
+{ set +o xtrace; } 2>/dev/null
 export AZURE_CLIENT_ID="${AZURE_CLIENT_ID}"
 export AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET}"
 export AZURE_TENANT_ID="${AZURE_TENANT_ID}"
