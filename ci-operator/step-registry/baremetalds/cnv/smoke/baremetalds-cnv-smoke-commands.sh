@@ -42,6 +42,12 @@ echo "Running CNV smoke tests with storage class: ${CNV_STORAGE_CLASS}, volume m
 
 oc whoami --show-console
 
+echo "Waiting for golden images to be imported..."
+oc wait DataImportCron -n openshift-virtualization-os-images \
+  --all --for=condition=UpToDate --timeout=20m
+echo "Golden images ready. Available PVCs:"
+oc get pvc -n openshift-virtualization-os-images
+
 START_TIME=$(date "+%s")
 
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
