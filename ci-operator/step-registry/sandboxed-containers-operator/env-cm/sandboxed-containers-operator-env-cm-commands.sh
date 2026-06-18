@@ -161,6 +161,7 @@ data:
   trusteeUrl: "${TRUSTEE_URL}"
   INITDATA: "${INITDATA}"
   enablePeerPods: "${ENABLEPEERPODS}"
+  identityMode: "${IDENTITY_MODE:-cco}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
   installKataRPM: "${INSTALL_KATA_RPM}"
