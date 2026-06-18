@@ -125,6 +125,22 @@ if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
 else
   echo "No MSI mock SP lease provided, skipping mock SP overrides"
 fi
+
+# Temporary MGMT cluster sizing overrides for single-wave E2E parallelism.
+# These will be removed once the matching config.yaml defaults land in ARO-HCP.
+# Only apply when identity containers are leased (E2E runs); healthcheck
+# workflows provision without leases and should use the default sizing.
+if [[ -n "${LEASED_MSI_CONTAINERS:-}" ]]; then
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 7 |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.infraAgentPool.vmSize = \"Standard_D8ds_v6\"
+  " "${OVERRIDE_CONFIG_FILE}"
+else
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 1
+  " "${OVERRIDE_CONFIG_FILE}"
+fi
+
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
 
