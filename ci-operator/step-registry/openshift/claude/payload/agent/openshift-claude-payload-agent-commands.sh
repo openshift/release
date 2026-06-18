@@ -379,6 +379,7 @@ run_claude() {
         "${agentic_args[@]+"${agentic_args[@]}"}" \
         "${prompt}" \
         -- \
+        --permission-mode default \
         --allowedTools "${ALLOWED_TOOLS}" \
         --verbose \
         "$@"
