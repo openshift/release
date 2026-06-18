@@ -24,9 +24,29 @@ function debug_dump() {
 function wait_for_condition() {
   local condition_type="$1"
   local deadline="$2"
+  local api_failures=0
+  local max_api_failures=25
 
   while (( $(date +%s) < deadline )); do
-    condition_json="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -c --arg type "${condition_type}" '.status.conditions[]? | select(.type == $type)')"
+    # During control plane rollout the API server may be temporarily
+    # unreachable (HAProxy/keepalive connection drops, TLS handshake
+    # timeouts). Tolerate consecutive transient failures.
+    local cr_json
+    if ! cr_json="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json 2>/dev/null)"; then
+      api_failures=$(( api_failures + 1 ))
+      log "API request failed for condition ${condition_type} (${api_failures}/${max_api_failures}), retrying..."
+      if (( api_failures >= max_api_failures )); then
+        log "API unreachable for ${max_api_failures} consecutive attempts"
+        debug_dump
+        exit 1
+      fi
+      sleep 30
+      continue
+    fi
+
+    api_failures=0
+    condition_json="$(jq -c --arg type "${condition_type}" '.status.conditions[]? | select(.type == $type)' <<< "${cr_json}")"
+
     if [[ -n "${condition_json}" ]]; then
       status="$(jq -r '.status' <<< "${condition_json}")"
       reason="$(jq -r '.reason // ""' <<< "${condition_json}")"
