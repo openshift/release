@@ -20,7 +20,6 @@ EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 
 if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   echo "Using default value: ${BASE_DOMAIN}"
