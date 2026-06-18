@@ -145,7 +145,6 @@ while true; do
         FAILING_CHECKS_BODY=""
         if [[ "${has_new_failures}" == "true" ]]; then
             FAILING_CHECKS_BODY=$(echo "${failing_checks}" | jq -r '.[] | "- \(.name) (\(.state))"' 2>/dev/null || echo "")
-            LAST_FAILING_NAMES="${current_failing_names}"
         fi
 
         timeout 1800 claude \
@@ -178,6 +177,8 @@ ${FAILING_CHECKS_BODY}" \
         idle_streak=$(( idle_streak + 1 ))
         echo "Nothing to do (idle streak: ${idle_streak}/3)."
     fi
+
+    LAST_FAILING_NAMES="${current_failing_names}"
 
     # Exit when we've done at least 6 iterations AND had 3 consecutive idle iterations
     if [[ "${iteration}" -ge 6 && "${idle_streak}" -ge 3 ]]; then
