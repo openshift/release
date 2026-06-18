@@ -1,6 +1,21 @@
 #!/bin/bash
 set -o errexit
 
+# Map results by setting identifier prefix in testsuite names for CR reporting.
+# Merge original results into a single file and send to shared dir for
+# mpiit-data-router-reporter.
+if [ "${MAP_TESTS:-}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--redhat-chaos-container-scenarios-etcd-hangup.xml
+    ' EXIT
+fi
+
 typeset secretDir=/secret/es
 ES_PASSWORD=$(<"${secretDir}/es-password--${CHAOS_TEAM_NAME}")
 ES_USERNAME=$(<"${secretDir}/es-username--${CHAOS_TEAM_NAME}")
