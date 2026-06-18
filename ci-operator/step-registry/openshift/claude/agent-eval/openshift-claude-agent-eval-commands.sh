@@ -94,8 +94,9 @@ if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${EVAL_CASES_DIR}" ]] && [[ 
     if [[ -z "${PULL_BASE_SHA:-}" ]]; then
         echo "PULL_BASE_SHA not set, running all cases."
     else
-        CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" -- "${EVAL_CASES_DIR}" || true)
-        if [[ -n "${CHANGED_FILES}" ]]; then
+        if ! CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" -- "${EVAL_CASES_DIR}"); then
+            echo "Failed to diff against PULL_BASE_SHA (${PULL_BASE_SHA}); running all cases."
+        elif [[ -n "${CHANGED_FILES}" ]]; then
             DETECTED_CASES=$(echo "${CHANGED_FILES}" | sed "s|^${EVAL_CASES_DIR}/||" | cut -d'/' -f1 | sort -u | paste -sd, -)
             echo "Changed cases: ${DETECTED_CASES}"
             EVAL_CASES="${DETECTED_CASES}"
