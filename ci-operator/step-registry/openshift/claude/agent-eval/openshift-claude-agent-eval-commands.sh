@@ -86,6 +86,26 @@ trap copy_artifacts EXIT TERM INT
 export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 
 # -----------------------------------------------------------------------
+# Auto-detect changed eval cases from PR diff
+# -----------------------------------------------------------------------
+if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${EVAL_CASES_DIR}" ]] && [[ -z "${EVAL_CASES}" ]]; then
+    echo ""
+    echo "=== Detecting changed eval cases ==="
+    CHANGED_FILES=""
+    if git rev-parse HEAD^1 &>/dev/null; then
+        CHANGED_FILES=$(git diff --name-only HEAD^1 HEAD -- "${EVAL_CASES_DIR}" || true)
+    fi
+    if [[ -n "${CHANGED_FILES}" ]]; then
+        DETECTED_CASES=$(echo "${CHANGED_FILES}" | sed "s|^${EVAL_CASES_DIR}/||" | cut -d'/' -f1 | sort -u | paste -sd, -)
+        echo "Changed cases: ${DETECTED_CASES}"
+        EVAL_CASES="${DETECTED_CASES}"
+    else
+        echo "No changed cases detected in ${EVAL_CASES_DIR}, skipping eval."
+        exit 0
+    fi
+fi
+
+# -----------------------------------------------------------------------
 # Build arguments
 # -----------------------------------------------------------------------
 RUN_ID="ci-$(date +%Y%m%d-%H%M%S)-${EVAL_MODEL}"
