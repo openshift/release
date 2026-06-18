@@ -56,6 +56,7 @@ uv --verbose --cache-dir /tmp/uv-cache \
   --tc-file=tests/global_config_lvms.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
+  --tc "default_access_mode:ReadWriteOnce" \
   --storage-class-matrix="${CNV_STORAGE_CLASS}" \
   --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
   --latest-rhel \
