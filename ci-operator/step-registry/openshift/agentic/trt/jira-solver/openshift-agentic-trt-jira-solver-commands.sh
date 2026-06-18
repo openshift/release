@@ -90,7 +90,7 @@ if [[ ! -s "${PR_BODY_FILE}" ]]; then
 Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n' >> "${PR_BODY_FILE}"
+printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
 echo "Creating PR..."
 PR_URL=$(gh pr create \
@@ -107,8 +107,5 @@ PR_URL=$(gh pr create \
 echo "PR created: ${PR_URL}"
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
 echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
-
-# Trigger CodeRabbit review
-gh pr comment "${PR_NUM}" --repo "${UPSTREAM_REPO}" --body "@coderabbitai review" 2>/dev/null || echo "Warning: Failed to trigger CodeRabbit review."
 
 echo "=== TRT Jira Solver Complete ==="
