@@ -17,12 +17,11 @@ images:
   items:
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tempo-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.12"
 resources:
   '*':
@@ -43,9 +42,11 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
-    cluster_profile: azure-observability
+    cluster_profile: gcp-observability
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1157117
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.10
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -54,12 +55,15 @@ tests:
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
-      SKIP_TESTS: tests/e2e-openshift-object-stores/*
+      SKIP_TESTS: tests/e2e-openshift-object-stores/* tests/e2e-openshift-tls-profile/03-tls-profile
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     test:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-stage
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

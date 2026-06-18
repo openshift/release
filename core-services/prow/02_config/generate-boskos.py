@@ -194,16 +194,26 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 14,
-        'eastus': 14,
-        'eastus2': 14,
-        'westus': 14
+        'centralus': 8,
+        'eastus': 8,
+        'eastus2': 8,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
+        'westus': 8,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-2-quota-slice': {
-        'centralus': 33,
-        'eastus': 33,
-        'eastus2': 33,
-        'westus': 33
+        'centralus': 21,
+        'eastus': 12,
+        'eastus2': 21,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
+        'westus': 21,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -239,7 +249,7 @@ CONFIG = {
         'centralus': 15
     },
     'azure-observability-quota-slice': {
-        'westus': 3
+        'westus': 25
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -310,8 +320,12 @@ CONFIG = {
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
     # BEGIN ARO-HCP E2E SLOT TYPES
-    'aro-hcp-dev-shard1-slot': {},
     'aro-hcp-dev-shard0-slot': {},
+    'aro-hcp-dev-shard1-slot': {},
+    'aro-hcp-dev-shard2-slot': {},
+    'aro-hcp-dev-shard3-slot': {},
+    'aro-hcp-int-shard0-slot': {},
+    'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
@@ -342,7 +356,7 @@ CONFIG = {
         'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 25,
     },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
@@ -773,10 +787,18 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(7):
-    CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(15):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1

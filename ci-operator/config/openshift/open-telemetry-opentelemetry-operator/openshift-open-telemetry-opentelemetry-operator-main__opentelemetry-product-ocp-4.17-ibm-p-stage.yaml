@@ -17,12 +17,11 @@ images:
   items:
   - context_dir: .
     dockerfile_path: ./tests/e2e-openshift/Dockerfile
-    to: opentelemetry-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.17"
 resources:
   '*':
@@ -44,7 +43,10 @@ tests:
       {{end}}'
   steps:
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
       FIPS_ENABLED: "false"
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle@sha256:35ea32f1d12e6abfce4be19e3a69589ed8d777f6a606aa29a898a6c9c634b581
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
       OCP_CLUSTER_VERSION: stable-4.17
       OPERATORS: |
         [
@@ -57,6 +59,9 @@ tests:
       SKIP_TESTS: tests/e2e-openshift/must-gather tests/e2e-targetallocator/* tests/e2e-targetallocator-cr/*
         tests/e2e-multi-instrumentation/* tests/e2e-otel/* tests/e2e-opampbridge/*
         tests/e2e-pdb/* tests/e2e-instrumentation/* tests/e2e-prometheuscr/* tests/e2e-otel/google*
+    post:
+    - ref: openshift-observability-qe-agent
+    - ref: openshift-observability-ibm-p-cluster-destroy
     test:
     - as: install-opentelemetry-operator
       cli: latest
@@ -70,6 +75,9 @@ tests:
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
         oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+      env:
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
       from: operator-sdk
       resources:
         requests:

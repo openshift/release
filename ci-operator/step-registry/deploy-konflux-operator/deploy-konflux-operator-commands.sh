@@ -29,6 +29,8 @@ function set_proxy () {
         # cat "${SHARED_DIR}/proxy-conf.sh"
         echo "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
+        export no_proxy=mirror.openshift.com,openshift-mirror-list.ci-systems.workers.dev,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+        export NO_PROXY=mirror.openshift.com,openshift-mirror-list.ci-systems.workers.dev,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
     else
         echo "no proxy setting."
     fi
@@ -64,7 +66,7 @@ function install_opm() {
 
 function install_oc() {
     echo "Install oc"
-    run_command "curl -L --retry 5 https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz | tar -xz -C ${TOOLS_DIR} oc && chmod +x ${TOOLS_DIR}/oc"
+    run_command "curl -L --retry 5 https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/ocp/stable/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz | tar -xz -C ${TOOLS_DIR} oc && chmod +x ${TOOLS_DIR}/oc"
 }
 
 function install_deps() {

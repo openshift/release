@@ -33,6 +33,21 @@ if [ ! -d "${REVIEW_PLUGIN_DIR}/.claude-plugin" ]; then
 fi
 echo "Code-review plugin found"
 
+# Install tool dependencies
+echo "Installing tool dependencies..."
+GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
+python3.9 -m ensurepip --user 2>/dev/null || true
+python3.9 -m pip install --user pre-commit 2>&1 | tail -1
+export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
+
+# Install plugins
+echo "Installing Claude Code plugins..."
+claude plugin marketplace add openshift-eng/ai-helpers
+claude plugin install utils@ai-helpers
+claude plugin install golang@ai-helpers
+claude plugin marketplace add enxebre/ai-scripts
+claude plugin install git@enxebre
+
 cd /tmp/hypershift
 
 # Configure git
@@ -400,7 +415,7 @@ while IFS= read -r line; do
   claude -p "$ISSUE_KEY origin --ci. $FORK_CONTEXT" \
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
-    --max-turns 100 \
+    --max-turns 300 \
     --effort max \
     --model "$CLAUDE_MODEL" \
     --verbose \
@@ -467,7 +482,7 @@ while IFS= read -r line; do
         --plugin-dir "${REVIEW_PLUGIN_DIR}" \
         --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob Task" \
-        --max-turns 75 \
+        --max-turns 225 \
         --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \
@@ -522,6 +537,17 @@ while IFS= read -r line; do
         REVIEW_FINDINGS=$(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt")
       fi
 
+      # Refresh tokens before Phase 3 since it pushes code.
+      # Phases 1-2 can exceed the 1-hour GitHub App token lifetime.
+      echo "Refreshing GitHub App tokens before Phase 3..."
+      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for fork"
+      else
+        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+        echo "Fork token refreshed"
+      fi
+
       PHASE3_START=$(date +%s)
 
       if [ -n "$REVIEW_FINDINGS" ]; then
@@ -541,7 +567,7 @@ IMPORTANT:
         set +e
         claude -p "$FIX_PROMPT" \
           --allowedTools "Bash Read Write Edit Grep Glob" \
-          --max-turns 75 \
+          --max-turns 225 \
           --effort max \
           --model "$CLAUDE_MODEL" \
           --verbose \
@@ -587,11 +613,10 @@ IMPORTANT:
       echo "Phase 3 duration: ${PHASE3_DURATION}s"
       echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
 
-      # Regenerate GitHub App tokens before push/PR operations.
-      # Installation tokens expire after 1 hour, and phases 1-3 can
-      # easily exceed that. Refreshing here ensures push and PR
-      # creation use a valid token.
-      echo "Refreshing GitHub App tokens before push/PR..."
+      # Regenerate GitHub App tokens before Phase 4.
+      # Phase 3 may also have taken significant time, so refresh again
+      # to ensure PR creation uses a valid token.
+      echo "Refreshing GitHub App tokens before Phase 4..."
       GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
       if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
         echo "ERROR: Failed to refresh GitHub App token for fork"
@@ -633,7 +658,7 @@ IMPORTANT:
       set +e
       claude -p "$PR_PROMPT" \
         --allowedTools "Bash Read Grep Glob" \
-        --max-turns 15 \
+        --max-turns 90 \
         --effort max \
         --model "$CLAUDE_MODEL" \
         --verbose \

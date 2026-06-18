@@ -182,7 +182,7 @@ function install_yq_if_not_exists() {
 install_yq_if_not_exists
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
-OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
+OC_URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
 # Exports
 export PATH="${BIN_FOLDER}:${PATH}"

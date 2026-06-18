@@ -86,7 +86,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry
     # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    if ! curl --retry-all-errors --max-time 65 --retry-delay 60 --retry 3 --retry-max-time 370 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="

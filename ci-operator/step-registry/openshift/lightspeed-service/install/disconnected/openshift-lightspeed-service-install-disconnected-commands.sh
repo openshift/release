@@ -121,7 +121,7 @@ mirror:
 EOF
 
     run_command "cd /tmp"
-    run_command "curl -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
+    run_command "curl -L -o oc-mirror.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
 
     # Setup TLS certificate for mirror registry by extracting from cluster
     echo "Extracting mirror registry CA certificate from cluster..."

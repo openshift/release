@@ -1,3 +1,8 @@
+base_images:
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -28,16 +33,22 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: shellcheck
+  commands: |
+    set -x
+    echo "Searching for shell scripts..."
+    find . -type f -name "*.sh" -exec shellcheck -x -s bash {} \;
+    echo "Shellcheck completed successfully"
+  container:
+    from: shellcheck
+- as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-bm-bond
+- as: e2e-metal-ipi-ovn-ipv4-bond
   capabilities:
   - intranet
   optional: true

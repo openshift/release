@@ -23,8 +23,8 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
-if [[ ! -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
-  echo "### Dev-scripts logs not found, collecting as fallback..."
+if [[ ! -f "${SHARED_DIR}/devscripts-logs-collected" ]]; then
+  echo "### Dev-scripts logs not collected by setup, collecting as fallback..."
   timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
   if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
     find "${ARTIFACT_DIR}/root/dev-scripts/logs" -type f -exec sed -i '

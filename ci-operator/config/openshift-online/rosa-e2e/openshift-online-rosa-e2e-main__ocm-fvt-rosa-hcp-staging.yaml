@@ -28,8 +28,13 @@ tests:
   cron: 0 3 * * *
   nested_podman: true
   steps:
+    allow_best_effort_post_steps: true
     env:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
     test:
     - ref: rosa-e2e-ocm-fvt
   timeout: 5h0m0s
@@ -162,6 +167,17 @@ tests:
   steps:
     env:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-upgrade-staging-main
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-staging-main
+  capabilities:
+  - nested-podman
+  interval: 168h
+  nested_podman: true
+  steps:
+    env:
+      OCM_FVT_JOB_NAME: cs-sanity-staging
     test:
     - ref: rosa-e2e-ocm-fvt
   timeout: 5h0m0s

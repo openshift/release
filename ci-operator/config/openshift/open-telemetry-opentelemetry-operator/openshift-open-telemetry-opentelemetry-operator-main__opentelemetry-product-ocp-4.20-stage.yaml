@@ -13,12 +13,11 @@ images:
   items:
   - context_dir: .
     dockerfile_path: ./tests/e2e-openshift/Dockerfile
-    to: opentelemetry-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.20"
 resources:
   '*':
@@ -49,6 +48,9 @@ tests:
       {{end}}'
   steps:
     env:
+      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1155556
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -59,6 +61,10 @@ tests:
             {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.3", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
+        tests/e2e-instrumentation/instrumentation-go
+    post:
+    - ref: openshift-observability-qe-agent
+    - chain: gather
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators

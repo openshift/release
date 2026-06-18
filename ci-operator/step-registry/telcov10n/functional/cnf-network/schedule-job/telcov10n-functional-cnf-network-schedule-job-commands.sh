@@ -46,6 +46,9 @@ dow=$(date -d "$TODAY" +%u)
 # If today is Friday and there are 1 to 6 days left until the event
 if (( dow == 5 )) && (( offset >= 1 && offset <= 6 )); then
     echo "$TODAY ✅ $offset day(s) until event — run CI"
+# If today is Saturday and there are 0 to 5 days left until the event
+elif (( dow == 6 )) && (( offset >= 0 && offset <= 5 )); then
+    echo "$TODAY ✅ $offset day(s) until event — run CI"
 else
     echo "$TODAY ❌ $offset day(s) until event — Skip"
     touch "${SHARED_DIR}"/skip.txt

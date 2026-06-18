@@ -159,12 +159,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-ovn-single-node-rhcos9-techpreview
+- as: e2e-aws-ovn-single-node-rhcos9
   interval: 168h
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
     observers:
       enable:
@@ -250,18 +249,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-bm
-  capabilities:
-  - intranet
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     observers:
       enable:
       - observers-resource-watch
@@ -893,6 +880,7 @@ tests:
   capabilities:
   - intranet
   cron: 19 10,20 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-recovery
@@ -1716,6 +1704,34 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      env:
+      - default: "true"
+        name: OPENSHIFT_5
+      from: driver-toolkit-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-driver-toolkit-10
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      env:
+      - default: "true"
+        name: OPENSHIFT_5
+      - default: latest-rhel-10
+        name: DTK_TAG
+      - default: rhel-coreos-10
+        name: RHCOS_IMAGE_NAME
+      - default: rhel-coreos-10-extensions
+        name: RHCOS_EXTENSIONS_IMAGE_NAME
       from: driver-toolkit-tests
       resources:
         requests:
@@ -2709,6 +2725,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
@@ -2723,6 +2740,8 @@ tests:
       :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
     workflow: opct-conformance-external-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
@@ -2892,7 +2911,9 @@ tests:
 - as: e2e-rosa-hcp-ovn
   cron: '@daily'
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: rosa-e2e-02
+    env:
+      ENABLE_BILLING_ACCOUNT: "yes"
     observers:
       enable:
       - observers-resource-watch

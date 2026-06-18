@@ -2,6 +2,10 @@ ref:
   as: hypershift-resolve-nodepool-releases
   cli: latest
   commands: hypershift-resolve-nodepool-releases-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
   env:
     - default: ""
       name: NODEPOOL_N1_VERSION
@@ -25,6 +29,6 @@ ref:
   documentation: |-
     Resolves N-minor OCP release images via the release controller API and
     writes them to ${SHARED_DIR}/nodepool_release_images for consumption by
-    downstream run-e2e steps. This avoids declaring nXminor releases in the
-    ci-operator config, which would spawn concurrent import pods and cause
-    race conditions.
+    downstream run-e2e steps. Verifies each resolved image is available in the
+    registry before accepting it. Falls back to the nightly stream when CI
+    stream images have been garbage-collected.

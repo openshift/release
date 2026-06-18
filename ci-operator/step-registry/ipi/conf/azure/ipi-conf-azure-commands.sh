@@ -75,7 +75,7 @@ if [ "${COMPUTE_NODE_REPLICAS}" -le 0 ] || [ "${SIZE_VARIANT}" = "compact" ]; th
   workers=0
 fi
 master_type=null
-master_type_prefix=""
+master_type_prefix="Standard_D8"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type_prefix=Standard_D32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
@@ -85,7 +85,7 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 if [ -n "${master_type_prefix}" ]; then
   if [ "${OCP_ARCH}" = "amd64" ]; then
-    master_type=${master_type_prefix}s_v3
+    master_type=${master_type_prefix}as_v5
   elif [ "${OCP_ARCH}" = "arm64" ]; then
     master_type=${master_type_prefix}ps_v5
   fi

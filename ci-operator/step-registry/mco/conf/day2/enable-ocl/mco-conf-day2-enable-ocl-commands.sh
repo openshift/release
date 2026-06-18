@@ -56,7 +56,7 @@ function debug_and_exit() {
     echo '####################################################'
     echo ''
     echo 'Builder pods logs'
-    run_command "oc logs -l machineconfiguration.openshift.io/on-cluster-layering"
+    run_command "oc logs -n openshift-machine-config-operator -l machineconfiguration.openshift.io/on-cluster-layering"
     exit 255
 }
 
@@ -188,7 +188,7 @@ for custom_mcp_name in "${mcp_arr[@]}"; do
     machine_os_build_name=$(oc get machineosconfig "$MOSC_NAME" -ojsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io/current-machine-os-build}')
 
     echo "Waiting for $machine_os_build_name MOSB to succeed"
-    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=600s"
+    if ! run_command "oc wait --for=condition=Succeeded  machineosbuild $machine_os_build_name --timeout=1200s"
     then
         echo "ERROR. The $machine_os_build_name MOSB resource failed to build the image"
         debug_and_exit
