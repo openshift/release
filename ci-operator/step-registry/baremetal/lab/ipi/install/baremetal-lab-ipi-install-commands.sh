@@ -14,6 +14,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+# shellcheck source=/dev/null
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -294,10 +295,54 @@ fi
 
 echo -e "\n[INFO] Launching 'wait-for install-complete' step again....."
 oinst wait-for install-complete &
-if ! wait "$!"; then
-  echo "ERROR: Installation failed. Aborting execution."
-  exit 1
-elif [ "${NO_END_TIME}" = "true" ]; then
+install_pid=$!
+
+if ! wait "$install_pid"; then
+  echo -e "\n[WARNING] Wait for install-complete timed out. Checking cluster state..."
+  NO_END_TIME=true
+
+  # Check if cluster is actually progressing
+  if oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get nodes &>/dev/null; then
+    echo "[INFO] Cluster API is responding. Nodes may still be joining..."
+
+    # Check cluster operators
+    echo -e "\n[INFO] Getting count of Ready operators...\n    $ oc get co --no-headers 2>/dev/null | grep -c \"True.*False.*False\""
+    ready_operators=$(oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get co --no-headers 2>/dev/null | grep -c "True.*False.*False" || echo 0)
+    echo -e "\n[INFO] Getting count of total operators...\n    $ oc get co --no-headers 2>/dev/null | wc -l"
+    total_operators=$(oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get co --no-headers 2>/dev/null | wc -l || echo 0)
+
+    echo "[INFO] Cluster operators ready: ${ready_operators}/${total_operators}"
+
+    # List operators that are not ready
+    echo -e "\n[INFO] Getting count of NotReady operators...\n    $ oc get co --no-headers 2>/dev/null | grep -v \"True.*False.*False\""
+    not_ready_operators=$(oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get co --no-headers 2>/dev/null | grep -v "True.*False.*False" || true)
+    if [ -n "$not_ready_operators" ]; then
+      echo "[INFO] Operators not ready:"
+      echo "$not_ready_operators"
+    fi
+
+    if [ "$ready_operators" -gt 0 ] && [ "$total_operators" -gt 0 ]; then
+      echo "[INFO] Cluster is making progress. Trying final wait-for install-complete....."
+
+      # Final attempt with explicit timeout
+      oinst wait-for install-complete || {
+        echo "ERROR: Installation failed after extended wait. Last cluster state:"
+        oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get nodes 2>/dev/null || echo "Cannot get nodes"
+        oc --kubeconfig="${INSTALL_DIR}/auth/kubeconfig" get co 2>/dev/null || echo "Cannot get cluster operators"
+        exit 1
+      }
+      if [ "${NO_END_TIME:-false}" = "true" ]; then
+        date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+      fi
+    else
+      echo "ERROR: Cluster is not making progress. Aborting."
+      exit 1
+    fi
+  else
+    echo "ERROR: Cluster API is not responding after two attempts. Installation failed."
+    exit 1
+  fi
+elif [ "${NO_END_TIME:-false}" = "true" ]; then
   date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 fi
 
@@ -305,7 +350,7 @@ fi
 # for multi-arch compute nodes clusters with mixed arch nodes.
 if [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
   echo -e "\nWaiting for all the nodes to be ready..."
-  wait_for_nodes_readiness ${EXPECTED_NODES}
+  wait_for_nodes_readiness "${EXPECTED_NODES}"
 fi
 update_image_registry
 
