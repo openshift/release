@@ -143,6 +143,11 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+if [ "${IMAGE_POLICY_DISABLED:-true}" = "true" ]; then
+    ### Disable image policy for nightly build
+    export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
+fi
+
 case "${BOOT_MODE}" in
 "iso")
   ### Create ISO image
