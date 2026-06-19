@@ -1,0 +1,22 @@
+workflow:
+  as: storage-disconnected-mno-lvms
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-aws-pre-disconnected
+    - ref: storage-create-aws-extra-disks
+    - chain: storage-conf-csi-optional-topolvm
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    env:
+      EXTRA_DISKS_COUNT: "2"
+      DISCONNECTED: "true"
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES: "true"
+  documentation: |-
+    The storage-disconnected-mno-lvms workflow provisions a fully disconnected
+    Multi-Node OpenShift (MNO) cluster on AWS using ipi-aws-pre-disconnected,
+    creates extra EBS disks, installs the LVMS operator from a mirrored catalog,
+    and allows job authors to inject their own end-to-end test logic.

@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Check if a custom redhat-operators CatalogSource was created and use it
 if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
   CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
