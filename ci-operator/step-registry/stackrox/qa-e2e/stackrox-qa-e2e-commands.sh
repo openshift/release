@@ -16,6 +16,14 @@ if [ "${MAP_TESTS}" = "true" ]; then
         "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
+        # Strip <system-out> and <system-err> from JUnit XMLs before merging.
+        # The merged file is copied to SHARED_DIR (a Kubernetes Secret, 1 MiB
+        # limit). The QA E2E suite system-out alone reaches ~2.4 MiB. Our
+        # junit2jira/flakechecker already read the full data in dispatch.sh.
+        # Single-line pattern first: GNU sed range /start/,/end/d looks for end
+        # on the NEXT line, so same-line matches would extend the range to EOF.
+        find "${ARTIFACT_DIR}" -type f -name "*.xml" -print0 | xargs -0 -r \
+            sed -i "/<system-out>.*<\/system-out>/d; /<system-out>/,/<\/system-out>/d; /<system-err>.*<\/system-err>/d; /<system-err>/,/<\/system-err>/d"
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
