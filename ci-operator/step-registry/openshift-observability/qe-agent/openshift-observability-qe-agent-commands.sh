@@ -120,7 +120,8 @@ if [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]]; then
   _DUR_S=$(( $(jq -r '.duration_ms  // 0' "${ARTIFACT_DIR}/qe-agent-usage.json" 2>/dev/null || echo 0) / 1000 ))
   _IN=$(jq -r    '.usage.input_tokens  // 0' "${ARTIFACT_DIR}/qe-agent-usage.json" 2>/dev/null || echo 0)
   _OUT=$(jq -r   '.usage.output_tokens // 0' "${ARTIFACT_DIR}/qe-agent-usage.json" 2>/dev/null || echo 0)
-  echo "Cost: \$${_COST} | Turns: ${_TURNS} | Duration: ${_DUR_S}s | Tokens in: ${_IN} out: ${_OUT}"
+  printf 'Cost: $%s | Turns: %s | Duration: %ss | Tokens in: %s out: %s\n' \
+    "${_COST}" "${_TURNS}" "${_DUR_S}" "${_IN}" "${_OUT}"
 fi
 
 # ---------------------------------------------------------------------------
