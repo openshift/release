@@ -132,7 +132,7 @@ tests:
   steps:
     cluster_profile: <profile>
     env:
-      AGENT_SKILL: RHOSDT
+      AGENT_SKILL: TEMPO
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
@@ -149,7 +149,10 @@ Skills are Markdown files hosted in this step's `skills/` directory within the `
 
 ```text
 ci-operator/step-registry/openshift-observability/qe-agent/skills/
-├── RHOSDT.md        ← Red Hat OpenShift Distributed Tracing (Tempo, OTel, Tracing UI)
+├── OTEL.md          ← OpenTelemetry Operator (junit_otel_* tests, chainsaw)
+├── TEMPO.md         ← Tempo Operator (junit_tempo_* tests, chainsaw)
+├── TRACING_UI.md    ← Distributed Tracing Console Plugin (Cypress)
+├── DISCONNECTED.md  ← Distributed Tracing disconnected suite (chainsaw)
 └── OWNERS
 ```
 
@@ -171,7 +174,7 @@ Skill names must be alphanumeric (hyphens and underscores allowed). The step rej
 | Required | Yes |
 | Format | Alphanumeric, hyphens, underscores only |
 | Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/skills/<name>.md` in `openshift/release` |
-| Example | `RHOSDT` |
+| Example | `TEMPO` |
 
 ---
 
@@ -243,7 +246,7 @@ The Distributed Tracing QE team (Tempo Operator, OpenTelemetry Operator, Tracing
 **CI config snippet** (`openshift-grafana-tempo-operator-main__upstream-ocp-4.22-amd64.yaml`):
 ```yaml
 env:
-  AGENT_SKILL: RHOSDT
+  AGENT_SKILL: TEMPO
 post:
 - ref: openshift-observability-qe-agent
 - chain: cucushift-installer-rehearse-azure-ipi-deprovision
