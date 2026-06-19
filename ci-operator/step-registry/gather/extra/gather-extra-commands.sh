@@ -148,6 +148,7 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
+  queue ${ARTIFACT_DIR}/nodes/$i/lsmod oc --insecure-skip-tls-verify debug node/$i -- chroot /host lsmod
 done < /tmp/nodes
 
 echo "INFO: gathering the audit logs for each master"
