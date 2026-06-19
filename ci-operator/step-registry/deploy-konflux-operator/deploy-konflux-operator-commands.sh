@@ -128,8 +128,15 @@ function deploy_operators() {
     run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
 
-set_proxy
+echo "HTTP_PROXY=${HTTP_PROXY:-}"
+echo "HTTPS_PROXY=${HTTPS_PROXY:-}"
+echo "NO_PROXY=${NO_PROXY:-}"
+echo "http_proxy=${http_proxy:-}"
+echo "https_proxy=${https_proxy:-}"
+echo "no_proxy=${no_proxy:-}"
+
 install_deps
+set_proxy
 run_command "oc whoami"
 run_command "which oc && oc version -o yaml"
 deploy_operators
