@@ -54,6 +54,25 @@ tests:
       NODEPOOL_N2_VERSION: "4.21"
       NODEPOOL_N3_VERSION: "4.20"
     workflow: hypershift-azure-e2e-v2-self-managed
+- always_run: false
+  as: e2e-aws
+  capabilities:
+  - build-tmpfs
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: ^TestMultiHopUpgrade$
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested
 zz_generated_metadata:
   branch: create_multihop_upgrades
   org: mgencur
