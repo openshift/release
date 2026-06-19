@@ -1,0 +1,20 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+ref="${GIT_REF:-main}"
+if [[ -z "${GIT_REF:-}" ]]; then
+  echo "GIT_REF unset; using default ref=${ref}"
+fi
+
+echo "Checking out ${ref}"
+git fetch --tags origin "${ref}" 2>/dev/null || git fetch origin "${ref}"
+git fetch --unshallow origin 2>/dev/null || true
+git checkout "${ref}" || {
+  echo "ERROR: failed to checkout ${ref}"
+  exit 1
+}
+git rev-parse HEAD
+echo "${ref}" > "${SHARED_DIR}/git-checkout-ref"
+git rev-parse HEAD > "${SHARED_DIR}/git-checkout-sha"

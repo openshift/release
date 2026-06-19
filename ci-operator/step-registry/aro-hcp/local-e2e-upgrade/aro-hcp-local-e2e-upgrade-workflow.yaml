@@ -1,0 +1,33 @@
+workflow:
+  as: aro-hcp-local-e2e-upgrade
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+      - env: LEASED_MSI_MOCK_SP
+        resource_type: aro-hcp-msi-mock-cs-sp-dev
+    pre:
+      - ref: aro-hcp-lease-acquire
+      - ref: aro-hcp-git-checkout
+      - ref: aro-hcp-write-config
+      - ref: aro-hcp-provision-environment
+    test:
+      - ref: aro-hcp-test-local-pre-upgrade
+      - ref: aro-hcp-git-checkout-head
+      - ref: aro-hcp-upgrade-infra
+      - ref: aro-hcp-test-local-post-upgrade
+    post:
+      - ref: aro-hcp-gather-provision-failure
+      - ref: aro-hcp-gather-visualization
+      - ref: aro-hcp-gather-test-visualization
+      - ref: aro-hcp-gather-custom-link-tools
+      - ref: aro-hcp-gather-observability
+      - ref: aro-hcp-gather-snapshot
+      - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-lease-release
+  documentation: |-
+    Acquire runtime leases, checkout main (or GIT_REF override), provision regional infrastructure, run upgrade/create tests, checkout the PR head,
+    rerun pipeline/RP.HypershiftOperator using hypershift.image and hypershift.sharedIngressImage
+    digests from PR-head config/config.yaml, then run upgrade/post-infra tests.
+    Uses the dedicated aro-hcp-dev-upgrade-westus3-slot pool (Dev - 03, slot_count: 1)
+    so the provisioned cluster persists isolated across both upgrade suite phases.
+    Override GIT_REF on git-checkout steps via job env when needed.
