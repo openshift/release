@@ -5,11 +5,35 @@ Agentic post-step for OpenShift Observability teams that autonomously triages e2
 When a test step reports failures, the agent reads the JUnit XML reports and a context file from `SHARED_DIR`, then runs Claude with a team-provided skill to diagnose the root cause and — depending on the skill — attempt remediation (re-run failing tests, propose a fix, write a bug report, etc.).
 
 The step is a **no-op** (exits immediately with no cost) when:
-- `AGENT_SKILL_URL` is not set
+- `AGENT_SKILL` is not set
 - `SHARED_DIR/qe-agent-context.json` is absent (test step did not run or skipped the trap)
 - `has_test_failures` in the context file is `false` (all tests passed)
 
-Full Claude output is streamed to CI logs in real-time and saved to `ARTIFACT_DIR/qe-agent-output.json` for post-run inspection.
+Claude's full session output (stream-json) is captured to a temporary file and never written to the CI build-log or uploaded to GCS. Two derived artifacts are extracted from it and saved to `ARTIFACT_DIR` after the session completes: a cost/usage record and a Bash command audit log (see [Audit artifacts](#audit-artifacts)).
+
+---
+
+## Why use this step
+
+The traditional workflow for debugging a CI test failure is:
+
+1. Provision a new cluster (~30–45 minutes)
+2. Set up the test environment (operators, dependencies, configuration)
+3. Run the failing test suite
+4. Inspect logs and iterate
+
+End-to-end this typically takes **1–2 hours of cluster time**, which at OpenShift CI cloud rates is substantially more expensive than the AI API cost — and requires an engineer's attention throughout.
+
+The qe-agent step runs **inside the already-provisioned CI job**, against the cluster that just ran the tests. The environment is already set up. The failing test artifacts are already present. Claude reruns the exact failing tests, collects diagnostics, and produces a root-cause analysis and proposed fix — all autonomously, at a cost of **$3–5 in AI API spend** per run based on observed production runs.
+
+The cost can be reduced further by:
+- Implementing cross-run pattern awareness using Sippy to skip analysis for known failures
+- Reducing the rerun count in the flakiness confirmation loop
+- Switching to a smaller model for simpler triage tasks
+
+Even at the current ceiling of $5, a single qe-agent run replaces most of the value of a 1–2 hour manual debug session on a freshly provisioned cluster.
+
+> **Where to add this step**: Target upstream testing CI jobs first, not the full job matrix. Upstream jobs run against the latest operator and test code, so they surface both product regressions and test issues at the earliest point in the development cycle — exactly where autonomous triage adds the most value. Adding the step to every job (stage, product, multi-arch, disconnected) spreads AI budget across runs where failures are often already understood, and increases noise before the step has proven itself in your environment. Until cross-run pattern awareness via Sippy is implemented — preventing the agent from running against failures that are already known and tracked — keep the step limited to upstream jobs where each failure is more likely to be novel and worth investigating.
 
 ---
 
@@ -98,9 +122,9 @@ Replace `step_script_ref` with the path to your commands script relative to the 
 
 > **Note on JUnit XML size**: `SHARED_DIR` is backed by a Kubernetes Secret with a 1 MiB limit shared across all files. JUnit XMLs are safe to copy; do **not** copy binary artifacts such as Cypress screenshots.
 
-### 4. Add the step and set `AGENT_SKILL_URL` in your CI config
+### 4. Add the step and set `AGENT_SKILL` in your CI config
 
-Add `openshift-observability-qe-agent` to the `post:` phase of your test and set `AGENT_SKILL_URL` in the `env:` block of the same test to the raw URL of your team's `SKILL.md`:
+Add `openshift-observability-qe-agent` to the `post:` phase of your test and set `AGENT_SKILL` in the `env:` block to your team's skill name:
 
 ```yaml
 tests:
@@ -108,7 +132,7 @@ tests:
   steps:
     cluster_profile: <profile>
     env:
-      AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/<your-repo>/main/plugins/qe-agent/skills/SKILL.md
+      AGENT_SKILL: RHOSDT
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
@@ -121,17 +145,81 @@ tests:
 
 ## Agent Skill
 
-The skill is a `SKILL.md` Markdown file hosted in your team's QE repository. It is fetched at runtime by the step and passed to Claude as the system prompt. The skill defines how Claude should approach the failure: what tests to re-run, what logs to collect, how to classify the root cause, and what output to produce.
+Skills are Markdown files hosted in this step's `skills/` directory within the `openshift/release` repository:
 
-See the [Distributed Tracing QE skill](https://github.com/openshift/distributed-tracing-qe/blob/main/plugins/qe-agent/skills/SKILL.md) as a reference implementation.
+```text
+ci-operator/step-registry/openshift-observability/qe-agent/skills/
+├── RHOSDT.md        ← Red Hat OpenShift Distributed Tracing (Tempo, OTel, Tracing UI)
+└── OWNERS
+```
 
-### AGENT_SKILL_URL
+Each skill is fetched at runtime from `https://raw.githubusercontent.com/openshift/release/main/...` and passed to Claude as its system prompt. The skill defines how Claude should approach the failure: what tests to re-run, what logs to collect, how to classify the root cause, and what output to produce.
+
+### Adding a new team skill
+
+1. Create `ci-operator/step-registry/openshift-observability/qe-agent/skills/<TEAM_NAME>.md`
+2. Add your team identifier to the `OWNERS` file in `skills/`
+3. Open a PR to `openshift/release` — the step OWNERS review and approve it
+4. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+
+Skill names must be alphanumeric (hyphens and underscores allowed). The step rejects any value that does not match `^[A-Za-z0-9_-]+$` to prevent path traversal.
+
+### AGENT_SKILL
 
 | Property | Value |
 |---|---|
 | Required | Yes |
-| Allowlist | Must start with `https://raw.githubusercontent.com/openshift/` — any other URL is rejected at runtime |
-| Example | `https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md` |
+| Format | Alphanumeric, hyphens, underscores only |
+| Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/skills/<name>.md` in `openshift/release` |
+| Example | `RHOSDT` |
+
+---
+
+## Blast Radius and Risk Profile
+
+This step grants Claude Code CLI unrestricted Bash access inside a CI pod that holds live cluster credentials. Before adopting it, understand what Claude can and cannot do.
+
+### What Claude can do
+
+| Capability | Scope |
+|---|---|
+| Run shell commands | Full pod OS access (non-root). No explicit sandbox — the skill file is the constraint. |
+| `kubectl` / `oc` | Any operation allowed by the pod's service account RBAC: create, delete, patch namespaces, pods, ClusterRoles, CSVs, CRDs, and more. |
+| Read files | Any file visible to the pod process, including mounted secrets, `KUBECONFIG`, `SHARED_DIR`, and `ARTIFACT_DIR`. |
+| Write files | Anything writable by the pod: `ARTIFACT_DIR` (uploaded to GCS), `SHARED_DIR` (shared with other post-steps), `/tmp`. |
+| Clone git repos | Network access to GitHub is available; the skill instructs `git clone` during test environment setup. |
+
+### What Claude cannot do
+
+- **No outbound HTTP** — `WebFetch` is not in `allowedTools`; Claude cannot call arbitrary external URLs.
+- **No git push** — no git credentials are mounted; file changes are confined to the pod.
+- **No cross-tenant cluster access** — RBAC bounds apply; Claude cannot reach other teams' clusters or namespaces.
+- **No persistence beyond the job** — the test cluster is ephemeral and torn down by the deprovision chain after every job.
+
+### Worst-case scenarios
+
+**Unexpected cluster mutation** — Claude misinterprets a skill step and deletes a namespace or patches a resource it should not touch. Not a concern in practice: the step runs in the `post:` phase against a test-only cluster, and the deprovision chain that follows destroys the entire cluster regardless. No production or shared infrastructure is reachable.
+
+**Runaway session** — Claude enters a reasoning loop, consuming turns and Vertex AI budget without making progress. Hard-bounded on two axes: `--max-budget-usd 5` stops the session the moment spend reaches $5 — preventing runaway cost from exhausting the Vertex AI cost center budget — and the 90-minute wall-clock timeout is the outer limit. `best_effort: true` ensures neither bound can block the pipeline.
+
+**ARTIFACT_DIR pollution** — Claude writes unexpected files to `ARTIFACT_DIR`, which are then uploaded to GCS. The skill scopes Claude to documented output paths, but this is a prompt-level control, not a technical one.
+
+**SHARED_DIR pollution** — Claude writes unexpected files to `SHARED_DIR`, which is shared with the deprovision post-step. The deprovision step ignores unexpected files in practice, but this is not formally enforced.
+
+### Audit artifacts
+
+After every run, two files are written to `ARTIFACT_DIR` for post-incident review:
+
+| File | Contents |
+|---|---|
+| `qe-agent-usage.json` | Token counts (input, output, cache), USD cost, turn count, and wall-clock duration. |
+| `qe-agent-commands.log` | Every Bash command Claude executed — the command strings only, not their output. Cluster data (pod logs, events, API responses) is deliberately excluded. |
+
+The full stream-json session output (which includes cluster logs, API responses, and `--verbose` traces) is captured to a temporary file in the pod and deleted on exit — it never reaches the CI build-log or GCS. Only these two derived files, which contain no cluster data, are written to `ARTIFACT_DIR`.
+
+### Required: private Prow deck only
+
+This step **must only be used with jobs backed by a private Prow deck** (login required to view artifacts). Claude reads cluster diagnostics — pod logs, events, resource specs — that may contain internal IP addresses, service URLs, error messages, and configuration details that must not be world-readable. Do not attach this step to any job whose artifacts are publicly accessible without authentication.
 
 ---
 
@@ -139,7 +227,7 @@ See the [Distributed Tracing QE skill](https://github.com/openshift/distributed-
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_SKILL_URL` | — | Raw URL to the team's `SKILL.md`. Must start with `https://raw.githubusercontent.com/openshift/`. Step is skipped if unset or URL fails the allowlist check. |
+| `AGENT_SKILL` | — | Name of the skill to load from the `skills/` directory. Step is skipped if unset or the file does not exist. |
 | `CLAUDE_MODEL` | `claude-opus-4-6` | Claude model used for analysis. |
 | `CLAUDE_CODE_USE_VERTEX` | `1` | Enable Google Vertex AI backend for Claude Code. |
 | `CLOUD_ML_REGION` | `global` | Google Cloud region for Vertex AI. |
@@ -155,7 +243,7 @@ The Distributed Tracing QE team (Tempo Operator, OpenTelemetry Operator, Tracing
 **CI config snippet** (`openshift-grafana-tempo-operator-main__upstream-ocp-4.22-amd64.yaml`):
 ```yaml
 env:
-  AGENT_SKILL_URL: https://raw.githubusercontent.com/openshift/distributed-tracing-qe/main/plugins/qe-agent/skills/SKILL.md
+  AGENT_SKILL: RHOSDT
 post:
 - ref: openshift-observability-qe-agent
 - chain: cucushift-installer-rehearse-azure-ipi-deprovision
