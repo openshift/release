@@ -30,8 +30,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay317-aro-ocp421
-  cron: 0 12 * * 3
+- as: quay-e2e-tests-quay317-aro
+  cron: 0 12 1 1 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -39,12 +39,34 @@ tests:
       ARO_WORKER_VM_SIZE: Standard_D8s_v3
       CSO_CHANNEL: stable-3.17
       CSO_SOURCE: fbc-operator-catalog
-      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:4d329eb8c32ce91a9844fd18959f6076da0e41cb4020544d2537f86dc875ccd7
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:2a048c3d57231d7cb7885439217af05cb36df14589c2b7dda2d9da657108319b
       QBO_CHANNEL: stable-3.17
       QBO_SOURCE: fbc-operator-catalog
       QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-azure-aro
+- as: quay-e2e-tests-quay318-aro
+  cron: 0 12 1 1 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_WORKER_COUNT: "6"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CSO_CHANNEL: stable-3.18
+      CSO_SOURCE: fbc-operator-catalog
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:5684950962c8d86d0dc82ef502a19664c8ad6f274a4f391145711e8babdc241a
+      QBO_CHANNEL: stable-3.18
+      QBO_SOURCE: fbc-operator-catalog
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-deploy-quay-azure
