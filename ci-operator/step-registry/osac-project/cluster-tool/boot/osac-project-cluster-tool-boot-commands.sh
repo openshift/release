@@ -194,11 +194,12 @@ COMPONENT_OVERRIDE_CMD=""
 if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     echo "=== Component override: ${COMPONENT_IMAGE_NAME} → ${COMPONENT_IMAGE} ==="
     COMPONENT_TAG="${COMPONENT_IMAGE##*:}"
+    COMPONENT_REPO="${COMPONENT_IMAGE%:*}"
     VF="/installer/${VALUES_FILE}"
     # Replace full image:tag references — match entire registry/path to handle short names (e.g. osac-aap)
     COMPONENT_OVERRIDE_CMD="sed -i 's|[a-zA-Z0-9./_-]*${COMPONENT_IMAGE_NAME}:[a-zA-Z0-9._-]*|${COMPONENT_IMAGE}|g' ${VF} && "
     # Replace split repository/tag format (e.g. operator.image.repository + operator.image.tag)
-    COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}sed -i '/repository: .*${COMPONENT_IMAGE_NAME##*/}/{n;s/tag: .*/tag: ${COMPONENT_TAG}/}' ${VF} && "
+    COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}sed -i '/repository: .*${COMPONENT_IMAGE_NAME##*/}/{s|repository: .*|repository: ${COMPONENT_REPO}|;n;s/tag: .*/tag: ${COMPONENT_TAG}/}' ${VF} && "
 fi
 
 # When testing an osac-aap PR, the installer-with-pr image contains
@@ -210,14 +211,14 @@ AAP_SOURCE_SHA=$(podman run --authfile /root/pull-secret --rm "${INSTALLER_IMAGE
 if [[ -n "${AAP_SOURCE_SHA}" ]]; then
     echo "=== AAP project git ref override: ${AAP_SOURCE_SHA} ==="
     VF="/installer/${VALUES_FILE}"
-    AAP_OVERRIDE_CMD="sed -i 's|projectGitBranch: .*|projectGitBranch: \"${AAP_SOURCE_SHA}\"|' ${VF} && "
+    AAP_OVERRIDE_CMD="sed -i 's|projectGitBranch: .*|projectGitBranch: \"${AAP_SOURCE_SHA}\"|' ${VF} && grep -q '${AAP_SOURCE_SHA}' ${VF} || { echo 'ERROR: projectGitBranch override failed'; exit 1; } && "
     if [[ -n "${AAP_SOURCE_REPO_URL}" ]]; then
         echo "=== AAP project git URI override: ${AAP_SOURCE_REPO_URL} ==="
-        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|projectGitUri: .*|projectGitUri: \"${AAP_SOURCE_REPO_URL}\"|' ${VF} && "
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|projectGitUri: .*|projectGitUri: \"${AAP_SOURCE_REPO_URL}\"|' ${VF} && grep -q '${AAP_SOURCE_REPO_URL}' ${VF} || { echo 'ERROR: projectGitUri override failed'; exit 1; } && "
     fi
     if [[ -n "${COMPONENT_IMAGE}" ]]; then
         echo "=== AAP EE image override: ${COMPONENT_IMAGE} ==="
-        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|eeImage: .*|eeImage: \"${COMPONENT_IMAGE}\"|' ${VF} && "
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|eeImage: .*|eeImage: \"${COMPONENT_IMAGE}\"|' ${VF} && grep -q 'eeImage:.*${COMPONENT_IMAGE}' ${VF} || { echo 'ERROR: eeImage override failed'; exit 1; } && "
     fi
 fi
 
