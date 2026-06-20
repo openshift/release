@@ -165,10 +165,30 @@ Each skill is fetched at runtime from `https://raw.githubusercontent.com/openshi
 
 1. Create `ci-operator/step-registry/openshift-observability/qe-agent/skills/<TEAM_NAME>.md`
 2. Add your team identifier to the `OWNERS` file in `skills/`
-3. Open a PR to `openshift/release` — the step OWNERS review and approve it
-4. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+3. Validate the skill before submitting (see [Skill validation](#skill-validation))
+4. Open a PR to `openshift/release` — the step OWNERS review and approve it
+5. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
 
 Skill names must be alphanumeric (hyphens and underscores allowed). The step rejects any value that does not match `^[A-Za-z0-9_-]+$` to prevent path traversal.
+
+### Skill validation
+
+Before submitting a new or modified skill, validate it with the following tools:
+
+**[Skillsaw](https://github.com/stbenjam/skillsaw)** — Linter for AI agent instruction files. Checks for security issues (embedded secrets, dangerous patterns), content quality (weak language, contradictions, attention dead zones), and structural correctness (frontmatter, instruction budget). Run it against your skill file before opening a PR:
+
+```bash
+pip install skillsaw
+skillsaw lint ci-operator/step-registry/openshift-observability/qe-agent/skills/
+```
+
+**[Agent Eval Harness](https://github.com/opendatahub-io/agent-eval-harness)** — Evaluation framework for testing AI agent skill effectiveness. Use it to measure how well your skill performs against known test failure scenarios before deploying to CI:
+
+```bash
+pip install agent-eval-harness
+```
+
+Both tools help catch issues early — Skillsaw identifies security risks and content quality problems in the skill definition, while Agent Eval Harness validates that the skill produces correct and useful results when executed.
 
 ### AGENT_SKILL
 

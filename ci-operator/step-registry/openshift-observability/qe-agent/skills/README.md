@@ -127,10 +127,44 @@ Must state:
 
 1. Create `skills/<TEAM_NAME>.md` following this structure
 2. Add your team identifier to the `OWNERS` file in `skills/`
-3. Open a PR to `openshift/release`
-4. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+3. Validate the skill before submitting (see [Skill validation](#skill-validation))
+4. Open a PR to `openshift/release`
+5. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
 
 Skill names must match `^[A-Za-z0-9_-]+$`. The step rejects any value with other characters.
+
+---
+
+## Skill validation
+
+Before submitting a new or modified skill, run these tools to catch security and quality issues early:
+
+### Skillsaw
+
+[Skillsaw](https://github.com/stbenjam/skillsaw) is a linter for AI agent instruction files. It checks for:
+- **Security** — embedded secrets, API keys, tokens, or passwords in skill content
+- **Content quality** — weak/vague language, contradictions, tautological instructions, attention dead zones (critical instructions buried in the middle of long files)
+- **Structure** — valid frontmatter, instruction budget limits, placeholder text, broken internal references
+
+```bash
+pip install skillsaw
+skillsaw lint skills/
+```
+
+Fix violations before submitting:
+
+```bash
+skillsaw fix skills/          # Apply deterministic fixes
+skillsaw fix --llm skills/    # Apply LLM-powered content improvements
+```
+
+### Agent Eval Harness
+
+[Agent Eval Harness](https://github.com/opendatahub-io/agent-eval-harness) is an evaluation framework for testing AI agent skill effectiveness. Use it to measure how well your skill performs against known test failure scenarios — verifying that the agent produces correct diagnoses, useful fixes, and structured output before the skill is deployed to CI.
+
+```bash
+pip install agent-eval-harness
+```
 
 ---
 
