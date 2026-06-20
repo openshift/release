@@ -130,16 +130,19 @@ Add `openshift-observability-qe-agent` to the `post:` phase of your test and set
 tests:
 - as: my-upstream-tests
   steps:
-    cluster_profile: <profile>
+    cluster_profile: <non-cloud-profile>
     env:
-      AGENT_SKILL: TEMPO
+      AGENT_SKILL: MY_TEAM
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
     - chain: <your-deprovision-chain>
     test:
     - ref: <your-test-ref>
+    workflow: <non-cloud-workflow>
 ```
+
+> **Important**: Do not use cloud-provisioned clusters (GCP, AWS, Azure) with this step. See [Blast Radius and Risk Profile](#blast-radius-and-risk-profile) for details.
 
 ---
 
@@ -182,6 +185,12 @@ Skill names must be alphanumeric (hyphens and underscores allowed). The step rej
 
 This step grants Claude Code CLI unrestricted Bash access inside a CI pod that holds live cluster credentials. Before adopting it, understand what Claude can and cannot do.
 
+### Cluster requirement: non-cloud provisioned clusters only
+
+This step **must not be used with cloud-provisioned test clusters** (GCP, AWS, Azure, etc.). Cloud-provisioned clusters store cloud provider credentials in `kube-system` and `openshift-*` namespaces. Because the agent runs with cluster-admin privileges, it could read those credentials. Kubernetes RBAC is purely additive (no deny rules), so there is no way to grant cluster-admin while blocking secret reads in specific namespaces.
+
+Use non-cloud provisioned clusters (e.g., bare metal) where no cloud provider credentials are stored in the cluster, eliminating this risk entirely.
+
 ### What Claude can do
 
 | Capability | Scope |
@@ -194,6 +203,7 @@ This step grants Claude Code CLI unrestricted Bash access inside a CI pod that h
 
 ### What Claude cannot do
 
+- **No cloud credential access** — non-cloud provisioned clusters have no cloud provider credentials stored in the cluster. There are no GCP service account keys, AWS IAM credentials, or Azure service principal secrets for Claude to read.
 - **No outbound HTTP** — `WebFetch` is not in `allowedTools`; Claude cannot call arbitrary external URLs.
 - **No git push** — no git credentials are mounted; file changes are confined to the pod.
 - **No cross-tenant cluster access** — RBAC bounds apply; Claude cannot reach other teams' clusters or namespaces.
@@ -220,9 +230,9 @@ After every run, two files are written to `ARTIFACT_DIR` for post-incident revie
 
 The full stream-json session output (which includes cluster logs, API responses, and `--verbose` traces) is captured to a temporary file in the pod and deleted on exit — it never reaches the CI build-log or GCS. Only these two derived files, which contain no cluster data, are written to `ARTIFACT_DIR`.
 
-### Required: private Prow deck only
+### Required: non-cloud provisioned clusters
 
-This step **must only be used with jobs backed by a private Prow deck** (login required to view artifacts). Claude reads cluster diagnostics — pod logs, events, resource specs — that may contain internal IP addresses, service URLs, error messages, and configuration details that must not be world-readable. Do not attach this step to any job whose artifacts are publicly accessible without authentication.
+This step **must not be used with cloud-provisioned clusters** (GCP, AWS, Azure, etc.) — the agent runs with cluster-admin privileges and could read cloud provider credentials stored in `kube-system`. Use non-cloud provisioned clusters where no cloud credentials are present.
 
 ---
 
@@ -249,7 +259,7 @@ env:
   AGENT_SKILL: TEMPO
 post:
 - ref: openshift-observability-qe-agent
-- chain: cucushift-installer-rehearse-azure-ipi-deprovision
+- chain: <deprovision-chain>
 ```
 
 **Test step trap** (in `distributed-tracing-tests-tempo-upstream-commands.sh`):
