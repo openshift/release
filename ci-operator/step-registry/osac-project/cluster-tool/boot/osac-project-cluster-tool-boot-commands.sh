@@ -200,6 +200,8 @@ if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
     COMPONENT_OVERRIDE_CMD="sed -i 's|[a-zA-Z0-9./_-]*${COMPONENT_IMAGE_NAME}:[a-zA-Z0-9._-]*|${COMPONENT_IMAGE}|g' ${VF} && "
     # Replace split repository/tag format (e.g. operator.image.repository + operator.image.tag)
     COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}sed -i '/repository: .*${COMPONENT_IMAGE_NAME##*/}/{s|repository: .*|repository: ${COMPONENT_REPO}|;n;s/tag: .*/tag: ${COMPONENT_TAG}/}' ${VF} && "
+    # Verify the override landed
+    COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}grep -q '${COMPONENT_TAG}' ${VF} || { echo 'ERROR: component image override not found in values file'; exit 1; } && "
 fi
 
 # When testing an osac-aap PR, the installer-with-pr image contains
