@@ -219,11 +219,16 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: sbr-operator
       OCP_VERSION: "422"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.21
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation
+      POLARION_TESTRUN_ID: RHWA-SBR-4.22-weekly
+      REPORT_CASE_TAG: polarion-testcase-id
+    post:
+    - ref: medik8s-polarion-reporter
     test:
     - ref: medik8s-catalogsource
     - ref: medik8s-operator-subscribe
@@ -234,7 +239,9 @@ tests:
       cli: latest
       commands: make run-tests
       env:
+      - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
+      - name: REPORT_CASE_TAG
       from: src
       resources:
         requests:
