@@ -87,6 +87,10 @@ for ns in ${VM_NAMESPACES}; do
     oc get pvc -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/pvcs.txt" 2>&1 || true
     oc get events -n "${ns}" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/cnv/${ns}/events.txt" 2>&1 || true
     oc get networkpolicies -n "${ns}" -o yaml > "${ARTIFACT_DIR}/cnv/${ns}/networkpolicies.yaml" 2>&1 || true
+    oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/cnv/${ns}/pods.txt" 2>&1 || true
+    for pod in $(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        oc logs "${pod}" -n "${ns}" --all-containers > "${ARTIFACT_DIR}/cnv/${ns}/pod-${pod}.log" 2>&1 || true
+    done
 done
 
 echo "=== Collecting compute instance status ==="
@@ -116,6 +120,31 @@ oc describe node > "${ARTIFACT_DIR}/node-describe.txt" 2>&1 || true
 echo "=== Collecting cluster operator status ==="
 oc get co > "${ARTIFACT_DIR}/clusteroperators.txt" 2>&1 || true
 oc get csv -n openshift-cnv -o wide > "${ARTIFACT_DIR}/cnv/csv.txt" 2>&1 || true
+
+echo "=== Collecting storage diagnostics ==="
+mkdir -p "${ARTIFACT_DIR}/storage"
+oc get pods -n openshift-storage -o wide > "${ARTIFACT_DIR}/storage/pods.txt" 2>&1 || true
+oc get events -n openshift-storage --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/storage/events.txt" 2>&1 || true
+oc get lvmcluster -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmcluster.yaml" 2>&1 || true
+oc get lvmvolumegroups -n openshift-storage -o yaml > "${ARTIFACT_DIR}/storage/lvmvolumegroups.yaml" 2>&1 || true
+oc get sc -o wide > "${ARTIFACT_DIR}/storage/storageclasses.txt" 2>&1 || true
+oc get pv -o wide > "${ARTIFACT_DIR}/storage/pvs.txt" 2>&1 || true
+oc get pvc -A -o wide > "${ARTIFACT_DIR}/storage/pvcs-all.txt" 2>&1 || true
+oc get volumeattachments -o wide > "${ARTIFACT_DIR}/storage/volumeattachments.txt" 2>&1 || true
+for pod in $(oc get pods -n openshift-storage -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    oc logs "${pod}" -n openshift-storage > "${ARTIFACT_DIR}/storage/pod-${pod}.log" 2>&1 || true
+done
+
+echo "=== Collecting MachineConfig diagnostics ==="
+mkdir -p "${ARTIFACT_DIR}/mco"
+oc get mcp -o wide > "${ARTIFACT_DIR}/mco/mcp.txt" 2>&1 || true
+oc get mc --sort-by=.metadata.creationTimestamp > "${ARTIFACT_DIR}/mco/mc.txt" 2>&1 || true
+oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null \
+    | base64 -d 2>/dev/null | jq -r '.auths | keys[]' > "${ARTIFACT_DIR}/mco/pull-secret-registries.txt" 2>&1 || true
+
+echo "=== Collecting service account pull secret state ==="
+oc get sa -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/serviceaccounts.yaml" 2>&1 || true
+oc get secrets -n "${E2E_NAMESPACE}" -o custom-columns='NAME:.metadata.name,TYPE:.type' > "${ARTIFACT_DIR}/secrets-types.txt" 2>&1 || true
 
 echo "=== Collecting AAP operator status ==="
 oc get ansibleautomationplatform -n "${E2E_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/aap-status.yaml" 2>&1 || true
