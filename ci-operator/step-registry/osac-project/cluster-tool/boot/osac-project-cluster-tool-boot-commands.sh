@@ -230,6 +230,7 @@ echo "=== Running refresh ==="
 podman run --authfile /root/pull-secret --rm --network=host \
     -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
     -v /tmp/license.zip:/installer/${VALUES_DIR}/license.zip:z \
+    -v /root/pull-secret:/installer/${VALUES_DIR}/pull-secret.json:z \
     -e KUBECONFIG=/root/.kube/config \
     -e VALUES_FILE="${VALUES_FILE}" \
     -e INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
