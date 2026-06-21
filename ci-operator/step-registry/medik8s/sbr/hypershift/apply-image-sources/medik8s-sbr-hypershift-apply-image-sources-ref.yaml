@@ -1,0 +1,23 @@
+ref:
+  as: medik8s-sbr-hypershift-apply-image-sources
+  from: upi-installer
+  cli: latest
+  commands: medik8s-sbr-hypershift-apply-image-sources-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 25m0s
+  env:
+  - name: GIT_REF
+    default: "main"
+    documentation: Branch or git ref to resolve the rhwa-fbc FBC commit from.
+  - name: FBC_COMMIT_SHA
+    default: ""
+    documentation: Pin to a specific rhwa-fbc commit SHA. If empty, resolves latest from GIT_REF.
+  documentation: |-
+    Patches the HyperShift HostedCluster with imageContentSources derived from the
+    rhwa-fbc ImageDigestMirrorSet, so hosted cluster workers can pull Konflux operator
+    bundle images via the internal registry mirror instead of quay.io directly.
+    Runs against the management cluster kubeconfig (before the kubeconfig switch step).
+    Waits up to 20m for MachineConfigPool rollout to propagate the mirror config to nodes.

@@ -41,8 +41,16 @@ EOF
 sleep 60
 
 echo "⏳ Wait for StorageCluster to be deployed"
-oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+if ! oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
+    -n "$ODF_INSTALL_NAMESPACE" --for=condition='Available' --timeout="${SC_WAIT_TIMEOUT:-10m}"; then
+    echo "StorageCluster Available condition not met within ${SC_WAIT_TIMEOUT:-10m}; falling back to OSD readiness check"
+    # On HyperShift, OCSInitialization owner-ref resolution fails in the API server, which
+    # prevents the Available condition from ever being set even when Ceph is healthy.
+    # Wait for all 3 OSD deployments to be Available as a proxy for storage readiness.
+    oc wait deploy -l app=rook-ceph-osd -n "$ODF_INSTALL_NAMESPACE" \
+        --for=condition=Available --timeout=30m
+    echo "OSD deployments are Available; storage is ready"
+fi
 
 echo "Remove is-default-class annotation from all the storage classes"
 oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
