@@ -33,10 +33,9 @@ images:
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.22"
+    release:
+      channel: stable
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -318,7 +317,7 @@ tests:
     - as: deploy-hive
       cli: latest
       commands: |
-        make deploy
+        IMG=$HIVE_IMAGE make deploy
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -328,6 +327,27 @@ tests:
           cpu: 100m
     - chain: cucushift-installer-check-cluster-health
     - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f14-longduration-hive-remaining-41212
+  cron: 43 16 2,16 * *
+  reporter_config:
+    channel: '#team-hive-alert'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    - success
+    report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;~HiveSpec&;41212&
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
