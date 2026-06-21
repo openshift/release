@@ -12,7 +12,7 @@ export CLUSTER_ARCH
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+ssh_key_string=$(cat "${OCP_ADDONS_CREDENTIALS}/httpd-vsi-key-addon-key")
 export ssh_key_string
 tmp_ssh_key="/tmp/ssh-private-key"
 envsubst <<"EOF" >${tmp_ssh_key}
@@ -22,12 +22,12 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+IC_API_KEY=$(cat "${OCP_ADDONS_CREDENTIALS}/ibmcloud-apikey-addon-key")
 export IC_API_KEY
 
-# Run the clone
+# Run the clone (fork + deploy key from httpd-vsi-key-addon-key in hypershift-agent-ibmz-credentials)
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
+git clone -b image-name-fix git@github.ibm.com:Singana-Sivaram-Naidu/ibmcloud-openshift-provisioning.git
 
 #Navigate to clone directory
 cd "ibmcloud-openshift-provisioning" || {
