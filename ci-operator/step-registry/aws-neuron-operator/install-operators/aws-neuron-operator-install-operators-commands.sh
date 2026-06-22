@@ -59,13 +59,13 @@ image_re = re.compile(r'^[a-zA-Z0-9._/:-]+(@sha256:[0-9a-fA-F]{64})?$')
 env_path = os.path.join(os.environ['SHARED_DIR'], 'neuron-deviceconfig.env')
 with open(env_path, 'w') as ef:
     for key, value in mapping.items():
+        if in_cluster_build and key in optional_when_in_cluster:
+            ef.write(f'export {key}=\n')
+            print(f'  {key}= (empty, in-cluster build mode)')
+            continue
         existing = os.environ.get(key, '')
         final = existing if existing else value
         if not final:
-            if in_cluster_build and key in optional_when_in_cluster:
-                ef.write(f'export {key}=\n')
-                print(f'  {key}= (empty, in-cluster build mode)')
-                continue
             print(f'ERROR: {key} resolved to empty', file=sys.stderr)
             sys.exit(1)
         if not image_re.match(final):
