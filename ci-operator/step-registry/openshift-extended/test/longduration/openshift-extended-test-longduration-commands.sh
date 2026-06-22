@@ -4,36 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export PATH=/tmp/:$PATH
-which extended-platform-tests || true
-
-# Debug wait with timeout (default 3 hours)
-DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-10800}"
-echo "=========================================="
-echo "DEBUG WAIT ACTIVE - Cluster ready for debugging"
-echo "=========================================="
-echo "Timeout: ${DEBUG_WAIT_TIMEOUT} seconds"
-echo "To continue tests, create the signal file:"
-echo "  oc rsh <test-pod>"
-echo "  touch /tmp/continue"
-echo "=========================================="
-
-elapsed=0
-while [ ! -f "/tmp/continue" ] && [ $elapsed -lt $DEBUG_WAIT_TIMEOUT ]
-do
-    sleep 10
-    elapsed=$((elapsed + 10))
-    if [ $((elapsed % 300)) -eq 0 ]; then
-        echo "Debug wait: $elapsed / $DEBUG_WAIT_TIMEOUT seconds elapsed..."
-    fi
-done
-
-if [ -f "/tmp/continue" ]; then
-    echo "Continue signal received. Proceeding with tests..."
-else
-    echo "Debug wait timeout reached. Proceeding with tests..."
-fi
-
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
@@ -293,6 +263,42 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
+fi
+
+# Debug wait with timeout (default 3 hours) - placed AFTER cluster is ready
+DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-10800}"
+echo "=========================================="
+echo "DEBUG WAIT ACTIVE - Cluster ready for debugging"
+echo "=========================================="
+echo "Cluster is fully provisioned and ready!"
+echo "Timeout: ${DEBUG_WAIT_TIMEOUT} seconds ($(($DEBUG_WAIT_TIMEOUT / 3600)) hours)"
+echo ""
+echo "To access the cluster:"
+echo "  1. Find this pod in Prow job logs"
+echo "  2. oc rsh -n test-credentials <pod-name>"
+echo "  3. export KUBECONFIG=\${SHARED_DIR}/kubeconfig"
+echo "  4. oc get nodes"
+echo ""
+echo "To continue tests, create the signal file:"
+echo "  touch /tmp/continue"
+echo "=========================================="
+
+elapsed=0
+while [ ! -f "/tmp/continue" ] && [ $elapsed -lt $DEBUG_WAIT_TIMEOUT ]
+do
+    sleep 10
+    elapsed=$((elapsed + 10))
+    if [ $((elapsed % 300)) -eq 0 ]; then
+        hours=$((elapsed / 3600))
+        minutes=$(((elapsed % 3600) / 60))
+        echo "Debug wait: ${hours}h ${minutes}m elapsed (${elapsed}s / ${DEBUG_WAIT_TIMEOUT}s)..."
+    fi
+done
+
+if [ -f "/tmp/continue" ]; then
+    echo "Continue signal received. Proceeding with tests..."
+else
+    echo "Debug wait timeout reached after $(($DEBUG_WAIT_TIMEOUT / 3600)) hours. Proceeding with tests..."
 fi
 
 #if OVERRIDE_OC_MIRROR then download oc-mirror from mirror.openshift.com
