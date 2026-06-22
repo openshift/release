@@ -194,9 +194,10 @@ configure_claude() {
     "allow": [
       "Read(//tmp/**)",
       "Write(//tmp/**)",
-      "Bash(bash plugins/microshift-ci/scripts/*)",
-      "Bash(python3 plugins/microshift-ci/scripts/*)",
-      "Skill(microshift-ci:*)"
+      "Bash(bash plugins/*/scripts/*)",
+      "Bash(python3 plugins/*/scripts/*)",
+      "Skill(microshift-ci:*)",
+      "mcp__jira__*"
     ]
   }
 }
