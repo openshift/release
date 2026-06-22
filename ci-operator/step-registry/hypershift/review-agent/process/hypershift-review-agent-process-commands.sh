@@ -67,6 +67,8 @@ except ImportError:
 BOT_ACCOUNTS = [
     "hypershift-jira-solve-ci[bot]",
     "hypershift-jira-solve-ci",
+    "github-actions",
+    "github-actions[bot]",
 ]
 
 # Approved bots that ARE allowed to trigger responses
