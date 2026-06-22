@@ -85,6 +85,18 @@ NIC="$(cat $NIC_FILE)"
 SECONDARY_NIC="$(cat $SECONDARY_NIC_FILE)"
 JIRA_LINK="$(cat $JIRA_LINK_FILE)"
 
+# Read containers_version written by the cnf-tests ansible playbook
+CONTAINERS_VERSION=""
+if [[ -f "${SHARED_DIR}/containers_version" ]] && [[ -s "${SHARED_DIR}/containers_version" ]]; then
+  CONTAINERS_VERSION="$(cat "${SHARED_DIR}/containers_version")"
+  echo "Containers version: ${CONTAINERS_VERSION}"
+else
+  echo "No containers_version file found, falling back to z-stream version for image tags"
+fi
+
+extra_args=()
+[[ -n "$CONTAINERS_VERSION" ]] && extra_args+=(--containers-version "$CONTAINERS_VERSION")
+
 echo "Sending Slack notification to cnf-qe-core channel..."
 cd $SCRIPTS_FOLDER
 python3 $PYTHON_SCRIPT \
@@ -95,7 +107,8 @@ python3 $PYTHON_SCRIPT \
   --nic "$NIC" \
   --secondary-nic "$SECONDARY_NIC" \
   --jira-link "$JIRA_LINK" \
-  --phase1-build-id "$PHASE1_BUILD_ID"
+  --phase1-build-id "$PHASE1_BUILD_ID" \
+  "${extra_args[@]}"
 
 
 

@@ -68,6 +68,7 @@ ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=
 echo "Gather artifacts from bastion"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/cnftests-junit.xml ${ARTIFACT_DIR}/junit_test-result.xml || true
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/junit_cnftests.xml ${ARTIFACT_DIR}/junit_test-result.xml || true
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "$BASTION_USER@$BASTION_IP:$PROJECT_DIR/containers_version" "${SHARED_DIR}/containers_version" || true
 
 # Fail if the report file doesn't exist
 if [ ! -f "${ARTIFACT_DIR}/junit_test-result.xml" ]; then
