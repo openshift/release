@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
 
 # Check if the system architecture is supported to perform the e2e installation
