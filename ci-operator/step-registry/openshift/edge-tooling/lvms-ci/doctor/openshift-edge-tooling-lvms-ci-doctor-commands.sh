@@ -76,10 +76,9 @@ configure_claude() {
     "allow": [
       "Read(//tmp/**)",
       "Write(//tmp/**)",
-      "Bash(bash plugins/lvms-ci/scripts/*)",
-      "Bash(python3 plugins/lvms-ci/scripts/*)",
-      "Skill(lvms-ci:doctor)",
-      "Skill(lvms-ci:prow-job)"
+      "Bash(bash plugins/*/scripts/*)",
+      "Bash(python3 plugins/*/scripts/*)",
+      "Skill(lvms-ci:*)"
     ]
   }
 }
