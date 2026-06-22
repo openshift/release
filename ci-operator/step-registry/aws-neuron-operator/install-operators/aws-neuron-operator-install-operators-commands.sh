@@ -30,16 +30,17 @@ with open('${DEVICECONFIG_SAMPLE}') as f:
         if m:
             spec[m.group(1)] = m.group(2).strip('\"')
 
-drivers_image = spec.get('driversImage', '')
-in_cluster_build = not bool(drivers_image)
+raw_drivers_image = spec.get('driversImage', '')
+resolved_drivers_image = os.environ.get('ECO_HWACCEL_NEURON_DRIVERS_IMAGE', '') or raw_drivers_image
+in_cluster_build = not bool(resolved_drivers_image)
 
-if drivers_image and ':' in drivers_image:
-    driver_version = drivers_image.rsplit(':', 1)[-1]
+if resolved_drivers_image and ':' in resolved_drivers_image:
+    driver_version = resolved_drivers_image.rsplit(':', 1)[-1]
 else:
     driver_version = spec.get('driverVersion', '')
 
 mapping = {
-    'ECO_HWACCEL_NEURON_DRIVERS_IMAGE': drivers_image,
+    'ECO_HWACCEL_NEURON_DRIVERS_IMAGE': raw_drivers_image,
     'ECO_HWACCEL_NEURON_DRIVER_VERSION': driver_version,
     'ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE': spec.get('devicePluginImage', ''),
     'ECO_HWACCEL_NEURON_SCHEDULER_IMAGE': spec.get('customSchedulerImage', ''),
