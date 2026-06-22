@@ -31,11 +31,13 @@ with open('${DEVICECONFIG_SAMPLE}') as f:
             spec[m.group(1)] = m.group(2).strip('\"')
 
 raw_drivers_image = spec.get('driversImage', '')
-resolved_drivers_image = os.environ.get('ECO_HWACCEL_NEURON_DRIVERS_IMAGE', '') or raw_drivers_image
+force_in_cluster = os.environ.get('ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD', '').lower() == 'true'
+resolved_drivers_image = '' if force_in_cluster else (os.environ.get('ECO_HWACCEL_NEURON_DRIVERS_IMAGE', '') or raw_drivers_image)
 in_cluster_build = not bool(resolved_drivers_image)
 
-if resolved_drivers_image and ':' in resolved_drivers_image:
-    driver_version = resolved_drivers_image.rsplit(':', 1)[-1]
+version_source = resolved_drivers_image or raw_drivers_image
+if version_source and ':' in version_source:
+    driver_version = version_source.rsplit(':', 1)[-1]
 else:
     driver_version = spec.get('driverVersion', '')
 
