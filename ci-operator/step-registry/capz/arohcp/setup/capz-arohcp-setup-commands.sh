@@ -1,0 +1,1 @@
+../../test/setup/capz-test-setup-commands.sh

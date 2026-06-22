@@ -1,0 +1,30 @@
+ref:
+  as: capz-arohcp-dev-setup
+  from: aro-hcp-e2e-tests
+  commands: capz-arohcp-dev-setup-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 30m
+  grace_period: 5m
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: ARO_HCP_DEPLOY_ENV
+    default: "ci01"
+    documentation: |-
+      ARO-HCP deployment environment name. Used to select the
+      infrastructure subscription and SVC cluster configuration.
+  documentation: |-
+    Sets up the ARO-HCP dev environment for CAPZ e2e tests. Uses the
+    aro-hcp-e2e-tests image (with Go 1.25+ and templatize tool) to get
+    the SVC cluster kubeconfig, discover the frontend endpoint via Istio
+    VirtualService, grant frontend ingress, and register the CI
+    subscription. Writes FRONTEND_ADDRESS to ${SHARED_DIR}/dev_endpoint.

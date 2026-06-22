@@ -1,0 +1,1 @@
+../../test/delete-workload-cluster/capz-test-delete-workload-cluster-commands.sh

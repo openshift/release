@@ -1,0 +1,1 @@
+../../test/validate-cleanup/capz-test-validate-cleanup-commands.sh

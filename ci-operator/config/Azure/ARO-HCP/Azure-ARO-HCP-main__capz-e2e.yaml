@@ -1,0 +1,247 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+
+      # Tool versions
+      ARG KUBECTL_VERSION=v1.35.2
+      ARG HELM_VERSION=v3.16.0
+      ARG CLUSTERCTL_VERSION=v1.12.8
+      ARG CLUSTERCTL_SHA256=19679fd674731c7f48276b633874834958a62b0e93cb870b87a2df240d6a7ce0
+      ARG GOTESTSUM_VERSION=v1.13.0
+
+      # Install OpenShift CLI
+      ARG OC_VERSION=latest
+      RUN curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/oc.tar.gz && \
+          tar xz -C /usr/local/bin -f /tmp/oc.tar.gz oc && \
+          chmod +x /usr/local/bin/oc && \
+          rm -f /tmp/oc.tar.gz
+
+      # Install Azure CLI and other tools
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          printf '%s\n' \
+            '[azure-cli]' \
+            'name=Azure CLI' \
+            'baseurl=https://packages.microsoft.com/yumrepos/azure-cli' \
+            'enabled=1' \
+            'gpgcheck=1' \
+            'gpgkey=https://packages.microsoft.com/keys/microsoft.asc' \
+            > /etc/yum.repos.d/azure-cli.repo && \
+          if [ -d /etc/yum.repos.art/ci ]; then \
+            cp /etc/yum.repos.d/azure-cli.repo /etc/yum.repos.art/ci/; \
+          fi && \
+          dnf install -y azure-cli jq gettext libxml2 bc python3-cffi podman && dnf clean all
+
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+      # Install kubectl
+      RUN curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+          curl -Lo /tmp/kubectl.sha256 "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" && \
+          echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum -c && \
+          chmod +x /usr/local/bin/kubectl && rm -f /tmp/kubectl.sha256
+
+      # Install helm
+      RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz && \
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" -o /tmp/helm.sha256sum && \
+          echo "$(awk '{print $1}' /tmp/helm.sha256sum)  /tmp/helm.tar.gz" | sha256sum -c && \
+          tar xz -C /tmp -f /tmp/helm.tar.gz && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && chmod +x /usr/local/bin/helm && \
+          rm -rf /tmp/helm.tar.gz /tmp/helm.sha256sum /tmp/linux-amd64
+
+      # Install gotestsum
+      RUN GOFLAGS='' GOBIN=/usr/local/bin go install gotest.tools/gotestsum@${GOTESTSUM_VERSION}
+
+      # Install clusterctl
+      RUN curl -Lo /usr/local/bin/clusterctl "https://github.com/kubernetes-sigs/cluster-api/releases/download/${CLUSTERCTL_VERSION}/clusterctl-linux-amd64" && \
+          echo "${CLUSTERCTL_SHA256}  /usr/local/bin/clusterctl" | sha256sum -c && \
+          chmod +x /usr/local/bin/clusterctl
+
+      # Clone capi-tests source
+      RUN git clone --depth 1 https://github.com/stolostron/capi-tests.git /go/src/capi-tests
+      WORKDIR /go/src/capi-tests
+      RUN rm -rf openshift-ci
+images:
+  items:
+  - dockerfile_literal: |
+      FROM aro-hcp-e2e-tests
+    from: aro-hcp-e2e-tests
+    to: aro-hcp-e2e-tools
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: backend/Dockerfile
+    to: aro-hcp-backend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: frontend/Dockerfile
+    to: aro-hcp-frontend
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: admin/Dockerfile
+    to: aro-hcp-admin-api
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: sessiongate/Dockerfile
+    to: aro-hcp-sessiongate
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: fleet/Dockerfile
+    to: aro-hcp-fleet
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: mgmt-agent/Dockerfile
+    to: aro-hcp-mgmt-agent
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: kube-applier/Dockerfile
+    to: aro-hcp-kube-applier
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    - name: ARO_HCP_IMAGE_TAG
+      value: ci-test-img
+    dockerfile_path: hcp-recovery/Dockerfile
+    from: src
+    to: aro-hcp-hcp-recovery
+  run_if_changed: ^$
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: dev
+  run_if_changed: ^$
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: westus3
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: dev
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-dev-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-dev
+    - count: 1
+      env: LEASED_MSI_MOCK_SP
+      resource_type: aro-hcp-msi-mock-cs-sp-dev
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-cleanup-msi-roleassignments
+    - ref: capz-arohcp-aks-deprovision
+    - ref: aro-hcp-gather-provision-failure
+    - ref: aro-hcp-gather-visualization
+    - ref: aro-hcp-gather-custom-link-tools
+    - ref: aro-hcp-gather-observability
+    - ref: aro-hcp-deprovision-environment
+    pre:
+    - ref: aro-hcp-write-config
+    - ref: aro-hcp-provision-environment
+    - ref: capz-arohcp-write-env-dev
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    - ref: capz-arohcp-dev-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
+- as: production
+  cron: 0 20 * * 1-5
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: uksouth
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: prod
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-cleanup-msi-roleassignments
+    - ref: capz-arohcp-aks-deprovision
+    pre:
+    - ref: capz-arohcp-write-env
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: capz-e2e
