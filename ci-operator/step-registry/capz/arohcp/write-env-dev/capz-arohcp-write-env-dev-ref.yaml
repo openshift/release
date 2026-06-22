@@ -1,0 +1,34 @@
+ref:
+  as: capz-arohcp-write-env-dev
+  from: cli
+  commands: capz-arohcp-write-env-dev-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  - namespace: test-credentials
+    name: stolostron-capi-tests-quay-credentials
+    mount_path: /etc/quay-pull-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to resolve.
+  - name: ARO_REPO_URL
+    default: "https://github.com/stolostron/cluster-api-installer.git"
+    documentation: Git URL for the cluster-api-installer repository.
+  - name: ARO_REPO_BRANCH
+    default: "main"
+    documentation: Branch of the cluster-api-installer repository to clone.
+  - name: ARO_REPO_DIR
+    default: "/tmp/cluster-api-installer-pro"
+    documentation: Directory to clone the cluster-api-installer repository into.
+  timeout: 1m0s
+  documentation: |-
+    Resolves Azure credentials from the dev environment secrets and writes
+    all CAPZ environment variables to ${SHARED_DIR}/capz-test-env.sh.
+    Subsequent steps source this file instead of mounting secrets directly.
