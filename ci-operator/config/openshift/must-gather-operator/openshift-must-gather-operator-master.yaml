@@ -231,6 +231,16 @@ tests:
 
         echo "[setup] Starting oape-ci-monitor for ${REPO_OWNER}/${REPO_NAME} PR#${PULL_NUMBER}"
 
+        # --- Rehearsal detection ---
+        # Prow rehearsal jobs run against openshift/release, not the target repo.
+        # The container image build already validated the setup; skip monitoring.
+        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+          echo "[setup] Rehearsal mode detected (JOB_NAME=${JOB_NAME})"
+          echo "[setup] Container image built successfully — setup validated"
+          echo "[setup] CI monitoring will activate on actual target-repo PRs"
+          exit 0
+        fi
+
         # --- GitHub auth: try App token, fall back to GITHUB_TOKEN ---
         USE_APP_TOKEN="false"
         if [[ -f /var/run/github-app/app-id && -f /var/run/github-app/private-key.pem ]]; then
