@@ -479,13 +479,14 @@ spec:
       for: 10m
       labels:
         severity: critical
-    - alert: ImagePullBackOff
+    - alert: NonKubeContainerWaiting
       annotations:
-        message: Many pods have been failing on pulling images. Please check the relevant events on the cluster.
-      expr: sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30
-      for: 10m
+        description: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container }} has been in waiting state for longer than 1 hour. (reason: "{{ $labels.reason }}").'
+        summary: Pod container waiting longer than 1 hour
+      expr: kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0
+      for: 1h
       labels:
-        severity: critical
+        severity: warning
     - alert: prow-job-backlog-growing
       annotations:
         message: The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.
@@ -583,16 +584,6 @@ spec:
       for: 15m
       labels:
         severity: critical
-        team: crt
-  - name: release-controller-container-waiting
-    rules:
-    - alert: releaseControllerContainerWaiting
-      annotations:
-        message: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container}} has been in waiting state for longer than 1 hour. (reason: "{{ $labels.reason }}").'
-      expr: kube_pod_container_status_waiting_reason{reason!="CrashLoopBackOff", namespace="ci", pod=~"release-controller.*"} > 0
-      for: 1h
-      labels:
-        severity: warning
         team: crt
   - name: tide-missing
     rules:
