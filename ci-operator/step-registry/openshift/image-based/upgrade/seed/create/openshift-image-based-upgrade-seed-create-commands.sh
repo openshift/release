@@ -93,6 +93,20 @@ if [[ ! -z "${RECERT_IMAGE_OVERRIDE}" ]]; then
   RECERT_IMAGE=$RECERT_IMAGE_OVERRIDE
 fi
 
+# lifecycle-agent presubmits: export Prow git coordinates for ib-orchestrate-vm.
+# Other repos sharing this workflow leave these empty (ib-orchestrate-vm uses defaults).
+#
+#   CI_LCA_GIT_REF  = PULL_PULL_SHA  (PR head / refs/pull/<N>/head, not merge)
+#   CI_LCA_GIT_PULL = PULL_NUMBER    (fetch pull/<N>/head when SHA unreachable)
+#   LCA_GIT_BRANCH  = PULL_BASE_REF  (target branch, e.g. release-4.22)
+CI_LCA_GIT_REF=""
+CI_LCA_GIT_PULL=""
+if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift-kni/lifecycle-agent" ]]; then
+  CI_LCA_GIT_REF="${PULL_PULL_SHA:-}"
+  CI_LCA_GIT_PULL="${PULL_NUMBER:-}"
+  LCA_GIT_BRANCH="${PULL_BASE_REF:-${LCA_GIT_BRANCH:-}}"
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
@@ -103,6 +117,10 @@ export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
+export CI_LCA_GIT_REF="${CI_LCA_GIT_REF}"
+export CI_LCA_GIT_PULL="${CI_LCA_GIT_PULL}"
+export LCA_GIT_REPO="https://github.com/openshift-kni/lifecycle-agent"
+export LCA_GIT_BRANCH="${LCA_GIT_BRANCH:-main}"
 export SEED_RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"

@@ -28,6 +28,20 @@ target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir
 
 echo "${TARGET_VM_NAME}" > "${SHARED_DIR}/target_vm_name"
 
+# lifecycle-agent presubmits: export Prow git coordinates for ib-orchestrate-vm.
+# Other repos sharing this workflow leave these empty (ib-orchestrate-vm uses defaults).
+#
+#   CI_LCA_GIT_REF  = PULL_PULL_SHA  (PR head / refs/pull/<N>/head, not merge)
+#   CI_LCA_GIT_PULL = PULL_NUMBER    (fetch pull/<N>/head when SHA unreachable)
+#   LCA_GIT_BRANCH  = PULL_BASE_REF  (target branch, e.g. release-4.22)
+CI_LCA_GIT_REF=""
+CI_LCA_GIT_PULL=""
+if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift-kni/lifecycle-agent" ]]; then
+  CI_LCA_GIT_REF="${PULL_PULL_SHA:-}"
+  CI_LCA_GIT_PULL="${PULL_NUMBER:-}"
+  LCA_GIT_BRANCH="${PULL_BASE_REF:-${LCA_GIT_BRANCH:-}}"
+fi
+
 echo "Creating upgrade script..."
 cat <<EOF > ${SHARED_DIR}/upgrade_from_seed.sh
 #!/bin/bash
@@ -40,6 +54,10 @@ export TARGET_VERSION="${TARGET_VERSION}"
 export TARGET_LCA_REF="${TARGET_LCA_REF}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
+export CI_LCA_GIT_REF="${CI_LCA_GIT_REF}"
+export CI_LCA_GIT_PULL="${CI_LCA_GIT_PULL}"
+export LCA_GIT_REPO="https://github.com/openshift-kni/lifecycle-agent"
+export LCA_GIT_BRANCH="${LCA_GIT_BRANCH:-main}"
 export SEED_VERSION="${SEED_VERSION}"
 export IP_STACK="${IP_STACK}"
 export UPGRADE_TIMEOUT="60m"
