@@ -1,6 +1,10 @@
-binary_build_commands: make install
 build_root:
   from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.clients
+    to: terraform-provider-rhcs-clients
+  skip_if_only_changed: ^(LICENSE|OWNERS|.*\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)(?:/|$)
 resources:
   '*':
     limits:
@@ -9,13 +13,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: |-
-    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@v2.20.1
-    unset GOFLAGS
-    make unit-test
+- as: pre-push-checks
+  commands: make pre-push-checks
   container:
-    from: src
+    from: terraform-provider-rhcs-clients
+  skip_if_only_changed: ^(LICENSE|OWNERS|.*\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)(?:/|$)
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
