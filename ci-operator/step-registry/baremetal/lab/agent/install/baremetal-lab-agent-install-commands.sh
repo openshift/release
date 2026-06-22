@@ -260,7 +260,7 @@ if ! wait "$!"; then
   # TODO: gather logs??
   exit 1
 fi
-
+sleep 1m
 # Used by observer pod
 touch  "${SHARED_DIR}/success"
 
