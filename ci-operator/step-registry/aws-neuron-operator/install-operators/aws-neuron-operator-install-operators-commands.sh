@@ -30,17 +30,27 @@ with open('${DEVICECONFIG_SAMPLE}') as f:
         if m:
             spec[m.group(1)] = m.group(2).strip('\"')
 
+raw_drivers_image = spec.get('driversImage', '')
+resolved_drivers_image = os.environ.get('ECO_HWACCEL_NEURON_DRIVERS_IMAGE', '') or raw_drivers_image
+in_cluster_build = not bool(resolved_drivers_image)
+
+if resolved_drivers_image and ':' in resolved_drivers_image:
+    driver_version = resolved_drivers_image.rsplit(':', 1)[-1]
+else:
+    driver_version = spec.get('driverVersion', '')
+
 mapping = {
-    'ECO_HWACCEL_NEURON_DRIVERS_IMAGE': spec.get('driversImage', ''),
+    'ECO_HWACCEL_NEURON_DRIVERS_IMAGE': raw_drivers_image,
+    'ECO_HWACCEL_NEURON_DRIVER_VERSION': driver_version,
     'ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE': spec.get('devicePluginImage', ''),
     'ECO_HWACCEL_NEURON_SCHEDULER_IMAGE': spec.get('customSchedulerImage', ''),
     'ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE': spec.get('schedulerExtensionImage', ''),
     'ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE': spec.get('nodeMetricsImage', ''),
 }
 
-drivers_image = spec.get('driversImage', '')
-driver_version = drivers_image.rsplit(':', 1)[-1] if ':' in drivers_image else ''
-mapping['ECO_HWACCEL_NEURON_DRIVER_VERSION'] = driver_version
+optional_when_in_cluster = {
+    'ECO_HWACCEL_NEURON_DRIVERS_IMAGE',
+}
 
 image_re = re.compile(r'^[a-zA-Z0-9._/:-]+(@sha256:[0-9a-fA-F]{64})?$')
 
@@ -50,6 +60,10 @@ with open(env_path, 'w') as ef:
         existing = os.environ.get(key, '')
         final = existing if existing else value
         if not final:
+            if in_cluster_build and key in optional_when_in_cluster:
+                ef.write(f'export {key}=\n')
+                print(f'  {key}= (empty, in-cluster build mode)')
+                continue
             print(f'ERROR: {key} resolved to empty', file=sys.stderr)
             sys.exit(1)
         if not image_re.match(final):
@@ -57,6 +71,9 @@ with open(env_path, 'w') as ef:
             sys.exit(1)
         ef.write(f'export {key}={shlex.quote(final)}\n')
         print(f'  {key}={final}')
+    icb = 'true' if in_cluster_build else 'false'
+    ef.write(f'export ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD={icb}\n')
+    print(f'  ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD={icb}')
 "
 echo "DeviceConfig values resolved (written to SHARED_DIR/neuron-deviceconfig.env)"
 
