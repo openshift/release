@@ -159,9 +159,15 @@ ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key
     --selector=node-role.kubernetes.io/worker,\!node-role.kubernetes.io/master \
     node-role.kubernetes.io/workercnf="
 
-echo "Resolve OCP tools image for CNF_TEST_IMAGE (available on disconnected registry)"
+echo "Write pull secret to bastion for registry authentication"
+PULL_SECRET_PATH="${REMOTE_WORKDIR}/pull-secret.json"
+base64 -d /var/group_variables/common/bastions/pull_secret_string > "${WORKDIR}/pull-secret.json"
+scp "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
+  "${WORKDIR}/pull-secret.json" "${BASTION_USER}@${BASTION_IP}:${PULL_SECRET_PATH}"
+
+echo "Resolve OCP tools image for CNF_TEST_IMAGE"
 CNF_TEST_IMAGE=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
-  "oc --kubeconfig='${SPOKE_KUBECONFIG}' adm release info --image-for=tools")
+  "REGISTRY_AUTH_FILE='${PULL_SECRET_PATH}' oc --kubeconfig='${SPOKE_KUBECONFIG}' adm release info --image-for=tools")
 echo "CNF_TEST_IMAGE=${CNF_TEST_IMAGE}"
 
 cd /eco-ci-cd
