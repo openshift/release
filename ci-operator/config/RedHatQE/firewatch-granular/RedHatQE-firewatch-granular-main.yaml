@@ -1,0 +1,139 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+images:
+- dockerfile_path: Dockerfile
+  to: firewatch-granular
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: integration-fixtures
+  commands: |
+    set -euo pipefail
+    go build -o /tmp/firewatch-granular ./cmd/firewatch-granular/
+
+    mkdir -p "${ARTIFACT_DIR}/junit"
+    cp testdata/multi-failure.xml "${ARTIFACT_DIR}/junit/"
+    cp testdata/nested-testsuites.xml "${ARTIFACT_DIR}/junit/"
+
+    /tmp/firewatch-granular analyze \
+      --artifact-dir "${ARTIFACT_DIR}" \
+      --output-dir "${SHARED_DIR}"
+
+    echo "=== Validating labels file ==="
+    test -f "${SHARED_DIR}/firewatch-additional-labels" || { echo "FAIL: labels file not created"; exit 1; }
+
+    label_count=$(wc -l < "${SHARED_DIR}/firewatch-additional-labels")
+    echo "Label count: ${label_count}"
+    test "${label_count}" -gt 0 || { echo "FAIL: labels file is empty"; exit 1; }
+
+    operator_count=$(grep -c "^operator:" "${SHARED_DIR}/firewatch-additional-labels" || true)
+    test "${operator_count}" -le 5 || { echo "FAIL: operator count ${operator_count} exceeds cap 5"; exit 1; }
+
+    component_count=$(grep -c "^component:" "${SHARED_DIR}/firewatch-additional-labels" || true)
+    test "${component_count}" -le 3 || { echo "FAIL: component count ${component_count} exceeds cap 3"; exit 1; }
+
+    location_count=$(grep -c "^location:" "${SHARED_DIR}/firewatch-additional-labels" || true)
+    test "${location_count}" -le 3 || { echo "FAIL: location count ${location_count} exceeds cap 3"; exit 1; }
+
+    ! grep -q ' ' "${SHARED_DIR}/firewatch-additional-labels" || { echo "FAIL: labels contain spaces"; exit 1; }
+
+    echo "=== Validating JSON report ==="
+    test -f "${SHARED_DIR}/firewatch-granular-data.json" || { echo "FAIL: JSON report not created"; exit 1; }
+
+    python3 -c "
+    import json, sys
+    with open('${SHARED_DIR}/firewatch-granular-data.json') as f:
+        report = json.load(f)
+    assert report['failure_count'] > 0, 'expected failures'
+    assert len(report['operators']) > 0, 'expected operators'
+    print(f'Report valid: {report[\"failure_count\"]} failures, {len(report[\"operators\"])} operators')
+    "
+
+    echo "=== All integration checks passed ==="
+  container:
+    from: src
+- as: integration-no-failures
+  commands: |
+    set -euo pipefail
+    go build -o /tmp/firewatch-granular ./cmd/firewatch-granular/
+
+    mkdir -p "${ARTIFACT_DIR}/junit"
+    cp testdata/no-failures.xml "${ARTIFACT_DIR}/junit/"
+
+    /tmp/firewatch-granular analyze \
+      --artifact-dir "${ARTIFACT_DIR}" \
+      --output-dir "${SHARED_DIR}"
+
+    test ! -f "${SHARED_DIR}/firewatch-additional-labels" || { echo "FAIL: labels file should not exist for passing tests"; exit 1; }
+    test -f "${SHARED_DIR}/firewatch-granular-data.json" || { echo "FAIL: JSON report should still be written"; exit 1; }
+
+    python3 -c "
+    import json
+    with open('${SHARED_DIR}/firewatch-granular-data.json') as f:
+        report = json.load(f)
+    assert report['failure_count'] == 0, f'expected 0 failures, got {report[\"failure_count\"]}'
+    print('No-failure case: PASS')
+    "
+
+    echo "=== No-failure integration checks passed ==="
+  container:
+    from: src
+- as: integration-empty-dir
+  commands: |
+    set -euo pipefail
+    go build -o /tmp/firewatch-granular ./cmd/firewatch-granular/
+
+    /tmp/firewatch-granular analyze \
+      --artifact-dir "/nonexistent/path" \
+      --output-dir "${SHARED_DIR}"
+
+    test -f "${SHARED_DIR}/firewatch-granular-data.json" || { echo "FAIL: JSON report should be written even for missing dir"; exit 1; }
+
+    echo "=== Empty dir integration checks passed ==="
+  container:
+    from: src
+- as: integration-append-mode
+  commands: |
+    set -euo pipefail
+    go build -o /tmp/firewatch-granular ./cmd/firewatch-granular/
+
+    echo "pre-existing-label" > "${SHARED_DIR}/firewatch-additional-labels"
+
+    mkdir -p "${ARTIFACT_DIR}/junit"
+    cp testdata/single-failure.xml "${ARTIFACT_DIR}/junit/"
+
+    /tmp/firewatch-granular analyze \
+      --artifact-dir "${ARTIFACT_DIR}" \
+      --output-dir "${SHARED_DIR}"
+
+    head -1 "${SHARED_DIR}/firewatch-additional-labels" | grep -q "pre-existing-label" || { echo "FAIL: existing labels overwritten"; exit 1; }
+
+    new_labels=$(tail -n +2 "${SHARED_DIR}/firewatch-additional-labels" | wc -l)
+    test "${new_labels}" -gt 0 || { echo "FAIL: no new labels appended"; exit 1; }
+
+    echo "=== Append mode integration checks passed ==="
+  container:
+    from: src
+promotion:
+  to:
+  - namespace: firewatch
+    name: firewatch-granular
+    tag: main
+zz_generated_metadata:
+  branch: main
+  org: RedHatQE
+  repo: firewatch-granular

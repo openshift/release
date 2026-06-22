@@ -1,0 +1,25 @@
+ref:
+  as: firewatch-granular-analysis
+  from_image:
+    namespace: firewatch
+    name: firewatch-granular
+    tag: main
+  commands: firewatch-granular-analysis-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: FIREWATCH_GRANULAR_ARTIFACT_SUBDIR
+    default: ""
+    documentation: Subdirectory under ARTIFACT_DIR to search for JUnit XML files. If empty, searches ARTIFACT_DIR directly (including a junit/ subdirectory if present).
+  - name: FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE
+    default: "firewatch-additional-labels"
+    documentation: The filename in SHARED_DIR to append extracted labels to. Must match the value used by the firewatch-report-issues step.
+  best_effort: true
+  documentation: |-
+    Parses JUnit XML test results from CI artifacts and extracts granular metadata
+    (operator names, component names, file locations) as Jira labels. Writes labels
+    to ${SHARED_DIR}/firewatch-additional-labels for consumption by firewatch-report-issues.
+    This step should be placed in the post chain BEFORE firewatch-report-issues.
+    See https://github.com/RedHatQE/firewatch-granular for documentation.
