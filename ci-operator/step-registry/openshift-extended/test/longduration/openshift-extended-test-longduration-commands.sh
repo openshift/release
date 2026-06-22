@@ -4,6 +4,36 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export PATH=/tmp/:$PATH
+which extended-platform-tests || true
+
+# Debug wait with timeout (default 3 hours)
+DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-10800}"
+echo "=========================================="
+echo "DEBUG WAIT ACTIVE - Cluster ready for debugging"
+echo "=========================================="
+echo "Timeout: ${DEBUG_WAIT_TIMEOUT} seconds"
+echo "To continue tests, create the signal file:"
+echo "  oc rsh <test-pod>"
+echo "  touch /tmp/continue"
+echo "=========================================="
+
+elapsed=0
+while [ ! -f "/tmp/continue" ] && [ $elapsed -lt $DEBUG_WAIT_TIMEOUT ]
+do
+    sleep 10
+    elapsed=$((elapsed + 10))
+    if [ $((elapsed % 300)) -eq 0 ]; then
+        echo "Debug wait: $elapsed / $DEBUG_WAIT_TIMEOUT seconds elapsed..."
+    fi
+done
+
+if [ -f "/tmp/continue" ]; then
+    echo "Continue signal received. Proceeding with tests..."
+else
+    echo "Debug wait timeout reached. Proceeding with tests..."
+fi
+
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
