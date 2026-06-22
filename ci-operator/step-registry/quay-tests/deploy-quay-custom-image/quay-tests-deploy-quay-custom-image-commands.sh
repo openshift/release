@@ -77,8 +77,11 @@ if [[ -n "${REGISTRY_TOKEN}" ]]; then
   oc -n "${NAMESPACE}" create secret generic ci-registry-pull-secret \
     --from-literal=.dockerconfigjson="${REGISTRY_TOKEN}" \
     --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml | oc apply -f -
-  oc -n "${NAMESPACE}" secrets link default ci-registry-pull-secret --for=pull
-  oc -n "${NAMESPACE}" secrets link deployer ci-registry-pull-secret --for=pull
+  # Link to all service accounts that may pull CI images — the quay-app pods
+  # use a dedicated SA created by the operator (e.g. quay-quay-app)
+  for sa in default deployer $(oc -n "${NAMESPACE}" get sa -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -i quay); do
+    oc -n "${NAMESPACE}" secrets link "${sa}" ci-registry-pull-secret --for=pull 2>/dev/null || true
+  done
   echo "CI registry pull secret configured"
 else
   echo "WARNING: Could not obtain CI registry token, image pull may fail on external clusters" >&2
