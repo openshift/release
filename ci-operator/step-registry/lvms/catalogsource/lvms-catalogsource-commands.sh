@@ -12,6 +12,11 @@ declare -r IDMS_NAME=${IDMS_NAME:-"lvm-operator-idms"}
 declare -r CATALOG_SOURCE=${LVM_CATALOG_SOURCE:-"lvm-catalogsource"}
 declare LVM_INDEX_IMAGE
 
+# Source proxy config early so oc commands work in disconnected environments
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
