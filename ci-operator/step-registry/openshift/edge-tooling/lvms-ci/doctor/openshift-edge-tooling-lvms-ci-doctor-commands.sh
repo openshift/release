@@ -112,5 +112,5 @@ timeout 3000 claude \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}"
+    --verbose &> "${CLAUDE_DOCTOR_LOG}"
 echo "Analysis for LVMS CI jobs completed"
