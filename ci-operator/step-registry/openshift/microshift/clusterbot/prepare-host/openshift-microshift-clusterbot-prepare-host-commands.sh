@@ -193,6 +193,7 @@ sslverify=1
 sslcacert=/etc/rhsm/ca/redhat-uep.pem
 sslclientcert=${CERT}
 sslclientkey=${KEY}
+skip_if_unavailable=1
 REPOEOF
         cat <<REPOEOF | sudo tee /etc/yum.repos.d/fast-datapath-rhel9.repo
 [fast-datapath-for-rhel-9]
@@ -205,6 +206,7 @@ sslverify=1
 sslcacert=/etc/rhsm/ca/redhat-uep.pem
 sslclientcert=${CERT}
 sslclientkey=${KEY}
+skip_if_unavailable=1
 REPOEOF
     fi
 
