@@ -14,7 +14,7 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     set -xeuo pipefail
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     curl -sL https://github.com/ngopalak-redhat/cri-o/archive/refs/heads/fix-libpathrs-0.2.5.tar.gz | tar xz -C /tmp
-    cd /tmp/cri-o-pin-runc-version/contrib/test/ci
+    cd /tmp/cri-o-fix-libpathrs-0.2.5/contrib/test/ci
     ansible-playbook setup-main.yml --connection=local -vvv
     sudo rm -rf "\${SOURCE_DIR}"
 EOF
