@@ -36,8 +36,11 @@ echo "Model: ${CLAUDE_MODEL}"
 # Load secrets with xtrace disabled to prevent leaking credentials in logs
 set +x
 if [ -f "${GITHUB_TOKEN_PATH}" ]; then
-    export GITHUB_TOKEN
-    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    # GH_TOKEN is what the gh CLI reads; GITHUB_TOKEN is the conventional
+    # name other tools (e.g. git credential helpers, API wrappers) expect.
+    export GH_TOKEN GITHUB_TOKEN
+    GH_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    GITHUB_TOKEN="${GH_TOKEN}"
     echo "GitHub token loaded."
 else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."

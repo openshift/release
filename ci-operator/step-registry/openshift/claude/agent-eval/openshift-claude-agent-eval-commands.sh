@@ -24,8 +24,11 @@ echo "Starting claude-agent-eval"
 # Load GitHub token for gh CLI access (same secret as payload-agent)
 set +x
 if [ -f "${GITHUB_TOKEN_PATH:-}" ]; then
-    export GITHUB_TOKEN
-    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    # GH_TOKEN is what the gh CLI reads; GITHUB_TOKEN is the conventional
+    # name other tools (e.g. git credential helpers, API wrappers) expect.
+    export GH_TOKEN GITHUB_TOKEN
+    GH_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    GITHUB_TOKEN="${GH_TOKEN}"
     echo "GitHub token loaded."
 else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH:-<unset>}. gh CLI will run unauthenticated."
