@@ -68,6 +68,23 @@ if [[ -z "${QUAY_DEPLOY}" ]]; then
 fi
 echo "Found quay-app deployment: ${QUAY_DEPLOY}"
 
+# Create pull secret for CI registry so ROSA/external clusters can pull CI-built images
+echo "Creating CI registry pull secret..."
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+REGISTRY_TOKEN=$(KUBECONFIG="" oc registry login --to=- 2>/dev/null)
+if [[ -n "${REGISTRY_TOKEN}" ]]; then
+  oc -n "${NAMESPACE}" create secret generic ci-registry-pull-secret \
+    --from-literal=.dockerconfigjson="${REGISTRY_TOKEN}" \
+    --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml | oc apply -f -
+  oc -n "${NAMESPACE}" secrets link default ci-registry-pull-secret --for=pull
+  oc -n "${NAMESPACE}" secrets link deployer ci-registry-pull-secret --for=pull
+  echo "CI registry pull secret configured"
+else
+  echo "WARNING: Could not obtain CI registry token, image pull may fail on external clusters" >&2
+fi
+$WAS_TRACING && set -x
+
 # Patch the container image
 oc -n "${NAMESPACE}" set image "deployment/${QUAY_DEPLOY}" "quay-app=${QUAY_CI_IMAGE}"
 
