@@ -365,24 +365,36 @@ EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
-run_claude() {
+agentic_ci() {
     local agentic_args=()
-    while [[ "$1" == --no-streaming ]]; do
-        agentic_args+=("$1"); shift
+    local timeout_seconds=""
+    while true; do
+        case "${1:-}" in
+            --no-streaming) agentic_args+=("$1"); shift ;;
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) break ;;
+        esac
     done
     local prompt="$1"; shift
-    agentic-ci run \
-        --backend local \
-        --harness claude-code \
-        --model "${CLAUDE_MODEL}" \
-        --workdir "${WORKDIR}" \
-        "${agentic_args[@]+"${agentic_args[@]}"}" \
-        "${prompt}" \
-        -- \
-        --permission-mode default \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --verbose \
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${agentic_args[@]+"${agentic_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
         "$@"
+    )
+    if [[ -n "${timeout_seconds}" ]]; then
+        timeout "${timeout_seconds}" "${cmd[@]}"
+    else
+        "${cmd[@]}"
+    fi
     local rc=$?
     for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
         [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
@@ -399,7 +411,7 @@ After completing your analysis, you MUST use the Skill tool to invoke ci:payload
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 3600 run_claude \
+agentic_ci --timeout 3600 \
     "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
@@ -411,7 +423,7 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 run_claude \
+    agentic_ci --timeout 600 \
         "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
         --continue \
         --max-turns 20 \
@@ -455,7 +467,7 @@ for attempt in 1 2 3; do
     if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
     echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
 
-    timeout 600 run_claude \
+    agentic_ci --timeout 600 \
         "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
         --continue \
         --max-turns 10 \
@@ -559,7 +571,7 @@ fi
 
 echo "Asking Claude to summarize findings for Slack..."
 SLACK_LOG=$(mktemp)
-run_claude --no-streaming \
+agentic_ci --no-streaming \
     "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     --continue \
     --max-turns 5 \
