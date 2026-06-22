@@ -130,7 +130,7 @@ for plugin in "${plugins_list[@]}"; do
     fi
 done
 
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
 
 # Login to IBM cloud

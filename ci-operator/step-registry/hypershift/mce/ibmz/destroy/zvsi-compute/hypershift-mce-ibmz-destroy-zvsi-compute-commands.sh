@@ -16,7 +16,7 @@ infra_name="hcp-ci-$job_id"
 export infra_name
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
