@@ -43,10 +43,13 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-upstream-tests
+  capabilities:
+  - intranet
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: equinix-ocp-metal-qe
     env:
       AGENT_SKILL: TEMPO
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -56,11 +59,16 @@ tests:
             {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
+      RESERVE_BOOTSTRAP: "false"
       SKIP_TESTS: tests/e2e-openshift-object-stores/*
+      architecture: amd64
+      masters: "3"
+      workers: "2"
     post:
     - ref: openshift-observability-qe-agent
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - chain: baremetal-lab-post
     test:
+    - ref: ipi-install-rbac
     - as: install
       cli: latest
       commands: |
@@ -77,7 +85,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: baremetal-lab-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
