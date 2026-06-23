@@ -3,6 +3,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base-rhel9
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
@@ -129,6 +133,21 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-ovn-tls-13
+- as: periodic-hypershift-tls
+  interval: 72h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: tls-scanner-hypershift-aws
 zz_generated_metadata:
   branch: main
   org: openshift
