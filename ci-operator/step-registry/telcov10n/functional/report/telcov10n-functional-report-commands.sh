@@ -40,30 +40,41 @@ rm -rf /tmp/reports /tmp/junit
 echo "Create reports directory"
 mkdir -pv /tmp/reports
 
-for f in "${SHARED_DIR}"/polarion_*.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^polarion_//')
-    cp "$f" "/tmp/reports/${filename}"
-  fi
-done
-
-for f in "${SHARED_DIR}"/report_*.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^report_//')
-    cp "$f" "/tmp/reports/${filename}"
-  fi
-done
-
 echo "Create junit directory"
 mkdir -pv /tmp/junit
 
-echo "Copy junit reports to junit directory"
-for f in "${SHARED_DIR}"/junit_*.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^junit_//')
-    cp "$f" "/tmp/junit/${filename}"
-  fi
-done
+if ! ls "${SHARED_DIR}"/polarion_*.xml 2>/dev/null | grep -q .; then
+  echo "No Reports found in ${SHARED_DIR}, Using Bastion"
+  BASTION_REPORT_DIR="/tmp/ptp_reports"
+  POLARION_REPORT_DIR="${BASTION_REPORT_DIR}/polarion"
+  JUNIT_REPORT_DIR="${BASTION_REPORT_DIR}/junit"
+  UPLOAD_SHARED_DIR=""
+else
+  echo "Reports found in SHARED_DIR"
+  for f in "${SHARED_DIR}"/polarion_*.xml; do
+    if [[ -f "$f" ]]; then
+      filename=$(basename "$f" | sed 's/^polarion_//')
+      cp "$f" "/tmp/reports/${filename}"
+    fi
+  done
+
+  for f in "${SHARED_DIR}"/report_*.xml; do
+    if [[ -f "$f" ]]; then
+      filename=$(basename "$f" | sed 's/^report_//')
+      cp "$f" "/tmp/reports/${filename}"
+    fi
+  done
+
+  for f in "${SHARED_DIR}"/junit_*.xml; do
+    if [[ -f "$f" ]]; then
+      filename=$(basename "$f" | sed 's/^junit_//')
+      cp "$f" "/tmp/junit/${filename}"
+    fi
+  done
+  POLARION_REPORT_DIR=/tmp/reports
+  JUNIT_REPORT_DIR=/tmp/junit
+  UPLOAD_SHARED_DIR="${SHARED_DIR}"
+fi
 
 cd /eco-ci-cd
 
@@ -84,12 +95,12 @@ if [[ -f "${METRICS_FILE}" ]]; then
 fi
 
 echo "Uploading reports to Polarion and Report Portal"
-ansible-playbook ./playbooks/upload-report.yaml \
+SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${KUBECONFIG} \
     reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
-    processed_report_dir=/tmp/reports \
-    junit_report_dir=/tmp/junit \
+    processed_report_dir=${POLARION_REPORT_DIR} \
+    junit_report_dir=${JUNIT_REPORT_DIR} \
     reports_directory=/tmp/upload \
     reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
