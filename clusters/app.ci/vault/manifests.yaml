@@ -30,36 +30,6 @@ spec:
               number: 8300
         pathType: ImplementationSpecific
 ---
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: vault
-  namespace: vault
-spec:
-  lookupPolicy:
-    local: true
-  tags:
-  - name: 1.6.2
-    from:
-      kind: DockerImage
-      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
-      name: quay.io/alvaroaleman/vault:1.6.2
-    referencePolicy:
-      type: Local
-  - name: 1.7.0
-    from:
-      kind: DockerImage
-      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
-      name: quay.io/alvaroaleman/vault:1.7.0
-    referencePolicy:
-      type: Local
-  - name: 1.16.2
-    from:
-      kind: DockerImage
-      name: quay.io/jguzik/vault:1.16.2
-    referencePolicy:
-      type: Local
----
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -205,7 +175,7 @@ spec:
           preStop:
             exec:
               command: ["/bin/sleep", "30"]
-      - image: vault:1.16.2
+      - image: docker.io/hashicorp/vault:1.16.2
         name: unsealer
         command:
         - /bin/sh
@@ -224,7 +194,7 @@ spec:
             secretKeyRef:
               name: vault-unseal
               key: unseal
-      - image: vault:1.16.2
+      - image: docker.io/hashicorp/vault:1.16.2
         name: vault
         args:
         - server
