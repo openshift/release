@@ -22,13 +22,18 @@ images:
     to: sippy-devcontainer
   - dockerfile_literal: |
       FROM sippy AS binary
+      FROM src AS source
       FROM sippy-devcontainer
       COPY --from=binary /bin/sippy /workspace/bin/sippy
+      COPY --from=source /go/src/github.com/openshift/sippy/config /workspace/config
       WORKDIR /workspace
     inputs:
       sippy:
         as:
         - sippy
+      src:
+        as:
+        - src
     to: sippy-staging-dev
 promotion:
   to:

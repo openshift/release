@@ -2,7 +2,6 @@
 set -euo pipefail
 
 NAMESPACE="sippy-staging"
-POSTGRES_PASSWORD="sippy-staging-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
 echo "==> Creating namespace ${NAMESPACE}"
 oc new-project "${NAMESPACE}" || oc project "${NAMESPACE}"
@@ -13,13 +12,8 @@ oc create secret generic pull-secret \
   --type=kubernetes.io/dockerconfigjson \
   -n "${NAMESPACE}"
 
-echo "==> Creating GCS credentials secret"
-oc create secret generic gcs-sa \
-  --from-file=gcs-sa="${GCS_SA_JSON_PATH}" \
-  -n "${NAMESPACE}"
-
-echo "==> Deploying PostgreSQL"
-oc apply -n "${NAMESPACE}" -f - <<EOF
+echo "==> Deploying PostgreSQL and Redis"
+oc apply -n "${NAMESPACE}" -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,14 +30,13 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: quay.io/sclorg/postgresql-16-c9s:latest
+        image: quay.io/enterprisedb/postgresql:latest
         env:
-        - name: POSTGRESQL_USER
-          value: sippy
-        - name: POSTGRESQL_PASSWORD
-          value: "${POSTGRES_PASSWORD}"
-        - name: POSTGRESQL_DATABASE
-          value: sippy
+        - name: POSTGRES_PASSWORD
+          value: password
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: trust
+        args: ["-c", "listen_addresses=*"]
         ports:
         - containerPort: 5432
         resources:
@@ -53,9 +46,9 @@ spec:
           limits:
             memory: 2Gi
         readinessProbe:
-          tcpSocket:
-            port: 5432
-          initialDelaySeconds: 10
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 5
           periodSeconds: 5
 ---
 apiVersion: v1
@@ -68,16 +61,57 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: docker.io/redis:7-alpine
+        args: ["--maxmemory", "4gb", "--maxmemory-policy", "allkeys-lru"]
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 4Gi
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
 EOF
 
-echo "==> Waiting for PostgreSQL to be ready"
+echo "==> Waiting for PostgreSQL and Redis to be ready"
 oc wait --for=condition=Available deployment/postgres -n "${NAMESPACE}" --timeout=180s
-oc wait --for=condition=Ready pod -l app=postgres -n "${NAMESPACE}" --timeout=180s
+oc wait --for=condition=Available deployment/redis -n "${NAMESPACE}" --timeout=180s
 
-SIPPY_DATABASE_DSN="postgresql://sippy:${POSTGRES_PASSWORD}@postgres.${NAMESPACE}.svc:5432/sippy?sslmode=disable"
-
-echo "==> Deploying sippy staging environment"
-oc apply -n "${NAMESPACE}" -f - <<EOF
+echo "==> Deploying sippy devcontainer"
+oc apply -n "${NAMESPACE}" -f - <<OUTER
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -102,43 +136,37 @@ spec:
         - -c
         - |
           set -euo pipefail
-          echo "==> Loading data into database..."
-          /workspace/bin/sippy load \
-            --database-dsn "\${SIPPY_DATABASE_DSN}" \
-            --google-service-account-credential-file /var/run/gcs-sa/gcs-sa \
-            --mode ocp
+          DSN="postgresql://postgres:password@postgres.${NAMESPACE}.svc:5432/postgres?sslmode=disable"
+
+          echo "==> Seeding database..."
+          /workspace/bin/sippy seed-data --init-database --database-dsn="\${DSN}"
+
           echo "==> Starting sippy server..."
-          exec /workspace/bin/sippy serve \
-            --listen-addr 0.0.0.0:8080 \
-            --database-dsn "\${SIPPY_DATABASE_DSN}"
-        env:
-        - name: SIPPY_DATABASE_DSN
-          value: "${SIPPY_DATABASE_DSN}"
+          exec /workspace/bin/sippy serve \\
+            --listen ":8080" \\
+            --listen-metrics ":2112" \\
+            --database-dsn="\${DSN}" \\
+            --data-provider postgres \\
+            --views /workspace/config/seed-views.yaml \\
+            --redis-url="redis://redis.${NAMESPACE}.svc:6379" \\
+            --enable-write-endpoints
         ports:
         - containerPort: 8080
           name: http
-        volumeMounts:
-        - name: gcs-sa
-          mountPath: /var/run/gcs-sa
-          readOnly: true
         resources:
           requests:
-            cpu: 500m
-            memory: 2Gi
-          limits:
+            cpu: "1"
             memory: 4Gi
+          limits:
+            memory: 8Gi
         readinessProbe:
           httpGet:
             path: /api/health
             port: 8080
-          initialDelaySeconds: 120
+          initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 30
-      volumes:
-      - name: gcs-sa
-        secret:
-          secretName: gcs-sa
 ---
 apiVersion: v1
 kind: Service
@@ -151,14 +179,14 @@ spec:
   - port: 8080
     targetPort: 8080
     name: http
-EOF
+OUTER
 
 echo "==> Creating HTTPS route"
 oc create route edge sippy --service=sippy --port=http -n "${NAMESPACE}"
 
 SIPPY_URL="https://$(oc get route sippy -n "${NAMESPACE}" -o jsonpath='{.spec.host}')"
 
-echo "==> Waiting for sippy to be ready (this may take several minutes while data loads)..."
+echo "==> Waiting for sippy to be ready (seeding may take a few minutes)..."
 oc wait --for=condition=Available deployment/sippy -n "${NAMESPACE}" --timeout=600s || true
 
 echo ""
