@@ -3,7 +3,7 @@ import glob
 import os
 
 
-def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
+def add_rpm_mirror_service(gendoc, clone_dir, major_minor, exclude_repo_keys=None):
     hyphened_version = f'{major_minor.replace(".", "-")}'
     for repo_file in sorted(glob.glob(f'{clone_dir}/core-services/release-controller/_repos/ocp-{major_minor}-*.repo')):
         bn = os.path.splitext(os.path.basename(repo_file))[0]  # e.g. ocp-4.7-default
@@ -20,6 +20,9 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
         # Perform that mapping now.
         file_prefix = f'ocp-{hyphened_version}-'
         repo_key = bn[len(file_prefix):]  # strip off prefix => "default" or "openstack-beta"
+
+        if exclude_repo_keys and repo_key in exclude_repo_keys:
+            continue
 
         if repo_key == 'default':
             service_name = f'base-{hyphened_version}'

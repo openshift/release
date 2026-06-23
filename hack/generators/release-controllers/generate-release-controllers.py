@@ -59,13 +59,10 @@ def generate_app_ci_content(config, git_clone_dir):
         content.add_ibm_managed_control_plane_testing(gendoc)
 
     for path in config.paths.path_rc_rpms:
-        with genlib.GenDoc(path.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
-            content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
-
-    for path in config.paths.path_rc_rpms:
-        for major_minor in config.releases:
+        exclude = ['openstack', 'epel-9', 'epel-10'] if 'vsphere02' in str(path) else None
+        for major_minor in ['3.11'] + config.releases:
             with genlib.GenDoc(path.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
-                content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
+                content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor, exclude_repo_keys=exclude)
 
     # If there is an annotation defined for the public release controller, use it as a template
     # for the private annotations.
