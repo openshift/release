@@ -518,7 +518,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'lon04': 3,
+        'eu-gb': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
