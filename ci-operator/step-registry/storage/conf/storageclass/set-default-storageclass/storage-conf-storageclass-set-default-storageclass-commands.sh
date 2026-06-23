@@ -78,9 +78,10 @@ OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.versio
 # Instead, remove all default annotations and wait for the operator to
 # reconcile its SC as the default.
 # Only apply this path when LVMS operator is actually installed.
-LVMS_INSTALLED=$(oc get csv -A 2>/dev/null | grep -c "lvms-operator" || true)
+LVMS_VERSION=$(oc get csv -A -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.version}{"\n"}{end}' 2>/dev/null | grep "lvms-operator" | awk '{print $2}' | cut -d'.' -f1,2 | head -1)
+echo "Detected LVMS operator version: ${LVMS_VERSION:-not installed}"
 
-if version_ge "${OCP_VERSION}" "4.22" && [ "${LVMS_INSTALLED}" -gt 0 ] && oc get sc "${REQUIRED_DEFAULT_STORAGECLASS}" &>/dev/null; then
+if [ -n "${LVMS_VERSION}" ] && version_ge "${LVMS_VERSION}" "4.22" && oc get sc "${REQUIRED_DEFAULT_STORAGECLASS}" &>/dev/null; then
     echo "OCP ${OCP_VERSION}: Removing default annotation from all storageclasses, operator will reconcile ${REQUIRED_DEFAULT_STORAGECLASS}"
     run_command "oc annotate sc storageclass.kubernetes.io/is-default-class=false --all --overwrite"
     wait_for_default_sc

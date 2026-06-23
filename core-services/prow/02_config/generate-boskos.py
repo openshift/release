@@ -324,6 +324,7 @@ CONFIG = {
     'aro-hcp-dev-shard1-slot': {},
     'aro-hcp-dev-shard2-slot': {},
     'aro-hcp-dev-shard3-slot': {},
+    'aro-hcp-dev-hypershift-westus3-slot': {},
     'aro-hcp-int-shard0-slot': {},
     'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
@@ -517,7 +518,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'lon04': 3,
+        'eu-gb': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -789,12 +790,14 @@ for i in range(150):
 # BEGIN ARO-HCP E2E SLOT RESOURCES
 for i in range(6):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(3):
+for i in range(6):
     CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
