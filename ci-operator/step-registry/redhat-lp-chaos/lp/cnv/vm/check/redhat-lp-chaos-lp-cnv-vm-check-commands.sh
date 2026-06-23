@@ -1,22 +1,18 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-vmList="$(cat "${SHARED_DIR}/target-vm-name.txt")"
-declare binDir="/tmp/bin"
+typeset vmList
+vmList=$(< "${SHARED_DIR}/target-vm-name.txt")
+typeset binDir="/tmp/bin"
 
-: '--- Starting Check the VMs ---'
-: "Namespace: ${LPC_LP_CNV__VM__NS}"
-: '------------------------------'
 
-# Set virtctl path
 mkdir -p "${binDir}"
 if ! [[ "${PATH}" =~ :?"${binDir}":? ]]; then
     export PATH="${binDir}:${PATH}"
 fi
 
-# Check vms status
 function CheckVmRunningStatus() {
-    declare -i failedCount=0
+    typeset -i failedCount=0
     for vmName in ${vmList}; do
         oc -n "${LPC_LP_CNV__VM__NS}" wait "vmi/${vmName}" --for condition=Ready --timeout 0 || ((++failedCount))
     done
@@ -26,15 +22,14 @@ function CheckVmRunningStatus() {
     fi
 }
 
-# Install virtctl tool
 function InstallAndVerifyVirtctl() {
-    declare baseURL
+    typeset baseURL
     if ! baseURL=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'); then
         : "FATAL ERROR: Failed to get OpenShift cluster base domain."
         return 1
     fi
 
-    declare dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
+    typeset dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
     if ! curl -kfsSL "${dlURL}" | tar zx -C "${binDir}"; then
         : "FATAL ERROR: Failed to download and extract virtctl."
         return 1
@@ -46,10 +41,9 @@ function InstallAndVerifyVirtctl() {
     fi
 }
 
-# Check ssh availability
 function CheckVmIPConnectivity() {
-    declare -i sshFailedCount=0
-    declare sshOpts=(
+    typeset -i sshFailedCount=0
+    typeset sshOpts=(
         --local-ssh-opts "-o BatchMode=yes"
         --local-ssh-opts "-o LogLevel=ERROR"
         --local-ssh-opts "-o UserKnownHostsFile=/dev/null"
@@ -71,7 +65,6 @@ function CheckVmIPConnectivity() {
     fi
 }
 
-# Main Execution Flow
 InstallAndVerifyVirtctl
 CheckVmRunningStatus
 CheckVmIPConnectivity
