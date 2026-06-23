@@ -149,6 +149,18 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 5 1,15 * *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --fips
+      PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
@@ -291,6 +303,19 @@ tests:
   cron: 0 */2 * * *
   steps:
     cluster_profile: hypershift-aks
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-aks-external-oidc
   cron: 0 10 * * *
