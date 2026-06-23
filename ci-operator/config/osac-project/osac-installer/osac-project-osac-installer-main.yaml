@@ -77,6 +77,29 @@ tests:
       OSAC_INSTALLER_IMAGE: osac-installer
       OSAC_TEST_IMAGE: osac-test-infra
     workflow: osac-project-cluster-tool-vmaas
+- always_run: false
+  as: e2e-vmaas-full-setup-helm
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-osac
+    dependencies:
+      OSAC_INSTALLER_IMAGE: osac-installer
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=cnv,lvm
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        MASTER_MEMORY=57344
+        MASTER_DISK_COUNT=2
+        MASTER_DISK=200000000000
+        MASTER_CPU=24
+        OPENSHIFT_VERSION=4.20
+      DEPLOY_MODE: helm
+      NOTIFY_LABEL: Full Setup vmaas (helm)
+      VALUES_FILE: values/vmaas-ci/values.yaml
+    workflow: osac-project-ofcir-baremetal
 zz_generated_metadata:
   branch: main
   org: osac-project
