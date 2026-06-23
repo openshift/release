@@ -1,0 +1,34 @@
+ref:
+  as: sippy-staging-deploy
+  cli: latest
+  from: cli
+  commands: sippy-staging-deploy-commands.sh
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials-all
+  - namespace: test-credentials
+    name: sippy-ci-gcs-read-sa
+    mount_path: /var/run/sippy-ci-gcs-sa
+  env:
+  - name: DOCKERCONFIGJSON
+    default: "/var/run/registry-pull-credentials-all/.dockerconfigjson"
+    documentation: Path to Docker config for image pull credentials.
+  - name: GCS_SA_JSON_PATH
+    default: "/var/run/sippy-ci-gcs-sa/gcs-sa"
+    documentation: Path to GCS service account JSON for data loading.
+  - name: STAGING_IMAGE
+    default: ""
+    documentation: Image reference for the sippy staging pod (devcontainer + binary).
+  dependencies:
+  - name: "pipeline:sippy-staging-dev"
+    env: STAGING_IMAGE
+  documentation: |-
+    Deploy a sippy staging environment on the claimed cluster.
+    Creates postgres and sippy deployments, exposes sippy via an HTTPS route,
+    and prints the public URL in the build log.
