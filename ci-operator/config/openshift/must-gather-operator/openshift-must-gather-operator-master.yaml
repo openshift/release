@@ -238,7 +238,8 @@ tests:
           echo "[setup] Detected openshift/release context — switching to test target"
           export REPO_OWNER="openshift"
           export REPO_NAME="must-gather-operator"
-          TEST_PR=$(gh pr list --repo "${REPO_OWNER}/${REPO_NAME}" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
+          TEST_PR=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls?state=open&per_page=1" \
+            | python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0]['number'] if data else '')" 2>/dev/null || echo "")
           if [[ -z "$TEST_PR" ]]; then
             echo "[setup] No open PRs found on ${REPO_OWNER}/${REPO_NAME} — skipping"
             exit 0
