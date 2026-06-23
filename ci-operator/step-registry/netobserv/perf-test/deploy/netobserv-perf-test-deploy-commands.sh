@@ -68,7 +68,7 @@ if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:f581902"
+    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:08e411a2"
 fi
 
 
@@ -81,24 +81,7 @@ oc patch flowcollector/cluster --type=merge -p '{
   "spec": {
     "processor": {
       "informers": {
-        "enabled": true,
-        "replicas": 2,
-        "resources": {
-          "requests": {
-            "memory": "128Mi",
-            "cpu": "50m"
-          },
-          "limits": {
-            "memory": "256Mi",
-            "cpu": "200m"
-          }
-        },
-        "advanced": {
-          "resyncInterval": 60,
-          "batchSize": 100,
-          "sendTimeout": 10,
-          "updateBufferSize": 100,
-          "processorPort": 9090
+        "enabled": true
         }
       }
     }
