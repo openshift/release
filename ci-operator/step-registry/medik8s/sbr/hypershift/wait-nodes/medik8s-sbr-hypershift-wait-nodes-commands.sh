@@ -53,3 +53,25 @@ if [[ "$ready_count" -lt "$EXPECTED_NODES" ]]; then
     oc get nodes -o wide
     exit 1
 fi
+
+# HyperShift drains old nodes (SchedulingDisabled) before deleting them. The outdated-revision
+# taint is removed after drain completes, so the taint loop above can exit while a stale
+# cordoned node still exists in the API. Wait until total node count == EXPECTED_NODES so that
+# no cordoned remnant can be selected as a test target.
+log "Waiting for stale cordoned nodes to be removed (total must equal ${EXPECTED_NODES}, timeout 5m)..."
+elapsed=0
+while true; do
+    total=$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$total" -le "$EXPECTED_NODES" ]]; then
+        log "Total node count is ${total} — no stale nodes remaining"
+        break
+    fi
+    if [[ $elapsed -ge 300 ]]; then
+        log "WARNING: timed out waiting for stale nodes to be deleted (total=${total}, expected=${EXPECTED_NODES})"
+        oc get nodes -o wide
+        break
+    fi
+    log "Total nodes=${total}, expected=${EXPECTED_NODES} — waiting for old node(s) to be deleted (${elapsed}s)..."
+    sleep 15
+    elapsed=$((elapsed + 15))
+done

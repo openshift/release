@@ -44,16 +44,35 @@ log "Patching HostedCluster ${HC_NAMESPACE}/${HC_NAME} with imageContentSources.
 oc patch hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" \
     --type=merge \
     --patch "{\"spec\":{\"imageContentSources\":${image_content_sources}}}"
-log "Patch applied — waiting for HyperShift NodePool to finish rolling out new nodes (up to 20m)..."
+log "Patch applied — waiting for NodePool to acknowledge the config change (up to 2m)..."
 
-# HyperShift hosted clusters have no MachineConfigPool objects; node rotation is driven
-# by the NodePool controller on the management cluster. Wait for the NodePool to report
-# AllNodesHealthy, which means all nodes have the new imageContentSources config.
-HC_NAME_ENCODED="${HC_NAME}"
-oc wait nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" \
+# After patching HostedCluster.spec.imageContentSources, the NodePool controller takes a
+# few seconds to react. AllNodesHealthy is already True at patch time, so an immediate
+# wait would return instantly — before rotation starts. Wait up to 2m for the NodePool to
+# report UpdatingConfig=True, confirming it has picked up the change and started rotating.
+# If UpdatingConfig never fires (e.g. nodes already have the config), proceed anyway.
+LABEL="hypershift.openshift.io/auto-created-for-infra=${HC_NAME}"
+elapsed=0
+while [[ $elapsed -lt 120 ]]; do
+    updating=$(oc get nodepool -n "${HC_NAMESPACE}" -l "${LABEL}" \
+        -o jsonpath='{.items[*].status.conditions[?(@.type=="UpdatingConfig")].status}' 2>/dev/null || true)
+    if [[ "${updating}" == *"True"* ]]; then
+        log "NodePool UpdatingConfig=True — rotation has started"
+        break
+    fi
+    sleep 10
+    elapsed=$((elapsed + 10))
+done
+if [[ $elapsed -ge 120 ]]; then
+    log "NodePool UpdatingConfig never fired — nodes may already have the correct config, proceeding"
+fi
+
+log "Waiting for NodePool(s) AllNodesHealthy after rotation (up to 20m)..."
+oc wait nodepool -n "${HC_NAMESPACE}" \
+    -l "${LABEL}" \
     --for=condition=AllNodesHealthy --timeout=20m || {
-    log "ERROR: NodePool did not reach AllNodesHealthy in 20m"
-    oc get nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" -o wide || true
+    log "ERROR: NodePool(s) did not reach AllNodesHealthy in 20m"
+    oc get nodepool -n "${HC_NAMESPACE}" -l "${LABEL}" -o wide || true
     exit 1
 }
 
