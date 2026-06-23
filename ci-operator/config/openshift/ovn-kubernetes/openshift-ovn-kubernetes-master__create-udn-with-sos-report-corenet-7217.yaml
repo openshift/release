@@ -1,0 +1,238 @@
+base_images:
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+# CORENET-7217: UDN CPU Priority Testing
+# This configuration creates UDNs and collects sos-reports to analyze
+# CPU starvation of ovs-vswitchd and ovn-controller by ovnkube-controller
+
+- as: corenet-7217-udn-cpu-baseline
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-qe
+    product: ocp
+    timeout: 8h0m0s
+    version: "4.17"
+  steps:
+    cluster_profile: aws-qe
+    test:
+    # Baseline: Collect sos-report before creating UDNs
+    - ref: openshift-qe-sosreport
+      env:
+      - name: SOS_NODE_SELECTOR
+        value: "node-role.kubernetes.io/worker="
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
+      - name: SOS_TIMEOUT
+        value: "30m"
+      - name: SOS_MAX_PARALLEL
+        value: "10"
+
+    # Create 500 UDNs
+    - ref: openshift-qe-cudn-density
+      env:
+      - name: TARGET_UDN_COUNT
+        value: "500"
+      - name: NAMESPACES_PER_CUDN
+        value: "5"
+      - name: POD_READY_THRESHOLD
+        value: "1400s"
+      - name: PPROF
+        value: "true"
+
+    # Under Load: Collect sos-report after UDNs are created
+    - ref: openshift-qe-sosreport
+      env:
+      - name: SOS_COLLECT_ALL_NODES
+        value: "true"
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
+      - name: SOS_TIMEOUT
+        value: "45m"
+      - name: SOS_MAX_PARALLEL
+        value: "10"
+
+    # Collect must-gather for container metrics and pod logs
+    post:
+    - ref: gather-must-gather
+      env:
+      - name: MUST_GATHER_TIMEOUT
+        value: "35m"
+      - name: EXTRA_MG_ARGS
+        value: "--host-network"
+
+- as: corenet-7217-udn-cpu-high-scale
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-qe
+    product: ocp
+    timeout: 10h0m0s
+    version: "4.17"
+  steps:
+    cluster_profile: aws-qe
+    test:
+    # High scale test: 1000 UDNs with sos-report
+    - chain: openshift-qe-cudn-density-with-sos
+      env:
+      # UDN workload parameters
+      - name: TARGET_UDN_COUNT
+        value: "1000"
+      - name: NAMESPACES_PER_CUDN
+        value: "5"
+      - name: POD_READY_THRESHOLD
+        value: "2000s"
+      - name: PPROF
+        value: "true"
+
+      # sos-report parameters
+      - name: SOS_COLLECT_ALL_NODES
+        value: "true"
+      - name: SOS_MAX_PARALLEL
+        value: "10"
+      - name: SOS_TIMEOUT
+        value: "45m"
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
+
+    # Collect must-gather for container metrics and pod logs
+    post:
+    - ref: gather-must-gather
+      env:
+      - name: MUST_GATHER_TIMEOUT
+        value: "35m"
+      - name: EXTRA_MG_ARGS
+        value: "--host-network"
+
+- as: corenet-7217-udn-cpu-phased
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-qe
+    product: ocp
+    timeout: 12h0m0s
+    version: "4.17"
+  steps:
+    cluster_profile: aws-qe
+    test:
+    # Phase 0: Baseline (no UDNs)
+    - ref: openshift-qe-sosreport
+      env:
+      - name: SOS_NODE_SELECTOR
+        value: "node-role.kubernetes.io/worker="
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,process"
+      - name: SOS_TIMEOUT
+        value: "20m"
+
+    # Phase 1: Medium load (500 UDNs)
+    - ref: openshift-qe-cudn-density
+      env:
+      - name: TARGET_UDN_COUNT
+        value: "500"
+      - name: NAMESPACES_PER_CUDN
+        value: "5"
+
+    - ref: openshift-qe-sosreport
+      env:
+      - name: SOS_COLLECT_ALL_NODES
+        value: "true"
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,openvswitch,ovn,process,systemd"
+      - name: SOS_TIMEOUT
+        value: "30m"
+
+    # Phase 2: High load (additional 500 UDNs -> 1000 total)
+    - ref: openshift-qe-cudn-density
+      env:
+      - name: TARGET_UDN_COUNT
+        value: "1000"
+      - name: NAMESPACES_PER_CUDN
+        value: "5"
+      - name: POD_READY_THRESHOLD
+        value: "2000s"
+
+    - ref: openshift-qe-sosreport
+      env:
+      - name: SOS_COLLECT_ALL_NODES
+        value: "true"
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
+      - name: SOS_TIMEOUT
+        value: "45m"
+      - name: SOS_MAX_PARALLEL
+        value: "8"
+
+    # Collect must-gather for container metrics and pod logs
+    post:
+    - ref: gather-must-gather
+      env:
+      - name: MUST_GATHER_TIMEOUT
+        value: "35m"
+      - name: EXTRA_MG_ARGS
+        value: "--host-network"
+
+- as: corenet-7217-udn-cpu-quick
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-qe
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.17"
+  steps:
+    cluster_profile: aws-qe
+    test:
+    # Quick test: Minimal UDNs with fast sos-report collection
+    - chain: openshift-qe-cudn-density-with-sos
+      env:
+      # Create 200 UDNs
+      - name: TARGET_UDN_COUNT
+        value: "200"
+      - name: NAMESPACES_PER_CUDN
+        value: "5"
+
+      # Fast collection: workers only, minimal plugins
+      - name: SOS_NODE_SELECTOR
+        value: "node-role.kubernetes.io/worker="
+      - name: SOS_PLUGIN_FILTER
+        value: "ovs,process"
+      - name: SOS_TIMEOUT
+        value: "15m"
+      - name: SOS_MAX_PARALLEL
+        value: "15"
+
+    # Collect must-gather for container metrics and pod logs
+    post:
+    - ref: gather-must-gather
+      env:
+      - name: MUST_GATHER_TIMEOUT
+        value: "25m"
+      - name: EXTRA_MG_ARGS
+        value: "--host-network"
+
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ovn-kubernetes
+  variant: create-udn-with-sos-report-corenet-7217

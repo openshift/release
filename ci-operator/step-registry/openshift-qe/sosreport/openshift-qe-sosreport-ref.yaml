@@ -1,0 +1,46 @@
+ref:
+  as: openshift-qe-sosreport
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: SOS_TIMEOUT
+    default: "30m"
+    documentation: |-
+      Maximum time to wait for sos-report collection per node
+  - name: SOS_NODE_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+    documentation: |-
+      Node selector label to filter which nodes to collect from.
+      Use empty string "" to select all nodes.
+  - name: SOS_MAX_PARALLEL
+    default: "10"
+    documentation: |-
+      Maximum number of parallel sos-report collections
+  - name: SOS_COLLECT_ALL_NODES
+    default: "false"
+    documentation: |-
+      If true, collect from all nodes ignoring NODE_SELECTOR.
+      If false, use SOS_NODE_SELECTOR to filter nodes.
+  - name: SOS_PLUGIN_FILTER
+    default: "ovs,openvswitch,ovn,networking,process,systemd,cgroups"
+    documentation: |-
+      Comma-separated list of sos plugins to include.
+      Reduces collection time and archive size.
+  commands: openshift-qe-sosreport-commands.sh
+  timeout: 2h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    This step collects sos-report from cluster nodes to gather host-level
+    information including OVS process data, systemd services, and cgroups
+    configuration. This is required for CORENET-7217 CPU priority analysis
+    as OVS runs on the host and is not captured by must-gather.
