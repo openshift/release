@@ -45,6 +45,9 @@ def process_file(file_path: Path) -> list:
     masters = workers = additional_workers = 0
 
     def save_record():
+        if job:
+            if not re.match(r'^(metal|baremetal)', job) or any(x in job for x in ["360", "999", "metal-ds"]):
+                return
         parts = cron.split()
         if job and cron and aux and len(parts) >= 3:
             total_sys = masters + workers + additional_workers
