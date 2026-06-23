@@ -704,8 +704,10 @@ function dump_resources() {
   fi
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
+# Combined trap to handle both child process cleanup and prepare_next_steps
+# This allows the trap to execute when SIGTERM arrives by using background processes
+# instead of blocking pipelines
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill -TERM ${CHILDREN} 2>/dev/null; fi; wait; prepare_next_steps' EXIT TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -935,8 +937,11 @@ export TF_LOG=debug
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-ret=${PIPESTATUS[0]}
+# Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+openshift-install --dir="${dir}" create cluster 2>&1 > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') &
+INSTALL_PID=$!
+wait $INSTALL_PID
+ret=$?
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
   SKIP_WAIT_FOR=false
@@ -964,8 +969,11 @@ echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
 if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-  openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-  ret=${PIPESTATUS[0]}
+  # Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+  openshift-install wait-for install-complete --dir="${dir}" 2>&1 > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') &
+  INSTALL_PID=$!
+  wait $INSTALL_PID
+  ret=$?
   echo "ret=${ret}"
   echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
 fi
