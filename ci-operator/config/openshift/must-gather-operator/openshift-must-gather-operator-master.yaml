@@ -232,13 +232,21 @@ tests:
         echo "[setup] Starting oape-ci-monitor for ${REPO_OWNER}/${REPO_NAME} PR#${PULL_NUMBER}"
 
         # --- Rehearsal detection ---
-        # Prow rehearsal jobs run against openshift/release, not the target repo.
-        # The container image build already validated the setup; skip monitoring.
-        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
-          echo "[setup] Rehearsal mode detected (JOB_NAME=${JOB_NAME})"
-          echo "[setup] Container image built successfully — setup validated"
-          echo "[setup] CI monitoring will activate on actual target-repo PRs"
-          exit 0
+        # Prow rehearsal runs against openshift/release, not the target repo.
+        # Switch to a real must-gather-operator PR to validate the full pipeline.
+        if [[ "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" ]]; then
+          echo "[setup] Detected openshift/release context — switching to test target"
+          export REPO_OWNER="openshift"
+          export REPO_NAME="must-gather-operator"
+          TEST_PR=$(gh pr list --repo "${REPO_OWNER}/${REPO_NAME}" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [[ -z "$TEST_PR" ]]; then
+            echo "[setup] No open PRs found on ${REPO_OWNER}/${REPO_NAME} — skipping"
+            exit 0
+          fi
+          export PULL_NUMBER="$TEST_PR"
+          export PR_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}"
+          export DRY_RUN="true"
+          echo "[setup] Testing against ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER} (dry-run, no comments posted)"
         fi
 
         # --- GitHub auth: try App token, fall back to GITHUB_TOKEN ---
