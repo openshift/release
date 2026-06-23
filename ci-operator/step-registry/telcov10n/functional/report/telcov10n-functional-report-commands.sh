@@ -43,7 +43,7 @@ mkdir -pv /tmp/reports
 echo "Create junit directory"
 mkdir -pv /tmp/junit
 
-if ! ls "${SHARED_DIR}"/polarion_*.xml 2>/dev/null | grep -q .; then
+if ! compgen -G "${SHARED_DIR}/polarion_*.xml" > /dev/null 2>&1; then
   echo "No Reports found in ${SHARED_DIR}, Using Bastion"
   BASTION_REPORT_DIR="/tmp/ptp_reports"
   POLARION_REPORT_DIR="${BASTION_REPORT_DIR}/polarion"

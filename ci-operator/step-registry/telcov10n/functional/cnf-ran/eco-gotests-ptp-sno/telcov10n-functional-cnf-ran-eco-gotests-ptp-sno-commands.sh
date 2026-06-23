@@ -78,7 +78,6 @@ ssh -o ServerAliveInterval=30 \
 echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
 # SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
 # This is the only transfer from bastion to CI pod — processing happens on the bastion.
-CYCLE_NAMES=("BC-OC" "OC2port" "T-TSC" "T-BC")
 for i in 0 1 2 3; do
   mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}"
   scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
