@@ -240,7 +240,14 @@ fi
 
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
-vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
+
+# Collect IPs for the default VRF from both current cluster nodes and any spare baremetal hosts
+# pre-configured in the ostestbm network (via virsh DHCP entries). This ensures nodes provisioned
+# dynamically during tests (e.g. via MachineSet scaling) are already known to the external FRR,
+# preventing BGP session rejections that cause frr-status container crashes on new nodes.
+node_ips=$($KCLI get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+spare_ips=$(sudo virsh net-dumpxml ostestbm | xmllint --xpath '/network//host/@ip' - | cut -d '=' -f2 | tr -d \" | xargs 2>/dev/null || true)
+vrf_neighbors["default"]=$(echo "$node_ips $spare_ips" | tr ' ' '\n' | sort -u | xargs)
 
 # deploy an agnhost container isolated on a macvlan network
 deploy_agnhost_container agnhost
