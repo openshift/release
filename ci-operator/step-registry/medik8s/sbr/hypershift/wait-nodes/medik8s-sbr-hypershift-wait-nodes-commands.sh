@@ -30,15 +30,21 @@ while true; do
         break
     fi
     log "${outdated} node(s) still have outdated-revision taint (${elapsed}s elapsed)..."
-    sleep "${INTERVAL}"
-    elapsed=$((elapsed + INTERVAL))
     if [[ $elapsed -ge $TIMEOUT ]]; then
         log "ERROR: Timed out after ${TIMEOUT}s waiting for NodePool rotation"
         oc get nodes -o wide
         oc get nodes -o json | jq '.items[] | {name: .metadata.name, taints: .spec.taints}'
         exit 1
     fi
+    sleep "${INTERVAL}"
+    elapsed=$((elapsed + INTERVAL))
 done
 
 ready_count=$(oc get nodes --no-headers 2>/dev/null | grep -c ' Ready ' || true)
 log "${ready_count} node(s) Ready and at current revision"
+
+if [[ "$ready_count" -lt "$EXPECTED_NODES" ]]; then
+    log "ERROR: expected ${EXPECTED_NODES} Ready node(s) but found ${ready_count}"
+    oc get nodes -o wide
+    exit 1
+fi

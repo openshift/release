@@ -48,7 +48,7 @@ if ! oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
     # prevents the Available condition from ever being set even when Ceph is healthy.
     # Wait for all 3 OSD deployments to be Available as a proxy for storage readiness.
     oc wait deploy -l app=rook-ceph-osd -n "$ODF_INSTALL_NAMESPACE" \
-        --for=condition=Available --timeout=30m
+        --for=condition=Available --timeout="${SC_WAIT_TIMEOUT:-10m}"
     echo "OSD deployments are Available; storage is ready"
 fi
 

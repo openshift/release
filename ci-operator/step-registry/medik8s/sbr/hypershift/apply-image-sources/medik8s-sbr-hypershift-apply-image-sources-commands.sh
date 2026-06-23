@@ -14,6 +14,10 @@ if [[ -z "$FBC_COMMIT_SHA" ]]; then
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri')
     FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
         "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id)
+    if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
+        echo "ERROR: failed to resolve FBC commit SHA for ref '${GIT_REF}' (got: '${FBC_COMMIT_SHA}')"
+        exit 1
+    fi
     log "Resolved FBC_COMMIT_SHA: ${FBC_COMMIT_SHA}"
 else
     log "Using provided FBC_COMMIT_SHA: ${FBC_COMMIT_SHA}"
@@ -40,13 +44,16 @@ log "Patching HostedCluster ${HC_NAMESPACE}/${HC_NAME} with imageContentSources.
 oc patch hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" \
     --type=merge \
     --patch "{\"spec\":{\"imageContentSources\":${image_content_sources}}}"
-log "Patch applied — waiting for hosted cluster MachineConfigPools to roll out (up to 20m)..."
+log "Patch applied — waiting for HyperShift NodePool to finish rolling out new nodes (up to 20m)..."
 
-# MCP rollout propagates the new mirrors to worker nodes via MCO on the hosted cluster
-KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" \
-    oc wait mcp --all --for=condition=Updated --timeout=20m || {
-    log "WARNING: MCP rollout did not complete in 20m — proceeding anyway"
-    KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get mcp || true
+# HyperShift hosted clusters have no MachineConfigPool objects; node rotation is driven
+# by the NodePool controller on the management cluster. Wait for the NodePool to report
+# AllNodesHealthy, which means all nodes have the new imageContentSources config.
+HC_NAME_ENCODED="${HC_NAME}"
+oc wait nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" \
+    --for=condition=AllNodesHealthy --timeout=20m || {
+    log "WARNING: NodePool did not reach AllNodesHealthy in 20m — proceeding anyway"
+    oc get nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" -o wide || true
 }
 
 log "Image content sources active on hosted cluster workers"
