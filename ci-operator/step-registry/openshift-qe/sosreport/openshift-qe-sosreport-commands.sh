@@ -1,7 +1,25 @@
 #!/bin/bash
+set -o errexit
 set -o nounset
 set -o pipefail
-set -x
+# Enable debug tracing only when DEBUG=true
+${DEBUG:+set -x}
+
+
+# Convert timeout string (e.g., "30m", "2h") to seconds
+timeout_to_seconds() {
+  local timeout=${1:-30m}
+  local value=${timeout%[mhsd]}
+  local unit=${timeout: -1}
+  
+  case $unit in
+    m) echo $((value * 60)) ;;
+    h) echo $((value * 3600)) ;;
+    s) echo $value ;;
+    d) echo $((value * 86400)) ;;
+    *) echo 1800 ;;  # Default 30 minutes
+  esac
+}
 
 echo "========================================"
 echo "Starting sos-report collection"
@@ -28,6 +46,7 @@ SOS_COLLECT_ALL_NODES=${SOS_COLLECT_ALL_NODES:-"false"}
 SOS_PLUGIN_FILTER=${SOS_PLUGIN_FILTER:-"ovs,openvswitch,ovn,networking,process,systemd,cgroups"}
 
 # Create output directory
+  pod_name="sosreport-${node_name}-$(date +%s)"
 mkdir -p "${SOS_REPORT_DIR}"
 
 echo "Configuration:"
@@ -77,7 +96,6 @@ spec:
         --only-plugins=${SOS_PLUGIN_FILTER} \
         --all-logs \
         --log-size=100 \
-        -o ovs,openvswitch,ovn,systemd,process,networking,cgroups \
         --since=24hours \
         || true
 
@@ -112,13 +130,14 @@ EOF
 
   # Wait for sos-report to complete (check for sosreport*.tar.xz files)
   echo "Waiting for sos-report generation to complete..."
-  local max_wait=1800  # 30 minutes
+  local max_wait=$(timeout_to_seconds "${SOS_TIMEOUT:-30m}")
   local elapsed=0
   local interval=30
 
   while [ $elapsed -lt $max_wait ]; do
     # Check if sos-report file exists
-    local sosreport_count=$(oc exec -n default ${pod_name} -- bash -c \
+    local sosreport_count
+    sosreport_count=$(oc exec -n default ${pod_name} -- bash -c \
       "find /host/tmp -name 'sosreport-*.tar.xz' 2>/dev/null | wc -l" || echo "0")
 
     if [ "$sosreport_count" -gt 0 ]; then
@@ -139,7 +158,8 @@ EOF
   echo "Copying sos-report from pod to artifacts..."
   oc exec -n default ${pod_name} -- bash -c \
     "find /host/tmp -name 'sosreport-*.tar.xz' -type f" | while read sosfile; do
-    local basename=$(basename "$sosfile")
+    local basename
+    basename=$(basename "$sosfile")
     echo "  Copying: $sosfile -> ${output_dir}/${node_name}-${basename}"
     oc cp -n default ${pod_name}:${sosfile} "${output_dir}/${node_name}-${basename}" || {
       echo "WARNING: Failed to copy ${sosfile}"

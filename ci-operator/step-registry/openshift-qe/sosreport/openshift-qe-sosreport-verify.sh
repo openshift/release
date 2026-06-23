@@ -23,12 +23,12 @@ fail_count=0
 
 check_pass() {
     echo -e "${GREEN}✓${NC} $1"
-    ((pass_count++))
+    ((pass_count++)) || true
 }
 
 check_fail() {
     echo -e "${RED}✗${NC} $1"
-    ((fail_count++))
+    ((fail_count++)) || true
 }
 
 check_warn() {
