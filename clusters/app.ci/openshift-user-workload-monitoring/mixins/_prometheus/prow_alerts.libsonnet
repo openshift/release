@@ -17,14 +17,14 @@
           },
           {
             alert: 'NonKubeContainerWaiting',
-            expr: 'kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0',
+            expr: 'max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0)',
             'for': '1h',
             labels: {
               severity: 'warning',
             },
             annotations: {
               summary: 'Pod container waiting longer than 1 hour',
-	      description: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container }} has been in waiting state for longer than 1 hour. (reason: "{{ $labels.reason }}").',
+	      description: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container }} has been in waiting state for longer than 1 hour. (reason: {{ with printf `kube_pod_container_status_waiting_reason{namespace="%s",pod="%s",container="%s"}` $labels.namespace $labels.pod $labels.container | query }}{{ . | first | label "reason" }}{{ end }}).',
             },
           },
           {
