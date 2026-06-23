@@ -30,6 +30,16 @@ def detect_arch_strict(job_name: str, file_path: str) -> str:
         return "amd64"
     return "multi"
 
+def is_arch_match(target_arch: str, current_arch: str) -> bool:
+    """Helper to check if current arch matches target or belongs to multi arch."""
+    if not target_arch:
+        return True
+    if target_arch == current_arch:
+        return True
+    if current_arch == "multi":
+        return True
+    return False
+
 def extract_job_weight(block: str) -> int:
     total_systems = 0
     # Search for infrastructure allocations
@@ -46,7 +56,7 @@ def main():
     )
     parser.add_argument(
         "--arch", choices=["amd64", "arm64", "multi"], default=None,
-        help="Filter architecture folder during evaluation loop"
+        help="Filter architecture folder during evaluation loop (amd64/arm64 will include multi)"
     )
     parser.add_argument(
         "--system-limit", type=int, default=DEFAULT_SYSTEM_LIMIT,
@@ -94,10 +104,11 @@ def main():
                     continue
 
                 job_name = job_match.group(1).strip()
-                if not re.match(r'^(metal|baremetal)', job_name):
+                if not re.match(r'^(metal|baremetal)', job_name) or any(x in job_name for x in ["360", "999", "metal-ds"]):
                     continue
 
-                if target_arch and detect_arch_strict(job_name, str(yaml_file)) != target_arch:
+                current_arch = detect_arch_strict(job_name, str(yaml_file))
+                if not is_arch_match(target_arch, current_arch):
                     continue
 
                 job_weight_map[job_name] = extract_job_weight(block)
@@ -127,7 +138,8 @@ def main():
                     skip_cron = current_job not in job_weight_map
 
                     if not skip_cron and target_arch:
-                        if detect_arch_strict(current_job, str(yaml_file)) != target_arch:
+                        current_arch = detect_arch_strict(current_job, str(yaml_file))
+                        if not is_arch_match(target_arch, current_arch):
                             skip_cron = True
 
                 cron_match = re.match(r'^(\s*)cron:\s*(.*)$', line)
