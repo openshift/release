@@ -10,6 +10,11 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 fi
 
+if [[ -z "${HYPERSHIFT_NODE_COUNT:-}" || ! "${HYPERSHIFT_NODE_COUNT}" =~ ^[0-9]+$ ]]; then
+  echo "HYPERSHIFT_NODE_COUNT must be a non-negative integer" >&2
+  exit 1
+fi
+
 # shellcheck disable=SC2016
 timeout 30m bash -c 'until [[ $(oc get nodes --no-headers | wc -l) -eq "$HYPERSHIFT_NODE_COUNT" ]]; do sleep 15; done'
 

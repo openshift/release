@@ -1,8 +1,8 @@
 #!/bin/bash
 
+set -o errexit
 set -o nounset
 set -o pipefail
-set -x
 
 if [[ "${CLUSTER_TYPE,,}" != *aws* ]]; then
     echo "Running on platform ${CLUSTER_TYPE}, skipping this step"
@@ -12,7 +12,7 @@ fi
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
 
-BUCKET_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+BUCKET_NAME="$(echo -n "${PROW_JOB_ID}" | sha256sum | cut -c-20)"
 echo "create bucket name: $BUCKET_NAME, region $REGION"
 if [ "$REGION" == "us-east-1" ]; then
     aws s3api create-bucket --bucket "$BUCKET_NAME" \

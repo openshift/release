@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -u
+set -euo pipefail
 
 # Get HO image and Hypershift CLI
 HCP_CLI="bin/hypershift"
@@ -33,14 +33,6 @@ TechPreviewNoUpgrade)
     exit 1
     ;;
 esac
-
-if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
-    COMMAND+=(--aro-hcp-key-vault-users-client-id="$(<"${SHARED_DIR}/aks_keyvault_secrets_provider_client_id")")
-fi
-
-if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
-    COMMAND+=(--managed-service="$HYPERSHIFT_MANAGED_SERVICE")
-fi
 
 if [[ "$HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK" == "true" ]]; then
     COMMAND+=(--enable-conversion-webhook="true")
@@ -92,15 +84,6 @@ case "${CLUSTER_TYPE,,}" in
         fi
     fi
     ;;
-*azure*)
-    if [[ -n "$HYPERSHIFT_EXTERNAL_DNS_DOMAIN" ]]; then
-        COMMAND+=(
-            --external-dns-credentials=/etc/hypershift-ext-dns-app-azure/credentials
-            --external-dns-provider=azure
-            --external-dns-domain-filter="$HYPERSHIFT_EXTERNAL_DNS_DOMAIN"
-        )
-    fi
-    ;;
 *)
     echo "Unsupported platform ${CLUSTER_TYPE}" >&2
     exit 1
@@ -108,5 +91,5 @@ case "${CLUSTER_TYPE,,}" in
 esac
 
 # Hypershift install
-set -ex
-eval "${COMMAND[*]}"
+set -x
+"${COMMAND[@]}"
