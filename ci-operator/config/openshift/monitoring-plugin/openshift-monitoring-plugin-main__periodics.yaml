@@ -3,6 +3,10 @@ base_images:
     name: observability-bundle
     namespace: ci
     tag: latest
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
@@ -99,7 +103,29 @@ tests:
       logs> :volcano: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      CYPRESS_SKIP_COO_INSTALL: "true"
     test:
+    - as: install-coo-bundle
+      cli: latest
+      commands: |
+        NAMESPACE="openshift-cluster-observability-operator"
+        oc create namespace "${NAMESPACE}" || true
+        oc label namespace "${NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle \
+          --timeout=20m \
+          --install-mode=AllNamespaces \
+          --namespace "${NAMESPACE}" \
+          --verbose \
+          "${OO_BUNDLE}"
+      dependencies:
+      - env: OO_BUNDLE
+        name: observability-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
     - ref: monitoring-plugin-tests-incidents-ui-ci-bundle
     workflow: ipi-aws
 - as: e2e-virtualization
