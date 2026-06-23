@@ -64,7 +64,8 @@ collect_sosreport_from_node() {
   echo "Collecting sos-report from node: ${node_name}"
 
   # Create a debug pod on the target node
-  local pod_name="sosreport-${node_name}-$(date +%s)"
+  local pod_name
+  pod_name="sosreport-${node_name}-$(date +%s)"
 
   cat <<EOF | oc apply -f -
 apiVersion: v1
@@ -130,7 +131,8 @@ EOF
 
   # Wait for sos-report to complete (check for sosreport*.tar.xz files)
   echo "Waiting for sos-report generation to complete..."
-  local max_wait=$(timeout_to_seconds "${SOS_TIMEOUT:-30m}")
+  local max_wait
+  max_wait=$(timeout_to_seconds "${SOS_TIMEOUT:-30m}")
   local elapsed=0
   local interval=30
 
