@@ -72,8 +72,8 @@ echo "Found quay-app deployment: ${QUAY_DEPLOY}"
 echo "Creating CI registry pull secret..."
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-REGISTRY_TOKEN=$(KUBECONFIG="" oc registry login --to=- 2>/dev/null)
-if [[ -n "${REGISTRY_TOKEN}" ]]; then
+REGISTRY_TOKEN=$(env -u KUBECONFIG oc registry login --to=- 2>/dev/null)
+if [[ -n "${REGISTRY_TOKEN}" ]] && echo "${REGISTRY_TOKEN}" | jq empty 2>/dev/null; then
   oc -n "${NAMESPACE}" create secret generic ci-registry-pull-secret \
     --from-literal=.dockerconfigjson="${REGISTRY_TOKEN}" \
     --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml | oc apply -f -
