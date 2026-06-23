@@ -70,11 +70,18 @@ echo ""
 
 # Install dra-example-driver via Helm from local chart
 echo "Installing dra-example-driver ${DRA_EXAMPLE_DRIVER_VERSION}..."
+GPU_PARTITION_ARGS=""
+if [ -n "${DRA_GPU_PARTITIONS:-}" ]; then
+  echo "GPU partitions: ${DRA_GPU_PARTITIONS}"
+  GPU_PARTITION_ARGS="--set gpu.partitions=${DRA_GPU_PARTITIONS}"
+fi
+
 helm upgrade --install \
   --namespace "${DRA_EXAMPLE_DRIVER_NAMESPACE}" \
   dra-example-driver \
   "${DRA_CHART_DIR}" \
   --set kubeletPlugin.containers.plugin.securityContext.privileged=true \
+  ${GPU_PARTITION_ARGS} \
   --wait \
   --timeout 10m
 
