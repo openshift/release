@@ -52,8 +52,9 @@ log "Patch applied — waiting for HyperShift NodePool to finish rolling out new
 HC_NAME_ENCODED="${HC_NAME}"
 oc wait nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" \
     --for=condition=AllNodesHealthy --timeout=20m || {
-    log "WARNING: NodePool did not reach AllNodesHealthy in 20m — proceeding anyway"
+    log "ERROR: NodePool did not reach AllNodesHealthy in 20m"
     oc get nodepool "${HC_NAME_ENCODED}" -n "${HC_NAMESPACE}" -o wide || true
+    exit 1
 }
 
 log "Image content sources active on hosted cluster workers"

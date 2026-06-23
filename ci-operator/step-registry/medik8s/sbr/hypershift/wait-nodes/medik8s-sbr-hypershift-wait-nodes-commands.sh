@@ -17,6 +17,11 @@ declare INTERVAL=15
 
 log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 
+if ! [[ "${EXPECTED_NODES}" =~ ^[0-9]+$ ]] || [[ "${EXPECTED_NODES}" -lt 1 ]]; then
+    log "ERROR: HYPERSHIFT_NODE_COUNT must be a positive integer (got: ${EXPECTED_NODES})"
+    exit 1
+fi
+
 log "Waiting for ${EXPECTED_NODES} node(s) to be Ready (timeout 15m)..."
 oc wait nodes --all --for=condition=Ready --timeout=15m
 
