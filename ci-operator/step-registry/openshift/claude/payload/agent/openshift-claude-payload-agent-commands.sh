@@ -576,7 +576,7 @@ agentic_ci --no-streaming \
     --continue \
     --max-turns 5 \
     > "${SLACK_LOG}" 2>&1 || true
-SUMMARY=$(jq -r 'select(.type == "result") | .result // empty' "${SLACK_LOG}" 2>/dev/null | head -1) || SUMMARY=""
+SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "result") | .result // empty' 2>/dev/null | head -1) || SUMMARY=""
 rm -f "${SLACK_LOG}"
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then
