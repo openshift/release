@@ -47,6 +47,13 @@ for f in "${SHARED_DIR}"/polarion_*.xml; do
   fi
 done
 
+for f in "${SHARED_DIR}"/report_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f" | sed 's/^report_//')
+    cp "$f" "/tmp/reports/${filename}"
+  fi
+done
+
 echo "Create junit directory"
 mkdir -pv /tmp/junit
 
