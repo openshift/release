@@ -13,11 +13,17 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Get dev-scripts logs and other configuration
 finished()
 {
+  exit_code=$?
   # Make sure we always execute all of this, so we gather logs and installer status, even when
   # install fails.
   set +o pipefail
   set +o errexit
 
+  echo ""
+  echo "########################################################################"
+  echo "# Cleanup handler invoked (exit code: $exit_code). Collecting artifacts."
+  echo "########################################################################"
+  echo ""
   echo "Fetching kubeconfig, other credentials..."
   scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeconfig" "${SHARED_DIR}/"
   scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeadmin-password" "${SHARED_DIR}/"
@@ -31,7 +37,8 @@ finished()
   echo "Restarting proxy container"
   ssh "${SSHOPTS[@]}" "root@${IP}" "podman restart external-squid"
 }
-trap finished EXIT TERM
+trap 'finished' EXIT
+trap 'exit 143' TERM
 
 echo "Creating Ansible inventory file"
 cat > "${SHARED_DIR}/inventory" <<-EOF
