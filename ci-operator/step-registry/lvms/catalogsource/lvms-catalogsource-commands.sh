@@ -160,6 +160,9 @@ spec:
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
     source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+  - mirrors:
+    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/topolvm
+    source: registry.redhat.io/lvms4/topolvm-rhel9
 EOF
 
 	if [ $? -ne 0 ]; then
@@ -191,6 +194,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
     source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/topolvm
+    source: registry.redhat.io/lvms4/topolvm-rhel9
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
     source: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog

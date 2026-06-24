@@ -47,17 +47,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-sno-qe-integration-tests
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -76,17 +66,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-sno-arm-qe-integration-tests
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -110,17 +90,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-mno-qe-integration-tests
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -139,17 +109,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 - as: e2e-aws-mno-arm-qe-integration-tests
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -172,20 +132,56 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-mno-arm-rhcos10-tp-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_TYPE: m6g.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      OCP_ARCH: arm64
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-mno-y-1-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_CATALOG_SOURCE: lvm-catalogsource
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -208,17 +204,7 @@ tests:
           memory: 200Mi
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-sno-lvms
 - as: e2e-baremetalds-mno-dualstack-qe-integration-tests
-  cron: '@weekly'
-  reporter_config:
-    channel: '#lvms-release-coordination'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :large_green_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :large_green_circle:
-      {{else}} :red_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :red_circle: {{end}}'
+  cron: 0 8 * * 1
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:

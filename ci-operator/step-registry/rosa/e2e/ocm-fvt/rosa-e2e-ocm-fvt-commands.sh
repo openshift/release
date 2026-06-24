@@ -25,6 +25,8 @@ umask "${old_umask}"
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
   echo "JOB_LINK=${JOB_LINK}"
+  echo "SLACK_WEBHOOK_URL=$(cat /usr/local/cs-qe-credentials/slack_webhook_url)"
+  echo "CONSOLE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/console_client_secret)"
 } > "${podman_env_file}"
 
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
@@ -64,6 +66,10 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   )
 fi
 
+ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-results"
+mkdir -p "${ocm_fvt_output}"
+chmod 1777 "${ocm_fvt_output}"
+podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
 podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
@@ -72,7 +78,16 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
 fi
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
+exit_code=0
 podman run \
   "${podman_args[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
-  ocmtest "${ocmtest_args[@]}"
+  ocmtest "${ocmtest_args[@]}" || exit_code=$?
+
+# Copy only the merged report.xml to avoid inflated test counts from
+# per-phase XMLs that include all Ginkgo specs (including skipped).
+find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
+  cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"
+done
+
+exit "${exit_code}"

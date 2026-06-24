@@ -39,6 +39,8 @@ function set_proxy () {
 }
 set_proxy
 
+check_failed=""
+
 # Even the cluster is shown ready on ocm side, and the cluster operators are available, some of the cluster operators are
 # still progressing. The ocp e2e test scenarios requires PROGRESSING=False for each cluster operator.
 echo "Wait for cluster operators' progressing ready..."
@@ -48,34 +50,48 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=60m >
 end_time=$(date +"%s")
 cat "${CO_STATUS_LOG}"
 
-## If waiting operators timeout, call ocm-qe to analyze the root cause.
-costatus=$(cat "${CO_STATUS_LOG}")
-if [[ "${costatus}" =~ "timed out" ]]; then
+if grep -q "timed out" "${CO_STATUS_LOG}"; then
+  check_failed="Cluster operators not done progressing within 60m"
+fi
+
+if [[ -z "${check_failed}" ]]; then
+  record_cluster "timers" "co_wait_time" $(( "${end_time}" - "${start_time}" ))
+  echo "All cluster operators done progressing after $(( ${end_time} - ${start_time} )) seconds"
+
+  # Verify all cluster operators are Available and not Degraded
+  echo "Checking cluster operators Available=True..."
+  CO_AVAIL_LOG="${ARTIFACT_DIR}/co_available.log"
+  oc wait clusteroperators --all --for=condition=Available=true --timeout=10m > "${CO_AVAIL_LOG}" 2>&1 || true
+  cat "${CO_AVAIL_LOG}"
+  if grep -q "timed out" "${CO_AVAIL_LOG}"; then
+    check_failed="Some cluster operators are not Available"
+  fi
+fi
+
+if [[ -z "${check_failed}" ]]; then
+  echo "Checking cluster operators Degraded=False..."
+  CO_DEGRADED_LOG="${ARTIFACT_DIR}/co_degraded.log"
+  oc wait clusteroperators --all --for=condition=Degraded=false --timeout=10m > "${CO_DEGRADED_LOG}" 2>&1 || true
+  cat "${CO_DEGRADED_LOG}"
+  if grep -q "timed out" "${CO_DEGRADED_LOG}"; then
+    check_failed="Some cluster operators are Degraded"
+  fi
+fi
+
+if [[ -z "${check_failed}" ]]; then
+  echo "All cluster operators are Available, not Progressing, and not Degraded"
+fi
+
+if [[ -n "${check_failed}" ]]; then
+  echo "ERROR: ${check_failed}"
   oc get clusteroperators
   if [[ -e "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url" ]]; then
-    echo "Timeout: Meet operator issue. Sleep 3h to call debugging."
+    echo "Meet operator issue. Sleep 3h to call debugging."
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
     slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "Timeout: Wait for the cluster '"${CLUSTER_ID}"' operators progressing ready. Sleep 3 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+    slack_message='{"text": "'"${check_failed}"' for cluster '"${CLUSTER_ID}"'. Sleep 3 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
     curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
     sleep 10800
   fi
   exit 1
-else
-  record_cluster "timers" "co_wait_time" $(( "${end_time}" - "${start_time}" ))
-  echo "All cluster operators ready after $(( ${end_time} - ${start_time} )) seconds"
-fi
-
-# Additionally, non-HCP has a job "osd-cluster-ready" that determines when
-# the managed service operators are done and the cluster is truly ready.
-# Don't consider the cluster ready until that's done.
-if [[ "$HOSTED_CP" == "false" ]]
-then
-  while ! oc get job/osd-cluster-ready -n openshift-monitoring &>/dev/null; do
-    echo "Waiting for job/osd-cluster-ready to exist..."
-    sleep 30
-  done
-
-  echo "Waiting for job/osd-cluster-ready to complete..."
-  oc wait --for=condition=complete job/osd-cluster-ready -n openshift-monitoring --timeout=120m
 fi

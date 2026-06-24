@@ -1,6 +1,6 @@
 base_images:
   base-rhel9:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
@@ -12,7 +12,7 @@ base_images:
     namespace: origin
     tag: operator-sdk
   upi-installer:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
@@ -23,9 +23,15 @@ images:
   - dockerfile_path: images/ci/Dockerfile
     from: base-rhel9
     to: cert-manager-operator
-  - dockerfile_path: images/ci/operand.Dockerfile
+  - dockerfile_path: images/ci/certmanager.Dockerfile
     from: base-rhel9
     to: cert-manager
+  - dockerfile_path: images/ci/istiocsr.Dockerfile
+    from: base-rhel9
+    to: cert-manager-istio-csr
+  - dockerfile_path: images/ci/trustmanager.Dockerfile
+    from: base-rhel9
+    to: cert-manager-trust-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -40,13 +46,17 @@ operator:
     with: pipeline:cert-manager
   - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
     with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-istio-csr:.*
+    with: pipeline:cert-manager-istio-csr
+  - pullspec: quay.io/jetstack/trust-manager:.*
+    with: pipeline:cert-manager-trust-manager
 releases:
   latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -75,6 +85,18 @@ tests:
       SCAN_IMAGE: cert-manager
     test:
     - ref: fips-check-image-scan
+- as: fips-image-scan-istio-csr
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-istio-csr
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-trust-manager
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-trust-manager
+    test:
+    - ref: fips-check-image-scan
 - as: e2e-operator
   cluster_claim:
     architecture: amd64
@@ -82,7 +104,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.20"
+    version: "4.22"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:

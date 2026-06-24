@@ -179,7 +179,7 @@ if [[ "${KSERVE_MODE}" == "RawDeployment" ]]; then
     DSCI_TIMEOUT=300
     DSCI_ELAPSED=0
     while [[ ${DSCI_ELAPSED} -lt ${DSCI_TIMEOUT} ]]; do
-        DSCI_NAME=$(oc get dsci -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        DSCI_NAME=$(oc get dsci -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
         if [[ -n "${DSCI_NAME}" ]]; then
             break
         fi
@@ -192,7 +192,7 @@ if [[ "${KSERVE_MODE}" == "RawDeployment" ]]; then
     fi
     # RHOAI 3.x (DSCI apiVersion v2) removed spec.serviceMesh entirely.
     # Only patch on RHOAI 2.x where the field still exists.
-    DSCI_API=$(oc get dsci "${DSCI_NAME}" -o jsonpath='{.apiVersion}' 2>/dev/null)
+    DSCI_API=$(oc get dsci "${DSCI_NAME}" -o jsonpath='{.apiVersion}' 2>/dev/null || true)
     if [[ "${DSCI_API}" != *"/v2" ]]; then
         oc patch dsci "${DSCI_NAME}" --type=merge \
             -p '{"spec":{"serviceMesh":{"managementState":"Removed"}}}'

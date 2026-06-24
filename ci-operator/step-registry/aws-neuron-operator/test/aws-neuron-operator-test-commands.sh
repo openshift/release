@@ -11,7 +11,7 @@ export PATH="${TOOLS_DIR}:${PATH}"
 
 if ! command -v oc &>/dev/null; then
     echo "oc not found, downloading OpenShift client..."
-    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    curl -sL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
         | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
     if command -v oc &>/dev/null; then
         echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"
@@ -28,6 +28,11 @@ fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
+
+# Source DeviceConfig values saved by install-operators step
+if [[ -f "${SHARED_DIR}/neuron-deviceconfig.env" ]]; then
+    source "${SHARED_DIR}/neuron-deviceconfig.env"
+fi
 
 # Determine OCP version using multiple fallback methods (ROSA HCP may restrict clusterversion access)
 OCP_VERSION=""
@@ -107,11 +112,23 @@ export ECO_TEST_LABELS="${ECO_TEST_LABELS:-neuron}"
 echo "Running tests with features: ${ECO_TEST_FEATURES}"
 echo "Running tests with labels: ${ECO_TEST_LABELS}"
 
+TEST_EXIT_CODE=0
+
+if [[ "${ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD:-false}" == "true" ]]; then
+    echo "=== Phase 0: In-cluster build tests ==="
+    ginkgo --label-filter="${ECO_TEST_LABELS} && in-cluster-build" \
+        --timeout=1h \
+        --v \
+        --junit-report=junit_neuron_inclusterbuild.xml \
+        --output-dir="${ARTIFACT_DIR}" \
+        ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
+    dump_debug_info "phase0-inclusterbuild"
+fi
+
 # Run test suites in explicit order: vllm -> metrics -> upgrade
 # Each suite gets its own jUnit report for granular results.
 # The vLLM workload is kept alive through the metrics phase so neuron-monitor
 # has an active Neuron runtime and emits neuroncore_utilization_ratio.
-TEST_EXIT_CODE=0
 
 echo "=== Phase 1: vLLM inference tests ==="
 export ECO_SKIP_VLLM_CLEANUP=true

@@ -146,6 +146,14 @@ tests:
     test:
     - ref: monitoring-plugin-tests-alerts-ui
     workflow: ipi-aws
+- as: e2e-management-api
+  skip_branches:
+  - ^main$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-management-api
+    workflow: ipi-aws
 - always_run: false
   as: e2e-dashboards
   optional: true
@@ -249,6 +257,24 @@ tests:
     cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-perses-dev-ui
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-perses-ivt
+  optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui-ivt
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

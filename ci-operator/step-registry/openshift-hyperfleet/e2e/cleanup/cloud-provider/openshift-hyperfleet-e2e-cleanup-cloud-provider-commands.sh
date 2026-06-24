@@ -42,8 +42,7 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 NAMESPACE_NAME=$(cat ${SHARED_DIR}/namespace_name)
 
 log "Cleaning up Google Cloud Pub/Sub resources"
-cd /e2e/deploy-scripts/
-./deploy-clm.sh --action uninstall --namespace $NAMESPACE_NAME --delete-cloud-resources
-
-
-
+# Copy scripts to /tmp to avoid permission issues
+cp -r /e2e/ /tmp/
+cd /tmp/e2e/scripts/
+./cleanup-pubsub-resources.sh -p "$PROJECT_ID" -n "${NAMESPACE_NAME}"

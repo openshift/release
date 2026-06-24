@@ -254,7 +254,7 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.11.0"
+    CAMGI_VERSION="0.11.1"
     pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy
@@ -314,7 +314,7 @@ fi
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
 # Download the binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 set -x # log the MG commands

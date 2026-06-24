@@ -4,6 +4,32 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+export CLAUDE_CONFIG_DIR
+
+# --- Gangway override ---
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
+    echo "Applying Gangway override: PAYLOAD_TAG=${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
+    PAYLOAD_TAG="${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
+fi
+
+if [[ -z "${PAYLOAD_TAG:-}" ]]; then
+    echo "PAYLOAD_TAG not set, fetching latest rejected nightly from release controller..."
+    LATEST_VERSION=$(curl -sf "https://sippy.dptools.openshift.org/api/releases" | jq -r '.releases[] | select(test("^[0-9]+\\.[0-9]+$"))' | head -1)
+    if [[ -z "${LATEST_VERSION}" ]]; then
+        echo "ERROR: Could not determine latest OCP version from Sippy."
+        exit 1
+    fi
+    LATEST_STREAM="${LATEST_VERSION}.0-0.nightly"
+    PAYLOAD_TAG=$(curl -sf "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
+        | jq -r '[.tags[] | select(.phase == "Rejected")] | .[0].name // empty')
+    if [[ -z "${PAYLOAD_TAG}" ]]; then
+        echo "ERROR: No rejected nightly found for ${LATEST_STREAM}."
+        exit 1
+    fi
+    echo "Auto-selected: ${PAYLOAD_TAG}"
+fi
+
 echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
 echo "Model: ${CLAUDE_MODEL}"
 
@@ -47,6 +73,130 @@ PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PA
 
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
+
+# Generate autodl JSON deterministically for accepted payloads (no Claude needed).
+# Uses the same schema as rejected-payload autodl but with empty job/candidate fields.
+generate_accepted_autodl() {
+    local phase="${1:-Accepted}"
+    local analyzed_at
+    analyzed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+    local autodl_file="${ARTIFACT_DIR}/payload-analysis-${PAYLOAD_TAG}-autodl.json"
+
+    jq -n \
+        --arg payload_tag "${PAYLOAD_TAG}" \
+        --arg version "${VERSION}" \
+        --arg stream "${STREAM}" \
+        --arg phase "${phase}" \
+        --arg release_controller_url "${PAYLOAD_URL}" \
+        --arg analyzed_at "${analyzed_at}" \
+        --arg total_blocking_jobs "${TOTAL}" \
+        --arg failed_blocking_jobs "${FAILED}" \
+        '{
+            table_name: "payload_triage",
+            schema: {
+                payload_tag: "string",
+                version: "string",
+                stream: "string",
+                architecture: "string",
+                phase: "string",
+                release_controller_url: "string",
+                analyzed_at: "string",
+                rejection_streak: "int64",
+                total_blocking_jobs: "int64",
+                failed_blocking_jobs: "int64",
+                force_accept_recommended: "int64",
+                job_name: "string",
+                prow_url: "string",
+                failure_type: "string",
+                root_cause_summary: "string",
+                streak_length: "int64",
+                is_new_failure: "int64",
+                originating_payload_tag: "string",
+                candidate_pr_url: "string",
+                candidate_title: "string",
+                candidate_repo: "string",
+                candidate_confidence_score: "int64",
+                candidate_rationale: "string",
+                revert_pr_url: "string",
+                revert_pr_status: "string"
+            },
+            rows: [
+                {
+                    payload_tag: $payload_tag,
+                    version: $version,
+                    stream: $stream,
+                    architecture: "amd64",
+                    phase: $phase,
+                    release_controller_url: $release_controller_url,
+                    analyzed_at: $analyzed_at,
+                    rejection_streak: "0",
+                    total_blocking_jobs: $total_blocking_jobs,
+                    failed_blocking_jobs: $failed_blocking_jobs,
+                    force_accept_recommended: "0",
+                    job_name: "",
+                    prow_url: "",
+                    failure_type: "",
+                    root_cause_summary: "",
+                    streak_length: "0",
+                    is_new_failure: "0",
+                    originating_payload_tag: $payload_tag,
+                    candidate_pr_url: "",
+                    candidate_title: "",
+                    candidate_repo: "",
+                    candidate_confidence_score: "0",
+                    candidate_rationale: "",
+                    revert_pr_url: "",
+                    revert_pr_status: ""
+                }
+            ]
+        }' > "${autodl_file}"
+
+    echo "Generated autodl JSON: ${autodl_file}"
+}
+
+# Generate a zero-cost session metrics autodl for accepted payloads (no Claude invocation).
+generate_accepted_session_metrics() {
+    local analyzed_at
+    analyzed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    local metrics_file="${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
+
+    jq -n --arg analyzed_at "${analyzed_at}" '{
+        table_name: "claude_session_metrics",
+        schema: {
+            session_id: "string", model: "string", claude_code_version: "string",
+            permission_mode: "string", entrypoint: "string", prompt: "string",
+            plugins_loaded: "string", analyzed_at: "string",
+            duration_ms: "int64", duration_api_ms: "int64", ttft_ms: "int64",
+            num_turns: "int64", total_cost_usd: "float64",
+            input_tokens: "int64", output_tokens: "int64",
+            cache_read_input_tokens: "int64", cache_creation_input_tokens: "int64",
+            cache_hit_rate_pct: "float64", total_tool_calls: "int64",
+            tool_call_breakdown: "string", skills_invoked: "string",
+            files_written: "int64", num_thinking_blocks: "int64",
+            num_subagents: "int64", subagent_total_tool_uses: "int64",
+            subagent_total_duration_ms: "int64", is_error: "int64",
+            terminal_reason: "string", stop_reason: "string"
+        },
+        schema_mapping: null, rows: [{
+            session_id: "", model: "", claude_code_version: "",
+            permission_mode: "", entrypoint: "", prompt: "",
+            plugins_loaded: "", analyzed_at: $analyzed_at,
+            duration_ms: "0", duration_api_ms: "0", ttft_ms: "0",
+            num_turns: "0", total_cost_usd: "0.000000",
+            input_tokens: "0", output_tokens: "0",
+            cache_read_input_tokens: "0", cache_creation_input_tokens: "0",
+            cache_hit_rate_pct: "0.0", total_tool_calls: "0",
+            tool_call_breakdown: "{}", skills_invoked: "",
+            files_written: "0", num_thinking_blocks: "0",
+            num_subagents: "0", subagent_total_tool_uses: "0",
+            subagent_total_duration_ms: "0", is_error: "0",
+            terminal_reason: "accepted", stop_reason: ""
+        }], chunk_size: 0, expiration_days: 0, partition_column: ""
+    }' > "${metrics_file}"
+
+    echo "Generated session metrics: ${metrics_file}"
+}
 
 # Poll until blocking jobs finish OR the payload reaches a terminal state.
 # The release controller can report jobs as Pending even after they complete
@@ -122,6 +272,8 @@ _Model: ${CLAUDE_MODEL}_"
                     "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
             fi
 
+            generate_accepted_autodl "Accepted"
+            generate_accepted_session_metrics
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
@@ -140,6 +292,8 @@ _Model: ${CLAUDE_MODEL}_"
                 break
             elif [[ "${PHASE}" == "Accepted" ]]; then
                 echo "Payload was accepted. No analysis needed."
+                generate_accepted_autodl "Accepted"
+                generate_accepted_session_metrics
                 exit 0
             fi
         fi
@@ -157,11 +311,6 @@ _Model: ${CLAUDE_MODEL}_"
 done
 
 PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
-
-# Workaround: --continue + -p is broken (anthropics/claude-code#42376).
-# Sessions created by -p get sessionKind tagged and are filtered from --continue lookup.
-# Setting CLAUDE_CODE_ENTRYPOINT=-sdk-cli prevents the sessionKind tag from being set.
-export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
@@ -204,12 +353,55 @@ tar -czf "${ARTIFACT_DIR}/snapshot-${PAYLOAD_TAG}.tar.gz" -C "${SNAPSHOT_DIR}" .
 SNAPSHOT_DATA_DIR=$(dirname "$(find "${SNAPSHOT_DIR}" -name summary.json -print -quit)")
 echo "Snapshot data dir: ${SNAPSHOT_DATA_DIR}"
 
-# Install the must-gather plugin for analyzing must-gather archives
-echo "Installing must-gather plugin..."
+# Install additional plugins
+echo "Installing plugins..."
 claude plugin install must-gather@ai-helpers
-echo "must-gather plugin installed."
+claude plugin install prow-agent@ai-helpers
+echo "Plugins installed."
 
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+
+# agentic-ci manages OTEL collector lifecycle per invocation; collect JSONL after each run
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+
+agentic_ci() {
+    local agentic_args=()
+    local timeout_seconds=""
+    while true; do
+        case "${1:-}" in
+            --no-streaming) agentic_args+=("$1"); shift ;;
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) break ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${agentic_args[@]+"${agentic_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    if [[ -n "${timeout_seconds}" ]]; then
+        timeout "${timeout_seconds}" "${cmd[@]}"
+    else
+        "${cmd[@]}"
+    fi
+    local rc=$?
+    for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+        [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+    done
+    rm -rf /tmp/agentic-ci-run.*
+    return $rc
+}
 
 SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
 
@@ -219,14 +411,11 @@ After completing your analysis, you MUST use the Skill tool to invoke ci:payload
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 3600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
+agentic_ci --timeout 3600 \
+    "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
+    || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
@@ -234,20 +423,18 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
+    agentic_ci --timeout 600 \
+        "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --output-format stream-json \
         --max-turns 20 \
-        -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || NUDGE_EXIT=$?
+        || NUDGE_EXIT=$?
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
 # Validate structured output files, retry up to 3 times if missing/invalid
 VALIDATE_YAML="/opt/ai-helpers/plugins/ci/skills/payload-results-yaml/scripts/validate.py"
 VALIDATE_JSON="/opt/ai-helpers/plugins/ci/skills/payload-autodl-json/scripts/validate.py"
+VALIDATION_FAILED=0
 
 for attempt in 1 2 3; do
     YAML_OK=false
@@ -271,7 +458,8 @@ for attempt in 1 2 3; do
     if [[ "${attempt}" -eq 3 ]]; then
         echo "ERROR: Structured outputs still invalid after 3 attempts."
         PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
-        exit 1
+        VALIDATION_FAILED=1
+        break
     fi
 
     MISSING=""
@@ -279,14 +467,11 @@ for attempt in 1 2 3; do
     if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
     echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
 
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
+    agentic_ci --timeout 600 \
+        "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --output-format stream-json \
         --max-turns 10 \
-        -p "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
+        || true
 done
 
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
@@ -337,16 +522,33 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
+# Extract session metrics (cost, tokens, duration) for BigQuery
+METRICS_CASE=""
+METRICS_TEST_COUNT=0
+if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
+    METRICS_TEST_COUNT=1
+    METRICS_ARGS=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
+    if python3 "${EXTRACT_METRICS}" "${METRICS_ARGS[@]}"; then
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
+    else
+        FAILURE_COUNT=$((FAILURE_COUNT + 1))
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\">
+    <failure message=\"Failed to extract session metrics\">extract_metrics.py exited with an error. Check the output log.</failure>
+  </testcase>"
+    fi
+fi
+
 PHASE_COUNT=3
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     PHASE_COUNT=$((PHASE_COUNT + 1))
 fi
-TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
+TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT + METRICS_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="claude-ci" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
 ${PHASE_CASES}
 ${TIMEOUT_CASES}
+${METRICS_CASE}
 </testsuite>
 EOF
 
@@ -368,13 +570,14 @@ else
 fi
 
 echo "Asking Claude to summarize findings for Slack..."
-SUMMARY=$(claude \
-    --model "${CLAUDE_MODEL}" \
+SLACK_LOG=$(mktemp)
+agentic_ci --no-streaming \
+    "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     --continue \
-    --output-format text \
     --max-turns 5 \
-    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-    2>/dev/null) || SUMMARY=""
+    > "${SLACK_LOG}" 2>&1 || true
+SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "result") | .result // empty' 2>/dev/null | head -1) || SUMMARY=""
+rm -f "${SLACK_LOG}"
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then
     SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
@@ -388,4 +591,8 @@ _Model: ${CLAUDE_MODEL}_"
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
         curl -sf -X POST -H 'Content-type: application/json' -d @- \
         "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+fi
+
+if [[ "${VALIDATION_FAILED}" -eq 1 ]]; then
+    exit 1
 fi

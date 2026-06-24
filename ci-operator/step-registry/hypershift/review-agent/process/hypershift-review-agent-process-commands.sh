@@ -6,6 +6,21 @@ echo "=== HyperShift Review Agent Process ==="
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 
+# Install tool dependencies
+echo "Installing tool dependencies..."
+GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
+python3.9 -m ensurepip --user 2>/dev/null || true
+python3.9 -m pip install --user pre-commit 2>&1 | tail -1
+export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
+
+# Install plugins
+echo "Installing Claude Code plugins..."
+claude plugin marketplace add openshift-eng/ai-helpers
+claude plugin install utils@ai-helpers
+claude plugin install golang@ai-helpers
+claude plugin marketplace add enxebre/ai-scripts
+claude plugin install git@enxebre
+
 # Clone ai-helpers repository (contains /utils:address-reviews command)
 echo "Cloning ai-helpers repository..."
 git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
@@ -52,6 +67,8 @@ except ImportError:
 BOT_ACCOUNTS = [
     "hypershift-jira-solve-ci[bot]",
     "hypershift-jira-solve-ci",
+    "github-actions",
+    "github-actions[bot]",
 ]
 
 # Approved bots that ARE allowed to trigger responses
@@ -743,7 +760,7 @@ INSTRUCTIONS:
     --output-format stream-json \
     < /dev/null \
     2>&1 | tee "/tmp/claude-rebase-output.json"
-  local resolve_exit=$?
+  local resolve_exit=${PIPESTATUS[0]}
   set -e
 
   # Save artifact for debugging
@@ -754,7 +771,7 @@ INSTRUCTIONS:
   # Check if rebase completed (no longer in rebase state)
   if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
     echo "Claude could not fully resolve conflicts, aborting rebase"
-    git rebase --abort
+    git rebase --abort 2>/dev/null || true
     return 1
   fi
 
@@ -1124,7 +1141,7 @@ ${SUBAGENT_PROMPT}"
 
     set +e
     echo "Starting Claude review processing..."
-    RESULT=$(claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
+    claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
       --system-prompt "$SKILL_CONTENT" \
       --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
       --max-turns 150 \
@@ -1133,8 +1150,8 @@ ${SUBAGENT_PROMPT}"
       --verbose \
       --output-format stream-json \
       < /dev/null \
-      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-output.json")
-    REVIEW_EXIT=$?
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-output.json"
+    REVIEW_EXIT=${PIPESTATUS[0]}
     set -e
     echo "Review processing complete. Output saved to /tmp/claude-pr-${PR_NUMBER}-output.json"
 
@@ -1148,15 +1165,15 @@ ${SUBAGENT_PROMPT}"
       echo "Review phase succeeded for PR #$PR_NUMBER"
       echo ""
       echo "--- Claude review output for PR #$PR_NUMBER ---"
-      echo "$RESULT" | tail -50
+      tail -10 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
       echo "--- End Claude review output ---"
       echo ""
     else
       PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.reviews.result = "failed"')
       PR_HAD_ERROR=true
-      echo "Review phase failed for PR #$PR_NUMBER"
+      echo "Review phase failed for PR #$PR_NUMBER (claude exit code: $REVIEW_EXIT)"
       echo "Error output (last 20 lines):"
-      echo "$RESULT" | tail -20
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null || true
     fi
   fi
 
@@ -1210,7 +1227,7 @@ Reproduce each failure, fix the code, and verify the fix passes."
 
     set +e
     echo "Starting Claude CI fix processing..."
-    CI_RESULT=$(claude -p "$CI_FIX_PROMPT" \
+    claude -p "$CI_FIX_PROMPT" \
       --system-prompt "$CI_FIX_SYSTEM" \
       --allowedTools "Bash Read Write Edit Grep Glob" \
       --max-turns 150 \
@@ -1219,8 +1236,8 @@ Reproduce each failure, fix the code, and verify the fix passes."
       --verbose \
       --output-format stream-json \
       < /dev/null \
-      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json")
-    CI_FIX_EXIT=$?
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json"
+    CI_FIX_EXIT=${PIPESTATUS[0]}
     set -e
     echo "CI fix processing complete. Output saved to /tmp/claude-pr-${PR_NUMBER}-cifix-output.json"
 
@@ -1236,9 +1253,9 @@ Reproduce each failure, fix the code, and verify the fix passes."
     else
       PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.ci_fixes.result = "failed"')
       PR_HAD_ERROR=true
-      echo "CI fix phase failed for PR #$PR_NUMBER"
+      echo "CI fix phase failed for PR #$PR_NUMBER (claude exit code: $CI_FIX_EXIT)"
       echo "Error output (last 20 lines):"
-      echo "$CI_RESULT" | tail -20
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-cifix-output.json" 2>/dev/null || true
     fi
   fi
 
@@ -1267,23 +1284,76 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   if [ "$PR_HAD_ERROR" = "true" ]; then
     echo "Skipping push for PR #$PR_NUMBER because an earlier phase failed"
   elif [ "$PUSH_NEEDED" = "true" ]; then
-    echo "Pushing changes for PR #$PR_NUMBER..."
+    echo "Running Claude push phase for PR #$PR_NUMBER..."
+    # Export correct PULL_BASE_SHA/PULL_PULL_SHA for gitlint.
+    # CI sets these to the rehearsal PR's commits (openshift/release), not
+    # hypershift's, so gitlint fails with "Invalid revision range".
+    # Export them so all git push invocations (including retries) inherit them.
+    git fetch upstream "${BASE_BRANCH}" 2>/dev/null || true
+    PULL_BASE_SHA=$(git merge-base HEAD "upstream/${BASE_BRANCH}" 2>/dev/null || echo "HEAD~5")
+    PULL_PULL_SHA=$(git rev-parse HEAD)
+    export PULL_BASE_SHA PULL_PULL_SHA
+
+    PUSH_SYSTEM_PROMPT="You are in /tmp/hypershift on branch ${BRANCH_NAME}.
+Your task is to push the current branch to origin safely.
+
+REQUIREMENTS:
+- Push command: git push --force-with-lease origin ${BRANCH_NAME}
+  PULL_BASE_SHA and PULL_PULL_SHA are already exported in the environment.
+- If push fails because of hooks or branch state, diagnose the exact error and fix it.
+- You may run tests/lint/verify and make minimal code or commit updates only when required to satisfy hook failures.
+- Keep changes minimal and related to the reported push/hook failure.
+- Retry push after each fix attempt.
+- Stop once push succeeds.
+
+LIMITS:
+- Maximum 3 push attempts.
+- Do NOT reveal credential-related git config or remotes (no 'git remote -v' or 'git remote get-url').
+- Do NOT create a PR."
+
+    PUSH_USER_PROMPT="Push branch ${BRANCH_NAME} for PR #${PR_NUMBER}. If push is rejected due to hooks or branch constraints, fix the issue and retry up to 3 times."
+
     set +e
-    git push --force-with-lease origin "$BRANCH_NAME"
-    PUSH_EXIT=$?
+    claude -p "$PUSH_USER_PROMPT" \
+      --system-prompt "$PUSH_SYSTEM_PROMPT" \
+      --allowedTools "Bash Read Write Edit Grep Glob" \
+      --max-turns 60 \
+      --effort max \
+      --model "$CLAUDE_MODEL" \
+      --verbose \
+      --output-format stream-json \
+      < /dev/null \
+      2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-push-output.json"
+    PUSH_EXIT=${PIPESTATUS[0]}
     set -e
 
+    if [ -f "/tmp/claude-pr-${PR_NUMBER}-push-output.json" ]; then
+      cp "/tmp/claude-pr-${PR_NUMBER}-push-output.json" "${ARTIFACT_DIR}/claude-pr-${PR_NUMBER}-push-output.json"
+      extract_claude_summary "/tmp/claude-pr-${PR_NUMBER}-push-output.json" "${SHARED_DIR}/claude-pr-${PR_NUMBER}-push-summary.json"
+    fi
+
     if [ $PUSH_EXIT -eq 0 ]; then
-      echo "Push completed for PR #$PR_NUMBER"
+      REMOTE_SHA=$(git ls-remote --heads origin "$BRANCH_NAME" | awk '{print $1}')
+      LOCAL_SHA=$(git rev-parse HEAD)
+      if [ -z "$REMOTE_SHA" ] || [ "$REMOTE_SHA" != "$LOCAL_SHA" ]; then
+        echo "Push verification failed for PR #$PR_NUMBER: remote=$REMOTE_SHA local=$LOCAL_SHA"
+        PUSH_EXIT=1
+      fi
+    fi
+
+    if [ $PUSH_EXIT -eq 0 ]; then
+      echo "Push phase succeeded for PR #$PR_NUMBER"
+      PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.push.result = "success"')
     else
-      echo "Push failed for PR #$PR_NUMBER"
+      echo "Push phase failed for PR #$PR_NUMBER (claude exit code: $PUSH_EXIT)"
       PR_HAD_ERROR=true
+      PR_ACTIONS=$(echo "$PR_ACTIONS" | jq '.push.result = "failed"')
     fi
   else
     echo "No changes to push for PR #$PR_NUMBER"
   fi
 
-  # ---- Write per-PR actions JSON ----
+  # ---- Persist state early (before output dumps that can OOM the pod) ----
   echo "$PR_ACTIONS" > "${SHARED_DIR}/pr-${PR_NUMBER}-actions.json"
 
   if [ "$PR_HAD_ERROR" = "true" ]; then
@@ -1292,6 +1362,20 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   else
     PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
     echo "$PR_NUMBER $TIMESTAMP SUCCESS" >> "$STATE_FILE"
+  fi
+
+  # ---- Dump phase outputs (after state is safely persisted) ----
+  if [ -f "/tmp/claude-pr-${PR_NUMBER}-push-output.json" ] && [ "$PUSH_NEEDED" = "true" ]; then
+    if [ "$PR_HAD_ERROR" != "true" ]; then
+      echo ""
+      echo "--- Claude push output (last 10 lines) for PR #$PR_NUMBER ---"
+      tail -10 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
+      echo "--- End Claude push output ---"
+      echo ""
+    else
+      echo "Error output (last 20 lines):"
+      tail -20 "/tmp/claude-pr-${PR_NUMBER}-push-output.json" 2>/dev/null || true
+    fi
   fi
 
   TOTAL_PROCESSED=$((TOTAL_PROCESSED + 1))

@@ -11,7 +11,7 @@ echo "E2E_NAMESPACE: ${E2E_NAMESPACE}"
 echo "E2E_VM_TEMPLATE: ${E2E_VM_TEMPLATE}"
 echo "-------------------------------------------"
 
-CLONE_NAME="vmaas-kustomize"
+CLONE_NAME="vmaas-helm"
 KUBECONFIG_PATH="/root/.kube/${CLONE_NAME}.kubeconfig"
 REMOTE_RESULTS_DIR="/tmp/test-results"
 
@@ -82,8 +82,10 @@ echo "Tests completed."
 REMOTE_EOF
 
 if [[ "${TEST_EXIT}" -ne 0 ]]; then
+    echo "FAILED" > "${SHARED_DIR}/test-result"
     echo "Some tests failed (exit code: ${TEST_EXIT})"
     exit "${TEST_EXIT}"
 fi
 
+echo "PASSED" > "${SHARED_DIR}/test-result"
 echo "All tests passed."

@@ -20,7 +20,17 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion
+  name: periodic-ci-openshift-route-monitor-operator-master-rosa-sts-e2e-promotion-stage
+  reporter_config:
+    slack:
+      channel: '#rosa-prow-info'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>'
   spec:
     containers:
     - args:
@@ -29,7 +39,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-e2e-promotion
+      - --target=rosa-sts-e2e-promotion-stage
       command:
       - ci-operator
       env:

@@ -89,6 +89,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-autonode
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+      RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-multi
   cron: 0 2 * * *
   steps:
@@ -157,6 +171,18 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 3 1,15 * *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --fips
+      PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
@@ -170,7 +196,6 @@ tests:
       OCP_IMAGE_PREVIOUS: release:latest-4-20
     env:
       CI_TESTS_RUN: ^TestUpgradeControlPlane.*
-      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-conformance-cilium
   minimum_interval: 168h
@@ -233,6 +258,23 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 4 1,15 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *

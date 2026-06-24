@@ -65,14 +65,21 @@ tests:
 - as: e2e-vmaas
   capabilities:
   - intranet
+  skip_if_only_changed: ^(README\.md|AGENTS\.md|CLAUDE\.md|docs/.*|\.ai-bot/.*|\.claude/rules/.*|\.golangci\.yml|\.yamllint\.yaml|\.pre-commit-config.*\.yaml|\.dockerignore|\.gitattributes|OWNERS|LICENSE|bin/.*)$
   steps:
     workflow: osac-project-cluster-tool-vmaas
-- as: e2e-metal-vmaas-compute-instance-creation
+- as: e2e-vmaas-periodic
   capabilities:
   - intranet
-  cron: 0 2 * * 1
+  cron: 7 * * * *
   steps:
-    cluster_profile: packet-assisted
+    workflow: osac-project-cluster-tool-vmaas
+- as: e2e-vmaas-full-setup-helm
+  capabilities:
+  - intranet
+  cron: 0 */4 * * *
+  steps:
+    cluster_profile: packet-osac
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv,lvm
@@ -83,133 +90,8 @@ tests:
         MASTER_DISK=200000000000
         MASTER_CPU=24
         OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_creation.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-compute-instance-api-fields
-  capabilities:
-  - intranet
-  cron: 0 6 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_api_fields.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-compute-instance-cli-fields
-  capabilities:
-  - intranet
-  cron: 0 2 * * 2
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_cli_fields.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-compute-instance-delete-during-provision
-  capabilities:
-  - intranet
-  cron: 0 6 * * 2
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_delete_during_provision.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-compute-instance-restart
-  capabilities:
-  - intranet
-  cron: 0 2 * * 3
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_restart.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-compute-instance-restart-negative
-  capabilities:
-  - intranet
-  cron: 0 6 * * 3
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_compute_instance_restart_negative.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-subnet-lifecycle
-  capabilities:
-  - intranet
-  cron: 0 2 * * 4
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_subnet_lifecycle.py
-    workflow: osac-project-ofcir-baremetal
-- as: e2e-metal-vmaas-virtual-network-lifecycle
-  capabilities:
-  - intranet
-  cron: 0 6 * * 4
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv,lvm
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        MASTER_MEMORY=57344
-        MASTER_DISK_COUNT=2
-        MASTER_DISK=200000000000
-        MASTER_CPU=24
-        OPENSHIFT_VERSION=4.20
-      TEST: test_virtual_network_lifecycle.py
+      DEPLOY_MODE: helm
+      NOTIFY_LABEL: Full Setup vmaas (helm)
     workflow: osac-project-ofcir-baremetal
 zz_generated_metadata:
   branch: main

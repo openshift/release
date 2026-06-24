@@ -1,0 +1,41 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocm-fvt-periodic-cs-osd-ccs-aws-ad-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  steps:
+    env:
+      OCM_FVT_JOB_NAME: cs-osd-ccs-aws-ad-integration-main
+      OCM_FVT_OCM_ENV: integration
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-e2e
+  variant: ocm-fvt-osd-aws-integration

@@ -27,6 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  vault-enterprise:
+    name: vault-enterprise
+    namespace: ci
+    tag: 2.0.0-ent
   vault_kube_kms:
     name: vault-kube-kms
     namespace: control-plane_vault
@@ -450,18 +454,18 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
 - always_run: false
-  as: e2e-gcp-operator-encryption-kms
+  as: e2e-aws-operator-encryption-kms
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
     test:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - always_run: false
   as: e2e-gcp-operator-encryption-kms-rotation
   optional: true

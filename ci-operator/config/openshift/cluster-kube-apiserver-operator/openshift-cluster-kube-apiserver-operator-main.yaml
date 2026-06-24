@@ -27,10 +27,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  vault-enterprise:
+    name: vault-enterprise
+    namespace: ci
+    tag: 2.0.0-ent
   vault_kube_kms:
     name: vault-kube-kms
-    namespace: control-plane_vault
-    tag: 0.0.1
+    namespace: ci
+    tag: 0.1.0-beta-ubi
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -450,18 +454,20 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
 - always_run: false
-  as: e2e-gcp-operator-encryption-kms
+  as: e2e-aws-operator-encryption-kms
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:4206f83742528de5a1cc0ff2b2e93476a1e44dc18caf595b6658d03603dcafa2
     test:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - always_run: false
   as: e2e-gcp-operator-encryption-kms-rotation
   optional: true
@@ -471,6 +477,8 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-rotation
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:4206f83742528de5a1cc0ff2b2e93476a1e44dc18caf595b6658d03603dcafa2
     test:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test

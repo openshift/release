@@ -86,7 +86,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry
     # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    if ! curl --retry-all-errors --max-time 65 --retry-delay 60 --retry 3 --retry-max-time 370 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -132,6 +132,7 @@ CIRTYPE=host_el9
 [ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
 [ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
 [ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
+[ "$CLUSTERTYPE" == "osac" ] && CIRTYPE=osac
 
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

@@ -2,9 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
-
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 # Collect all JUnit XMLs from SHARED_DIR into ARTIFACT_DIR
 cp "${SHARED_DIR}"/junit-*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true

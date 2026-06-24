@@ -1,4 +1,7 @@
-binary_build_commands: go build -o /bin/openstack-tests ./cmd/openshift-tests
+binary_build_commands: |
+  go build -o /bin/openstack-tests ./cmd/openshift-tests && \
+  make tests-ext-build && \
+  gzip -c bin/openstack-test-tests-ext > /usr/bin/openstack-test-tests-ext.gz
 build_root:
   from_repository: true
   use_build_cache: true
@@ -29,7 +32,7 @@ resources:
       memory: 200Mi
 tests:
 - as: build
-  commands: openstack-tests --help
+  commands: ./bin/openstack-test-tests-ext --help
   container:
     from: bin
 - as: verify
@@ -42,7 +45,7 @@ tests:
     env:
       CONFIG_TYPE: minimal
     test:
-    - ref: openstack-test-openstack
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-ccpmso
@@ -62,13 +65,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 7h0m0s
-    - ref: openstack-test-openstack
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-dualstack
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-dualstack
 - always_run: false
   as: e2e-openstack-dualstack-v6primary
@@ -77,6 +83,9 @@ tests:
     cluster_profile: openstack-hwoffload
     env:
       CONFIG_TYPE: dualstack-v6primary
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-5.0

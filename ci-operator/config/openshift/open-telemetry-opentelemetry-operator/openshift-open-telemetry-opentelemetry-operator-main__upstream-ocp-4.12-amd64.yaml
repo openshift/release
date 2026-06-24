@@ -4,21 +4,20 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.12"
-    namespace: origin
-    tag: operator-sdk
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   upi-installer:
     name: "4.12"
     namespace: ocp
     tag: upi-installer
-binary_build_commands: unset GOFLAGS && make CONTROLLER_TOOLS_VERSION=v0.20.1 manager
-  && make CONTROLLER_TOOLS_VERSION=v0.20.1 targetallocator && make CONTROLLER_TOOLS_VERSION=v0.20.1
+binary_build_commands: unset GOFLAGS && make manager && make targetallocator && make
   operator-opamp-bridge
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
+    tag: rhel-9-golang-1.26-openshift-5.0
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
   items:
@@ -33,7 +32,7 @@ images:
     to: opentelemetry-operator
   - context_dir: .
     dockerfile_path: ./tests/e2e-openshift/Dockerfile
-    to: opentelemetry-tests-runner
+    to: obs-tests-runner
   - context_dir: ./tests/test-e2e-apps/bridge-server
     dockerfile_path: Dockerfile
     to: opamp-bridge-server
@@ -95,9 +94,8 @@ operator:
     with: pipeline:opentelemetry-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.12"
 resources:
   '*':
@@ -105,18 +103,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: security-sast-otel
-  steps:
-    env:
-      PROJECT_NAME: opentelemetry-operator
-      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
-    workflow: openshift-ci-security
 - as: opentelemetry-upstream-tests
   steps:
-    cluster_profile: azure-observability
+    cluster_profile: aws-observability
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -124,13 +115,14 @@ tests:
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-openshift/export-to-cluster-logging-lokistack
         tests/e2e-otel/*aws* tests/e2e-openshift/kafka tests/e2e-otel/google* tests/e2e-targetallocator/targetallocator-prometheuscr
+        tests/e2e-instrumentation/instrumentation-go tests/e2e/httpRoute
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
         oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -142,7 +134,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
