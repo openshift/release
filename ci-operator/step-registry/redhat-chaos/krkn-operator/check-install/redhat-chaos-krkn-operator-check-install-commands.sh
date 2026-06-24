@@ -14,6 +14,21 @@ kubectl wait --for=condition=available deployment/krkn-operator-operator \
   -n "${TARGET_NAMESPACE}" \
   --timeout=300s
 
+acm_version=$(oc -n ${MCH_NAMESPACE} get mch multiclusterhub -o jsonpath='{.status.currentVersion}{"\n"}')
+echo "Success! ACM ${acm_version} is Running"
+
+echo "# OCM Setup & krkn-operator Validation Summary"
+echo ""
+echo "## OCM ManagedClusters"
+kubectl get managedclusters 2>&1 || echo "Failed to get clusters"
+echo ""
+echo "## ManagedServiceAccounts"
+kubectl get managedserviceaccount -A 2>&1 || echo "Failed to get ManagedServiceAccounts"
+echo ""
+echo "## krkn-operator Pods"
+kubectl get pods -n krkn-operator 2>&1 || echo "Failed to get operator pods"
+echo ""
+
 # Patch kind-specific cluster assertions: test-api.sh hardcodes "cluster1" and
 # "cluster2" as expected cluster names (mock clusters in the kind dev env).
 # On OCP+ACM the discovered clusters have real names, so we disable these two
@@ -31,20 +46,3 @@ OPERATOR_NAMESPACE="${TARGET_NAMESPACE}" \
 KUBE_CONTEXT="$(kubectl config current-context)" \
   /tmp/krkn-operator/scripts/test-api.sh
 
-echo "# OCM Setup & krkn-operator Validation Summary"
-echo ""
-echo "## OCM ManagedClusters"
-kubectl get managedclusters 2>&1 || echo "Failed to get clusters"
-echo ""
-echo "## ManagedServiceAccounts"
-kubectl get managedserviceaccount -A 2>&1 || echo "Failed to get ManagedServiceAccounts"
-echo ""
-echo "## krkn-operator Pods"
-kubectl get pods -n krkn-operator 2>&1 || echo "Failed to get operator pods"
-echo ""
-echo "## Test Results"
-echo "- ✅ OCM hub and managed clusters configured"
-echo "- ✅ krkn-operator deployed and running"
-echo "- ✅ Admin user registered successfully"
-echo "- ✅ JWT authentication working"
-echo "- ✅ Target clusters discovered: 2 (cluster1, cluster2)"
