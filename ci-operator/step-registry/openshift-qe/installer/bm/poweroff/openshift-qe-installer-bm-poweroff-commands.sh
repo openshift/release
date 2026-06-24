@@ -20,16 +20,30 @@ export LAB_CLOUD
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+  OCPINV=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
+  export OCPINV
+fi
+
 cat > /tmp/poweroff.sh << 'EOF'
 echo 'Running poweroff.sh'
-OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
-for i in $(curl -sSk $OCPINV | jq -r ".nodes[1:][].name"); do
-   podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
-done
+if [[ "$OCP_INVENTORY_OVERRIDE" == "true" ]]; then
+  OCPINV=${OCPINV}
+  USER=$(jq -r ".nodes[0].pm_user" ${OCPINV})
+  PWD=$(jq -r ".nodes[0].pm_password" ${OCPINV})
+  for i in $(jq -r ".nodes[1:][].name" ${OCPINV}); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+else
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+  for i in $(curl -sSk $OCPINV | jq -r ".nodes[1:][].name"); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+fi
 EOF
-envsubst '${LAB_CLOUD},${QUADS_INSTANCE}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
+envsubst '${LAB_CLOUD},${OCP_INVENTORY_OVERRIDE},${OCPINV},${QUADS_INSTANCE}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
 
 scp -q ${SSH_ARGS} /tmp/poweroff_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
 
