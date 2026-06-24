@@ -34,6 +34,25 @@ cat > gather_logs.yaml <<-EOF
             -k podman.all -k podman.logs
       ignore_errors: true
 
+      # Strip libvirt auth token from sosreport archives. The libvirt plugin
+      # collects /run/libvirt/ which includes the daemon authentication token
+      # at /run/libvirt/common/system.token — sensitive data that must not
+      # appear in CI artifacts.
+      - name: Strip libvirt system.token from sosreport archives
+        ansible.builtin.shell: |
+          for sos_tar in {{ LOGS_DIR }}/sosreport-*.tar.xz; do
+            [ -f "$sos_tar" ] || continue
+            if tar tf "$sos_tar" | grep -q "run/libvirt/common/system.token"; then
+              tmpdir=$(mktemp -d)
+              tar xf "$sos_tar" -C "$tmpdir"
+              find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete
+              tar cf - -C "$tmpdir" . | xz > "$sos_tar"
+              rm -rf "$tmpdir"
+              echo "Stripped system.token from $sos_tar"
+            fi
+          done
+        ignore_errors: true
+
     - name: Gather logs and debug information from primary host
       block:
       - name: Copy terraform log
