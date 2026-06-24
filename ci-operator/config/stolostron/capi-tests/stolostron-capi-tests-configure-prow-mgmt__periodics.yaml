@@ -1,6 +1,65 @@
 build_root:
   project_image:
-    dockerfile_path: Dockerfile.prow
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+
+      # Tool versions
+      ARG KUBECTL_VERSION=v1.35.2
+      ARG HELM_VERSION=v3.16.0
+      ARG CLUSTERCTL_VERSION=v1.12.8
+      ARG CLUSTERCTL_SHA256=19679fd674731c7f48276b633874834958a62b0e93cb870b87a2df240d6a7ce0
+      ARG GOTESTSUM_VERSION=v1.13.0
+
+      # Install OpenShift CLI
+      ARG OC_VERSION=latest
+      RUN curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" -o /tmp/oc.tar.gz && \
+          tar xz -C /usr/local/bin -f /tmp/oc.tar.gz oc && \
+          chmod +x /usr/local/bin/oc && \
+          rm -f /tmp/oc.tar.gz
+
+      # Install Azure CLI and other tools
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          printf '%s\n' \
+            '[azure-cli]' \
+            'name=Azure CLI' \
+            'baseurl=https://packages.microsoft.com/yumrepos/azure-cli' \
+            'enabled=1' \
+            'gpgcheck=1' \
+            'gpgkey=https://packages.microsoft.com/keys/microsoft.asc' \
+            > /etc/yum.repos.d/azure-cli.repo && \
+          if [ -d /etc/yum.repos.art/ci ]; then \
+            cp /etc/yum.repos.d/azure-cli.repo /etc/yum.repos.art/ci/; \
+          fi && \
+          dnf install -y azure-cli jq gettext libxml2 bc python3-cffi podman && dnf clean all
+
+      SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+      # Install kubectl
+      RUN curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+          curl -Lo /tmp/kubectl.sha256 "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" && \
+          echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum -c && \
+          chmod +x /usr/local/bin/kubectl && rm -f /tmp/kubectl.sha256
+
+      # Install helm
+      RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz && \
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" -o /tmp/helm.sha256sum && \
+          echo "$(awk '{print $1}' /tmp/helm.sha256sum)  /tmp/helm.tar.gz" | sha256sum -c && \
+          tar xz -C /tmp -f /tmp/helm.tar.gz && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && chmod +x /usr/local/bin/helm && \
+          rm -rf /tmp/helm.tar.gz /tmp/helm.sha256sum /tmp/linux-amd64
+
+      # Install gotestsum
+      RUN GOFLAGS='' GOBIN=/usr/local/bin go install gotest.tools/gotestsum@${GOTESTSUM_VERSION}
+
+      # Install clusterctl
+      RUN curl -Lo /usr/local/bin/clusterctl "https://github.com/kubernetes-sigs/cluster-api/releases/download/${CLUSTERCTL_VERSION}/clusterctl-linux-amd64" && \
+          echo "${CLUSTERCTL_SHA256}  /usr/local/bin/clusterctl" | sha256sum -c && \
+          chmod +x /usr/local/bin/clusterctl
+
+      # Clone capi-tests source
+      RUN git clone --depth 1 https://github.com/stolostron/capi-tests.git /go/src/capi-tests
+      WORKDIR /go/src/capi-tests
+      RUN rm -rf openshift-ci
 releases:
   initial:
     integration:
@@ -48,8 +107,6 @@ tests:
       resource_type: aro-hcp-test-msi-containers-prod
     post:
     - ref: capz-arohcp-summary
-    - ref: capz-arohcp-teardown
-    - ref: capz-arohcp-cleanup-msi-roleassignments
     - ref: capz-arohcp-aks-deprovision
     pre:
     - ref: capz-arohcp-write-env
