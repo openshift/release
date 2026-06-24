@@ -42,7 +42,7 @@ cat > gather_logs.yaml <<-EOF
         ansible.builtin.shell: |
           for sos_tar in {{ LOGS_DIR }}/sosreport-*.tar.xz; do
             [ -f "$sos_tar" ] || continue
-            if tar tf "$sos_tar" | grep -q "run/libvirt/common/system.token"; then
+            if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
               tmpdir=$(mktemp -d)
               tar xf "$sos_tar" -C "$tmpdir"
               find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete

@@ -40,7 +40,7 @@ sos report --batch --tmp-dir /tmp/artifacts --all-logs \
 # appear in CI artifacts.
 for sos_tar in /tmp/artifacts/sosreport-*.tar.xz; do
   [ -f "$sos_tar" ] || continue
-  if tar tf "$sos_tar" | grep -q "run/libvirt/common/system.token"; then
+  if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
     tmpdir=$(mktemp -d)
     tar xf "$sos_tar" -C "$tmpdir"
     find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete
