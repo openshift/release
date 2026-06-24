@@ -77,16 +77,16 @@ oc process --ignore-unknown-parameters=true -f /scripts/netobserv/flows_v1beta2_
 oc apply -f "$ARTIFACT_DIR"/flowcollector.yaml
 
 
-# oc patch flowcollector/cluster --type=merge -p '{
-#   "spec": {
-#     "processor": {
-#       "informers": {
-#         "enabled": true
-#         }
-#       }
-#     }
-#   }
-# }'
+oc patch flowcollector/cluster --type=merge -p '{
+  "spec": {
+    "processor": {
+      "informers": {
+        "enabled": true
+        }
+      }
+    }
+  }
+}'
 
 
 waitForFlowcollectorReady() {
