@@ -112,8 +112,9 @@ git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 # Clone infra-deployments for DR test code
+# TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
 INFRA_DIR="/tmp/infra-deployments"
-git clone --branch main "https://github.com/redhat-appstudio/infra-deployments.git" "$INFRA_DIR"
+git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
 
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
