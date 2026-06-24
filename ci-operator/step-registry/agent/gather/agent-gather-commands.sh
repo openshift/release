@@ -15,7 +15,7 @@ cd dev-scripts
 make agent_gather
 EOF
 
-if scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/agent-gather*.tar.xz" "${ARTIFACT_DIR}/" >& /dev/null ; then
+if scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/agent-gather*.tar.xz" "root@${IP}:/root/dev-scripts/ocp/*/installation-logs.tar" "${ARTIFACT_DIR}/" >& /dev/null ; then
   echo "agent logs published"
 fi
 
