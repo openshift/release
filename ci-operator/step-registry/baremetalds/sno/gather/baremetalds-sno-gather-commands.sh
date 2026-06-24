@@ -44,7 +44,7 @@ for sos_tar in /tmp/artifacts/sosreport-*.tar.xz; do
     tmpdir=$(mktemp -d)
     tar xf "$sos_tar" -C "$tmpdir"
     find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete
-    tar cf - -C "$tmpdir" . | xz > "$sos_tar"
+    tar cf - -C "$tmpdir" . | xz > "${sos_tar}.new" && mv "${sos_tar}.new" "$sos_tar"
     rm -rf "$tmpdir"
     echo "Stripped system.token from $sos_tar"
   fi
