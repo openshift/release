@@ -6,6 +6,9 @@ cd /workspace
 echo "==> Setting up sippy environment (postgres, redis, build, seed)..."
 source hack/agentic_setup.sh
 
+echo "==> Building frontend..."
+make frontend
+
 echo "==> Starting sippy server..."
 ./sippy serve \
   --listen ":8080" \
