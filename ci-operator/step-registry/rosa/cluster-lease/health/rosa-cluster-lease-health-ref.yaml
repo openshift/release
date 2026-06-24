@@ -1,8 +1,8 @@
 ref:
-  as: rosa-pool-health
+  as: rosa-cluster-lease-health
   from: rosa-aws-cli
   grace_period: 5m
-  commands: rosa-pool-health-commands.sh
+  commands: rosa-cluster-lease-health-commands.sh
   resources:
     requests:
       cpu: 100m
@@ -10,12 +10,12 @@ ref:
   timeout: 30m0s
   credentials:
   - namespace: test-credentials
-    name: rosa-pool-manager
-    mount_path: /etc/rosa-pool-manager
+    name: rosa-cluster-lease-manager
+    mount_path: /etc/rosa-cluster-lease-manager
   env:
-  - name: POOL_NAMESPACE
-    default: "rosa-pool"
-    documentation: Namespace on the pool host cluster where pool ConfigMaps live.
+  - name: LEASE_NAMESPACE
+    default: "rosa-cluster-lease"
+    documentation: Namespace on the lease host cluster where lease ConfigMaps live.
   - name: OCM_LOGIN_ENV
     default: "staging"
     documentation: OCM environment for cluster health checks.
@@ -23,12 +23,12 @@ ref:
     default: "4"
     documentation: Hours after which an in-use lease is considered stale and force-released.
   documentation: |-
-    Periodic health check for the ROSA cluster standby pool.
+    Periodic health check for the ROSA cluster lease inventory.
 
-    For each pool cluster, checks OCM cluster status, API server
+    For each lease cluster, checks OCM cluster status, API server
     reachability via OCM kubeconfig, and node health. Detects stale leases
     (clusters stuck in-use beyond STALE_LEASE_HOURS) and force-releases
     them. Marks unhealthy clusters as status=error.
 
     Run as a periodic Prow job (e.g. every 30 minutes) to keep the
-    pool healthy and recover from job crashes.
+    lease inventory healthy and recover from job crashes.

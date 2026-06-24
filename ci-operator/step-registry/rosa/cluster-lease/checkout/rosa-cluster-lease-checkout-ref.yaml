@@ -1,0 +1,53 @@
+ref:
+  as: rosa-cluster-lease-checkout
+  from: rosa-aws-cli
+  grace_period: 2m
+  commands: rosa-cluster-lease-checkout-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 35m0s
+  credentials:
+  - namespace: test-credentials
+    name: rosa-cluster-lease-manager
+    mount_path: /etc/rosa-cluster-lease-manager
+  env:
+  - name: LEASE_TYPE
+    default: "classic-sts"
+    documentation: Label selector value for rosa-cluster-lease/type. Filters which lease clusters are eligible.
+  - name: LEASE_ENV
+    default: ""
+    documentation: Optional OCM environment filter (e.g. integration, staging). When set, only clusters with matching rosa-cluster-lease/env label are eligible.
+  - name: LEASE_REGION
+    default: ""
+    documentation: Optional region filter. When set, only clusters with matching rosa-cluster-lease/region label are eligible.
+  - name: LEASE_VERSION
+    default: ""
+    documentation: Optional version filter. When set, only clusters with matching rosa-cluster-lease/version label are eligible.
+  - name: LEASE_CHECKOUT_TIMEOUT_MINUTES
+    default: "30"
+    documentation: Maximum time to wait for an available cluster before failing.
+  - name: LEASE_NAMESPACE
+    default: "rosa-cluster-lease"
+    documentation: Namespace on the lease host cluster where lease ConfigMaps live.
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment for fetching cluster credentials.
+  documentation: |-
+    Checks out a pre-provisioned ROSA cluster from the lease inventory.
+
+    Uses ConfigMap-based lease tracking with optimistic concurrency (CAS)
+    to safely claim a cluster. If no clusters are available, waits and
+    retries until LEASE_CHECKOUT_TIMEOUT_MINUTES. On successful checkout,
+    fetches the admin kubeconfig from OCM and writes cluster-id,
+    cluster-name, and kubeconfig to SHARED_DIR.
+
+    Lease clusters must have public API servers since Prow pods run on
+    public infrastructure.
+
+    Each ConfigMap represents one lease cluster with labels for type,
+    env, region, version, and availability status.
+
+    Requires rosa-cluster-lease-manager credentials (kubeconfig for
+    lease host) and OCM credentials (from cluster profile).
