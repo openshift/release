@@ -81,9 +81,9 @@ CURRENT_RETRY=1
 SUCCESS=false
 
 function run-vault-image-mirror() {
-  oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  oc image mirror --keep-manifest-list=true --registry-config ${DS_WORKING_DIR}/pull_secret.json \
     "${vault_enterprise_src}" "${vault_enterprise_dst}" || return 1
-  oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  oc image mirror --keep-manifest-list=true --registry-config ${DS_WORKING_DIR}/pull_secret.json \
     "${vault_kms_src}" "${vault_kms_dst}" || return 1
 }
 
