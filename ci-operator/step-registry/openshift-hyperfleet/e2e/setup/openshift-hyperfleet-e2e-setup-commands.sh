@@ -64,7 +64,7 @@ git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.gi
 cd /tmp/hyperfleet-infra
 
 HELMFILE_ENV="e2e-gcp"
-NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfleet
+NAMESPACE=${NAMESPACE_NAME} E2E_RUN_ID=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfleet
 
 # Save installed charts for cleanup
 HELMFILE_JSON="${SHARED_DIR}/helm-release-${NAMESPACE_NAME}.json"
