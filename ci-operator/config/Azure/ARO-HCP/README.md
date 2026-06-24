@@ -8,6 +8,8 @@ This directory contains CI/CD configuration for the Azure ARO-HCP (Hosted Contro
 - **`Azure-ARO-HCP-main__periodic.yaml`** - Scheduled periodic jobs (cluster creation, E2E tests, cleanup)
 - **`Azure-ARO-HCP-main__image-updater.yaml`** - Automated image digest update job - Mon-Fri
 
+The `upgrade-e2e-parallel` optional presubmit validates main-to-PR infrastructure upgrades. See [ARO-HCP docs](https://github.com/Azure/ARO-HCP/blob/main/docs/ci-upgrade-path-presubmit.md) for usage and failure interpretation.
+
 # Adding New Production Regions to ARO-HCP Testing
 
 This guide shows how to add periodic CI tests for new ARO-HCP production regions.

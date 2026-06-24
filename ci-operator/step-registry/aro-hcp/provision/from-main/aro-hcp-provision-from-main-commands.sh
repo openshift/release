@@ -27,6 +27,10 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
+# Parse CI-built image coordinates (registry, repository, digest) before
+# checking out main. The env vars are injected by ci-operator from the PR
+# pipeline; we use the same images for the baseline so that only the
+# infrastructure definitions (Bicep/Helm/config) come from main.
 BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
 BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
 BACKEND_SOURCE_REGISTRY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
@@ -67,17 +71,28 @@ KUBE_APPLIER_REPOSITORY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/
 KUBE_APPLIER_SOURCE_REGISTRY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
 echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
 
-# Set up registries that require oc login - append backend and frontend registries
 if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
     USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
 else
     USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
 fi
+export USE_OC_LOGIN_REGISTRIES
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
+
+# Check out main branch to provision the baseline environment.
+# The container image has the PR source baked in; we swap to main so that
+# Bicep templates, Helm charts, config, and pipeline definitions all come
+# from the current state of the default branch.
+echo "Fetching and checking out main for baseline provision ..."
+git fetch https://github.com/Azure/ARO-HCP.git main
+git checkout -f FETCH_HEAD
+echo "Checked out main at $(git rev-parse --short HEAD)"
 
 OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
-# Image overrides
+# Image overrides — use CI-built images so the baseline has working,
+# pullable images rather than main's default config digests which may
+# reference registries inaccessible from CI pods.
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
@@ -105,7 +120,7 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
-# MSI mock SP overrides (if provided)
+# MSI mock SP overrides (if provided) — needed for both baseline and upgrade
 if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
   MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
   MSI_MOCK_PRINCIPAL_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".principalId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
@@ -126,9 +141,16 @@ else
   echo "No MSI mock SP lease provided, skipping mock SP overrides"
 fi
 
-# Healthcheck workflows provision without leases and don't need E2E-sized clusters.
-# Override minCount to 1 so healthcheck clusters stay small.
-if [[ -z "${LEASED_MSI_CONTAINERS:-}" ]]; then
+# Temporary MGMT cluster sizing overrides for single-wave E2E parallelism.
+# These will be removed once the matching config.yaml defaults land in ARO-HCP.
+# Only apply when identity containers are leased (E2E runs); healthcheck
+# workflows provision without leases and should use the default sizing.
+if [[ -n "${LEASED_MSI_CONTAINERS:-}" ]]; then
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 7 |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.infraAgentPool.vmSize = \"Standard_D8ds_v6\"
+  " "${OVERRIDE_CONFIG_FILE}"
+else
   yq -i "
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 1
   " "${OVERRIDE_CONFIG_FILE}"
@@ -139,12 +161,6 @@ cat "${OVERRIDE_CONFIG_FILE}"
 
 CONFIG_PROV="${SHARED_DIR}/config-prov.yaml"
 
-# There's a $SHARED_DIR/config.yaml already from the write-config step
-# but it is of limited accuracy. It's fine for int/stg/prod, but this prov
-# step will generate temporary names for a bunch of things, so if we want
-# following steps to know what those are, we need to override the older
-# less accurate config.yaml.
-# And let's do it in a way that works even if provisioning ends up failing.
 finalize() {
     if [[ -s "${CONFIG_PROV}" ]]; then
         mv "${CONFIG_PROV}" "${SHARED_DIR}/config.yaml"
@@ -165,8 +181,8 @@ make -o tooling/templatize/templatize entrypoint/Region \
   OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" \
   EXTRA_ARGS="${EXTRA_ARGS}" \
   TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
-  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
+  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint_baseline.xml \
   CONFIG_OUTPUT=${CONFIG_PROV}
 
-# Mark successful completion
-touch "${SHARED_DIR}/provision-complete"
+touch "${SHARED_DIR}/provision-from-main-complete"
+echo "Baseline provision from main complete."
