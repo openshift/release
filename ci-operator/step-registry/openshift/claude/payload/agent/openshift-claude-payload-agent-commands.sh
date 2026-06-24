@@ -263,9 +263,11 @@ echo ""
 
 while true; do
     POLL_COUNT=$((POLL_COUNT + 1))
-    RELEASE_JSON=$(fetch_with_backoff "${API_URL}" || true)
+    RELEASE_JSON=$(curl -sf "${API_URL}" || true)
     if [[ -z "${RELEASE_JSON}" ]]; then
-        echo "  Warning: Release API unavailable after retries. Will retry next poll cycle."
+        echo "  Warning: Failed to fetch release API. Retrying next poll..."
+        sleep ${POLL_INTERVAL}
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
         continue
     fi
     PENDING=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Pending")] | length')
