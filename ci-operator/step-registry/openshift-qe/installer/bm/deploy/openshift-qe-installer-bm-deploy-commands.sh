@@ -86,6 +86,15 @@ image_type: "minimal-iso"
 reset_idrac: $RESET_IDRAC
 EOF
 
+# Append ocp_inventory_override if enabled
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+   OCP_INVENTORY_PATH=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
+   export OCP_INVENTORY_PATH
+   cat <<EOF >>/tmp/all.yml
+ocp_inventory_override: "${OCP_INVENTORY_PATH}"
+EOF
+fi
+
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
   sed -i "s/^enable_bond: .*/enable_bond: $BOND/" /tmp/all.yml
@@ -219,8 +228,14 @@ cat /tmp/all.yml
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Copy the ssh key to the bastion host
-OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+   scp -q ${SSH_ARGS} root@${bastion}:${OCP_INVENTORY_PATH} /tmp/inventory_${LAB_CLOUD}.json
+   OCPINV=/tmp/inventory_${LAB_CLOUD}.json
+   bastion2=$(jq -r ".nodes[0].name" $OCPINV)
+else
+   OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+   bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+fi
 ssh ${SSH_ARGS} root@${bastion} "
    ssh-keygen -R ${bastion2}
    sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion2}
