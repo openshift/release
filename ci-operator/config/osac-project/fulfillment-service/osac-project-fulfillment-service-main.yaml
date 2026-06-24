@@ -35,7 +35,11 @@ images:
           source_path: /tmp/osac
     to: osac-cli
   - dockerfile_path: Containerfile
-    to: fulfillment-service-pr
+    to: fulfillment-service
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: fulfillment-service-code
   - dockerfile_literal: |
       FROM osac-installer
       COPY manifests/ /installer/base/osac-fulfillment-service/manifests/
@@ -52,7 +56,6 @@ images:
 promotion:
   to:
   - excluded_images:
-    - fulfillment-service-pr
     - osac-installer-with-pr
     name: latest
     namespace: osac-project
@@ -81,7 +84,7 @@ tests:
   skip_if_only_changed: ^.*\.(md|adoc)$|^LICENSE$|^\.github/workflows/
   steps:
     dependencies:
-      COMPONENT_IMAGE: fulfillment-service-pr
+      COMPONENT_IMAGE: fulfillment-service
       OSAC_INSTALLER_IMAGE: osac-installer-with-pr
       OSAC_TEST_IMAGE: osac-test-infra
     env:
