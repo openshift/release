@@ -93,18 +93,18 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: ols-evaluation-periodics
+- as: lseval-periodic-rhoai
   cluster_claim:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-      variant: fips
+      region: us-east-2
+      variant: gpu
     owner: obs
     product: ocp
-    timeout: 1h0m0s
+    timeout: 3h0m0s
     version: "4.20"
-  cron: 10 8 * * *
+  cron: 10 8 * * 0
   steps:
     allow_skip_on_success: true
     post:
@@ -113,24 +113,21 @@ tests:
     - as: e2e
       cli: latest
       commands: |
-        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
         export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
-        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+        export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/token)
+        export VLLM_API_KEY=$(cat /var/run/vllm/token)
+        export RHOAI_PROVISION=true
 
-        tests/scripts/test-evaluation.sh
+        tests/scripts/test-lseval-periodic.sh
       credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
       - mount_path: /var/run/openai
         name: openai-apitoken
         namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
+      - mount_path: /var/run/huggingface
+        name: hugging-face-token
         namespace: test-credentials
-      - mount_path: /var/run/vertex
-        name: vertex-apitoken
+      - mount_path: /var/run/vllm
+        name: vllm-apikey
         namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
