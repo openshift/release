@@ -19,22 +19,36 @@ resources:
 tests:
 - as: capz-e2e
   steps:
-    cluster_profile: openshift-org-azure
+    allow_best_effort_post_steps: true
     env:
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
       DEPLOY_CHARTS: "true"
-      SIZE_VARIANT: compact
+      LOCATION: uksouth
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: prod
       WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-prod-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
     post:
-    - ref: capz-test-summary
-    - chain: ipi-azure-post
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-cleanup-msi-roleassignments
+    - ref: capz-arohcp-aks-deprovision
     pre:
-    - chain: ipi-azure-pre
-    - ref: capz-test-check-dependencies
-    - ref: capz-test-setup
+    - ref: capz-arohcp-write-env
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
     test:
-    - ref: capz-test-management-cluster
-    - ref: capz-test-generate-yamls
-    workflow: openshift-e2e-azure
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
   timeout: 4h0m0s
 zz_generated_metadata:
   branch: configure-prow-mgmt
