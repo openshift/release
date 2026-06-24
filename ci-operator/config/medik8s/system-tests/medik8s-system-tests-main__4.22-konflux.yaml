@@ -343,6 +343,48 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: e2e-sbr-weekly-aws-efs
+  capabilities:
+  - intranet
+  cron: 0 16 * * 0
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      ECO_TC_PREFIX: OCP-
+      ECO_TEST_FEATURES: sbr-operator
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      POLARION_TESTRUN_ID: RHWA-SBR-4.22-weekly-efs
+      REPORT_CASE_TAG: polarion-testcase-id
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+    post:
+    - ref: medik8s-polarion-reporter
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - chain: ipi-aws-post
+    test:
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: storage-create-csi-aws-efs-sts-operator-role
+    - ref: storage-subscribe-aws-efs-csi-driver
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TC_PREFIX
+      - name: ECO_TEST_FEATURES
+      - name: REPORT_CASE_TAG
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-nhc-weekly-aws
   capabilities:
   - intranet
