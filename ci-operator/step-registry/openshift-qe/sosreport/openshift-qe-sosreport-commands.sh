@@ -46,7 +46,6 @@ SOS_COLLECT_ALL_NODES=${SOS_COLLECT_ALL_NODES:-"false"}
 SOS_PLUGIN_FILTER=${SOS_PLUGIN_FILTER:-"ovs,openvswitch,ovn,networking,process,systemd,cgroups"}
 
 # Create output directory
-  pod_name="sosreport-${node_name}-$(date +%s)"
 mkdir -p "${SOS_REPORT_DIR}"
 
 echo "Configuration:"
