@@ -343,6 +343,32 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: e2e-nhc-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 14 * * 0
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: nhc-operator
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: node-healthcheck-operator
+    test:
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
