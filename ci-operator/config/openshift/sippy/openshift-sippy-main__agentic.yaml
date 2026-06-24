@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -13,6 +17,7 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM claude-ai-helpers AS ai-helpers
       FROM nested-podman AS podman
       FROM src AS source
       FROM sippy-devcontainer
@@ -26,6 +31,10 @@ images:
           chmod +rx /entrypoint.sh
       COPY --from=source /go/src/github.com/openshift/sippy /workspace
       RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
+      COPY --from=ai-helpers /opt/ai-helpers /opt/ai-helpers
+      RUN mkdir -p /home/vscode/.claude/plugins
+      COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
+      RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
       ENV BUILDAH_ISOLATION=chroot
       USER vscode
       WORKDIR /workspace
@@ -33,6 +42,9 @@ images:
       CMD ["bash"]
     from: sippy-devcontainer
     inputs:
+      claude-ai-helpers:
+        as:
+        - claude-ai-helpers
       nested-podman:
         as:
         - nested-podman
