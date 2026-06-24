@@ -86,6 +86,13 @@ image_type: "minimal-iso"
 reset_idrac: $RESET_IDRAC
 EOF
 
+# Append HOST PREFIX if set
+if [[ -n "${HOST_PREFIX}" ]]; then
+  cat <<EOF >>/tmp/all.yml
+cluster_network_host_prefix: [${HOST_PREFIX}]
+EOF
+fi
+
 # Append ocp_inventory_override if enabled
 if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
    OCP_INVENTORY_PATH=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
