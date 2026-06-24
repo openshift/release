@@ -29,6 +29,6 @@ echo "TARGET_SPOKE_VERSION=${TARGET_SPOKE_VERSION}"
 cd /eco-ci-cd
 
 echo "Mirroring OCP ${TARGET_SPOKE_VERSION} to target hub disconnected registry"
-ansible-playbook ./playbooks/ran/prepare-ocp-release.yml \
+ansible-playbook ./playbooks/ran/ibu-prepare-ocp-release.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --extra-vars "release=${TARGET_SPOKE_VERSION} kubeconfig=${KUBECONFIG_PATH}"
