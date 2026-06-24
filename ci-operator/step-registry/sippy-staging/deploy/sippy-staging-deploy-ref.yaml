@@ -1,28 +1,18 @@
 ref:
   as: sippy-staging-deploy
-  cli: latest
-  from: cli
+  from: sippy-staging-dev
   commands: sippy-staging-deploy-commands.sh
-  timeout: 30m
+  timeout: 2h0m0s
   resources:
     requests:
-      cpu: 100m
-      memory: 200Mi
-  credentials:
-  - namespace: test-credentials
-    name: registry-pull-credentials
-    mount_path: /var/run/registry-pull-credentials-all
+      cpu: "2"
+      memory: 4Gi
   env:
-  - name: DOCKERCONFIGJSON
-    default: "/var/run/registry-pull-credentials-all/.dockerconfigjson"
-    documentation: Path to Docker config for image pull credentials.
-  - name: STAGING_IMAGE
-    default: ""
-    documentation: Image reference for the sippy staging pod (devcontainer + binary).
-  dependencies:
-  - name: "pipeline:sippy-staging-dev"
-    env: STAGING_IMAGE
+  - name: STAGING_TIMEOUT
+    default: "3600"
+    documentation: How long (in seconds) to keep the staging environment alive.
   documentation: |-
-    Deploy a sippy staging environment on the claimed cluster.
-    Deploys postgres, redis, and the sippy devcontainer with seed data.
-    Exposes sippy via an HTTPS route and prints the public URL.
+    Deploy a sippy staging environment inside the CI build pod using nested-podman.
+    Runs hack/agentic_setup.sh to start postgres/redis, build sippy, and seed the
+    database with synthetic data. Starts the sippy server and exposes it via a
+    cloudflared tunnel with a public HTTPS URL.
