@@ -235,6 +235,8 @@ if [ "$local_gateway_mode" = "true" ]; then
         fi
         sleep 10
       done
+      echo "Waiting for all nodes to be Ready after MCO rollout..."
+      oc wait node --all --for condition=Ready --timeout=10m
     fi
 fi
 
