@@ -1,7 +1,9 @@
 #!/bin/bash
 
 set -o nounset
+set -o errexit
 set -o pipefail
+set -o xtrace
 
 artifact_dir="${ARTIFACT_DIR}"
 if [ -n "${FIREWATCH_GRANULAR_ARTIFACT_SUBDIR:-}" ]; then
@@ -14,11 +16,10 @@ echo "Running firewatch-granular-analysis..."
 echo "  Artifact dir: ${artifact_dir}"
 echo "  Output dir: ${output_dir}"
 
+exit_code=0
 firewatch-granular analyze \
     --artifact-dir "${artifact_dir}" \
-    --output-dir "${output_dir}"
-
-exit_code=$?
+    --output-dir "${output_dir}" || exit_code=$?
 
 if [ -f "${output_dir}/firewatch-additional-labels" ]; then
     echo "Labels written:"
