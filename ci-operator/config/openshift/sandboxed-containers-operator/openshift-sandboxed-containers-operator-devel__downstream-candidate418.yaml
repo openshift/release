@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
   tests-private:
     name: tests-private
     namespace: ci
@@ -21,6 +25,18 @@ images:
           https://github.com/confidential-devhub/charts /charts && \
           rm -rf /charts/.git
     to: trustee-charts
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      USER root
+      RUN dnf install -y tar gzip jq skopeo git && dnf clean all
+      RUN curl -sL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz && \
+          mv linux-amd64/helm /usr/local/bin/helm && \
+          rm -rf linux-amd64 && \
+          chmod +x /usr/local/bin/helm && \
+          helm version
+      USER 1000
+    from: cli
+    to: tools-with-helm
 prowgen:
   disable_sparse_checkout: true
 releases:
@@ -143,7 +159,6 @@ tests:
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
-      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
       TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
@@ -224,7 +239,6 @@ tests:
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
-      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
       TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
@@ -301,7 +315,6 @@ tests:
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
-      TRUSTEE_CATALOG_SOURCE_NAME: trustee-catalog
       TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco

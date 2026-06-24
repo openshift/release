@@ -13,8 +13,9 @@
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
 #   TRUSTEE_NAMESPACE             - Namespace for operator (default: trustee-operator-system)
-#   TRUSTEE_CATALOG_SOURCE_NAME   - CatalogSource name (default: redhat-operators)
 #   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
+#                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
+#                                   in the helm chart and cannot be overridden
 #   IMAGE_TRUSTEE_CHARTS          - Pre-built charts image (set by ci-operator, recommended)
 #   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: https://github.com/confidential-devhub/charts)
 #   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
@@ -39,7 +40,6 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
-TRUSTEE_CATALOG_SOURCE_NAME=${TRUSTEE_CATALOG_SOURCE_NAME:-redhat-operators}
 TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
 TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts}
 TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
@@ -60,9 +60,9 @@ fi
 # Show configuration
 echo ">>> Trustee charts: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
-  echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
+  echo ">>> Trustee catalog source: trustee-operator-dev-catalog (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
-  echo ">>> Trustee catalog source: ${TRUSTEE_CATALOG_SOURCE_NAME} (using existing catalog)"
+  echo ">>> Trustee catalog source: redhat-operators (using existing catalog)"
 fi
 
 #========================================
@@ -241,12 +241,17 @@ function render_trustee_operator_chart() {
   # Add catalog source configuration if custom image provided
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=(
+      "--set" "dev.enabled=true"
       "--set" "dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}"
-      "--set" "catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}"
     )
-    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}, catalogSource.name=${TRUSTEE_CATALOG_SOURCE_NAME}" >&2
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.enabled=true, dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}" >&2
+    echo ">>> Note: CatalogSource name is hardcoded to 'trustee-operator-dev-catalog' in helm chart" >&2
   else
-    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}" >&2
+    helm_args+=(
+      "--set" "dev.enabled=false"
+    )
+    echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.enabled=false" >&2
+    echo ">>> Note: Using existing 'redhat-operators' CatalogSource" >&2
   fi
 
   # Render the chart and capture output for debugging
@@ -305,8 +310,8 @@ function install_trustee_operator() {
     return 1
   fi
 
-  echo ">>> Rendered operator YAML (first 30 lines):"
-  head -30 "${operator_yaml}"
+  echo ">>> Rendered operator YAML:"
+  cat "${operator_yaml}"
   echo ">>> Total YAML lines: $(wc -l < "${operator_yaml}")"
 
   # Apply operator chart
@@ -374,13 +379,14 @@ function wait_for_operator() {
   # Stage 1: Wait for Trustee CatalogSource to be READY (60s)
   # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
-    # Find the actual CatalogSource name that was created (helm chart creates trustee-operator-dev-catalog)
+    # Helm chart hardcodes the CatalogSource name to trustee-operator-dev-catalog
+    # Auto-discover in case the helm chart changes this in the future
     local actual_catalog_name
     actual_catalog_name=$(oc get catalogsource -n openshift-marketplace -l olm.catalogSource!=redhat-operators -o name 2>/dev/null | grep -i trustee | head -1 | cut -d/ -f2 || echo "")
 
     if [[ -z "$actual_catalog_name" ]]; then
-      # Fallback: try the name from env var
-      actual_catalog_name="${TRUSTEE_CATALOG_SOURCE_NAME}"
+      # Fallback: use the hardcoded name from the helm chart
+      actual_catalog_name="trustee-operator-dev-catalog"
     fi
 
     if ! wait_until "Trustee CatalogSource ${actual_catalog_name} READY" 60 5 \
@@ -394,7 +400,7 @@ function wait_for_operator() {
       return 1
     fi
   else
-    echo ">>> Using existing CatalogSource ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    echo ">>> Using existing CatalogSource redhat-operators"
   fi
 
   # Stage 2: Wait for Subscription to reference an InstallPlan (300s)
@@ -739,8 +745,8 @@ EOF
 # Update osc-config ConfigMap with Trustee URL and INITDATA
 function update_env_configmap() {
   if ! oc get configmap osc-config -n default &>/dev/null; then
-    echo ">>> WARN: osc-config ConfigMap not found (normal if env-cm step hasn't run yet)"
-    return 0
+    echo ">>> WARN: osc-config ConfigMap not found normal if env-cm step hasn't run yet)"
+    exit 1
   fi
 
   oc patch configmap osc-config -n default --type=json -p="[
