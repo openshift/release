@@ -1,0 +1,30 @@
+ref:
+  as: aro-hcp-deprovision-grafana-datasources
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-deprovision-grafana-datasources-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: GRAFANA_RESOURCE_GROUP
+    default: "global"
+    documentation: |-
+      Azure resource group containing the Managed Grafana instance.
+  - name: GRAFANA_NAME
+    default: "arohcp-dev"
+    documentation: |-
+      Name of the Azure Managed Grafana instance to clean.
+  documentation: |-
+    Remove orphaned Prometheus datasources from an Azure Managed Grafana instance.
+    Runs grafanactl clean datasources (removes stale AMW integrations from the
+    Grafana resource) followed by grafanactl clean fixup-datasources (deletes
+    Managed_Prometheus_* datasources not backed by a live Azure Monitor Workspace).
