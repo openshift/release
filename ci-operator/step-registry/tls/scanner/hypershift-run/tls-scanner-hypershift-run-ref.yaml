@@ -1,0 +1,70 @@
+ref:
+  as: tls-scanner-hypershift-run
+  from: cli
+  cli: latest
+  commands: tls-scanner-hypershift-run-commands.sh
+  env:
+  - name: TLS_SCANNER_RUN_HYPERSHIFT
+    default: "true"
+    documentation: |-
+      When true, run TLS scans against both HyperShift management and guest
+      clusters in a single step.
+  - name: SCAN_NAMESPACE
+    default: ""
+    documentation: "Comma-separated list of namespaces to scan. Empty means scan all namespaces."
+  - name: PQC_CHECK
+    default: "false"
+    documentation: "Set to 'true' to check post-quantum cryptography readiness (scanner will only check TLS 1.3 and mlkem/mlkem25519 support)."
+  - name: SCAN_LIMIT_IPS
+    default: ""
+    documentation: "Max IPs to scan (empty/0 = no limit). Bounds actual TLS scans after full endpoint discovery."
+  - name: SCANNER_CPU
+    default: "4"
+    documentation: "CPU request/limit for the scanner pod on the management cluster."
+  - name: SCANNER_MEMORY
+    default: "4Gi"
+    documentation: "Memory request/limit for the scanner pod on the management cluster."
+  - name: SCANNER_CPU_GUEST
+    default: "1"
+    documentation: |-
+      CPU request/limit for the scanner pod on the guest cluster. Defaults to 1
+      because HyperShift guest workers (e.g. m5.xlarge) cannot schedule a 4 CPU
+      Guaranteed pod.
+  - name: SCANNER_MEMORY_GUEST
+    default: "2Gi"
+    documentation: "Memory request/limit for the scanner pod on the guest cluster."
+  - name: TLS_PROFILE_TYPE
+    default: "Modern"
+    documentation: |-
+      Expected TLS profile for compliance checks on HyperShift clusters. The
+      hosted cluster APIServer CR and shared management cluster APIServer CR do
+      not reflect the HostedCluster Modern TLS configuration, so the scanner
+      uses this value instead of querying the API.
+  dependencies:
+  - env: RELEASE_IMAGE_LATEST
+    name: release:latest
+  - env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+    name: release:latest
+  - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    name: release:latest
+  - env: PULL_SPEC_TLS_SCANNER_TOOL
+    name: tls-scanner-tool
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 8h0m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs the TLS scanner against both HyperShift clusters.
+
+    HyperShift jobs involve two distinct clusters:
+    - management: shared cluster hosting the hosted control plane pods
+      (kube-apiserver, etcd, oauth-openshift in clusters-<name>)
+    - guest: the hosted cluster with worker nodes and no in-cluster control plane
+
+    Each scan writes artifacts under tls-scanner/<label>/ and publishes separate
+    JUnit files (junit_tls_scan_management.xml and junit_tls_scan_guest.xml).
+
+    TLS_PROFILE_TYPE defaults to Modern because HyperShift does not mirror the
+    effective TLS profile into APIServer/cluster on the guest or management cluster.
