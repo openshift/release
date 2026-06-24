@@ -68,23 +68,37 @@ if [[ -z "${QUAY_DEPLOY}" ]]; then
 fi
 echo "Found quay-app deployment: ${QUAY_DEPLOY}"
 
-# Create pull secret for CI registry so ROSA/external clusters can pull CI-built images
-echo "Creating CI registry pull secret..."
+# Add CI build-cluster registry credentials so ROSA/external clusters can
+# pull CI-built images.  Pattern from rosa-operator-install and
+# openshift-observability/inject-ci-registry-auth.
+echo "Injecting CI registry credentials..."
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 CI_REGISTRY_AUTH=$(mktemp)
-if env -u KUBECONFIG oc registry login --to="${CI_REGISTRY_AUTH}" 2>/dev/null && [[ -s "${CI_REGISTRY_AUTH}" ]]; then
-  oc -n "${NAMESPACE}" create secret generic ci-registry-pull-secret \
-    --from-file=.dockerconfigjson="${CI_REGISTRY_AUTH}" \
-    --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml | oc apply -f -
-  # Link to all service accounts that may pull CI images — the quay-app pods
-  # use a dedicated SA created by the operator (e.g. quay-quay-app)
+KUBECONFIG="" oc registry login --to="${CI_REGISTRY_AUTH}" 2>/dev/null || true
+if [[ -s "${CI_REGISTRY_AUTH}" ]]; then
+  echo "CI registry auth obtained, merging into cluster pull secret..."
+
+  # 1) Merge into global pull secret so nodes can pull the image
+  CURRENT_PS=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+  MERGED_PS=$(echo "${CURRENT_PS}" | jq -s '.[0] * .[1]' - "${CI_REGISTRY_AUTH}")
+  echo "${MERGED_PS}" > /tmp/merged-pull-secret.json
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+  echo "Global pull secret updated"
+
+  # 2) Also create a namespace-level pull secret for immediate use (global
+  #    pull secret propagation to nodes can take a few minutes on ROSA HCP)
+  oc -n "${NAMESPACE}" create secret docker-registry ci-registry-pull-secret \
+    --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
+    --dry-run=client -o yaml | oc apply -f -
   for sa in default deployer $(oc -n "${NAMESPACE}" get sa -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -i quay); do
     oc -n "${NAMESPACE}" secrets link "${sa}" ci-registry-pull-secret --for=pull 2>/dev/null || true
   done
-  echo "CI registry pull secret configured"
+  echo "Namespace pull secret configured"
+
+  rm -f /tmp/merged-pull-secret.json
 else
-  echo "WARNING: Could not obtain CI registry token, image pull may fail on external clusters" >&2
+  echo "WARNING: Could not obtain CI registry credentials — image pull may fail on external clusters" >&2
 fi
 rm -f "${CI_REGISTRY_AUTH}"
 $WAS_TRACING && set -x
