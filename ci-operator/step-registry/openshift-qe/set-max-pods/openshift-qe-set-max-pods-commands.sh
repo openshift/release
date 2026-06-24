@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-MAX_PODS="${MAX_PODS:-250}"
 
 if [[ $TYPE == "sno" ]]; then
   MCP_NAME=$(oc get mcp -l pools.operator.machineconfiguration.openshift.io/master= -o jsonpath='{.items[*].metadata.name}')
