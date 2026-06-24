@@ -12,8 +12,13 @@ oc config view
 oc projects
 
 # Create the performance profile setup
+if [[ $TYPE == "sno" ]]; then
+  MCP_NAME="master"
+else
+  MCP_NAME="worker"
+fi
 
-oc patch --type=merge --patch='{"spec":{"maxUnavailable":"100%"}}' machineconfigpool/worker
+oc patch --type=merge --patch='{"spec":{"maxUnavailable":"100%"}}' machineconfigpool/${MCP_NAME}
 
 cat << EOF| oc apply -f -
 apiVersion: performance.openshift.io/v2
@@ -34,9 +39,9 @@ spec:
     - count: ${HUGEPAGES_COUNT}
       size: 1G
   machineConfigPoolSelector:
-    pools.operator.machineconfiguration.openshift.io/worker: ''
+    pools.operator.machineconfiguration.openshift.io/${MCP_NAME}: ''
   nodeSelector:
-    node-role.kubernetes.io/worker: ""
+    node-role.kubernetes.io/${MCP_NAME}: ""
   workloadHints:
     realTime: false
     highPowerConsumption: false
@@ -53,5 +58,5 @@ EOF
 # Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount
 sleep 300
 
-kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
+kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
