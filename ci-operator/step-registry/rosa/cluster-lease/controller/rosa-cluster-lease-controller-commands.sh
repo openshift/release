@@ -48,6 +48,21 @@ else
     exit 1
 fi
 
+CURRENT_OCM_ENV="${OCM_LOGIN_ENV}"
+
+ocm_ensure_env() {
+    local target_env="$1"
+    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
+        return 0
+    fi
+    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        ocm login --url "${target_env}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    elif [[ -n "${OCM_TOKEN}" ]]; then
+        ocm login --url "${target_env}" --token "${OCM_TOKEN}"
+    fi
+    CURRENT_OCM_ENV="${target_env}"
+}
+
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
@@ -67,15 +82,26 @@ if [[ -z "${DESIRED_CM}" ]]; then
     exit 1
 fi
 
-DESIRED_YAML=$(echo "${DESIRED_CM}" | jq -r '.data["desired-clusters"]')
-DESIRED_NAMES=$(echo "${DESIRED_YAML}" | python3 -c "
+if ! DESIRED_YAML=$(echo "${DESIRED_CM}" | jq -er '.data["desired-clusters"]'); then
+    log "ERROR: desired-clusters key missing from rosa-cluster-lease-config"
+    exit 1
+fi
+
+if ! DESIRED_NAMES=$(echo "${DESIRED_YAML}" | python3 -c "
 import sys, yaml, json
 clusters = yaml.safe_load(sys.stdin.read()) or []
 for c in clusters:
     print(json.dumps(c))
-" 2>/dev/null || true)
+"); then
+    log "ERROR: Failed to parse desired-clusters YAML"
+    exit 1
+fi
 
 DESIRED_COUNT=$(echo "${DESIRED_NAMES}" | grep -c '{' || echo "0")
+if [[ "${DESIRED_COUNT}" -eq 0 ]]; then
+    log "ERROR: desired-clusters is empty, refusing to reconcile (would decommission all clusters)"
+    exit 1
+fi
 log "Desired clusters: ${DESIRED_COUNT}"
 
 # ---------------------------------------------------------------
@@ -86,13 +112,6 @@ log "Phase 2: Reading actual state"
 ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 log "Actual clusters: ${ACTUAL_COUNT}"
-
-# Build a map of actual cluster names
-declare -A ACTUAL_MAP
-for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
-    NAME=$(echo "${ACTUAL_CMS}" | jq -r ".items[${i}].metadata.name")
-    ACTUAL_MAP["${NAME}"]=1
-done
 
 # ---------------------------------------------------------------
 # Phase 3: Provision missing clusters
@@ -125,13 +144,7 @@ echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
     fi
 
     # Log in to the right OCM environment for this cluster
-    if [[ "${ENV}" != "${OCM_LOGIN_ENV}" ]]; then
-        if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-            ocm login --url "${ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-        elif [[ -n "${OCM_TOKEN}" ]]; then
-            ocm login --url "${ENV}" --token "${OCM_TOKEN}"
-        fi
-    fi
+    ocm_ensure_env "${ENV}"
 
     # Resolve latest version
     FULL_VERSION=$(rosa list versions --channel-group "${CHANNEL}" -o json 2>/dev/null \
@@ -180,6 +193,35 @@ echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
         --tags "rosa-cluster-lease:true,lease-managed:true" \
         || { log "ERROR: Failed to create cluster ${NAME}"; continue; }
 
+    # Get cluster ID immediately after create
+    CLUSTER_JSON_EARLY=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null || true)
+    CLUSTER_ID=$(echo "${CLUSTER_JSON_EARLY}" | jq -r '.id // empty')
+
+    if [[ -n "${CLUSTER_ID}" ]]; then
+        # Register early so the controller can track it
+        cat <<EARLY_EOF | lease_oc apply -n "${LEASE_NAMESPACE}" -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${NAME}
+  namespace: ${LEASE_NAMESPACE}
+  labels:
+    rosa-cluster-lease/managed: "true"
+    rosa-cluster-lease/type: ${TYPE}
+    rosa-cluster-lease/env: ${ENV}
+    rosa-cluster-lease/region: ${REGION}
+    rosa-cluster-lease/version: "${VERSION}"
+    rosa-cluster-lease/status: provisioning
+  annotations:
+    rosa-cluster-lease/registered-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+data:
+  cluster-id: "${CLUSTER_ID}"
+  cluster-name: "${NAME}"
+  region: "${REGION}"
+  ocm-env: "${ENV}"
+EARLY_EOF
+    fi
+
     # Wait for cluster to be ready (up to 60 min)
     log "Waiting for ${NAME} to be ready..."
     for attempt in $(seq 1 60); do
@@ -207,34 +249,23 @@ echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
     ACTUAL_VERSION=$(echo "${CLUSTER_JSON}" | jq -r '.openshift_version')
     VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
 
-    # Register in lease inventory
-    cat <<EOF | lease_oc apply -n "${LEASE_NAMESPACE}" -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ${NAME}
-  namespace: ${LEASE_NAMESPACE}
-  labels:
-    rosa-cluster-lease/managed: "true"
-    rosa-cluster-lease/type: ${TYPE}
-    rosa-cluster-lease/env: ${ENV}
-    rosa-cluster-lease/region: ${REGION}
-    rosa-cluster-lease/version: "${VERSION_LABEL}"
-    rosa-cluster-lease/status: available
-  annotations:
-    rosa-cluster-lease/holder: ""
-    rosa-cluster-lease/build-id: ""
-    rosa-cluster-lease/acquired-at: ""
-    rosa-cluster-lease/released-at: ""
-    rosa-cluster-lease/registered-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-data:
-  cluster-id: "${CLUSTER_ID}"
-  cluster-name: "${NAME}"
-  api-url: "${API_URL}"
-  region: "${REGION}"
-  version: "${ACTUAL_VERSION}"
-  ocm-env: "${ENV}"
-EOF
+    # Update the early-registered ConfigMap to available with full details
+    lease_oc patch configmap "${NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+        "metadata": {
+            "labels": { "rosa-cluster-lease/version": "'"${VERSION_LABEL}"'", "rosa-cluster-lease/status": "available" },
+            "annotations": {
+                "rosa-cluster-lease/holder": "",
+                "rosa-cluster-lease/build-id": "",
+                "rosa-cluster-lease/acquired-at": "",
+                "rosa-cluster-lease/released-at": ""
+            }
+        },
+        "data": {
+            "cluster-id": "'"${CLUSTER_ID}"'",
+            "api-url": "'"${API_URL}"'",
+            "version": "'"${ACTUAL_VERSION}"'"
+        }
+    }' || true
 
     log "Registered ${NAME} (${CLUSTER_ID}) in lease inventory"
 done
@@ -291,20 +322,40 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     fi
 
     # Skip health checks for in-use clusters
-    if [[ "${STATUS}" == "in-use" || "${STATUS}" == "maintenance" ]]; then
+    if [[ "${STATUS}" == "in-use" ]]; then
+        HEALTHY=$((HEALTHY + 1))
+        continue
+    fi
+
+    # Check if maintenance (upgrade) has completed
+    if [[ "${STATUS}" == "maintenance" ]]; then
+        UPGRADE_TARGET=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/upgrade-target"] // ""')
+        CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
+        ocm_ensure_env "${CLUSTER_OCM_ENV}"
+        OCM_STATUS=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        CURRENT_VERSION=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.openshift_version // ""' 2>/dev/null || true)
+
+        if [[ "${OCM_STATUS}" == "ready" && -n "${UPGRADE_TARGET}" && "${CURRENT_VERSION}" == "${UPGRADE_TARGET}" ]]; then
+            log "UPGRADE COMPLETE: ${CM_NAME} upgraded to ${CURRENT_VERSION}"
+            VERSION_LABEL=$(echo "${CURRENT_VERSION}" | cut -d. -f1,2)
+            if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
+                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    "metadata": {
+                        "labels": { "rosa-cluster-lease/status": "available", "rosa-cluster-lease/version": "'"${VERSION_LABEL}"'" },
+                        "annotations": { "rosa-cluster-lease/upgrade-target": "" }
+                    },
+                    "data": { "version": "'"${CURRENT_VERSION}"'" }
+                }' || true
+            fi
+            echo "UPGRADE COMPLETE: ${CM_NAME} -> ${CURRENT_VERSION}" >> "${REPORT}"
+        fi
         HEALTHY=$((HEALTHY + 1))
         continue
     fi
 
     # Check OCM cluster status
     CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
-    if [[ "${CLUSTER_OCM_ENV}" != "${OCM_LOGIN_ENV}" ]]; then
-        if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-            ocm login --url "${CLUSTER_OCM_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-        elif [[ -n "${OCM_TOKEN}" ]]; then
-            ocm login --url "${CLUSTER_OCM_ENV}" --token "${OCM_TOKEN}"
-        fi
-    fi
+    ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
     OCM_STATUS=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unreachable")
 
@@ -375,11 +426,7 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
 
     # Delete the ROSA cluster
     CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
-    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-    elif [[ -n "${OCM_TOKEN}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --token "${OCM_TOKEN}"
-    fi
+    ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
     rosa delete cluster -c "${CLUSTER_ID}" -y 2>/dev/null || true
 
@@ -429,14 +476,11 @@ echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
 
     # Resolve target version
     CLUSTER_OCM_ENV=$(echo "${ACTUAL_CM}" | jq -r '.data["ocm-env"] // "staging"')
-    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-    elif [[ -n "${OCM_TOKEN}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --token "${OCM_TOKEN}"
-    fi
+    ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
     TARGET_VERSION=$(rosa list upgrades -c "${CLUSTER_ID}" -o json 2>/dev/null \
-        | jq -r '.[] | select(.recommended == true) | .version' 2>/dev/null \
+        | jq -r --arg desired "${DESIRED_VERSION}" \
+          '.[] | select(.version | startswith($desired)) | .version' 2>/dev/null \
         | sort -V | tail -n1 || true)
 
     if [[ -z "${TARGET_VERSION}" ]]; then
@@ -475,14 +519,6 @@ done
 # ---------------------------------------------------------------
 log "Phase 7: Checking for clusters to decommission"
 
-# Build set of desired names
-declare -A DESIRED_NAME_SET
-echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
-    [[ -z "${cluster_json}" ]] && continue
-    NAME=$(echo "${cluster_json}" | jq -r '.name')
-    DESIRED_NAME_SET["${NAME}"]=1
-done 2>/dev/null || true
-
 ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 
@@ -511,11 +547,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     fi
 
     CLUSTER_OCM_ENV=$(echo "${ACTUAL_CMS}" | jq -r ".items[${i}].data[\"ocm-env\"] // \"staging\"")
-    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-    elif [[ -n "${OCM_TOKEN}" ]]; then
-        ocm login --url "${CLUSTER_OCM_ENV}" --token "${OCM_TOKEN}"
-    fi
+    ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
     rosa delete cluster -c "${CLUSTER_ID}" -y 2>/dev/null || true
     rosa delete operator-roles -c "${CLUSTER_ID}" -y --mode auto 2>/dev/null || true

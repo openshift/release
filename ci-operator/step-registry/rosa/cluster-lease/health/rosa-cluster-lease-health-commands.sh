@@ -111,7 +111,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
             lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                 "metadata": {
                     "labels": { "rosa-cluster-lease/status": "error" },
-                    "annotations": { "rosa-cluster-lease/error-reason": "OCM status: '"${OCM_STATUS}"'" }
+                    "annotations": { "rosa-cluster-lease/error-reason": "OCM status: '"${OCM_STATUS}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
             }' || true
         fi
@@ -128,7 +128,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
                 lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                     "metadata": {
                         "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "Backplane kubeconfig missing" }
+                        "annotations": { "rosa-cluster-lease/error-reason": "Backplane kubeconfig missing", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                     }
                 }' || true
             fi
@@ -143,7 +143,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
                 lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                     "metadata": {
                         "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "Node query failed" }
+                        "annotations": { "rosa-cluster-lease/error-reason": "Node query failed", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                     }
                 }' || true
             fi
@@ -163,7 +163,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
                 lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                     "metadata": {
                         "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "No ready nodes" }
+                        "annotations": { "rosa-cluster-lease/error-reason": "No ready nodes", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                     }
                 }' || true
             fi
@@ -178,7 +178,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
             lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                 "metadata": {
                     "labels": { "rosa-cluster-lease/status": "error" },
-                    "annotations": { "rosa-cluster-lease/error-reason": "Backplane login failed" }
+                    "annotations": { "rosa-cluster-lease/error-reason": "Backplane login failed", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
             }' || true
         fi
@@ -191,7 +191,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
         lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
             "metadata": {
                 "labels": { "rosa-cluster-lease/status": "available" },
-                "annotations": { "rosa-cluster-lease/error-reason": "" }
+                "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
             }
         }' || true
         echo "  RESTORED to available" >> "${REPORT}"

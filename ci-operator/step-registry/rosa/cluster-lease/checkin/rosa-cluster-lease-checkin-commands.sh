@@ -34,6 +34,15 @@ lease_oc() {
 }
 
 RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+JOB_NAME="${JOB_NAME:-unknown-job}"
+BUILD_ID="${BUILD_ID:-unknown-build}"
+
+# Verify we still hold this lease before releasing
+CURRENT_HOLDER=$(lease_oc get configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" -o json 2>/dev/null | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
+if [[ -n "${CURRENT_HOLDER}" && "${CURRENT_HOLDER}" != "${JOB_NAME}" ]]; then
+    log "WARNING: Lease ${CM_NAME} is held by ${CURRENT_HOLDER}, not us (${JOB_NAME}). Skipping checkin."
+    exit 0
+fi
 
 log "Checking in lease cluster: ${CM_NAME}"
 
