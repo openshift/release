@@ -20,7 +20,7 @@ fetch_with_backoff() {
     while true; do
         attempt=$((attempt + 1))
         # Use --write-out to capture HTTP status code separately
-        http_code=$(curl -sf -w '%{http_code}' -o "${tmpfile}" "$@" "${url}" 2>/dev/null) || http_code="${http_code:-000}"
+        http_code=$(curl --connect-timeout 30 --max-time 120 -sf -w '%{http_code}' -o "${tmpfile}" "$@" "${url}" 2>/dev/null) || http_code="${http_code:-000}"
 
         if [[ "${http_code}" =~ ^2[0-9][0-9]$ ]]; then
             cat "${tmpfile}"
@@ -263,9 +263,9 @@ echo ""
 
 while true; do
     POLL_COUNT=$((POLL_COUNT + 1))
-    RELEASE_JSON=$(fetch_with_backoff "${API_URL}" || true)
+    RELEASE_JSON=$(curl -sf "${API_URL}" || true)
     if [[ -z "${RELEASE_JSON}" ]]; then
-        echo "  Warning: Failed to fetch release API after retries. Retrying next poll..."
+        echo "  Warning: Failed to fetch release API. Retrying next poll..."
         sleep ${POLL_INTERVAL}
         ELAPSED=$((ELAPSED + POLL_INTERVAL))
         continue
