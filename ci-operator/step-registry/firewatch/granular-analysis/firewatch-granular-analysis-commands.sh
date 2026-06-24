@@ -1,7 +1,9 @@
 #!/bin/bash
 
 set -o nounset
+set -o errexit
 set -o pipefail
+set -o xtrace
 
 artifact_dir="${ARTIFACT_DIR}"
 if [ -n "${FIREWATCH_GRANULAR_ARTIFACT_SUBDIR:-}" ]; then
@@ -20,7 +22,8 @@ if [ ${#xml_files[@]} -eq 0 ]; then
     exit 0
 fi
 
-python3 << 'EXTRACT_LABELS'
+exit_code=0
+python3 << 'EXTRACT_LABELS' || exit_code=$?
 import json
 import os
 import re
@@ -122,8 +125,6 @@ with open(json_path, "w") as f:
 print(f"Extracted {failure_count} failure(s), {len(operator_list)} operator(s), "
       f"{len(component_list)} component(s), {len(location_list)} location(s)")
 EXTRACT_LABELS
-
-exit_code=$?
 
 if [ -f "${labels_file}" ]; then
     echo "Labels written to ${labels_file}:"
