@@ -28,18 +28,28 @@ target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir
 
 echo "${TARGET_VM_NAME}" > "${SHARED_DIR}/target_vm_name"
 
-# lifecycle-agent presubmits: export Prow git coordinates for ib-orchestrate-vm.
-# Other repos sharing this workflow leave these empty (ib-orchestrate-vm uses defaults).
-#
-#   CI_LCA_GIT_REF  = PULL_PULL_SHA  (PR head / refs/pull/<N>/head, not merge)
-#   CI_LCA_GIT_PULL = PULL_NUMBER    (fetch pull/<N>/head when SHA unreachable)
-#   LCA_GIT_BRANCH  = PULL_BASE_REF  (target branch, e.g. release-4.22)
+# Export lifecycle-agent git coordinates for ib-orchestrate-vm.
+# - lifecycle-agent presubmit: pin to the PR commit (CI_LCA_GIT_REF/PULL).
+# - openshift/release rehearsal of lifecycle-agent jobs: branch checkout only
+#   (main or release-4.x); CI_LCA_GIT_* stay empty.
+# - Other jobs: leave CI_LCA_GIT_* empty; ib-orchestrate-vm uses defaults.
 CI_LCA_GIT_REF=""
 CI_LCA_GIT_PULL=""
 if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift-kni/lifecycle-agent" ]]; then
   CI_LCA_GIT_REF="${PULL_PULL_SHA:-}"
   CI_LCA_GIT_PULL="${PULL_NUMBER:-}"
   LCA_GIT_BRANCH="${PULL_BASE_REF:-${LCA_GIT_BRANCH:-}}"
+elif [[ "${JOB_NAME}" == rehearse-* ]] && [[ "${JOB_NAME}" == *lifecycle-agent* ]]; then
+  LCA_GIT_BRANCH="$(echo "${JOB_SPEC}" | jq -r '[.extra_refs[]? | select(.org == "openshift-kni" and .repo == "lifecycle-agent") | .base_ref][0] // empty')"
+  if [[ -z "${LCA_GIT_BRANCH}" ]]; then
+    if [[ "${JOB_NAME}" =~ lifecycle-agent-release-([0-9]+\.[0-9]+) ]]; then
+      LCA_GIT_BRANCH="release-${BASH_REMATCH[1]}"
+    elif [[ "${JOB_NAME}" == *lifecycle-agent-main-* ]]; then
+      LCA_GIT_BRANCH="main"
+    else
+      LCA_GIT_BRANCH="main"
+    fi
+  fi
 fi
 
 echo "Creating upgrade script..."
