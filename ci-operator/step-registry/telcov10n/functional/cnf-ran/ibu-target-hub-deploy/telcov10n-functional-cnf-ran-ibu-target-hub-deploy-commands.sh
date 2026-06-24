@@ -80,6 +80,11 @@ find /eco-ci-cd/inventories/ocp-deployment/group_vars -maxdepth 1 -type f | whil
 done
 echo "${TARGET_CLUSTER_NAME}" > "${SHARED_DIR}/cluster_name"
 
+echo "Preserving target hub inventory with target- prefix (readable after ibu-restore-seed-inventory)"
+for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
+  [[ -f "${SHARED_DIR}/${key}" ]] && cp "${SHARED_DIR}/${key}" "${SHARED_DIR}/target-${key}"
+done
+
 echo "Getting target hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 

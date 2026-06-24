@@ -225,7 +225,7 @@ wait_for_mcp_to_update() {
     while true; do
         attempt=$((attempt+1))
 
-        if oc wait mcp --all --for condition=updated --timeout=1m; then
+        if oc wait mcp --all --for condition=updated --timeout="${poll_interval_seconds}s"; then
             echo "MCPs are updated."
             return 0
         fi
@@ -235,8 +235,7 @@ wait_for_mcp_to_update() {
             return 1
         fi
 
-        echo "Attempt ${attempt}/${max_attempts}: MCPs not yet updated, waiting ${poll_interval_seconds} seconds..."
-        sleep "${poll_interval_seconds}"
+        echo "Attempt ${attempt}/${max_attempts}: MCPs not yet updated, retrying in ${poll_interval_seconds} seconds..."
     done
 }
 

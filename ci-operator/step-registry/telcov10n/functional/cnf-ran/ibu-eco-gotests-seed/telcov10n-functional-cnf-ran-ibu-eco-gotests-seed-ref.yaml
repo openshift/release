@@ -1,0 +1,36 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-eco-gotests-seed
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-eco-gotests-seed-commands.sh
+  documentation: |-
+    Prepare IBU seed SNO, run eco-gotests seedgeneration suite, then poweroff
+    seed spoke VM.
+
+    Flow:
+    1. Retrieve seed spoke kubeconfig from hub cluster ACM
+    2. Attach container storage disk to seed SNO VM
+    3. Configure shared container storage mount on seed SNO
+    4. Run eco-gotests IBU seedgeneration test suite
+    5. Power off seed spoke VM to prepare for upgrade
+
+    This step reuses inventory and credentials from earlier workflow steps
+    (available in SHARED_DIR from hub-deploy step).
+  timeout: 90m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+  env:
+  - name: SEED_SPOKE_CLUSTER
+    default: "ibu-seed"
+    documentation: Seed spoke SNO cluster name (where seed image is generated)
+  - name: ECO_GOTESTS_FEATURES
+    default: "seedgeneration"
+    documentation: Space-separated list of eco-gotests features (IBU tests)
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Disconnected mirror registry address for seed image

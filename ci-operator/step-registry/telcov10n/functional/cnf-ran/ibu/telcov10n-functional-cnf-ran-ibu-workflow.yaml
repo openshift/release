@@ -5,7 +5,7 @@ workflow:
     Pre: deploy seed hub (kni-qe-108) and target hub (kni-qe-109) at VERSION, install operators on both,
          mirrors operators and OCP release images to target bastion's disconnected registry,
          deploy MinIO on target bastion, deploy spoke master VMs for both seed and target hubs,
-         then deploy the SNO spoke cluster on the seed hub via ZTP.
+         then deploy the SNO spoke on the seed hub and the target spoke on the target hub via ZTP.
     Test: run IBU upgrade and post-upgrade eco-gotests, report results.
     Post: notify Slack, trigger next job in chain.
   steps:
@@ -15,6 +15,8 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-hub-config
     - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
     # Target hub setup — kni-qe-109 deployed at VERSION
+    # Note: ibu-target-hub-deploy saves target-* prefixed inventory files in SHARED_DIR
+    #       alongside the flat copies so they survive ibu-restore-seed-inventory below.
     - ref: telcov10n-functional-cnf-ran-ibu-target-hub-deploy
     - ref: telcov10n-functional-cnf-ran-ibu-target-hub-config
     - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-spoke-operators
@@ -25,5 +27,13 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-restore-seed-inventory
     # Deploy SNO spoke on seed hub (kni-qe-108) via ZTP
     - ref: telcov10n-functional-cnf-ran-deploy-spoke-sno
+    # Deploy SNO spoke on target hub (kni-qe-109) via ZTP
+    # Reads target-* prefixed inventory files saved by ibu-target-hub-deploy (unaffected by restore above)
+    - ref: telcov10n-functional-cnf-ran-ibu-target-deploy-spoke-sno
+    # Prune ArgoCD apps and remove seed spoke (managed cluster) from ACM ManagedCluster
+    - ref: telcov10n-functional-cnf-ran-ibu-prune-argocd-apps
+    test:
+    # Prepare seed SNO, run eco-gotests seedgeneration suite, power off seed spoke
+    - ref: telcov10n-functional-cnf-ran-ibu-eco-gotests-seed
     post: []
 

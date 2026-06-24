@@ -12,6 +12,7 @@ log(){
 
 POOL_NAMESPACE="${POOL_NAMESPACE:-rosa-pool}"
 POOL_TYPE="${POOL_TYPE:-classic-sts}"
+POOL_ENV="${POOL_ENV:-}"
 POOL_REGION="${POOL_REGION:-}"
 POOL_VERSION="${POOL_VERSION:-}"
 POOL_CHECKOUT_TIMEOUT="${POOL_CHECKOUT_TIMEOUT_MINUTES:-30}"
@@ -29,6 +30,9 @@ pool_oc() {
 
 # Build label selector
 SELECTOR="rosa-pool/managed=true,rosa-pool/status=available,rosa-pool/type=${POOL_TYPE}"
+if [[ -n "${POOL_ENV}" ]]; then
+    SELECTOR="${SELECTOR},rosa-pool/env=${POOL_ENV}"
+fi
 if [[ -n "${POOL_REGION}" ]]; then
     SELECTOR="${SELECTOR},rosa-pool/region=${POOL_REGION}"
 fi
@@ -38,6 +42,7 @@ fi
 
 log "Pool checkout starting"
 log "  Type: ${POOL_TYPE}"
+log "  Env: ${POOL_ENV:-any}"
 log "  Region: ${POOL_REGION:-any}"
 log "  Version: ${POOL_VERSION:-any}"
 log "  Timeout: ${POOL_CHECKOUT_TIMEOUT} minutes"
@@ -123,15 +128,21 @@ done
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 log "Cluster claimed: ${CLUSTER_ID}"
 
+# Use the OCM environment from the claimed cluster, falling back to the env var
+CLAIMED_OCM_ENV=$(cat "${SHARED_DIR}/ocm-env" 2>/dev/null || true)
+LOGIN_ENV="${CLAIMED_OCM_ENV:-${OCM_LOGIN_ENV}}"
+
 # Log in to OCM to fetch cluster credentials
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
 
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    log "Logging into OCM ${LOGIN_ENV} with SSO credentials"
+    ocm login --url "${LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
 elif [[ -n "${OCM_TOKEN}" ]]; then
-    ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+    log "Logging into OCM ${LOGIN_ENV} with offline token"
+    ocm login --url "${LOGIN_ENV}" --token "${OCM_TOKEN}"
 else
     log "ERROR: No OCM credentials found in cluster profile"
     exit 1
