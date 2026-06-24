@@ -21,11 +21,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-# CORENET-7217: UDN CPU Priority Testing
-# This configuration creates UDNs and collects sos-reports to analyze
-# CPU starvation of ovs-vswitchd and ovn-controller by ovnkube-controller
-
-- as: corenet-7217-udn-cpu-baseline
+- as: corenet-7217-udn-medium-with-sos
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -34,53 +30,22 @@ tests:
     timeout: 8h0m0s
     version: "4.17"
   steps:
-    test:
-    # Baseline: Collect sos-report before creating UDNs
-    - ref: openshift-qe-sosreport
-      env:
-      - name: SOS_NODE_SELECTOR
-        value: "node-role.kubernetes.io/worker="
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
-      - name: SOS_TIMEOUT
-        value: "30m"
-      - name: SOS_MAX_PARALLEL
-        value: "10"
-
-    # Create 500 UDNs
-    - ref: openshift-qe-cudn-density
-      env:
-      - name: TARGET_UDN_COUNT
-        value: "500"
-      - name: NAMESPACES_PER_CUDN
-        value: "5"
-      - name: POD_READY_THRESHOLD
-        value: "1400s"
-      - name: PPROF
-        value: "true"
-
-    # Under Load: Collect sos-report after UDNs are created
-    - ref: openshift-qe-sosreport
-      env:
-      - name: SOS_COLLECT_ALL_NODES
-        value: "true"
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
-      - name: SOS_TIMEOUT
-        value: "45m"
-      - name: SOS_MAX_PARALLEL
-        value: "10"
-
-    # Collect must-gather for container metrics and pod logs
+    env:
+      CUDN_ITERATION_MULTIPLIER: "20"
+      EXTRA_MG_ARGS: --host-network
+      MUST_GATHER_TIMEOUT: 35m
+      NAMESPACES_PER_CUDN: "5"
+      POD_READY_THRESHOLD: 1400s
+      PPROF: "true"
+      SOS_COLLECT_ALL_NODES: "true"
+      SOS_MAX_PARALLEL: "10"
+      SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd,cgroups
+      SOS_TIMEOUT: 45m
     post:
     - ref: gather-must-gather
-      env:
-      - name: MUST_GATHER_TIMEOUT
-        value: "35m"
-      - name: EXTRA_MG_ARGS
-        value: "--host-network"
-
-- as: corenet-7217-udn-cpu-high-scale
+    test:
+    - chain: openshift-qe-cudn-density-with-sos
+- as: corenet-7217-udn-high-with-sos
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -89,107 +54,22 @@ tests:
     timeout: 10h0m0s
     version: "4.17"
   steps:
+    env:
+      CUDN_ITERATION_MULTIPLIER: "40"
+      EXTRA_MG_ARGS: --host-network
+      MUST_GATHER_TIMEOUT: 40m
+      NAMESPACES_PER_CUDN: "5"
+      POD_READY_THRESHOLD: 2000s
+      PPROF: "true"
+      SOS_COLLECT_ALL_NODES: "true"
+      SOS_MAX_PARALLEL: "10"
+      SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd,cgroups
+      SOS_TIMEOUT: 60m
+    post:
+    - ref: gather-must-gather
     test:
-    # High scale test: 1000 UDNs with sos-report
     - chain: openshift-qe-cudn-density-with-sos
-      env:
-      # UDN workload parameters
-      - name: TARGET_UDN_COUNT
-        value: "1000"
-      - name: NAMESPACES_PER_CUDN
-        value: "5"
-      - name: POD_READY_THRESHOLD
-        value: "2000s"
-      - name: PPROF
-        value: "true"
-
-      # sos-report parameters
-      - name: SOS_COLLECT_ALL_NODES
-        value: "true"
-      - name: SOS_MAX_PARALLEL
-        value: "10"
-      - name: SOS_TIMEOUT
-        value: "45m"
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
-
-    # Collect must-gather for container metrics and pod logs
-    post:
-    - ref: gather-must-gather
-      env:
-      - name: MUST_GATHER_TIMEOUT
-        value: "35m"
-      - name: EXTRA_MG_ARGS
-        value: "--host-network"
-
-- as: corenet-7217-udn-cpu-phased
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 12h0m0s
-    version: "4.17"
-  steps:
-    test:
-    # Phase 0: Baseline (no UDNs)
-    - ref: openshift-qe-sosreport
-      env:
-      - name: SOS_NODE_SELECTOR
-        value: "node-role.kubernetes.io/worker="
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,process"
-      - name: SOS_TIMEOUT
-        value: "20m"
-
-    # Phase 1: Medium load (500 UDNs)
-    - ref: openshift-qe-cudn-density
-      env:
-      - name: TARGET_UDN_COUNT
-        value: "500"
-      - name: NAMESPACES_PER_CUDN
-        value: "5"
-
-    - ref: openshift-qe-sosreport
-      env:
-      - name: SOS_COLLECT_ALL_NODES
-        value: "true"
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,openvswitch,ovn,process,systemd"
-      - name: SOS_TIMEOUT
-        value: "30m"
-
-    # Phase 2: High load (additional 500 UDNs -> 1000 total)
-    - ref: openshift-qe-cudn-density
-      env:
-      - name: TARGET_UDN_COUNT
-        value: "1000"
-      - name: NAMESPACES_PER_CUDN
-        value: "5"
-      - name: POD_READY_THRESHOLD
-        value: "2000s"
-
-    - ref: openshift-qe-sosreport
-      env:
-      - name: SOS_COLLECT_ALL_NODES
-        value: "true"
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,openvswitch,ovn,process,systemd,cgroups"
-      - name: SOS_TIMEOUT
-        value: "45m"
-      - name: SOS_MAX_PARALLEL
-        value: "8"
-
-    # Collect must-gather for container metrics and pod logs
-    post:
-    - ref: gather-must-gather
-      env:
-      - name: MUST_GATHER_TIMEOUT
-        value: "35m"
-      - name: EXTRA_MG_ARGS
-        value: "--host-network"
-
-- as: corenet-7217-udn-cpu-quick
+- as: corenet-7217-udn-quick
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -198,35 +78,36 @@ tests:
     timeout: 4h0m0s
     version: "4.17"
   steps:
-    test:
-    # Quick test: Minimal UDNs with fast sos-report collection
-    - chain: openshift-qe-cudn-density-with-sos
-      env:
-      # Create 200 UDNs
-      - name: TARGET_UDN_COUNT
-        value: "200"
-      - name: NAMESPACES_PER_CUDN
-        value: "5"
-
-      # Fast collection: workers only, minimal plugins
-      - name: SOS_NODE_SELECTOR
-        value: "node-role.kubernetes.io/worker="
-      - name: SOS_PLUGIN_FILTER
-        value: "ovs,process"
-      - name: SOS_TIMEOUT
-        value: "15m"
-      - name: SOS_MAX_PARALLEL
-        value: "15"
-
-    # Collect must-gather for container metrics and pod logs
+    env:
+      CUDN_ITERATION_MULTIPLIER: "8"
+      EXTRA_MG_ARGS: --host-network
+      MUST_GATHER_TIMEOUT: 25m
+      NAMESPACES_PER_CUDN: "5"
+      POD_READY_THRESHOLD: 1000s
+      SOS_MAX_PARALLEL: "15"
+      SOS_NODE_SELECTOR: node-role.kubernetes.io/worker=
+      SOS_PLUGIN_FILTER: ovs,process
+      SOS_TIMEOUT: 20m
     post:
     - ref: gather-must-gather
-      env:
-      - name: MUST_GATHER_TIMEOUT
-        value: "25m"
-      - name: EXTRA_MG_ARGS
-        value: "--host-network"
-
+    test:
+    - chain: openshift-qe-cudn-density-with-sos
+- as: corenet-7217-baseline-sos
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-qe
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.17"
+  steps:
+    env:
+      SOS_MAX_PARALLEL: "10"
+      SOS_NODE_SELECTOR: node-role.kubernetes.io/worker=
+      SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd
+      SOS_TIMEOUT: 20m
+    test:
+    - ref: openshift-qe-sosreport
 zz_generated_metadata:
   branch: master
   org: openshift
