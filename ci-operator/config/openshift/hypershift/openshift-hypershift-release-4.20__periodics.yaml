@@ -149,6 +149,18 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 5 1,15 * *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --fips
+      PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
@@ -282,32 +294,6 @@ tests:
       TEST_TYPE: main
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
-- as: e2e-kubevirt-metal-ovn
-  capabilities:
-  - intranet
-  cron: 0 0 * * 0
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
-      REDHAT_OPERATORS_INDEX_TAG: v4.18
-    workflow: hypershift-kubevirt-baremetalds-conformance
-- as: e2e-kubevirt-metal-ovn-disconnected
-  capabilities:
-  - intranet
-  cron: 0 4 * * 1
-  steps:
-    cluster_profile: equinix-ocp-hcp
-    env:
-      CCS_OPERATOR_CHANNELS: stable-4.15,stable-4.15,stable-4.15,stable-4.15
-      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
-    workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
 - as: e2e-kubevirt-aws-ovn-csi
   cron: 0 4 * * *
   steps:
@@ -317,6 +303,19 @@ tests:
   cron: 0 */2 * * *
   steps:
     cluster_profile: hypershift-aks
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-aks-external-oidc
   cron: 0 10 * * *
@@ -336,17 +335,6 @@ tests:
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
-- as: e2e-kubevirt-aws-ovn
-  cron: 0 0,6,12,18 * * *
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: c5n.metal
-      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
-    workflow: hypershift-kubevirt-e2e-aws
 - as: e2e-kubevirt-azure
   cron: 0 0 1 1 *
   steps:

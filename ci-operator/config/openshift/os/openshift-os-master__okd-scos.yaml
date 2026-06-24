@@ -17,16 +17,23 @@ images:
   - build_args:
     - name: OPENSHIFT_CI
       value: "1"
+    - name: OPENSHIFT_VERSION
+      value: "5.0"
+    - name: YUM_REPO_NAMES
+      value: c10s-baseos,c10s-appstream,c10s-sig-nfv,c10s-sig-cloud-okd,rhel-10.2-server-ose-5.0
+    - name: STREAM_CLASS
+      value: centos-10
     dockerfile_path: Containerfile
     inputs:
       stream-coreos-base:
         as:
-        - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
         - ${IMAGE_FROM}
-    to: os-image
+    to: stream-coreos
   - build_args:
     - name: OPENSHIFT_CI
       value: "1"
+    - name: STREAM_CLASS
+      value: centos-10
     dockerfile_path: extensions/Containerfile
     inputs:
       ocp_builder_stream:
@@ -34,40 +41,15 @@ images:
         - registry.access.redhat.com/ubi9/ubi:latest
       stream-coreos:
         as:
-        - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-    to: extensions-image
-  - dockerfile_literal: |-
-      FROM os-image
-      LABEL io.openshift.os.streamclass=centos-10
-    inputs:
-      os-image:
-        as:
-        - os-image
-    to: stream-coreos
-  - dockerfile_literal: |-
-      FROM extensions-image
-      LABEL io.openshift.os.streamclass=centos-10
-    inputs:
-      extensions-image:
-        as:
-        - extensions-image
+        - ${IMAGE_FROM}
     to: stream-coreos-extensions
 promotion:
   to:
-  - excluded_images:
-    - os-image
-    - extensions-image
-    name: scos-4.22
+  - name: scos-4.22
     namespace: origin
-  - excluded_images:
-    - os-image
-    - extensions-image
-    name: scos-4.22-art
+  - name: scos-4.22-art
     namespace: origin
-  - excluded_images:
-    - os-image
-    - extensions-image
-    name: scos-5.0-art
+  - name: scos-5.0-art
     namespace: origin
 releases:
   latest:

@@ -385,6 +385,16 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f28-longduration-mco-p1
   cron: 49 15 28 * *
+  reporter_config:
+    channel: '#forum-ocp-mco-qe'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -398,6 +408,16 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f28-longduration-mco-p2
   cron: 25 16 27 * *
+  reporter_config:
+    channel: '#forum-ocp-mco-qe'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -411,6 +431,16 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f28-longduration-mco-p3
   cron: 35 5 17 * *
+  reporter_config:
+    channel: '#forum-ocp-mco-qe'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -582,52 +612,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-fips-guest-f28-destructive
-  cron: 10 8 14 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --fips
-      FIPS_ENABLED: "true"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-fips-mgmt-f14
-  cron: 28 16 13,29 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --fips
-      FIPS_ENABLED: "true"
-      PUBLIC_ONLY: "true"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-guest-critical-f28
   cron: 44 1 6 * *
   reporter_config:
@@ -3941,15 +3925,15 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-install-disconnected
-- as: metal-ds-ipi-ovn-dualstack-primaryv6-f360-virt-netobserv
+- always_run: false
+  as: metal-ds-ipi-ovn-ipv4-f360-virt-netobserv
   capabilities:
   - intranet
-  cron: 24 15 14 1 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6v4
+        IP_STACK=v4
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
@@ -3961,10 +3945,10 @@ tests:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: metal-ds-ipi-ovn-dualstack-primaryv6-f360-ipv6-netobserv
+- always_run: false
+  as: metal-ds-ipi-ovn-dualstack-primaryv6-f360-ipv6-netobserv
   capabilities:
   - intranet
-  cron: 35 21 9 5 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -3981,8 +3965,8 @@ tests:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: vsphere-ipi-amd-f28-ipsec-netobserv
-  cron: 52 13 7 * *
+- always_run: false
+  as: vsphere-ipi-amd-f28-ipsec-netobserv
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:

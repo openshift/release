@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build09
-  cron: 1 3 * * 2,6
+  cron: 42 1 * * 2,6
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -98,8 +98,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build06
-  cron: 18 3 * * 2,6
+  cluster: build05
+  cron: 6 5 * * 2,6
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -117,6 +117,17 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-knative-eventing-istio-release-v1.21-421-e2e-tests-c
+  reporter_config:
+    slack:
+      channel: '#knative-eventing-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:

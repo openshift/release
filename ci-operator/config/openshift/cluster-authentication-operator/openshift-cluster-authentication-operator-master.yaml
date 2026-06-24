@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  vault-enterprise:
+    name: vault-enterprise
+    namespace: ci
+    tag: 2.0.0-ent
   vault_kube_kms:
     name: vault-kube-kms
     namespace: control-plane_vault
@@ -152,25 +156,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- always_run: false
-  as: e2e-gcp-operator-encryption-kms
-  optional: true
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
-  steps:
-    cluster_profile: openshift-org-gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: ipi-gcp
 - as: e2e-oidc-techpreview
   run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
   steps:
@@ -306,7 +291,7 @@ tests:
     workflow: ipi-aws
   timeout: 2h0m0s
 - always_run: false
-  as: e2e-aws-operator-encryption-kms-ote
+  as: e2e-aws-operator-encryption-kms
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
@@ -314,6 +299,8 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: registry.ci.openshift.org/control-plane-custom-builds/vault-kube-kms@sha256:33599dd6eee61dcf9a60138759fafda3d88593a3c2072585156882c6b5bd3fa5
     test:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test

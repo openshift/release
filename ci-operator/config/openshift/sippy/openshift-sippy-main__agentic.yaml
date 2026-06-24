@@ -1,0 +1,79 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  sippy-devcontainer:
+    name: sippy
+    namespace: ci
+    tag: sippy-devcontainer
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman AS podman
+      FROM src AS source
+      FROM sippy-devcontainer
+      USER root
+      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl && dnf clean all
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
+          chmod +rx /entrypoint.sh
+      COPY --from=source /go/src/github.com/openshift/sippy /workspace
+      RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
+      ENV BUILDAH_ISOLATION=chroot
+      USER vscode
+      WORKDIR /workspace
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
+    from: sippy-devcontainer
+    inputs:
+      nested-podman:
+        as:
+        - nested-podman
+      src:
+        as:
+        - src
+    to: sippy-agentic-dev
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-sippy-jira-agent
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+        mcp__sippy-dev__* mcp__playwright__*
+      FORK_REPO: openshift-trt/sippy
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: openshift/sippy
+    workflow: openshift-agentic-trt-jira-solver
+- as: periodic-sippy-pr-followup-agent
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+        mcp__sippy-dev__* mcp__playwright__*
+      FORK_REPO: openshift-trt/sippy
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: openshift/sippy
+    workflow: openshift-agentic-trt-pr-followup
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: sippy
+  variant: agentic

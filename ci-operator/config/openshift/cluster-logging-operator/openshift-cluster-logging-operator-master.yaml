@@ -109,7 +109,7 @@ tests:
       cli: latest
       commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
         LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e
+        make test-e2e IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -129,6 +129,42 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
+- as: e2e-using-bundle
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  optional: true
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    dependencies:
+      OO_INDEX: ci-index-cluster-logging-operator-bundle
+    env:
+      OO_CHANNEL: stable-6.6
+      OO_INSTALL_NAMESPACE: openshift-logging
+      OO_PACKAGE: cluster-logging
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        GOFLAGS=-mod=mod NO_COLOR=1 go test -v -timeout=90m \
+        -ginkgo.v -ginkgo.trace -ginkgo.poll-progress-after=600s \
+        -ginkgo.poll-progress-interval=30s ./test/e2e/...
+      dependencies:
+      - env: RELATED_IMAGE_VECTOR
+        name: pipeline:logging-vector
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: optional-operators-ci-generic-claim
 - as: functional-target
   cluster_claim:
     architecture: amd64

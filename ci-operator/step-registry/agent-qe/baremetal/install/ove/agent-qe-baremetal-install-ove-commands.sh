@@ -9,12 +9,19 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && { echo "Proxy conf file is not found. Failing."; exit 1; }
 
-source "${SHARED_DIR}/proxy-conf.sh"
+if [ "${DISCONNECTED}" == "true" ]; then
+  [ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && {
+    echo "Proxy conf file is not found. Failing."
+    exit 1
+  }
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
-yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
+HOST_ID=$(yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml")
+echo "$HOST_ID" >"${SHARED_DIR}"/host-id.txt
 
 function mount_virtual_media() {
   local host="${1}"
@@ -39,6 +46,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   (
+   bmc_user=$(echo "$bmhost" | jq -r '.bmc_user')
+   bmc_pass=$(echo "$bmhost" | jq -r '.bmc_pass')
+   bmc_address=$(echo "$bmhost" | jq -r '.bmc_address')
+   vendor=$(echo "$bmhost" | jq -r '.vendor')
+
    name=$(echo "$bmhost" | jq -r '.name')
    host=$(echo "$bmhost" | jq -r '.host')
    transfer_protocol_type=$(echo "$bmhost" | jq -r '.transfer_protocol_type // ""')
@@ -48,17 +60,27 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    else
      # Assuming HTTP or HTTPS
      # IF _SNAPSHOT_ is not empty, this is a konflux job
+     OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
      if [ ! -z "${SNAPSHOT}" ]; then
-        OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
         iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${CLUSTER_NAME}.agent-ove.x86_64.iso"
      else
-        iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${AGENT_ISO}"
+        iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${AGENT_ISO}"
      fi
    fi
-   mount_virtual_media "${host}" "${iso_path}"
-
+   boot_selection="http"
+   if [ "${vendor}" == "dell" ]; then
+     mount_virtual_media "${host}" "${iso_path}"
+     boot_selection="vcd"
+   fi
    echo "Power on #${host} (${name})..."
-   if ! timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"; then
+   HOST_ADDRESS=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
+   if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" -p $((14000+"${HOST_ID}")) root@access."${HOST_ADDRESS}" prepare_host_for_boot \
+          --host "$bmc_address" \
+          --user "$bmc_user" \
+          --password "$bmc_pass" \
+          --vendor "$vendor" \
+          --bootmode "$boot_selection" \
+          --iso "$iso_path"; then
      echo "Failed to power on ${host} (${name})"
    fi
   ) &

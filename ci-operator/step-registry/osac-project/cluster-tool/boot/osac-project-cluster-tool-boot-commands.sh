@@ -8,14 +8,14 @@ echo "************ cluster-tool boot ************"
 echo "CLUSTER_TOOL_COMMIT: ${CLUSTER_TOOL_COMMIT}"
 echo "CLUSTER_TOOL_FLAVOR_IMAGE: ${CLUSTER_TOOL_FLAVOR_IMAGE}"
 echo "E2E_NAMESPACE: ${E2E_NAMESPACE}"
-echo "E2E_KUSTOMIZE_OVERLAY: ${E2E_KUSTOMIZE_OVERLAY}"
+echo "E2E_VALUES_FILE: ${E2E_VALUES_FILE}"
 echo "E2E_VM_TEMPLATE: ${E2E_VM_TEMPLATE}"
 echo "OSAC_INSTALLER_IMAGE: ${OSAC_INSTALLER_IMAGE}"
 echo "COMPONENT_IMAGE: ${COMPONENT_IMAGE:-<none>}"
 echo "COMPONENT_IMAGE_NAME: ${COMPONENT_IMAGE_NAME:-<none>}"
 echo "-------------------------------------------"
 
-CLONE_NAME="ci-test"
+CLONE_NAME="vmaas-helm"
 
 # === Create ssh_config from ofcir-acquire output ===
 IP=$(cat "${SHARED_DIR}/server-ip")
@@ -80,6 +80,19 @@ timeout -s 9 2m scp -F "${SHARED_DIR}/ssh_config" \
     /tmp/license.zip \
     ci_machine:/tmp/license.zip
 
+# === Determine fork repo URL for AAP project sync ===
+AAP_SOURCE_REPO_URL=""
+if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "osac-aap" ]]; then
+    PR_AUTHOR=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].author // empty' 2>/dev/null || true)
+    if [[ -n "${PR_AUTHOR}" ]] && [[ "${PR_AUTHOR}" != "${REPO_OWNER:-}" ]]; then
+        CANDIDATE_URL="https://github.com/${PR_AUTHOR}/${REPO_NAME}"
+        if curl -sfI "${CANDIDATE_URL}" &>/dev/null; then
+            AAP_SOURCE_REPO_URL="${CANDIDATE_URL}.git"
+            echo "Fork PR detected, AAP source repo: ${AAP_SOURCE_REPO_URL}"
+        fi
+    fi
+fi
+
 # === Write boot script to machine and execute ===
 echo "Creating boot script on machine..."
 timeout -s 9 1m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -c 'cat > /root/boot.sh' <<'REMOTE_SCRIPT'
@@ -89,13 +102,24 @@ COMMIT="$1"
 FLAVOR_IMAGE="$2"
 CLONE="$3"
 INSTALLER_IMAGE="$4"
-KUSTOMIZE_OVERLAY="$5"
+VALUES_FILE="$5"
 VM_TEMPLATE="$6"
 COMPONENT_IMAGE="${7:-}"
 COMPONENT_IMAGE_NAME="${8:-}"
 NAMESPACE="${9:-osac-e2e-ci}"
+AAP_SOURCE_REPO_URL="${10:-}"
+
+VALUES_DIR=$(dirname "${VALUES_FILE}")
+
+_timer() {
+    local elapsed=$(( $(date +%s) - $1 ))
+    printf "[TIMING] %s: %dm %ds\n" "$2" $((elapsed/60)) $((elapsed%60))
+}
+
+BOOT_TOTAL_START=$(date +%s)
 
 # --- Phase 1: cluster-tool setup ---
+SETUP_START=$(date +%s)
 echo "=== Downloading cluster-tool ==="
 curl -fsSL "https://raw.githubusercontent.com/omer-vishlitzky/cluster-tool/${COMMIT}/cluster-tool" \
     -o /usr/local/bin/cluster-tool
@@ -127,17 +151,22 @@ echo "DNS ready (standalone dnsmasq, upstream=${ORIG_DNS})"
 
 echo "=== Setting up server ==="
 python3 /usr/local/bin/cluster-tool connect ci --host local --data-path /home/cluster-tool
+_timer $SETUP_START "Setup (cluster-tool + DNS + server)"
 
 # --- Phase 2: pull + boot ---
 echo "=== Setting up container auth ==="
 mkdir -p /root/.config/containers
 cp /root/pull-secret /root/.config/containers/auth.json
 
+PULL_START=$(date +%s)
 echo "=== Pulling OSAC vmaas flavor ==="
 python3 /usr/local/bin/cluster-tool pull "${FLAVOR_IMAGE}"
+_timer $PULL_START "Pull flavor"
 
+CLUSTER_BOOT_START=$(date +%s)
 echo "=== Booting cluster ==="
-python3 /usr/local/bin/cluster-tool boot --flavor osac-vmaas-pruned --name "${CLONE}"
+python3 /usr/local/bin/cluster-tool boot --flavor vmaas-helm --name "${CLONE}"
+_timer $CLUSTER_BOOT_START "Boot cluster"
 
 systemctl restart dnsmasq
 
@@ -163,24 +192,56 @@ oc set data secret/pull-secret -n openshift-config \
 # --- Phase 4: component override (conditional) ---
 COMPONENT_OVERRIDE_CMD=""
 if [[ -n "${COMPONENT_IMAGE}" ]] && [[ -n "${COMPONENT_IMAGE_NAME}" ]]; then
-    echo "=== Component override: ${COMPONENT_IMAGE_NAME} ==="
-    COMPONENT_OVERRIDE_CMD="curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xzf - -C /usr/local/bin && cd /installer/base && kustomize edit set image ${COMPONENT_IMAGE_NAME}=${COMPONENT_IMAGE} && cd /installer && "
+    echo "=== Component override: ${COMPONENT_IMAGE_NAME} → ${COMPONENT_IMAGE} ==="
+    COMPONENT_TAG="${COMPONENT_IMAGE##*:}"
+    COMPONENT_REPO="${COMPONENT_IMAGE%:*}"
+    VF="/installer/${VALUES_FILE}"
+    # Replace full image:tag references — match entire registry/path to handle short names (e.g. osac-aap)
+    COMPONENT_OVERRIDE_CMD="sed -i 's|[a-zA-Z0-9./_-]*${COMPONENT_IMAGE_NAME}:[a-zA-Z0-9._-]*|${COMPONENT_IMAGE}|g' ${VF} && "
+    # Replace split repository/tag format (e.g. operator.image.repository + operator.image.tag)
+    COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}sed -i '/repository: .*${COMPONENT_IMAGE_NAME##*/}/{s|repository: .*|repository: ${COMPONENT_REPO}|;n;s/tag: .*/tag: ${COMPONENT_TAG}/}' ${VF} && "
+    # Verify the override landed
+    COMPONENT_OVERRIDE_CMD="${COMPONENT_OVERRIDE_CMD}grep -q '${COMPONENT_TAG}' ${VF} || { echo 'ERROR: component image override not found in values file'; exit 1; } && "
+fi
+
+# When testing an osac-aap PR, the installer-with-pr image contains
+# .aap-source-sha with the PR's head commit SHA. Override both
+# AAP_PROJECT_GIT_BRANCH (playbook sync) and AAP_EE_IMAGE (execution
+# environment) so AAP uses the PR's code instead of the pinned versions.
+AAP_OVERRIDE_CMD=""
+AAP_SOURCE_SHA=$(podman run --authfile /root/pull-secret --rm "${INSTALLER_IMAGE}" cat /installer/.aap-source-sha 2>/dev/null || true)
+if [[ -n "${AAP_SOURCE_SHA}" ]]; then
+    echo "=== AAP project git ref override: ${AAP_SOURCE_SHA} ==="
+    VF="/installer/${VALUES_FILE}"
+    AAP_OVERRIDE_CMD="sed -i 's|projectGitBranch: .*|projectGitBranch: \"${AAP_SOURCE_SHA}\"|' ${VF} && grep -q '${AAP_SOURCE_SHA}' ${VF} || { echo 'ERROR: projectGitBranch override failed'; exit 1; } && "
+    if [[ -n "${AAP_SOURCE_REPO_URL}" ]]; then
+        echo "=== AAP project git URI override: ${AAP_SOURCE_REPO_URL} ==="
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|projectGitUri: .*|projectGitUri: \"${AAP_SOURCE_REPO_URL}\"|' ${VF} && grep -q '${AAP_SOURCE_REPO_URL}' ${VF} || { echo 'ERROR: projectGitUri override failed'; exit 1; } && "
+    fi
+    if [[ -n "${COMPONENT_IMAGE}" ]]; then
+        echo "=== AAP EE image override: ${COMPONENT_IMAGE} ==="
+        AAP_OVERRIDE_CMD="${AAP_OVERRIDE_CMD}sed -i 's|eeImage: .*|eeImage: \"${COMPONENT_IMAGE}\"|' ${VF} && grep -q 'eeImage:.*${COMPONENT_IMAGE}' ${VF} || { echo 'ERROR: eeImage override failed'; exit 1; } && "
+    fi
 fi
 
 # --- Phase 5: refresh ---
+REFRESH_START=$(date +%s)
 echo "=== Running refresh ==="
 podman run --authfile /root/pull-secret --rm --network=host \
     -v "${KUBECONFIG_PATH}":/root/.kube/config:z \
-    -v /root/pull-secret:/installer/overlays/${KUSTOMIZE_OVERLAY}/files/quay-pull-secret.json:z \
-    -v /tmp/license.zip:/installer/overlays/${KUSTOMIZE_OVERLAY}/files/license.zip:z \
+    -v /tmp/license.zip:/installer/${VALUES_DIR}/license.zip:z \
+    -v /root/pull-secret:/installer/${VALUES_DIR}/pull-secret.json:z \
     -e KUBECONFIG=/root/.kube/config \
-    -e INSTALLER_KUSTOMIZE_OVERLAY="${KUSTOMIZE_OVERLAY}" \
+    -e VALUES_FILE="${VALUES_FILE}" \
     -e INSTALLER_VM_TEMPLATE="${VM_TEMPLATE}" \
     -e INSTALLER_NAMESPACE="${NAMESPACE}" \
     "${INSTALLER_IMAGE}" \
-    bash -c "${COMPONENT_OVERRIDE_CMD}cd /installer && sh scripts/refresh-after-snapshot.sh"
+    bash -c "${COMPONENT_OVERRIDE_CMD}${AAP_OVERRIDE_CMD}cd /installer && python3 -u scripts/refresh-after-snapshot.py"
+_timer $REFRESH_START "Refresh"
 
+echo ""
 echo "=== Boot + refresh complete ==="
+_timer $BOOT_TOTAL_START "Total (setup + pull + boot + refresh)"
 REMOTE_SCRIPT
 
 echo "Executing boot script on machine..."
@@ -190,10 +251,11 @@ timeout -s 9 50m ssh -F "${SHARED_DIR}/ssh_config" ci_machine \
     '${CLUSTER_TOOL_FLAVOR_IMAGE}' \
     '${CLONE_NAME}' \
     '${OSAC_INSTALLER_IMAGE}' \
-    '${E2E_KUSTOMIZE_OVERLAY}' \
+    '${E2E_VALUES_FILE}' \
     '${E2E_VM_TEMPLATE}' \
     '${COMPONENT_IMAGE:-}' \
     '${COMPONENT_IMAGE_NAME:-}' \
-    '${E2E_NAMESPACE}'"
+    '${E2E_NAMESPACE}' \
+    '${AAP_SOURCE_REPO_URL:-}'"
 
 echo "Boot step finished successfully."

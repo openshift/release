@@ -74,6 +74,7 @@ presubmits:
         - --ignore=openshift-logging/extended-logging-tests-interop
         - --ignore=Azure/ARO-HCP
         - --ignore=rhbk/sso-test
+        - --ignore=openshift-priv/kubernetes-sigs-resource-state-metrics
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -137,6 +138,7 @@ presubmits:
         - --ignore=jws-qe/interop-ocp-ci
         - --ignore=Azure/ARO-HCP
         - --ignore=rhbk/sso-test
+        - --ignore=openshift-priv/kubernetes-sigs-resource-state-metrics
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -456,7 +458,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: core-ci
+    cluster: app.ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -495,7 +497,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260508-77c4e0541
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260617-37d12bec7
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -625,6 +627,70 @@ presubmits:
           requests:
             cpu: 10m
     trigger: ((?m)^/test generated-dashboards,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/hyperfleet-risk-scorer-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-hyperfleet-risk-scorer-test
+    rerun_command: /test hyperfleet-risk-scorer-test
+    run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=hyperfleet-risk-scorer-test
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hyperfleet-risk-scorer-test,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -819,7 +885,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-main-release-config
     rerun_command: /test release-config
-    run_if_changed: ^core-services/release-controller/_releases/.*
+    run_if_changed: ^(core-services/release-controller/_releases/.*|core-services/release-controller/release-qualifiers.yaml)$
     spec:
       containers:
       - args:

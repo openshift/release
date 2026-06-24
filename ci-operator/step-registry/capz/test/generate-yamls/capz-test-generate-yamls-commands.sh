@@ -2,9 +2,14 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
+source "${SHARED_DIR}/capz-test-env.sh"
 
-source openshift-ci/capz-test-env.sh
+if [[ -d "${ARO_REPO_DIR}" ]]; then
+  echo "Repository already exists at ${ARO_REPO_DIR}"
+else
+  echo "Cloning ${ARO_REPO_URL} branch ${ARO_REPO_BRANCH} into ${ARO_REPO_DIR}"
+  git clone -b "${ARO_REPO_BRANCH}" "${ARO_REPO_URL}" "${ARO_REPO_DIR}"
+fi
 
 # Diagnostic: print the capi-tests commit so we can verify which version CI used
 echo "=== capi-tests source commit ==="

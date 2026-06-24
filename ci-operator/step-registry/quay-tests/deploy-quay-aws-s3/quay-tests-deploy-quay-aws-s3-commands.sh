@@ -117,16 +117,30 @@ EOF
 
 echo "The Quay Operator subscription is $SUB"
 
+CSV_READY=false
 for _ in {1..60}; do
   CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
     if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       echo "ClusterServiceVersion \"$CSV\" ready"
+      CSV_READY=true
       break
     fi
   fi
   sleep 10
 done
+if [[ "$CSV_READY" != "true" ]]; then
+  echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
+  echo "=== CSV Status ===" >&2
+  oc -n quay-enterprise get csv -o wide 2>&1 || true
+  echo "=== Subscription Status ===" >&2
+  oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status}' 2>&1 || true
+  echo "" >&2
+  echo "=== CatalogSource Status ===" >&2
+  oc get catalogsource -n openshift-marketplace -o wide 2>&1 || true
+  archive_pod_info
+  exit 1
+fi
 echo "Quay Operator is deployed successfully"
 
 echo "Waiting for QuayRegistry CRD to be available..."
@@ -139,6 +153,11 @@ for _ in {1..30}; do
 done
 if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
   echo "Timed out waiting for QuayRegistry CRD" >&2
+  echo "=== Operator Pod Logs ===" >&2
+  oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
+  echo "=== Events ===" >&2
+  oc get events -n quay-enterprise --sort-by='.lastTimestamp' 2>&1 | tail -30 || true
+  archive_pod_info
   exit 1
 fi
 

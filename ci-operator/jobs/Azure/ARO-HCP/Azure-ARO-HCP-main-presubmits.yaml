@@ -12,6 +12,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -224,6 +225,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -297,6 +299,164 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )bicep-lint,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/capz-e2e-dev
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      timeout: 4h0m0s
+    labels:
+      ci-operator.openshift.io/variant: capz-e2e
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-capz-e2e-dev
+    rerun_command: /test capz-e2e-dev
+    run_if_changed: ^$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=dev
+        - --variant=capz-e2e
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )capz-e2e-dev,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/capz-e2e-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: capz-e2e
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-capz-e2e-images
+    rerun_command: /test capz-e2e-images
+    run_if_changed: ^$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=capz-e2e
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )capz-e2e-images,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -308,6 +468,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -449,6 +610,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -457,7 +619,6 @@ presubmits:
       - sessiongate/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
-      timeout: 10h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -591,6 +752,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -612,6 +774,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=aro-hcp-e2e-tests
+        - --target=aro-hcp-e2e-tools
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -657,6 +820,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -741,6 +905,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -833,6 +998,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -917,6 +1083,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1001,6 +1168,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1085,6 +1253,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1168,6 +1337,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1252,6 +1422,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1336,6 +1507,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1409,6 +1581,72 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )observability-verify,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/periodic-healthcheck-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+    labels:
+      ci-operator.openshift.io/variant: periodic-healthcheck
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-periodic-healthcheck-images
+    rerun_command: /test periodic-healthcheck-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodic-healthcheck
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodic-healthcheck-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -1420,6 +1658,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1512,6 +1751,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1596,6 +1836,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1688,6 +1929,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1772,6 +2014,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1856,6 +2099,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -1948,6 +2192,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2032,6 +2277,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2124,6 +2370,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2208,6 +2455,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile
@@ -2291,6 +2539,7 @@ presubmits:
       sparse_checkout_files:
       - admin/Dockerfile
       - backend/Dockerfile
+      - fleet/Dockerfile
       - frontend/Dockerfile
       - hcp-recovery/Dockerfile
       - image-sync/oc-mirror/Dockerfile

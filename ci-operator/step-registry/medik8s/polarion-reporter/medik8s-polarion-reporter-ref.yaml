@@ -1,0 +1,39 @@
+ref:
+  as: medik8s-polarion-reporter
+  from_image:
+    namespace: dno
+    name: droute
+    tag: latest
+  commands: medik8s-polarion-reporter-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: medik8s-datarouter-creds
+    mount_path: /var/run/datarouter
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  best_effort: true
+  grace_period: 15s
+  timeout: 15m0s
+  env:
+  - name: DATAROUTER_URL
+    default: "https://datarouter.dno.corp.redhat.com"
+    documentation: DataRouter API endpoint URL.
+  - name: POLARION_PROJECT_ID
+    default: "OSE"
+    documentation: Polarion project ID to import results into.
+  - name: POLARION_TESTRUN_ID
+    default: ""
+    documentation: |-
+      Polarion test run ID to update (e.g. "RHWA-SBR-4.22-weekly").
+      If empty, Polarion creates a new test run from the imported XML.
+  documentation: |-
+    Uploads reportxml test results from $SHARED_DIR to Polarion via DataRouter.
+    Reads DataRouter credentials from the medik8s-datarouter-creds secret.
+    Must run after the test step that writes *_testrun.xml files to $SHARED_DIR.
+
+    best_effort is set to true so a DataRouter upload failure does not fail the
+    overall CI job — test results are informational and should never block a
+    passing run. Upload failures are still visible: the step exits 1 and droute's
+    error is logged to stderr, so the failure appears in the Prow step log.

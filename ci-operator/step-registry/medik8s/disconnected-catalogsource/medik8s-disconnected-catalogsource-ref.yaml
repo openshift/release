@@ -1,0 +1,47 @@
+ref:
+  as: medik8s-disconnected-catalogsource
+  from: upi-installer
+  cli: latest
+  grace_period: 30m
+  commands: medik8s-disconnected-catalogsource-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  resources:
+    requests:
+      cpu: 100m
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  env:
+  - name: OCP_VERSION
+    documentation: OCP version suffix for the FBC catalog image (e.g., "422" for OCP 4.22). Required.
+    default: ""
+  - name: GIT_REF
+    documentation: |-
+      The branch or git ref to resolve the FBC commit from.
+      Supports slash-containing refs via URL encoding.
+    default: "main"
+  - name: FBC_COMMIT_SHA
+    documentation: |-
+      Pin to a specific dragonfly/rhwa-fbc commit SHA for reproducibility.
+      If empty, the step resolves the latest commit from GIT_REF.
+    default: ""
+  - name: MEDIK8S_PACKAGES
+    documentation: |-
+      Comma-separated list of medik8s operator package names to mirror.
+      Default includes all 6 medik8s operators.
+    default: "fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation"
+  - name: CATALOG_SOURCE_NAME
+    documentation: The name of the CatalogSource to create.
+    default: "medik8s-catalog"
+  - name: IDMS_NAME
+    documentation: The name of the ImageDigestMirrorSet to create.
+    default: "medik8s-disconnected"
+  documentation: |-
+    Creates a CatalogSource for medik8s operator testing in disconnected
+    environments. Mirrors the FBC catalog and operator images to the CI mirror
+    registry using oc-mirror v2, creates IDMS pointing to the mirror, and creates
+    a CatalogSource from the mirrored image.
+    For connected environments, use the medik8s-catalogsource step instead.

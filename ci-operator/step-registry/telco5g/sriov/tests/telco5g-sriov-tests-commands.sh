@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/tests-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-sriov-tests.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-sriov-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
 
 # Checkout the pull request branch
 # $1 - github organization
@@ -95,6 +103,15 @@ else
     sriov_branch=master
 fi
 
+rm -f "${SHARED_DIR}/diagnose-telco5g-sriov-tests.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-sriov-tests" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-sriov-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export SRIOV_BRANCH=${sriov_branch:-unknown}
+EOF
+
 git clone --origin upstream --branch $sriov_branch https://github.com/openshift/sriov-network-operator sriov-network-operator
 pushd sriov-network-operator
 
@@ -145,7 +162,9 @@ pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 [[ -f ${ARTIFACT_DIR}/test_results.html ]] && cp ${ARTIFACT_DIR}/test_results.html $ARTIFACT_DIR/test-summary.html
 
 rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
+gzip -c /tmp/tests-output.log > ${SHARED_DIR}/tests-output.log.gz 2>/dev/null || true
 set +x
 set -e
 
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-sriov-tests"
 exit ${status}

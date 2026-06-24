@@ -1,6 +1,6 @@
 ref:
   as: tls-scanner-run
-  from: src
+  from: cli
   cli: latest
   commands: tls-scanner-run-commands.sh
   env:
@@ -19,6 +19,20 @@ ref:
   - name: SCANNER_MEMORY
     default: "4Gi"
     documentation: "Memory request/limit for the scanner pod."
+  - name: TLS_SCANNER_CLUSTER_LABEL
+    default: ""
+    documentation: |-
+      HyperShift scan target label. Set to "management" to scan the shared
+      management cluster hosted control plane namespace, or "guest" to scan the
+      hosted cluster. Empty uses the step KUBECONFIG and scans all namespaces.
+  - name: TLS_PROFILE_TYPE
+    default: ""
+    documentation: |-
+      Expected cluster TLS profile type for compliance checks (Old, Intermediate,
+      Modern). When set, passes --tls-profile-type to tls-scanner instead of
+      reading APIServer/cluster from the API. Required for HyperShift hosted
+      control planes where the guest APIServer CR may not mirror HostedCluster
+      configuration.
   dependencies:
   - env: RELEASE_IMAGE_LATEST
     name: release:latest

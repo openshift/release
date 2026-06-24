@@ -2,7 +2,7 @@
 set -e -u -o pipefail
 
 # NOTE: this script is meant to be run inside osd-test-harness and
-# assumes all requried binaries are in the same directory as the script
+# assumes all required binaries are in the same directory as the script
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"

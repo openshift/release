@@ -1,51 +1,26 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
+# Map results by setting identifier prefix in tests suites names for reporting tools
+# Merge original results into a single file and compress
+# Send modified file to shared dir for Data Router Reporter step
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--gitops-operator__tests__gitops-operator-tests.xml
+    ' EXIT
+fi
 
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: Gitops-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites."+@name" = "Gitops-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
-    fi
-}
-
-set -x
-
-exit_code=0
 scripts/openshift-CI-kuttl-tests.sh
 
 make ginkgo
-./bin/ginkgo -v --trace --timeout 210m --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel || exit_code=1
+./bin/ginkgo -v --trace --timeout 210m --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel
 
-original_results="${ARTIFACT_DIR}/original_results/"
-mkdir "${original_results}"
+cp "openshift-gitops-parallel-e2e.xml" "${ARTIFACT_DIR}/openshift-gitops-parallel-e2e.xml"
 
-# Keep a copy of all the original Junit file before modifying it
-cp "openshift-gitops-parallel-e2e.xml" "${original_results}/openshift-gitops-parallel-e2e.xml"
-
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${original_results}/openshift-gitops-parallel-e2e.xml"
-
- # Send junit file to shared dir for Data Router Reporter step
-cp "openshift-gitops-parallel-e2e.xml" "${SHARED_DIR}"
-
-exit $exit_code
+true

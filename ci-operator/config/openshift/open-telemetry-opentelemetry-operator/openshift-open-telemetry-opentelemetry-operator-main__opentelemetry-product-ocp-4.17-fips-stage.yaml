@@ -17,12 +17,11 @@ images:
   items:
   - context_dir: .
     dockerfile_path: ./tests/e2e-openshift/Dockerfile
-    to: opentelemetry-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.17"
 resources:
   '*':
@@ -43,15 +42,15 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
-    cluster_profile: azure-observability
+    cluster_profile: gcp-observability
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1105397
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1155558
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "opentelemetry-operator-system", "target_namespaces": "", "operator_group": "opentelemetry-operator-system"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.1", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
@@ -59,12 +58,12 @@ tests:
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/oidcauthextension
         tests/e2e-openshift/export-to-cluster-logging-lokistack tests/e2e-otel/google*
-        tests/e2e/smoke-ports
+        tests/e2e/smoke-ports tests/e2e-instrumentation/instrumentation-go
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-stage
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

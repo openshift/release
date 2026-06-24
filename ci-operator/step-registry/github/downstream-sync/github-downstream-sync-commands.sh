@@ -36,6 +36,12 @@ GITHUB_TOKEN=$(curl -sS -H "Authorization: Bearer $JWT" -H "Accept: application/
     "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" | jq -r .token)
 echo "✅ Received install token (ID: ${INSTALLATION_ID})"
 
+# For backward compatibility, use DEFAULT_BRANCH for upstream if UPSTREAM_BRANCH not set
+if [[ -z "${UPSTREAM_BRANCH:-}" ]]; then
+  UPSTREAM_BRANCH="${DEFAULT_BRANCH}"
+  echo "ℹ️  UPSTREAM_BRANCH not set, using DEFAULT_BRANCH (${DEFAULT_BRANCH}) for upstream"
+fi
+
 echo "📥 Cloning repo and setting up remotes…"
 # get the repo
 WORKDIR="$(mktemp -d)"
@@ -43,7 +49,7 @@ cd "$WORKDIR"
 git clone --single-branch --branch "${DEFAULT_BRANCH}" "https://github.com/${DOWNSTREAM_REPO}" repo
 cd repo
 git remote add upstream "https://github.com/${UPSTREAM_REPO}"
-git fetch upstream "${DEFAULT_BRANCH}"
+git fetch upstream "${UPSTREAM_BRANCH}"
 git fetch origin "${DEFAULT_BRANCH}"
 
 echo "🔍 Checking for open downstream-merge PR…"
@@ -65,7 +71,7 @@ fi
 
 echo "📊 Counting new commits upstream…"
 # to save on overhead we don't need to open a new d/s merge PR until we have enough commits to bring in
-NEW_COMMITS=$(git rev-list origin/"${DEFAULT_BRANCH}"..upstream/"${DEFAULT_BRANCH}" --count)
+NEW_COMMITS=$(git rev-list origin/"${DEFAULT_BRANCH}"..upstream/"${UPSTREAM_BRANCH}" --count)
 echo "Found $NEW_COMMITS new commits upstream."
 (( NEW_COMMITS < MIN_COMMITS )) && { echo "⚠️  Not enough commits (min=${MIN_COMMITS}); exiting."; exit 0; }
 
@@ -79,10 +85,10 @@ echo "🌿 Creating merge branch ${BRANCH} and merging…"
 # if we made it this far, we can create the merge and push the PR
 git checkout -b "$BRANCH" origin/"${DEFAULT_BRANCH}"
 # if there happens to be a merge conflict we can still push it and create a PR...
-if ! git merge "upstream/${DEFAULT_BRANCH}"; then
+if ! git merge "upstream/${UPSTREAM_BRANCH}"; then
   echo "⚠️  Merge conflict detected"
   git add -A
-  git commit -m "Merge upstream/${DEFAULT_BRANCH} into ${DEFAULT_BRANCH} with conflicts ($(date +%m-%d-%Y))"
+  git commit -m "Merge upstream/${UPSTREAM_BRANCH} into ${DEFAULT_BRANCH} with conflicts ($(date +%m-%d-%Y))"
   CONFLICT=true
 fi
 
@@ -149,7 +155,7 @@ git push origin "$BRANCH"
 
 echo "✏️  Opening Pull Request…"
 PR_TITLE="NO-JIRA: DownStream Merge [$(date +%m-%d-%Y)]"
-PR_BODY="Automated merge of upstream/${DEFAULT_BRANCH} → ${DEFAULT_BRANCH}."
+PR_BODY="Automated merge of upstream/${UPSTREAM_BRANCH} → ${DEFAULT_BRANCH}."
 if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
   PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of \`openshift/go.mod\` with upstream dependencies (\`go mod tidy\`)."
 fi

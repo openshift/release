@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.23:tools'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/5.0:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -378,8 +378,8 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-graphql-endpoint=http://ghproxy/graphql',
                                         '--github-throttle=250',
                                         "--jira-endpoint=https://redhat.atlassian.net",
-                                        "--jira-username=brawilli@redhat.com",
-                                        "--jira-password-file=/etc/jira/password",
+                                        "--jira-username=openshift-release-controller-jira-bot@redhat.com",
+                                        "--jira-password-file=/etc/jira/bot-password",
                                         '--verify-jira',
                                         '--plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml',
                                         '--supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config',
@@ -466,8 +466,8 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--art-suffix={context.art_suffix}',
                                         '--enable-jira',
                                         "--jira-endpoint=https://redhat.atlassian.net",
-                                        "--jira-username=brawilli@redhat.com",
-                                        "--jira-password-file=/etc/jira/password",
+                                        "--jira-username=openshift-release-controller-jira-bot@redhat.com",
+                                        "--jira-password-file=/etc/jira/bot-password",
                                         ],
                             'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
                             'imagePullPolicy': 'Always',

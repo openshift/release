@@ -57,7 +57,8 @@ echo -e "${HAPROXY}" >> "$HAPROXY_DIR/haproxy.cfg"
 echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
 echo "Create and start HAProxy container..."
-podman run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
+podman run --name "haproxy-$CLUSTER_NAME" -d --restart=always \
+  -v "$HAPROXY_DIR:/etc/haproxy:Z" \
   -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg:Z" \
   -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf:Z" \
   --network none \
@@ -81,14 +82,14 @@ for dev in "${devices[@]}"; do
   ovs-docker.sh add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
   nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
     /sbin/dhclient -v \
-    -pf "/var/run/dhclient.$interface.pid" \
-    -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
+    -pf "/etc/haproxy/dhclient.$interface.pid" \
+    -lf "/etc/haproxy/dhclient.$interface.lease" "$interface"
   
   if [ "$bridge" = "br-int" ]; then
     nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
       /sbin/dhclient -6 -v \
-      -pf "/var/run/dhclient.$interface.v6.pid" \
-      -lf "/var/lib/dhcp/dhclient.$interface.v6.lease" "$interface"
+      -pf "/etc/haproxy/dhclient.$interface.v6.pid" \
+      -lf "/etc/haproxy/dhclient.$interface.v6.lease" "$interface"
   fi
 done
 

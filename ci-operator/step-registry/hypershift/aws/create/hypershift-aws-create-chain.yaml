@@ -86,6 +86,9 @@ chain:
     - name: ADDITIONAL_CA_BUNDLE_FILE
       default: ""
       documentation: "The additional ca bundle file name in the shared directory"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -184,6 +187,11 @@ chain:
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/aws-load-balancer-health-probe-mode=ServiceNodePort)
+      fi
       
       # Disabling Hosted Cluster capabilities
       if [[ -n "$HC_DISABLED_CAPS" ]]; then
@@ -224,7 +232,9 @@ chain:
           # time for nodes to join.
           sleep 300
         else
-          num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          replicas_per_np=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+          num_zones=$(echo "${HC_ZONES}" | tr ',' '\n' | wc -l)
+          num_nodes_expected=$((replicas_per_np * num_zones))
           export num_nodes_expected
           export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
           set +e

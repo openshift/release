@@ -13,12 +13,11 @@ images:
   items:
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tempo-tests-runner
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.21"
 resources:
   '*':
@@ -41,7 +40,8 @@ tests:
   steps:
     cluster_profile: gcp-observability
     env:
-      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1106842
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1157127
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.10
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -57,7 +57,6 @@ tests:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-stage
-    - ref: distributed-tracing-tests-tracing-ui-integration
     workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main

@@ -11,6 +11,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -889,54 +893,6 @@ tests:
     - ref: idp-openldap
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-fips-guest-f28-destructive
-  cron: 46 12 23 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --fips
-      FIPS_ENABLED: "true"
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-fips-mgmt-f14
-  cron: 42 1 7,21 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --fips
-      FIPS_ENABLED: "true"
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      PUBLIC_ONLY: "true"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-guest-ext-oidc-tp-f14
   cron: 11 23 6,20 * *
   reporter_config:
@@ -1043,31 +999,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-ipsec
-- as: aws-ipi-cilium-hypershift-guest-f7
-  cron: 3 3 1,8,17,24 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~SDN&;~56898&;~44493&;~55767&;~74734&
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest-cilium
 - as: aws-ipi-ovn-hypershift-guest-longduration-f14
   cron: 29 10 7,23 * *
   reporter_config:
@@ -1231,176 +1162,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private
-- as: aws-ipi-ovn-hypershift-n3minor-mgmt-f28
-  cron: 36 14 27 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-n3minor-guest-f14
-  cron: 17 5 12,28 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-n2minor-mgmt-f28
-  cron: 37 19 4 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-n2minor-guest-f14
-  cron: 30 19 7,21 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-n1minor-mgmt-f28
-  cron: 12 11 3 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-n1minor-guest-f14
-  cron: 21 6 1,17 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-shared-vpc-guest-f7
   cron: 17 15 6,13,20,27 * *
   reporter_config:
@@ -2554,105 +2315,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f7
-  cron: 7 19 2,11,18,25 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f14-destructive
-  cron: 45 21 5,19 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-guest-f14-longduration
-  cron: 31 7 15,29 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-longrun
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
-- as: azure-aks-hypershift-byo-vnet-fips-mgmt-f14
-  cron: 34 9 4,18 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      IS_ACTIVE_CLUSTER_OPENSHIFT: "false"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet
-- as: azure-aks-hypershift-cilium-guest-f7
-  cron: 1 4 3,10,17,26 * *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-aks-hypershift-cilium-guest
 - as: azure-aks-hypershift-disaster-recovery-infra-guest-f14
   cron: 17 19 3,17 * *
   reporter_config:
@@ -3357,7 +3019,7 @@ tests:
 - as: metal-upi-ovn-ipv4-f14
   capabilities:
   - intranet
-  cron: 26 15 14,28 * *
+  cron: 2 8 14,28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -4568,8 +4230,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-multi-nic
-- as: vsphere-ipi-amd-f7-netobserv
-  cron: 45 3 7,16,23,30 * *
+- always_run: false
+  as: vsphere-ipi-amd-f7-netobserv
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:
@@ -4585,8 +4247,8 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: vsphere-ipi-amd-f28-techpreview-nwevents-netobserv
-  cron: 59 16 20 * *
+- always_run: false
+  as: vsphere-ipi-amd-f28-techpreview-nwevents-netobserv
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:
@@ -4608,10 +4270,10 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: metal-ds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
+- always_run: false
+  as: metal-ds-ipi-ovn-ipv4-f28-virt-netobserv
   capabilities:
   - intranet
-  cron: 26 4 21 * *
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:
@@ -4626,7 +4288,7 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6v4
+        IP_STACK=v4
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
@@ -4638,10 +4300,10 @@ tests:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: metal-ds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
+- always_run: false
+  as: metal-ds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
   capabilities:
   - intranet
-  cron: 4 7 28 * *
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:
@@ -4668,8 +4330,8 @@ tests:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: vsphere-ipi-amd-f28-ipsec-netobserv
-  cron: 17 8 25 * *
+- always_run: false
+  as: vsphere-ipi-amd-f28-ipsec-netobserv
   reporter_config:
     channel: '#team-qe-netobserv'
     job_states_to_report:
@@ -5383,7 +5045,7 @@ tests:
 - as: metal-ipi-ovn-vmedia-disk-encryption-f7
   capabilities:
   - intranet
-  cron: 3 13 6,15,22,29 * *
+  cron: 2 8 6,15,22,29 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5430,7 +5092,7 @@ tests:
 - as: metal-sno-ipv4-etcd-encryption-rt-kernel-kdump-f7
   capabilities:
   - intranet
-  cron: 46 18 4,11,20,27 * *
+  cron: 2 8 4,11,20,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5448,7 +5110,7 @@ tests:
 - as: metal-sno-ipv4-etcd-encryption-rt-kernel-basecap-f7
   capabilities:
   - intranet
-  cron: 4 17 7,16,23,30 * *
+  cron: 2 8 7,16,23,30 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5468,7 +5130,7 @@ tests:
 - as: metal-upi-ovn-ipv6-static-rt-kernel-f7
   capabilities:
   - intranet
-  cron: 32 17 7,14,23,30 * *
+  cron: 2 8 7,14,23,30 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5484,7 +5146,7 @@ tests:
 - as: metal-sno-ipv4-disk-etcd-encrypt-disk-mirror-day2-f7
   capabilities:
   - intranet
-  cron: 0 18 7,16,23,30 * *
+  cron: 2 8 7,16,23,30 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5506,7 +5168,7 @@ tests:
 - as: metal-upi-ovn-ipsec-dualstack-fips-f7
   capabilities:
   - intranet
-  cron: 20 13 4,13,20,27 * *
+  cron: 2 20 4,13,20,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5522,7 +5184,7 @@ tests:
 - as: metal-upi-ovn-ipsec-ipv6-fips-f7
   capabilities:
   - intranet
-  cron: 46 19 4,13,20,27 * *
+  cron: 2 2 4,13,20,27 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5538,7 +5200,7 @@ tests:
 - as: metal-upi-ovn-ipv4-disconnected-ipsec-fips-f7
   capabilities:
   - intranet
-  cron: 45 15 7,14,21,28 * *
+  cron: 2 8 7,14,21,28 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -5556,7 +5218,7 @@ tests:
 - as: metal-upi-ovn-dualstack-fips-lgw-f7
   capabilities:
   - intranet
-  cron: 42 20 1,8,15,22 * *
+  cron: 2 8 1,8,15,22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:

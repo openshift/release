@@ -454,8 +454,12 @@ print(data.get('number', ''))
 " 2>/dev/null || echo "")
 
     if [[ -n "${PR_NUMBER}" ]]; then
-      # Construct cherry-pick comment from branch list (space-separated)
-      CHERRY_PICK_COMMENT="/cherry-pick ${CHERRY_PICK_BRANCHES}"
+      # Construct cherry-pick comment with one /cherry-pick per branch (space-separated list)
+      CHERRY_PICK_COMMENT=""
+      for branch in ${CHERRY_PICK_BRANCHES}; do
+        [[ -n "${CHERRY_PICK_COMMENT}" ]] && CHERRY_PICK_COMMENT+=$'\n'
+        CHERRY_PICK_COMMENT+="/cherry-pick ${branch}"
+      done
       info "github: adding cherry-pick comment to PR #${PR_NUMBER}"
       COMMENT_JSON=$(python3 -c "import json; print(json.dumps({'body': '''${CHERRY_PICK_COMMENT}'''}))")
       github_api POST "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/issues/${PR_NUMBER}/comments" \

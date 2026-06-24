@@ -4,6 +4,12 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: vcf-migration-operator
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.42.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-vcf
 promotion:
   to:
   - namespace: vcf
@@ -22,6 +28,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: bundle
+  commands: unset VERSION; NO_DOCKER=1 make bundle-verify
+  container:
+    from: operator-sdk-vcf
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
 - as: unit
   commands: make test
   container:

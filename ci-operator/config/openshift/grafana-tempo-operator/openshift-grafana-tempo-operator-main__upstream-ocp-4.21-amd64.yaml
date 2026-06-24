@@ -4,9 +4,13 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  upi-installer:
     name: "4.21"
-    namespace: origin
-    tag: operator-sdk
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -21,7 +25,7 @@ images:
     to: tempo-operator
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tempo-tests-runner
+    to: obs-tests-runner
 operator:
   bundles:
   - as: tempo-bundle
@@ -44,8 +48,11 @@ resources:
 tests:
 - as: tempo-upstream-tests
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: azure-observability
     env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -61,7 +68,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-tempo-operator
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE"
+        cd /tmp && operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
@@ -73,8 +80,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    - ref: distributed-tracing-tests-tracing-ui-integration
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

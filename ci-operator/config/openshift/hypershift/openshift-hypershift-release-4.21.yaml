@@ -19,14 +19,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  manila-csi-driver-operator-test:
-    name: "4.21"
-    namespace: ocp
-    tag: manila-csi-driver-operator-test
-  openstack-cinder-csi-driver-operator-test:
-    name: "4.21"
-    namespace: ocp
-    tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
   use_build_cache: true
@@ -312,73 +304,6 @@ tests:
       SNYK_ENABLE_DEPS_SCAN: "false"
     workflow: openshift-ci-security
 - always_run: false
-  as: e2e-openstack-aws
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
-- always_run: false
-  as: e2e-openstack-aws-nfv
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-nfv
-      NFV_NODEPOOLS: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-nfv-quota-slice
-    workflow: hypershift-openstack-aws-nfv
-- always_run: false
-  as: e2e-openstack-aws-conformance
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- always_run: false
-  as: e2e-openstack-aws-csi-cinder
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- always_run: false
-  as: e2e-openstack-aws-csi-manila
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- always_run: false
   as: e2e-aws-autonode
   optional: true
   steps:
@@ -428,6 +353,36 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-420
     workflow: hypershift-aws-reqserving-e2e
+- always_run: false
+  as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+    workflow: hypershift-mce-agent-metal3-backuprestore
+- always_run: false
+  as: e2e-kubevirt-metal-ovn-backuprestore
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      OADP_OPERATOR_SUB_CHANNEL: stable
+      OADP_OPERATOR_SUB_SOURCE: qe-app-registry
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+    workflow: hypershift-mce-kubevirt-baremetalds-backuprestore
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

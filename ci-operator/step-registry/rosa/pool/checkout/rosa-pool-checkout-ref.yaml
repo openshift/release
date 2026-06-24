@@ -1,0 +1,54 @@
+ref:
+  as: rosa-pool-checkout
+  from: rosa-aws-cli
+  grace_period: 2m
+  commands: rosa-pool-checkout-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 35m0s
+  credentials:
+  - namespace: test-credentials
+    name: rosa-pool-manager
+    mount_path: /etc/rosa-pool-manager
+  env:
+  - name: POOL_TYPE
+    default: "classic-sts"
+    documentation: Label selector value for rosa-pool/type. Filters which pool clusters are eligible.
+  - name: POOL_ENV
+    default: ""
+    documentation: Optional OCM environment filter (e.g. integration, staging). When set, only clusters with matching rosa-pool/env label are eligible.
+  - name: POOL_REGION
+    default: ""
+    documentation: Optional region filter. When set, only clusters with matching rosa-pool/region label are eligible.
+  - name: POOL_VERSION
+    default: ""
+    documentation: Optional version filter. When set, only clusters with matching rosa-pool/version label are eligible.
+  - name: POOL_CHECKOUT_TIMEOUT_MINUTES
+    default: "30"
+    documentation: Maximum time to wait for an available cluster before failing.
+  - name: POOL_NAMESPACE
+    default: "rosa-pool"
+    documentation: Namespace on the pool host cluster where pool ConfigMaps live.
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment for fetching cluster credentials.
+  documentation: |-
+    Checks out a pre-provisioned ROSA cluster from the standby pool.
+
+    Uses ConfigMap-based lease tracking with optimistic concurrency (CAS)
+    to safely claim a cluster. If no clusters are available, waits and
+    retries until POOL_CHECKOUT_TIMEOUT_MINUTES. On successful checkout,
+    fetches the admin kubeconfig from OCM and writes cluster-id,
+    cluster-name, and kubeconfig to SHARED_DIR.
+
+    Pool clusters must have public API servers since Prow pods run on
+    public infrastructure and cannot use backplane.
+
+    Pool ConfigMaps live in POOL_NAMESPACE on the pool host cluster.
+    Each ConfigMap represents one pool cluster with labels for type,
+    env, region, version, and availability status.
+
+    Requires rosa-pool-manager credentials (kubeconfig for pool host)
+    and OCM credentials (from cluster profile) for kubeconfig fetch.

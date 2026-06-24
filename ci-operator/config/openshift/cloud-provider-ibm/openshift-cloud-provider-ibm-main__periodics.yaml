@@ -1,0 +1,48 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 10 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        export BRANCH_NAME=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/IBM-Cloud/cloud-provider-ibm/branches" | grep -E '"name": "release-[0-9]+\.[0-9]+"' | awk -F'"' '{print $4}' | sort -V | tail -n 1)
+        rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
+                  --dest openshift/cloud-provider-ibm:main \
+                  --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cloud-provider-ibm
+  variant: periodics

@@ -70,13 +70,13 @@ tests:
     from: src
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  pipeline_run_if_changed: ^manifests/
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-serial
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  pipeline_run_if_changed: ^manifests/
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -116,8 +116,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
-- as: e2e-aws-capi-techpreview-post-install
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-capi-techpreview-post-install
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -137,6 +138,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
@@ -180,7 +182,6 @@ tests:
 - always_run: false
   as: e2e-openstack-ovn-techpreview
   optional: true
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: openstack-vexxhost
     env:

@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.3.4"
+readonly POWERVC_TOOL_VERSION="v2.4.3"
 readonly YQ_VERSION="v4.53.2"
 
 # Global variables for cleanup
@@ -302,10 +302,11 @@ function verify_rhcos_image() {
 
 	# Verify image exists in PowerVC
 	log_info "Checking if ${RHCOS_IMAGE_NAME} exists in PowerVC..."
-	if ! openstack --os-cloud="${CLOUD}" image show "${RHCOS_IMAGE_NAME}" --format=shell --column=name &>/dev/null; then
-		log_error "RHCOS image '${RHCOS_IMAGE_NAME}' not found in PowerVC cloud '${CLOUD}'"
-		log_info "Available RHCOS images:"
-		openstack --os-cloud="${CLOUD}" image list --format=value | grep -i rhcos || log_warning "No RHCOS images found"
+	if ! PowerVC-Tool \
+		rhcos-exists \
+		--cloud "${CLOUD}" \
+		--imageName "${RHCOS_IMAGE_NAME}" \
+		--shouldDebug false; then
 		exit 1
 	fi
 
@@ -316,6 +317,14 @@ function verify_rhcos_image() {
 #######################################
 # Main execution starts here
 #######################################
+log_info "=== Checking for zone.tab ==="
+if [ ! -f /usr/share/zoneinfo/zone.tab ]; then
+	ls -l /usr/share/zoneinfo/ || true
+
+	log_error "The file /usr/share/zoneinfo/zone.tab is required for the openstack CLI"
+	exit 1
+fi
+
 log_info "=== PowerVC IPI Configuration Script Started ==="
 
 # Validate environment
@@ -455,7 +464,7 @@ function get_subnet_id() {
 #######################################
 function create_ssh_keypair() {
 	log_info "Creating SSH keypair: ${CLUSTER_NAME}-key"
-	local ssh_public_key="${CLUSTER_PROFILE_DIR}/ssh-publickey"
+	local ssh_public_key="${SECRETS_DIR}/ssh-publickey"
 
 	# Delete existing keypair if present
 	if openstack --os-cloud="${CLOUD}" keypair show "${CLUSTER_NAME}-key" &>/dev/null; then
@@ -500,6 +509,7 @@ function create_bastion() {
 	log_info "  Network: ${NETWORK_NAME}"
 	log_info "  Cloud: ${CLOUD}"
 
+	# Note: an empty --bastionRsa is for remote creation
 	if ! PowerVC-Tool \
 		create-bastion \
 		--cloud "${CLOUD}" \
@@ -509,7 +519,7 @@ function create_bastion() {
 		--networkName "${NETWORK_NAME}" \
 		--sshKeyName "${CLUSTER_NAME}-key" \
 		--domainName "${BASE_DOMAIN}" \
-		--enableHAProxy false \
+		--enableHAProxy true \
 		--serverIP "${SERVER_IP}" \
 		--shouldDebug true; then
 		log_error "Failed to create bastion host"
