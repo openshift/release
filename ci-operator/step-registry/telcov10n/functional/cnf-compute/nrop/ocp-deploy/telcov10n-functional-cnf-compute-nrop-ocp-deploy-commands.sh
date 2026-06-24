@@ -46,7 +46,6 @@ EXTRA_VARS="${EXTRA_VARS} cluster_name=${CLUSTER_NAME}"
 EXTRA_VARS="${EXTRA_VARS} ocp_version_facts_release_type=${OCP_VERSION_RELEASE_TYPE}"
 EXTRA_VARS="${EXTRA_VARS} ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}"
 EXTRA_VARS="${EXTRA_VARS} internal_registry=true"
-EXTRA_VARS="${EXTRA_VARS} cpu_partitioning=true"
 
 export ANSIBLE_FORKS=2
 export ANSIBLE_PIPELINING=true

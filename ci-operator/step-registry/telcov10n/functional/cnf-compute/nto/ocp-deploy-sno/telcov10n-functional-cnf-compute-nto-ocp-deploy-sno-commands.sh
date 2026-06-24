@@ -64,5 +64,4 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml \
     --extra-vars "disconnected=${DISCONNECTED}" \
     --extra-vars "ipv4_only=${IPV4_ONLY}" \
     --extra-vars "ipv6_only=${IPV6_ONLY}" \
-    --extra-vars "extra_manifest_folder=${EXTRA_MANIFEST_FOLDER}" \
-    --extra-vars "cpu_partitioning=true"
+    --extra-vars "extra_manifest_folder=${EXTRA_MANIFEST_FOLDER}"
