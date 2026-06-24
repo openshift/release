@@ -12,8 +12,7 @@ GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
 export GH_FORK_TOKEN
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
-# TODO: Remove hardcoded issue key before merging — this is for pj-rehearse testing only
-JIRA_ISSUE_KEY="TRT-2747"
+JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 export JIRA_ISSUE_KEY
 ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
 ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
