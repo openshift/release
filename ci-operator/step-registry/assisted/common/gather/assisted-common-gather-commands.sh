@@ -40,6 +40,7 @@ cat > gather_logs.yaml <<-EOF
       # appear in CI artifacts.
       - name: Strip libvirt system.token from sosreport archives
         ansible.builtin.shell: |
+          # shellcheck disable=SC2154
           for sos_tar in {{ LOGS_DIR }}/sosreport-*.tar.xz; do
             [ -f "$sos_tar" ] || continue
             if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
