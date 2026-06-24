@@ -6,6 +6,7 @@ set -o pipefail
 
 echo "************ assisted common gather command ************"
 
+# shellcheck disable=SC2154
 cat > gather_logs.yaml <<-EOF
 - name: Gather logs and debug information and save them for debug purpose
   hosts: all
@@ -40,7 +41,6 @@ cat > gather_logs.yaml <<-EOF
       # appear in CI artifacts.
       - name: Strip libvirt system.token from sosreport archives
         ansible.builtin.shell: |
-          # shellcheck disable=SC2154
           for sos_tar in {{ LOGS_DIR }}/sosreport-*.tar.xz; do
             [ -f "$sos_tar" ] || continue
             if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
