@@ -3,11 +3,12 @@ set -euo pipefail
 
 cd /workspace
 
+echo "==> Building frontend (must exist before Go binary embeds it)..."
+make npm
+make frontend
+
 echo "==> Setting up sippy environment (postgres, redis, build, seed)..."
 source hack/agentic_setup.sh
-
-echo "==> Building frontend..."
-make frontend
 
 echo "==> Starting sippy server..."
 ./sippy serve \
