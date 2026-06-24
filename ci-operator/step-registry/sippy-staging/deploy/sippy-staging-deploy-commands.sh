@@ -19,7 +19,7 @@ SIPPY_PID=$!
 
 echo "==> Waiting for sippy to be ready..."
 for i in $(seq 1 60); do
-  if curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
+  if curl -sf http://localhost:8080/api/releases > /dev/null 2>&1; then
     echo "    Sippy is ready."
     break
   fi
@@ -30,7 +30,7 @@ for i in $(seq 1 60); do
   sleep 5
 done
 
-if ! curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
+if ! curl -sf http://localhost:8080/api/releases > /dev/null 2>&1; then
   echo "ERROR: Sippy did not become ready in time."
   exit 1
 fi
