@@ -10,6 +10,12 @@ QUAY_ACCESS_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/prega_quay_auth_token)
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+if [[ $TYPE == "sno" ]]; then
+  MCP_NAME="master"
+else
+  MCP_NAME="worker"
+fi
+
 get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
@@ -39,14 +45,14 @@ if [ ${OCP_BUILD} == "dev" ]; then
   jq -s '.[0] * .[1]' /tmp/existing_pull_secret.json /tmp/prega_pull_secret.json > /tmp/merged_pull_secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged_pull_secret.json
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
+  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 
   echo "Applying the ImageDigestMirrorSet manifest"
   get_idms_manifest
   oc apply -f /tmp/idms.yaml
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
+  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 
   echo "Creating CatalogSource for PREGA Operator Index"
