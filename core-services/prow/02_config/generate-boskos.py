@@ -153,6 +153,12 @@ CONFIG = {
     'aws-konflux-qe-quota-slice': {
         'us-west-2': 10
     },
+    'aws-konflux-stg-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25
+    },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
     },
