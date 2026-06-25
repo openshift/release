@@ -108,7 +108,9 @@ function populate_artifact_dir() {
   echo "Copying log bundle..."
 
   current_time=$(date +%s)
-  tar -xzf "${dir}"/log-bundle-*.tar.gz -C "${ARTIFACT_DIR}/" 2>/dev/null
+  cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  mkdir -p "${ARTIFACT_DIR}/expanded-log-bundle"
+  tar -xzf "${dir}"/log-bundle-*.tar.gz -C "${ARTIFACT_DIR}/expanded-log-bundle/" 2>/dev/null
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
