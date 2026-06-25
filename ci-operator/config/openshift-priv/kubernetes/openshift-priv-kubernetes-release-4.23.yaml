@@ -6,7 +6,7 @@ base_images:
   base-machine:
     name: centos
     namespace: openshift
-    tag: stream9
+    tag: stream10
   cli:
     name: 4.23-priv
     namespace: ocp-private
@@ -42,7 +42,7 @@ base_images:
   rhel-coreos-base:
     name: 4.23-priv
     namespace: ocp-private
-    tag: rhel-coreos
+    tag: rhel-coreos-10
   tools:
     name: 4.23-priv
     namespace: ocp-private
@@ -68,23 +68,23 @@ images:
       # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
       # bootable container).
       # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
-      FROM quay.io/centos/centos:stream9 as build
+      FROM quay.io/centos/centos:stream10 as build
       # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
       # in a container https://github.com/coreos/rpm-ostree/issues/4034
       RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
       # See also https://issues.redhat.com/browse/ART-4352
-      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
       COPY --from=build /*.rpm /
       # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
       RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
     inputs:
       base-machine-with-rpms:
         as:
-        - quay.io/centos/centos:stream9
+        - quay.io/centos/centos:stream10
       rhel-coreos-base:
         as:
-        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
-    to: rhel-coreos
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+    to: rhel-coreos-10
   - context_dir: build/pause
     dockerfile_path: Dockerfile.Rhel
     to: pod
@@ -95,7 +95,7 @@ promotion:
   - additional_images:
       artifacts: artifacts
     excluded_images:
-    - rhel-coreos
+    - rhel-coreos-10
     name: 4.23-priv
     namespace: ocp-private
 prowgen:

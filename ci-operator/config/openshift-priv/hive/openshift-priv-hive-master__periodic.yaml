@@ -1,0 +1,65 @@
+base_images:
+  openstack-installer:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: upi-installer
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/openshift/hive
+images:
+  items:
+  - dockerfile_literal: |
+      FROM ubi9-minimal
+      RUN rm -rf /etc/yum.repos.d/*
+      RUN curl http://base-4-22-rhel9.ocp.svc > /etc/yum.repos.d/base-4-22-rhel9.repo
+    to: ubi9-minimal-entitled
+  - build_args:
+    - name: DNF
+      value: microdnf
+    dockerfile_path: Dockerfile
+    from: ubi9-minimal-entitled
+    to: hive
+  - dockerfile_literal: |
+      FROM src
+      RUN make -C test/ote build
+      RUN dnf install -y gzip jq && dnf clean all
+      RUN cp /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
+      RUN gzip -f -k /usr/bin/openshift-tests-extension
+      WORKDIR /tmp
+    from: src
+    to: hive-tests
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+prowgen:
+  private: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: hive
+  variant: periodic
