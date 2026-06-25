@@ -39,8 +39,47 @@ if ! curl -sf http://localhost:8080/api/releases > /dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Configuring httpd reverse proxy with basic auth..."
+HTPASSWD_FILE="/var/run/sippy-staging-htpasswd/htpasswd"
+if [[ -f "${HTPASSWD_FILE}" ]]; then
+  cat > /tmp/httpd-proxy.conf <<'CONFEOF'
+Listen 8081
+ServerName localhost
+ErrorLog /tmp/httpd-error.log
+PidFile /tmp/httpd.pid
+
+LoadModule mpm_event_module modules/mod_mpm_event.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule authn_core_module modules/mod_authn_core.so
+LoadModule authn_file_module modules/mod_authn_file.so
+LoadModule authz_core_module modules/mod_authz_core.so
+LoadModule authz_user_module modules/mod_authz_user.so
+LoadModule auth_basic_module modules/mod_auth_basic.so
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+LoadModule unixd_module modules/mod_unixd.so
+
+<Location "/">
+  AuthType Basic
+  AuthName "Sippy Staging"
+  AuthUserFile HTPASSWD_PATH
+  Require valid-user
+  ProxyPass http://localhost:8080/
+  ProxyPassReverse http://localhost:8080/
+</Location>
+CONFEOF
+  sed -i "s|HTPASSWD_PATH|${HTPASSWD_FILE}|" /tmp/httpd-proxy.conf
+  httpd -f /tmp/httpd-proxy.conf &
+  HTTPD_PID=$!
+  PROXY_PORT=8081
+  echo "    httpd started on port ${PROXY_PORT}."
+else
+  echo "    WARNING: htpasswd file not found, running without auth."
+  PROXY_PORT=8080
+fi
+
 echo "==> Starting cloudflared tunnel..."
-cloudflared tunnel --url http://localhost:8080 > /tmp/cloudflared.log 2>&1 &
+cloudflared tunnel --url http://localhost:${PROXY_PORT} > /tmp/cloudflared.log 2>&1 &
 TUNNEL_PID=$!
 
 sleep 10
@@ -82,12 +121,25 @@ if [[ -n "${TUNNEL_URL}" ]]; then
 
     cat > /tmp/custom-link-staging.html <<HTMLEOF
 <!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Sippy Staging</title></head>
-<body style="font-family: system-ui, sans-serif; padding: 40px 20px 200px 20px;">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sippy Staging Environment</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 3rem 2rem; }
+  a { color: #0366d6; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .url { font-size: 1.2em; margin: 1rem 0; }
+</style>
+</head>
+<body>
 <h2>Sippy Staging Environment</h2>
-<p style="font-size: 18px;"><strong>URL:</strong> <a href="${TUNNEL_URL}" target="_blank">${TUNNEL_URL}</a></p>
+<p class="url"><strong>URL:</strong> <a href="${TUNNEL_URL}" target="_blank">${TUNNEL_URL}</a></p>
 <p>This environment is built from this PR and will remain available for approximately ${MINUTES} minutes.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
 </body>
 </html>
 HTMLEOF
@@ -133,6 +185,7 @@ fi
 
 if [[ "${URL_SURFACED}" != "true" ]]; then
   echo "ERROR: Could not surface staging URL via Spyglass or PR comment. Shutting down."
+  kill "${HTTPD_PID:-}" 2>/dev/null || true
   kill "${TUNNEL_PID}" 2>/dev/null || true
   kill "${SIPPY_PID}" 2>/dev/null || true
   exit 1
@@ -142,5 +195,6 @@ echo "==> Staging environment is live. Sleeping for ${STAGING_TIMEOUT} seconds..
 sleep "${STAGING_TIMEOUT}"
 
 echo "==> Staging timeout reached. Shutting down."
+kill "${HTTPD_PID:-}" 2>/dev/null || true
 kill "${TUNNEL_PID}" 2>/dev/null || true
 kill "${SIPPY_PID}" 2>/dev/null || true
